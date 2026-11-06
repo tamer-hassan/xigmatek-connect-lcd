@@ -268,6 +268,82 @@ print(f"  rings r {R.A26_RING_R}-{R.A26_RING_W} cy {R.A26_RING_Y} x "
 PY
 
 echo
+echo "== pinned metrics: the cases the sensors will not produce, drawn without putting them on the wire"
+python3 - <<'PY' || { echo "pinned metrics FAILED"; exit 1; }
+import json, math, os, tempfile
+from xigmalcd import main as M, render
+
+d = tempfile.mkdtemp(prefix="xigma-pin-")
+hot, missing = os.path.join(d, "hot.json"), os.path.join(d, "missing.json")
+with open(hot, "w") as fh:
+    json.dump({"cpu": {"temperature": 104.0, "load": 42.0},
+               "gpu": {"temperature": 96.0, "load": 61.0},
+               "_comment": "a key like this is a note in the file, not a section"},
+              fh)
+with open(missing, "w") as fh:
+    json.dump({"cpu": {"load": 42.0}, "gpu": {"load": 61.0}}, fh)
+os.utime(hot, (1_000_000, 1_000_000))         # distinct on purpose: the pin is
+os.utime(missing, (1_000_100, 1_000_100))     # re-read when the file's clock moves
+
+
+def args_for(extra):
+    return M.build_parser().parse_args(["--theme", "alpha"] + extra)
+
+
+class Stub:
+    """What a run would put on the wire, recorded instead of sent."""
+    def __init__(self):
+        self.state, self.media = [], []
+
+    def state_all(self, m):
+        self.state.append(m)
+
+    def send_media(self, name, blob, **kw):
+        self.media.append(blob)
+        return {"notice": "1 200"}
+
+
+def arc(img):
+    """Colours met along the CPU arc's filled part, at the stroke's middle."""
+    cx, cy, r = render.A26_TCOL_X[0], render.A26_RING_Y, render.A26_RING_R - 6
+    out = []
+    for deg10 in range(0, 3600, 2):
+        t = math.radians(render.A26_ARC_START + deg10 / 10.0)
+        px = img.getpixel((int(round(cx + r * math.cos(t))),
+                           int(round(cy + r * math.sin(t)))))
+        if px[3] > 200:
+            out.append(px[:3])
+    return out
+
+
+M.PINNED, M.PINNED_MTIME = {}, None            # no carry-over between the two
+a = args_for(["--metrics-file", hot])
+pinned = M.sample(a)
+assert pinned["cpu"]["temperature"] == 104.0, pinned["cpu"]
+assert "_comment" not in pinned, sorted(pinned)   # a note in the file, not a section
+st = Stub()
+size, name, code = M.one_frame(st, pinned, a, push_state=True)
+assert st.state == [] and len(st.media) == 1, (st.state, len(st.media))
+
+b = Stub()
+M.one_frame(b, M.sample(args_for([])), args_for([]), push_state=True)
+assert len(b.state) == 1 and len(b.media) == 1, (b.state, b.media)
+
+drawn = arc(render.draw(pinned, "alpha", bg=render.OVERLAY))
+assert len(drawn) > 1200, len(drawn)           # the whole 260 deg, not half of it
+tip = render.temp_colour(104.0, render.A26_ARC_LO, render.A26_ARC_MID,
+                         render.A26_ARC_HI)
+assert max(abs(x - y) for x, y in zip(drawn[-1], tip)) <= 12, (drawn[-1], tip)
+gone = arc(render.draw(M.sample(args_for(["--metrics-file", missing])),
+                       "alpha", bg=render.OVERLAY))
+assert gone == [], gone[:3]
+print(f"  pinned metrics   the far end of the ramp is what gets drawn "
+      f"({len(drawn)} samples along the sweep, outer colour {drawn[-1]} against "
+      f"the ramp's own {tip}) and a missing reading paints no arc at all "
+      f"({len(gone)} samples); pinned, the same upload call sends 0 metrics "
+      f"blobs where unpinned it sends 1, and the frame went up either way")
+PY
+
 echo "== vendored backgrounds (the vendor pairing as default, the quiet clip, the bright clip)"
 python3 - <<'PY' || { echo "background FAILED"; exit 1; }
 import hashlib, sys
@@ -369,7 +445,6 @@ for junk in ("", "{", "[]", '{"theme": "nope", "clock_size": 9999, "canvas": "x"
 print("  junk refused           empty, truncated, wrong type, out of range")
 PY
 
-echo
 echo "== the launcher, its icon and the login unit"
 deskdir=$(mktemp -d)
 sed -e "s|@DIR@|$PWD|g" -e "s|@PYTHON@|$(command -v python3)|g" \
@@ -448,14 +523,14 @@ unit = (unit.replace("@DIR@", os.getcwd())
 start = [ln for ln in unit.splitlines() if ln.startswith("ExecStart=")][0]
 args = start.split()[1:]
 assert "@" not in " ".join(args), args
-import inspect
-from xigmalcd import main as daemon, render
-for flag in [a for a in args if a.startswith("--")]:
-    assert f'"{flag}"' in inspect.getsource(daemon.main), (flag, "no such flag")
-i = args.index("--theme")
-assert args[i + 1] in render.THEMES, args[i + 1]
-i = args.index("--fps")
-assert 0.1 <= float(args[i + 1]) <= 5.0, args[i + 1]   # control.py's accepted range
+from xigmalcd import main as cli, render
+# The unit's command line has to be one the real parser takes, not merely one
+# whose flags appear somewhere in the source: an unknown flag is a SystemExit at
+# start, and a user unit that fails at start is a display that never comes back.
+ns = cli.build_parser().parse_args(args[2:])         # drop `-m xigmalcd`
+assert ns.theme == args[args.index("--theme") + 1], (ns.theme, args)
+assert ns.theme in render.THEMES, ns.theme
+assert 0.1 <= ns.fps <= 5.0, ns.fps                 # control.py's accepted range
 assert "--no-control" not in args, "the unit must leave the window a socket"
 print(f"  unit                   ExecStart: {' '.join(args)}")
 PY
@@ -1306,9 +1381,16 @@ for path in runs:
     assert re.search(r"\d\d:\d\d:\d\d", started[0]), started[0]
     # a kept log that put a picture on the glass has to announce the blob,
     # because that is what README's ledger column claims: countable here rather
-    # than taken on trust
+    # than taken on trust.  One kind of window is the deliberate exception: a run
+    # with pinned numbers sends no blob at all, so for those the check runs the
+    # other way and wants the loop's own refusal on the record.
     drew = any(re.match(r"-- .*  \((upload|frame|live)\)", ln) for ln in lines)
     pushes = text.count("STATE all 1` twice at session start")
+    if "PINNED" in text:
+        assert pushes == 0, (path, pushes)      # no unmeasured number was sent
+        assert "no `STATE all 1` blob is sent at all" in text, path
+        assert "--metrics-file" in text, path
+        continue
     assert pushes >= 1 if drew else True, (path, pushes)
 blob = [p for p in runs if "gui-blob" in os.path.basename(p)]
 assert blob, "no metrics-blob run kept, and README cites one"

@@ -1,0 +1,2 @@
+{"cpu": {"load": 42.0},
+ "_comment": "a column with no reading: the cpu section is here but has no temperature, so the CPU ring draws no arc at all and its value reads -- deg C, while the GPU column keeps this machine's real temperature. Only cpu is pinned; anything the file leaves out stays real."}

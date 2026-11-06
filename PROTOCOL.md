@@ -1174,6 +1174,17 @@ topic registry above is current. What that package adds is *content*:
   new default end to end with no encoder flag given: `ENCODE DEFAULT` at 00:32:17, **31 of 31**
   frames at **12 322–13 372 B** where the same theme as RGBA had logged 42 560–46 415 B
   (`data/glass/2026-11-07-003217-encode-DEFAULT-indexed.txt`).
+  The picture's own extremes were put on glass afterwards, with the numbers pinned by
+  `--metrics-file` rather than waited for: the gauge ramp filled its whole 260° in the red third
+  at **14 253–14 439 B** a frame (104 °C, **46 of 46**) and **14 528–14 557 B** (96 °C, **46 of
+  46**), a column missing its temperature drew no arc and cost **11 261–11 398 B** (**46 of
+  46**), and a longer repeat of the three-digit case ran **76 of 76** at **14 618–14 751 B**
+  (`data/glass/2026-11-07-005051-pin-104-3digit.txt`, `-005142-pin-96-red.txt`,
+  `-005233-pin-nocputemp.txt`, `-005552-pin-104-3digit-watch2.txt`). All indexed, all accepted,
+  and **none of those four windows sent a metrics blob at all** — a pinned run refuses to hand
+  the panel a number this machine did not measure, which is why their frame sizes are still
+  comparable with the windows above: same file shape, same canvas, same picture channel, and
+  the STATE traffic that normally opens a session simply absent.
 * **The reply-latency question is closed.**  Every file shape — our RGBA and indexed
   PNGs, a 1.5 KB flat one, and the panel's own 24–25 KB payloads — answers with the file
   notice 60–160 ms after `transport`, at every cadence from 0.3 s to 3 s, when the replies

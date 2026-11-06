@@ -1,0 +1,3 @@
+{"cpu": {"temperature": 96.0, "load": 42.0},
+ "gpu": {"temperature": 88.0, "load": 61.0},
+ "_comment": "the red end again, but two digits: the arc is filled almost to the end and sits in the red third of the ramp while the value font stays at 58. This is the window that separates ramp banding from any text complaint; 104 in the file before it tests both at once."}

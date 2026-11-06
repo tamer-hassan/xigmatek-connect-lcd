@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import inspect
+import json
 import os
 import signal
 import sys
@@ -28,11 +29,64 @@ def device_info(link, keepalive=60) -> dict:
         return {}
 
 
+PINNED: dict = {}        # last good `--metrics-file` read: a bad edit must not stop the loop
+PINNED_MTIME = None      # so the change is logged once, not every frame
+
+
+def _pinned(args) -> dict:
+    """Sections from `--metrics-file`, re-read whenever that file changes.
+
+    The file is a `STATE all 1` body - `{"cpu": {...}, "fans": [...]}` - and each
+    section in it replaces that section of the real reading, for the **picture
+    only**.  The panel is never handed a number this machine did not measure, so
+    a pinned run sends no metrics blob at all: see the `metrics:` line printed at
+    session start, and `--state-every` is ignored.  Meant for the cases the
+    sensors will not produce on their own - the red end of the gauge ramp, a
+    three-digit temperature, a column with no reading - and the log of a window
+    like that has to say the numbers were pinned, because nothing on this panel
+    reads back.
+    """
+    global PINNED, PINNED_MTIME
+    try:
+        mtime = os.stat(args.metrics_file).st_mtime
+    except OSError as exc:
+        print(f"  ! --metrics-file: {exc}", file=sys.stderr)
+        return PINNED
+    if mtime == PINNED_MTIME:
+        return PINNED
+    try:
+        with open(args.metrics_file) as fh:
+            data = json.load(fh)
+        assert isinstance(data, dict), "the file has to be a JSON object"
+        # a key starting with `_` is a comment in the file, not a section, so it
+        # never reaches the renderer as part of the STATE body
+        data = {k: v for k, v in data.items() if not k.startswith("_")}
+    except Exception as exc:
+        print(f"  ! --metrics-file: {type(exc).__name__}: {exc}; "
+              f"keeping the last good read", file=sys.stderr)
+        PINNED_MTIME = mtime          # so one broken file logs once, not per frame
+        return PINNED
+    if data != PINNED:
+        print("  metrics pinned for the picture (not readings, and not sent to "
+              f"the panel): {', '.join(f'{k}.{kk}={vv}' for k, s in data.items()
+                                      if isinstance(s, dict)
+                                      for kk, vv in s.items()) or data}")
+    PINNED, PINNED_MTIME = data, mtime
+    return PINNED
+
+
 def sample(args) -> dict:
-    """Read the sensors, with the fan section optional."""
+    """Read the sensors, with the fan section optional.
+
+    `--metrics-file` replaces whole sections of what is read.  That is a
+    rendering override only: `one_frame` and the session-start handshake both
+    refuse to push a blob while anything is pinned.
+    """
     m = sensors.collect()
     if args.no_fans:
         m.pop("fans", None)
+    if getattr(args, "metrics_file", ""):
+        m.update(_pinned(args))
     return m
 
 
@@ -377,16 +431,22 @@ def one_frame(link, metrics, args, push_state=False) -> tuple[int, str, str]:
                          **_theme_kwargs(args)))
     name = render.frame_name()
     if push_state:
-        try:
-            link.state_all(metrics)
-        except ProtocolError as exc:
-            print(f"  ! metrics ack: {exc}", file=sys.stderr)
+        if args.metrics_file:
+            print("  ! --state-every skipped: metrics are pinned, and a pinned "
+                  "blob would put unmeasured numbers on the wire", file=sys.stderr)
+        else:
+            try:
+                link.state_all(metrics)
+            except ProtocolError as exc:
+                print(f"  ! metrics ack: {exc}", file=sys.stderr)
     out = link.send_media(name, png, gap=args.gap, chunk=args.chunk,
                           wait=args.order == "fast", order=args.order)
     return len(png), name, str(out.get("notice") or "")
 
 
-def main(argv=None) -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """The whole command line, in one place: `--help` reads it and the
+    offline checks can parse it instead of guessing at the flags."""
     ap = argparse.ArgumentParser(prog="xigmalcd", description=__doc__.split("\n")[0])
     ap.add_argument("-d", "--device", help="serial port (default: first ttyACM)")
     ap.add_argument("-b", "--baud", type=int, default=115200)
@@ -423,6 +483,16 @@ def main(argv=None) -> int:
     ap.add_argument("--no-fans", action="store_true",
                     help="leave fans out entirely: no `fans` section in the "
                          "metrics blob and no fan figures on the picture")
+    ap.add_argument("--metrics-file", metavar="PATH", default="",
+                    help="draw the picture from the sections of a JSON `STATE all "
+                         "1` body instead of this machine's readings, re-read "
+                         "whenever the file changes. For the cases the sensors "
+                         "will not produce: the red end of the gauge ramp, a "
+                         "three-digit temperature, a column with no reading. The "
+                         "override is for the picture only - while anything is "
+                         "pinned no metrics blob is sent at all, and "
+                         "`--state-every` is skipped, so the panel is never "
+                         "handed a number this machine did not measure")
     ap.add_argument("--truecolor", action="store_true",
                     help="upload 8-bit RGBA PNGs instead of the 256-colour file "
                          "that is the default on every canvas.  Costs about 3.4x "
@@ -534,7 +604,11 @@ def main(argv=None) -> int:
                          "tools/reset_panel.py --yes is the deliberate way")
     ap.add_argument("--list", action="store_true",
                     help="list candidate serial ports and exit")
-    args = ap.parse_args(argv)
+    return ap
+
+
+def main(argv=None) -> int:
+    args = build_parser().parse_args(argv)
 
     if args.overlay:                          # kept for old command lines
         args.bg = "clear"
@@ -637,7 +711,16 @@ def main(argv=None) -> int:
                 "mode": info.get("mode"), "osdState": info.get("osdState"),
                 "timeout": info.get("timeout"), "app": v.get("app"),
                 "firmware": v.get("firmware")})
-        if not args.no_state:
+        if args.metrics_file:
+            # the one thing a drawing session normally does before its files is
+            # push the machine's numbers.  Not when they are pinned: the panel
+            # would be handed readings this machine never took, and the log would
+            # then look like every other window in data/glass/.
+            print("metrics: PINNED from --metrics-file, so no `STATE all 1` blob "
+                  "is sent at all - the panel gets no number this machine did "
+                  "not measure, and only the drawn picture uses the pinned ones")
+            sample(args)                    # first read, so the pin is logged now
+        elif not args.no_state:
             # ALPHA reports the machine twice at startup and afterwards only
             # pushes pictures; the panel stops answering transfers when it is
             # fed metrics continuously, so we follow the same pattern.

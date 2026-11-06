@@ -199,6 +199,7 @@ Put the module in `/etc/modules-load.d/` if you want it at every boot.
 | `--no-state` | skip the metrics blob entirely |
 | `--state-every N` | refresh metrics every Nth frame (see the caveat above) |
 | `--no-fans` | leave fans out entirely: no `fans` section in the metrics blob, and no fan figures on the picture |
+| `--metrics-file PATH` | draw the picture from the sections of a JSON `STATE all 1` body instead of this machine's readings, re-read whenever the file changes. For the layouts the sensors will not produce: the red end of the gauge ramp, a three-digit temperature, a column with no reading. Picture **only** - while anything is pinned the loop sends no metrics blob at all and `--state-every` is refused out loud, so the panel is never handed a number this machine did not measure. Fixtures in `tools/metrics/`, watched windows and wire sizes under "Notes and known limits" |
 | `--no-sleep` | set the panel's idle timeout to 0 so it never blanks the screen (default: vendor's 60 s) |
 | `--session-max N` | renew the serial session every N uploads (default 500, 0 = never) |
 | `--session-ttl N` | also renew it every N seconds of session life (default 300, 0 = never) |
@@ -311,14 +312,16 @@ where a long run would first be seen.
   same zero mismatches over 180 frames (88 pairs). If you change `protocol.py`,
   run this.
 * `tools/selftest.sh` — the offline checks: capture round-trip, a render of every
-  theme, encode/decode round-trips including the panel's malformed-reply case, the
-  window's saved-state round-trip, the `.desktop` entry and its icon, the GUI built
-  offscreen against a port that does not exist (clip sizes and lumas, five themes
-  previewed, the scrim rule, the reset gate, the four panel actions against a stubbed
-  `Link`), the wall-clock cost of the window re-measured rather than remembered, and the
-  GUI ledger's own numbers re-read out of `data/glass/` so the table in "The GUI" cannot
-  quietly become folklore. Needs no hardware, so it is what to run after editing
-  `protocol.py`, `render.py` or `xigmaui/`.
+  theme, encode/decode round-trips including the panel's malformed-reply case, the encoder
+  switches read out of the PNG each dry run writes, what the indexed file gives up next to
+  RGBA, the pinned-metrics promise (a pinned frame draws the far end of the ramp and
+  sends no metrics blob at all), the window's saved-state round-trip, the `.desktop`
+  entry and its icon, the GUI built offscreen against a port that does not exist (clip
+  sizes and lumas, five themes previewed, the scrim rule, the reset gate, the four panel
+  actions against a stubbed `Link`), the wall-clock cost of the window re-measured rather
+  than remembered, and the GUI ledger's own numbers re-read out of `data/glass/` so the
+  table in "The GUI" cannot quietly become folklore. Needs no hardware, so it is what to
+  run after editing `protocol.py`, `render.py` or `xigmaui/`.
 * `tools/gui_glass.py` — the GUI's drawing paths against the real glass, in one
   continuous labelled run: status, background upload, one frame, `--live-seconds`
   at `--fps`, with the phase name as the theme title so whatever you saw has a name
@@ -1229,12 +1232,50 @@ metrics schema; `xigmalcd/render.py` is the drawing; `xigmalcd/main.py` is the l
   good**, with both fan figures showing real numbers and both arcs partly filled. So the
   layout is judged readable at the size it draws: 12 px stroke at 97 px radius, label 22 and
   value 58 inside the hole, fan figures at 20 under each ring, in the mid-range colours (the
-  CPU was sitting at the amber crossover). What that window did **not** show are the extremes,
-  and they stay unjudged: no three-digit temperature, so the drop from value 58 to 46 has
-  never been on glass; nothing near the red end of the ramp; and no
-  missing reading, so `--°C` with no arc is unseen too. The older sighting (60 s at 5 fps,
+  CPU was sitting at the amber crossover). What that window did **not** show are the extremes -
+  no three-digit temperature, so the drop from value 58 to 46; nothing near the red end of the
+  ramp; no missing reading, so no `--°C` with no arc. Those three are judged now, on pinned
+  numbers (`--metrics-file`, the note below it, and the four `pin-*` windows in `data/glass/`):
+  the red arc **"read fine"**, a three-digit `104` inside the ring **"read fine, nothing
+  wrong"**, and the empty column **"read correctly"** as no reading rather than as a broken
+  gauge. The older sighting (60 s at 5 fps,
   300/300 frames, 2026-11-06) belongs to the earlier single-line fan layout and does not
   vouch for this one.
+* **Pinning the numbers to put a case on glass: `--metrics-file`.** Some layouts only arrive
+  with numbers the machine will not produce - the far end of the gauge ramp, a three-digit
+  temperature, a sensor that is not there. The flag draws the picture from the sections of a
+  JSON `STATE all 1` body instead, re-read whenever that file changes, and it is the picture
+  **only**: while anything is pinned the loop sends **no metrics blob at all**, `--state-every`
+  is refused out loud, and the session-start line says so ("`metrics: PINNED from
+  --metrics-file, so no 'STATE all 1' blob is sent at all`"), because the alternative is a
+  panel - and later a log - holding readings that were never taken. A key starting with `_` is
+  a comment in the file, not a section; a file that stops parsing logs one line and keeps the
+  last good read rather than stopping the loop, and a fresh process with a broken file falls
+  back to the real sensors rather than resurrecting the old fake. Three fixtures are kept in
+  `tools/metrics/` (`pin-104.json`, `pin-96.json`, `pin-no-cpu-temp.json`); `tools/selftest.sh`
+  checks the offline half of the promise - pinned, the same upload call sends **0** metrics
+  blobs where unpinned it sends **1**; the pinned 104 frame fills the whole 260° of arc
+  (**1 298** samples along the stroke's middle) and its outer colour `(255, 66, 64)` matches the
+  ramp's own hot tip `(255, 64, 64)`; a section with no temperature paints **0** samples.
+  What it costs on the wire, all of it with nothing refused: the filled red arc is
+  **14 253-14 439 B** a frame at 104 °C (`data/glass/2026-11-07-005051-pin-104-3digit.txt`,
+  **46 of 46**) and **14 528-14 557 B** at 96 °C
+  (`data/glass/2026-11-07-005142-pin-96-red.txt`, **46 of 46**) against the mid-range
+  **12 322-13 372 B**, and the column with no arc is **11 261-11 398 B**
+  (`data/glass/2026-11-07-005233-pin-nocputemp.txt`, **46 of 46**). So the ramp's whole length
+  costs about **+2 KB** a frame and a missing reading saves about **-1 KB**. The digits were
+  missed in the first window and looked at again in a longer one: `PINNED 104C, WATCH DIGITS`
+  at 00:55:52, **76 of 76** frames at **14 618-14 751 B**
+  (`data/glass/2026-11-07-005552-pin-104-3digit-watch2.txt`). Every one of those logs says in
+  its own header that the numbers were pinned rather than measured, and none of them pushed a
+  blob.
+  To repeat any of it:
+
+  ```bash
+  python3 -m xigmalcd --theme alpha --fps 1 --duration 75 --no-mp4 \
+      --title "PINNED 104C, WATCH DIGITS" --metrics-file tools/metrics/pin-104.json \
+      2>&1 | tee data/glass/$(date +%F-%H%M%S)-pin-104-3digit.txt
+  ```
 * **Two owners of the port, and the one file they now send.** `xigmalcd` - the daemon and the
   plain loop - used to encode over a transparent canvas as 32-bit RGBA (about **40.8 KB** for one
   ringed `alpha` frame offline, 42-46 KB on the glass), while the window's direct-port path
@@ -1254,10 +1295,12 @@ metrics schema; `xigmalcd/render.py` is the drawing; `xigmalcd/main.py` is the l
   comes back within 11/255, but PIL's octree quantiser treats RGBA as one four-channel colour,
   so of 11 149 pixels drawn fully opaque only **74** still carry alpha 255, and the gauge ramp,
   drawn in 80 colours along its fill, comes back in **13**, one flat colour every ~12 px of arc.
-  None of that read at the 45-49 deg C those windows ran at, which is the mid-range case: the red
-  end of the ramp, a three-digit temperature and the `--°C`-with-no-arc frame have still never
-  been on glass. If one of those ever shows the banding, the answer is `--truecolor`, not an
-  argument.
+  None of that read at the 45-49 °C those windows ran at, which is the mid-range case. The
+  extremes have since been put on glass too, on pinned numbers rather than on wishful ones
+  (`--metrics-file`, the note above), and the indexed file held there as well: the filled red
+  arc "read fine", at **14 528-14 557 B** a frame against the mid-range **12 169-12 401 B**.
+  Had it shown the banding there, the answer would have been `--truecolor` rather than an
+  argument - and for anyone whose panel does show it, that is still the answer.
 * **Where the defaults come from.** `alpha` is not a guess: it is the theme the vendor app on
   this machine currently has selected, read from `%APPDATA%/alpha/store.json` -
   `currentThemeId 1785506775818` is entry 26 of that file's `presetTheme` list (eight
@@ -1284,8 +1327,9 @@ metrics schema; `xigmalcd/render.py` is the drawing; `xigmalcd/main.py` is the l
   Nothing is upstream, nothing is pushed, and there is no remote. Tracked: the two
   Eltima **.txt** captures (37 MB - `tools/verify_protocol.py` and
   `tools/vendor_capture.py` read them, so a clone can re-derive the protocol
-  rather than trust these notes), the three vendored clips in `media/`, and all
-  sixteen `data/glass/` logs. Not tracked, and said so in `.gitignore`: the
+  rather than trust these notes), the three vendored clips in `media/`, all
+  twenty `data/glass/` logs, and the three pinned-number fixtures in
+  `tools/metrics/`. Not tracked, and said so in `.gitignore`: the
   `.spm` binaries of the same two sessions, which only the Windows monitoring
   tool opens, the 65 `.osd` payloads under `data/vendor_frames/` (which
   `tools/vendor_capture.py` takes back out of the tracked capture), and the
