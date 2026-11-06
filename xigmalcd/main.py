@@ -215,27 +215,26 @@ def _theme_kwargs(args):
 
 
 def _png(args, img):
-    """Encode a frame.  Over an opaque canvas the 256-colour PNG is used; over
-    a transparent one the frame goes up as 8-bit RGBA unless `--palette` asks
-    for the indexed file - which is what `xigmaui/panel.py` uploads either way.
+    """Encode a frame: the 256-colour PNG on any canvas, unless `--truecolor`
+    asks for 8-bit RGBA.  That default is measured, not assumed - see
+    `xigmaui/panel.py`, which has uploaded the indexed file all along, and
+    README's encode A/B/A windows, where the owner looked at both shapes on
+    real glass and saw no difference.
 
-    Measured on one ringed `alpha` frame (`tools/selftest.sh` prints a live
-    pair; the frame's own seconds clock moves the byte counts by a few
-    hundred): 40.8 KB and bit-exact, against 12.2 KB indexed.  Indexed keeps a
-    graded alpha - it moves it at ~36 100 of 230 400 pixels by up to 28/255 and
-    shifts the colour at ~12 700 of them by up to 26 - and the half-transparent
-    gauge track survives: 4 029 pixels at alpha 150, all back within 11/255 and
-    only 16 of them by more than 1.  What it does not keep is opacity: the
-    octree path treats RGBA as one four-channel colour, so of 11 149 pixels
-    drawn fully opaque only 74 still carry alpha 255, and the gauge ramp, drawn
-    in 80 colours along its fill, comes back in 13 - one flat colour every ~12
-    px of arc.  Both shapes have been on the glass for this frame (README's
-    encode A/B/A windows: 61 of 61 frames at 42 585-45 040 B, 61 of 61 at
-    12 342-13 699 B), so the panel takes either; nobody has yet put the two
-    pictures side by side in front of a person."""
-    opaque = _canvas(args)[3] == 255
-    use_palette = (opaque or args.palette) and not args.truecolor
-    return render.to_png(img, palette=use_palette, colors=args.colors)
+    What each shape costs, on one ringed `alpha` frame (`tools/selftest.sh`
+    prints a live pair; the frame's own seconds clock moves the byte counts by
+    a few hundred): RGBA 40.8 KB and bit-exact, indexed 12.2 KB.  Indexed keeps
+    a graded alpha - it moves it at ~36 100 of 230 400 pixels by up to 28/255
+    and shifts the colour at ~12 700 of them by up to 26 - and the
+    half-transparent gauge track survives: 4 029 pixels at alpha 150, all back
+    within 11/255, only 16 of them by more than 1.  What it does not keep is
+    opacity: the octree path treats RGBA as one four-channel colour, so of
+    11 149 pixels drawn fully opaque only 74 still carry alpha 255, and the
+    gauge ramp, drawn in 80 colours along its fill, comes back in 13 - one
+    flat colour every ~12 px of arc.  None of that read on the glass at the
+    size this panel draws: the same frame went up both ways at 1 fps, 61 of 61
+    frames both times, 42 560-46 415 B against 12 169-12 401 B."""
+    return render.to_png(img, palette=not args.truecolor, colors=args.colors)
 
 
 def _upload_background(link, args, path: str = ""):
@@ -425,15 +424,20 @@ def main(argv=None) -> int:
                     help="leave fans out entirely: no `fans` section in the "
                          "metrics blob and no fan figures on the picture")
     ap.add_argument("--truecolor", action="store_true",
-                    help="upload 8-bit RGBA PNGs whatever the canvas (the "
-                         "default already does that over a transparent one)")
+                    help="upload 8-bit RGBA PNGs instead of the 256-colour file "
+                         "that is the default on every canvas.  Costs about 3.4x "
+                         "the bytes (42-46 KB against 12-13 KB for a ringed "
+                         "`alpha` frame, both measured on glass) and buys an "
+                         "exact alpha; the eye did not notice the difference "
+                         "(`--palette` spells out the default, `--truecolor` "
+                         "wins if both are given)")
     ap.add_argument("--palette", action="store_true",
-                    help="use the 256-colour PNG even over a transparent canvas, "
-                         "which is what the Qt window's own path uploads: about "
-                         "12 KB against 41 KB for the ringed `alpha` frame, and "
-                         "measured offline the graded arc comes out in 13 "
-                         "palette colours where it is drawn in 80 (`--truecolor "
-                         "wins if both are given`)")
+                    help="the 256-colour PNG, spelled out: already the default, "
+                         "over a transparent canvas as over an opaque one, "
+                         "which is what xigmaui/panel.py has always uploaded.  "
+                         "12.2 KB against 40.8 KB for the ringed `alpha` frame, "
+                         "the gauge ramp quantised from 80 drawn colours to 13, "
+                         "and no difference seen on glass")
     ap.add_argument("--bg", choices=("clear", "black"), default="clear",
                     help="canvas under the glyphs: transparent, so the panel's "
                          "own stored background keeps playing behind them "

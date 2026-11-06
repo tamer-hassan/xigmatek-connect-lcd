@@ -26,13 +26,14 @@ done
 python3 -m xigmalcd --dry-run "$tmp/tc" --once --truecolor >/dev/null || {
     echo "truecolor FAILED"; exit 1; }
 
-# The encoder choice, measured.  The ringed `alpha` frame over a transparent
-# canvas goes up as 32-bit RGBA from `xigmalcd` (40-46 KB), while the window's
-# own direct-port path hands the same picture to `render.to_png` and gets an
-# indexed PNG about a third the size.  Indexed is not lossy-by-disaster and it
-# does stay graded, but it is not exact either, and the ringed frame has only
-# ever been put on glass as RGBA.  The numbers below are what README's
-# `--truecolor` row and PROTOCOL §9 quote.
+# The encoder choice, measured and now decided: the 256-colour PNG is what
+# `xigmalcd` uploads on every canvas, which is what `xigmaui/panel.py` has
+# always uploaded, and `--truecolor` asks for 8-bit RGBA instead.  Indexed is
+# not lossy-by-disaster and it does stay graded, but it is not exact, and the
+# numbers below are what README's `--truecolor` and `--palette` rows and
+# PROTOCOL §11 quote.  They are also the reason the two shapes were put on
+# glass for one picture: README's encode A/B/A windows, 61 of 61 frames each
+# way at 1 fps, and the owner's verdict on them.
 python3 - <<'PY' || { echo "encoder choice FAILED"; exit 1; }
 import math
 from io import BytesIO
@@ -61,7 +62,7 @@ def off(blob):
 
 
 exact = off(render.to_png(im, palette=False))
-qblob = render.to_png(im, palette=True)    # what the window's panel.py uploads
+qblob = render.to_png(im, palette=True)    # the default, and panel.py's path
 pal = off(qblob)
 assert exact[1] == exact[3] == 0, exact          # the RGBA path is lossless
 assert pal[0] * 3 < exact[0], (exact[0], pal[0])
@@ -76,7 +77,7 @@ src_a = im.getchannel("A").histogram()
 pal_a = quantised.getchannel("A").histogram()
 assert pal_a[255] * 10 < src_a[255] < sum(src_a), (src_a[255], pal_a[255])
 
-# ...but the half-transparent gauge track, the reason we encode RGBA at all,
+# ...but the half-transparent gauge track, the reason RGBA was ever considered,
 # is nearly what it has to keep: alpha 150, isolated from the ramp colours.
 diff_a = ImageChops.difference(im.getchannel("A"), quantised.getchannel("A"))
 track = im.getchannel("A").point(lambda v: 255 if v == 150 else 0)
@@ -110,38 +111,47 @@ assert len(set(cols)) < len(set(drawn)) // 3, (len(set(drawn)), len(set(cols)))
 band_deg = STEP * len(drawn) / max(1, len(set(cols)))
 band_px = math.radians(band_deg) * RAMP_R
 print(f"  the same ringed overlay frame: RGBA {exact[0]} B exactly as drawn "
-      f"(what `xigmalcd` uploads), indexed {pal[0]} B (what the window uploads) "
-      f"with alpha moved at {pal[1]} px, worst {pal[2]}/255, colour moved at "
-      f"{pal[3]} px, worst {pal[4]}")
+      f"(what `--truecolor` uploads), indexed {pal[0]} B (the default, and what "
+      f"the window uploads) with alpha moved at {pal[1]} px, worst "
+      f"{pal[2]}/255, colour moved at {pal[3]} px, worst {pal[4]}")
 print(f"  opacity is where it bites: {src_a[255]} pixels are drawn fully "
       f"opaque and only {pal_a[255]} of them stay at 255 in the indexed file, "
       f"while the {TRACK_N} half-transparent track pixels (alpha 150) come "
       f"back within {worst_track}/255 - {off_by_2} of them by more than 1")
 print(f"  where that shows: the gauge ramp, drawn in {len(set(drawn))} colours "
       f"along its fill and quantised to {len(set(cols))} - {band_deg:.1f} deg, "
-      f"about {band_px:.0f} px of arc, one flat colour each.  The panel has "
-      f"only ever seen the RGBA file of a ringed frame.")
+      f"about {band_px:.0f} px of arc, one flat colour each.  All of it went "
+      f"up on real glass both ways, 61 of 61 frames each, and the owner could "
+      f"see no difference; hence the indexed default.")
 PY
 
-# and the two switches, on the command line, on the real encoder path: a frame
-# over the default transparent canvas goes up RGBA, and only `--palette` puts an
-# indexed file there.  Checked by reading the PNG the dry run writes.
+# and the switches, on the command line, on the real encoder path: the default
+# frame over the transparent canvas is the indexed file, `--palette` says the same
+# thing out loud, and only `--truecolor` puts an RGBA file there.  Checked by
+# reading the PNG each dry run writes.
 python3 -m xigmalcd --dry-run "$tmp/pal" --once --theme alpha --palette >/dev/null \
     || { echo "--palette FAILED"; exit 1; }
-python3 - "$tmp/pal/frame0000.png" "$tmp/alpha/frame0000.png" \
-    <<'PY' || { echo "encoder switches FAILED"; exit 1; }
+python3 - "$tmp/alpha/frame0000.png" "$tmp/pal/frame0000.png" \
+    "$tmp/tc/frame0000.png" <<'PY' || { echo "encoder switches FAILED"; exit 1; }
 import sys
 from PIL import Image
-pal, dflt = Image.open(sys.argv[1]), Image.open(sys.argv[2])
-assert pal.mode == "P", pal.mode
-assert dflt.mode == "RGBA", dflt.mode
-alpha = pal.convert("RGBA").getchannel("A").histogram()
+dflt, explicit, tc = [Image.open(p) for p in sys.argv[1:4]]
+assert dflt.mode == "P" and explicit.mode == "P", (dflt.mode, explicit.mode)
+assert tc.mode == "RGBA", tc.mode
+alpha = dflt.convert("RGBA").getchannel("A").histogram()
 levels = sum(1 for v in alpha[1:255] if v)      # part-transparent steps kept
 assert alpha[0] and levels >= 1, (alpha[0], levels)
+
+
+def size(path):
+    with open(path, "rb") as fh:
+        return len(fh.read())
+
+
 print(f"  encoder switches   default over a transparent canvas: {dflt.mode} "
-      f"{len(open(sys.argv[2], 'rb').read())} B; --palette: {pal.mode} "
-      f"{len(open(sys.argv[1], 'rb').read())} B, {alpha[0]} clear px and "
-      f"{levels} part-transparent step(s) kept")
+      f"{size(sys.argv[1])} B with {alpha[0]} clear px and {levels} "
+      f"part-transparent step(s) kept; --palette: {explicit.mode} "
+      f"{size(sys.argv[2])} B; --truecolor: {tc.mode} {size(sys.argv[3])} B")
 PY
 
 echo

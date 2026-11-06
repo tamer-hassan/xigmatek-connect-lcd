@@ -1106,55 +1106,74 @@ topic registry above is current. What that package adds is *content*:
   `realtimeDisplay`/`sysinfoDisplay` in the app's code belong to product paths this unit
   does not implement — which is why they answer `400` here.
 * `GET`/`PUT`/`SET`/`DELETE` topics: registered verbs, never used in the captures.
-* **Our own overlay frame's size, and what a gauge costs on the wire.** A transparent
-  `alpha` overlay goes up as one full RGBA PNG – the panel's own `.osd` payloads are RGBA
-  too (§6) – and the daemon logs the byte count of every tenth frame, so these are wire
-  numbers, not lab ones: **30 710–32 157 B** before that theme grew two gauge rings
-  (`data/glass/2026-11-06-161444-socket-run.txt`), **44 388–46 014 B** after
+* **Our own overlay frame's size, and what a gauge costs on the wire.** Until the encoder
+  decision below, a transparent `alpha` overlay went up as one full RGBA PNG – the panel's own
+  `.osd` payloads are RGBA too (§6) – and the daemon logs the byte count of every tenth frame,
+  so these are wire numbers, not lab ones: **30 710–32 157 B** before that theme grew two gauge
+  rings (`data/glass/2026-11-06-161444-socket-run.txt`), **44 388–46 014 B** after
   (`data/glass/2026-11-06-180109-socket-run.txt`), same theme, same transparent canvas,
   same 1 fps: **+13 KB per frame, +44 %**, which at 1 fps is about 13 KB/s more of wire.
   The `gauge` frames inside those same two windows – 24 160–27 763 B and 23 193–27 668 B –
   are the control: the link did not change, the picture did. At 3 fps the ringed picture is
   still taken without a refusal: **91 of 91** frames in 30 s, frames 39 400–45 244 B
   (`data/glass/2026-11-06-181251-fps3-alpha.txt`, one process, `--no-mp4`, so those bytes are
-  the overlay alone). Offline the same picture encodes to **12.1–13.6 KB** as an indexed PNG
-  (`render.to_png(palette=True)`), and that is not a lab curiosity: **the two owners of the
-  port put different files on the wire for the same picture.** `xigmalcd` encodes RGBA over a
-  transparent canvas (`main._png`, only offering the palette when the canvas is opaque), which
-  is where the 44–46 KB above come from; the window's direct-port path calls
-  `render.to_png(img)` with no argument, so it gets the indexed file – and the two watched GUI
+  the overlay alone). Those are RGBA-era numbers. Offline the same picture encodes to
+  **12.1–13.6 KB** as an indexed PNG (`render.to_png(palette=True)`), and that was not a lab
+  curiosity: **for a while the two owners of the port put different files on the wire for the
+  same picture.** `xigmalcd` encoded RGBA over a transparent canvas (`main._png`, only offering
+  the palette when the canvas was opaque), which is where the 44–46 KB above come from; the
+  window's direct-port path called `render.to_png(img)` with no argument, so it got the indexed
+  file – and the two watched GUI
   runs logged it: `one frame sent: alpha, 9 KiB PNG, notice 200` at 14:26:47 and 14:42:49, the
-  theme before it had rings. Indexed is not lossless: measured on one ringed frame
-  (`tools/selftest.sh` prints these), the RGBA file is **40 777 B and bit-exact**, the indexed
-  file is **12 176 B** and keeps a graded alpha but moves it at **36 145 of 230 400 pixels by
-  up to 28/255** and shifts the colour at **12 660 pixels by up to 26**. That frame carries a
-  seconds clock, so the exact pair of byte counts and the exact pixel counts move by a few
-  hundred bytes and a few hundred pixels from minute to minute – the bands are what hold, not
-  the individual numbers. A transparent indexed overlay is not something the panel has been
-  seen to mis-handle, and now it has been seen in one such file: on 2026-11-06 the same ringed
-  `alpha` picture went up both ways, back to back, one process each, same box, 1 fps,
-  `--no-mp4`, transparent canvas – RGBA for 60 s at 20:17:08 (**61 of 61** frames,
-  42 585–45 040 B), the same frame with `--palette` for 60 s at 20:18:13 (**61 of 61**,
-  12 342–13 699 B), then RGBA again for 30 s at 20:19:17 (**31 of 31**, 42 001–45 597 B).
-  Every frame of all three windows came back confirmed, so the panel answers a transparent
-  indexed overlay of that picture exactly as it answers the RGBA one, and the wire ratio is
-  measured rather than extrapolated: means **43 304 B against 12 655 B, 3.4×**. The two RGBA
-  windows agree with each other to within 150 B, which is what makes that ratio worth quoting
-  (`data/glass/2026-11-06-201708-encode-A-rgba.txt`, `-201813-encode-B-indexed.txt`,
-  `-201917-encode-A2-rgba.txt`). The earlier evidence for the shape itself stays as it was:
-  §9's repaint table shows a 6.4 KB **indexed** file displaying (that one was not an overlay)
-  and a 14.9 KB **overlay** displaying (its file shape is not recorded), and the watched GUI
-  runs uploaded indexed PNGs of the pre-ring `alpha` theme at 9 KiB with the canvas default
-  `clear`. What none of it says is which picture is the better one: nobody is recorded as
-  watching those three windows, so they are acceptance-and-wire evidence only, and the
-  measurement that closes the encoder question – one frame up both ways, judged by an eye – is
-  still unmade. What makes looking worth it, measured offline on the same frame: of its
-  **11 149 pixels drawn fully opaque, only 74 keep alpha 255** in the indexed file, because
-  PIL's octree quantiser treats RGBA as one four-channel colour and averages the palette entry
-  for both kinds of pixel; the gauge ramp is drawn in 80 colours along its fill and comes back
-  in **13**, one flat colour every ~12 px of arc. The half-transparent track, the reason the
-  RGBA path exists, is the part that survives: 4 029 pixels at alpha 150, all of them back
-  within 11/255 and only 16 of them by more than 1.
+  theme before it had rings. That disagreement is now closed: `main._png` returns the indexed
+  file on every canvas and `--truecolor` is the way back to RGBA, so the daemon, the plain loop
+  and the window's own path put one file on the wire. The evidence for that decision, in the
+  order it was gathered:
+
+  * **The panel accepts either shape as an overlay.** Two sittings of the same ringed `alpha`
+    picture, each one RGBA / indexed / RGBA back to back, one process each, same box, 1 fps,
+    `--no-mp4`, transparent canvas. 2026-11-06 at 20:17:08 / 20:18:13 / 20:19:17: **61 of 61**,
+    **61 of 61**, **31 of 31** frames, 42 585–45 040 B / 12 342–13 699 B / 42 001–45 597 B.
+    2026-11-07 at 00:24:34 / 00:25:40 / 00:26:46: **61 of 61**, **61 of 61**, **31 of 31**,
+    42 560–46 415 B / 12 169–12 401 B / 41 856–42 471 B. Nothing refused, so a transparent
+    indexed overlay is answered exactly like the RGBA one, and the wire ratio is measured rather
+    than extrapolated: means **43 304 B against 12 655 B** in the first sitting, **43 782 B
+    against 12 289 B** in the second, **3.4×** either way — means taken over the frames each
+    log prints, every tenth one. The two RGBA windows of a sitting agree with each other by
+    **142 B (0.3 %)** in the first sitting and **1 595 B (3.7 %)** in the second, which is what
+    makes the ratio worth quoting
+    (`data/glass/2026-11-06-201708-encode-A-rgba.txt`, `-201813-encode-B-indexed.txt`,
+    `-201917-encode-A2-rgba.txt`, then `2026-11-07-002434-encode-Awatch-rgba.txt`,
+    `-002540-encode-Bwatch-indexed.txt`, `-002646-encode-A2watch-rgba.txt`).
+  * **The eye sees no difference at this size.** The first sitting has no watcher recorded, so
+    on its own it is acceptance-and-wire evidence only. It was repeated an hour later with the
+    owner at the panel and each window's encoder written into its on-screen heading, and the
+    verdict is **"no difference I could see"** – not in the arc's colour fill, not in how solid
+    the digits and labels read. That is the measurement that closed the question. Each sitting
+    is A/B/A rather than A/B, so a drift story cannot explain it either. CPU was 45–49 °C
+    throughout the watched sitting, so both gauges were filled a little under half: the
+    mid-range case, not the red end of the ramp and not a three-digit value.
+  * **What the accepted file does give up, so the trade cannot go quietly stale.** Measured
+    offline on one ringed frame, printed by `tools/selftest.sh` on every run: the RGBA file is
+    **40 777 B and bit-exact**, the indexed file is **12 176 B** and keeps a graded alpha but
+    moves it at **36 145 of 230 400 pixels by up to 28/255** and shifts the colour at **12 660
+    pixels by up to 26**. Of **11 149 pixels drawn fully opaque, only 74 keep alpha 255**,
+    because PIL's octree quantiser treats RGBA as one four-channel colour and averages the
+    palette entry shared by a glyph pixel and a track pixel; the gauge ramp is drawn in 80
+    colours along its fill and comes back in **13**, one flat colour every ~12 px of arc. The
+    half-transparent track is the part that survives: 4 029 pixels at alpha 150, all of them
+    back within 11/255 and only 16 by more than 1. That frame carries a seconds clock, so the
+    exact byte and pixel counts move by a few hundred from minute to minute – the bands hold,
+    not the individual numbers. None of it read on glass in the mid range; if the red end of the
+    ramp or a three-digit temperature ever shows it, the answer is `--truecolor`.
+
+  The earlier evidence for the shape itself stays as it was: §9's repaint table shows a 6.4 KB
+  **indexed** file displaying (that one was not an overlay) and a 14.9 KB **overlay** displaying
+  (its file shape is not recorded), and the watched GUI runs uploaded indexed PNGs of the
+  pre-ring `alpha` theme at 9 KiB with the canvas default `clear`. One further window runs the
+  new default end to end with no encoder flag given: `ENCODE DEFAULT` at 00:32:17, **31 of 31**
+  frames at **12 322–13 372 B** where the same theme as RGBA had logged 42 560–46 415 B
+  (`data/glass/2026-11-07-003217-encode-DEFAULT-indexed.txt`).
 * **The reply-latency question is closed.**  Every file shape — our RGBA and indexed
   PNGs, a 1.5 KB flat one, and the panel's own 24–25 KB payloads — answers with the file
   notice 60–160 ms after `transport`, at every cadence from 0.3 s to 3 s, when the replies

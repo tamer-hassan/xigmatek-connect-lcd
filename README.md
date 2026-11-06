@@ -151,15 +151,18 @@ Two things, in this order:
    fed metrics continuously, so `--state-every` exists but defaults to off.
 2. One PNG per frame — rendered at 960×960 and downscaled for clean type, uploaded as
    `<timestamp>.osd` through the media transfer channel. The loop never waits on the
-   panel: 40 KB is handed to the kernel in ~50 ms, the panel confirms each file ~100 ms
-   later while the next frame is being drawn, and `--fps` is the metronome. The stock
-   files from the Windows app are 480×480 8-bit RGBA PNGs (~24 KB), and over the default
-   transparent canvas ours are RGBA too - 39-46 KB for the ringed `alpha` picture, §11 -
-   because that alpha is what lets the panel's stored background through. The 256-colour
-   path (~12 KB) is used when the canvas is opaque, where there is no alpha to keep, and by
-   the window's direct-port path either way ("Notes and known limits"); `--truecolor` forces
-   24/32-bit in the CLI regardless and `--palette` takes the 256-colour file even over a
-   transparent one.
+   panel: 40 KB was handed to the kernel in ~50 ms, the panel confirms each file ~100 ms
+   later while the next frame is being drawn, and `--fps` is the metronome. (That write
+   timing was measured when frames went up as RGBA; they are about 12 KB now, and the
+   write has not been re-timed.) The stock files from the Windows app are 480×480 8-bit
+   RGBA PNGs (~24 KB). Ours are the 256-colour file on either canvas, transparent or
+   opaque: **12.2 KB** for one ringed `alpha` frame offline, 12 322-13 372 B a frame in
+   the first window run with that default. The choice was made on glass, not on the
+   offline numbers - the same frame went up both ways at 1 fps, **61 of 61** frames each,
+   42 560-46 415 B against 12 169-12 401 B, and what the offline numbers predict (a gauge
+   ramp drawn in 80 colours coming back in 13) was not visible from the chair.
+   `--truecolor` puts the exact 8-bit RGBA file back on the wire, where the alpha of the
+   half-transparent gauge track is kept to the unit ("Notes and known limits", §11).
 
 Sensors on this machine: `k10temp` (Ryzen Tctl), `amdgpu` (iGPU power/voltage),
 `nvme` and `r8169` via hwmon, `nvidia-smi` for the discrete GPU, `/proc` for load,
@@ -188,9 +191,9 @@ Put the module in `/etc/modules-load.d/` if you want it at every boot.
 | `--title TEXT`, `--label TEXT`, `--no-clock` | what the picture says. Themes without a heading ignore `--title`; `--label` defaults to `CPU TEMP`, or `CPU LOAD` with `--gauge-source load` |
 | `--scrim A` | alpha 0-255 of the dark plate drawn behind the glyphs. Unset is automatic: no plate over the shipped dark default (luma 18.7), a plate at `SCRIM_ON_BRIGHT` 150 over a vendored clip measured brighter than mid-grey (`theme_48.mp4` is 227, white on white without it), no plate for `--bg black` or an unmeasured clip. Every glyph is white because the vendor's are (`textColor` `rgba(255,255,255,1)` throughout `store.json`) |
 | `--order notice\|fast` | when `transported` goes out. `notice` (default) holds it until the panel's own file notice lands, which is the order ALPHA's traffic has and the only order that makes the glass redraw every frame; `fast` sends it right after the last file byte, and the panel answers that 1 time in 6 and the picture jumps (`tools/order_probe.py`, PROTOCOL.md §6) |
-| `--truecolor` | upload 24/32-bit PNGs instead of 256-colour. `xigmalcd` already does that over a transparent canvas, where losing exact alpha matters, and only offers the palette over an opaque one; offline one ringed frame is **12.2 KB indexed against 40.8 KB RGBA**, and the indexed file moves the alpha at ~36 100 pixels by up to 28/255 — numbers `tools/selftest.sh` prints. The window's own direct-port path still uploads the indexed file either way (PROTOCOL.md §11) |
-| `--palette` | take the 256-colour PNG even over a transparent canvas, which is what the window's path does: on glass the same ringed frame went up at **12 342-13 699 B against 42 585-45 040 B** (means 12 655 B against 43 304 B, **3.4×**) with every frame confirmed in both windows, and offline the price is the gauge ramp — drawn in 80 colours, quantised to **13**, one flat colour every ~12 px of arc — and no fully opaque glyph pixel keeping its opacity (74 of 11 149). Nobody has compared the two on glass by eye; `--truecolor` wins if both are given |
-| `--colors N` | palette size when a palette is used |
+| `--truecolor` | put the exact 8-bit RGBA PNG on the wire instead of the 256-colour file that is the default on **every** canvas. Costs 3.4× the bytes — on glass one ringed `alpha` frame measured **42 560-46 415 B against 12 169-12 401 B** (means 43 782 B against 12 289 B) — and it is the only shape that keeps the half-transparent gauge track's alpha to the unit. What the default gives up is in `tools/selftest.sh`'s prints: the gauge ramp drawn in 80 colours coming back in 13, and 74 of 11 149 fully opaque pixels keeping alpha 255. Both shapes went up **61 of 61** frames at 1 fps and the owner could see no difference from the chair, which is why RGBA is the opt-in (PROTOCOL.md §11) |
+| `--palette` | spell the default out: the 256-colour PNG, over a transparent canvas as over an opaque one, which is what `xigmaui/panel.py` has always uploaded. Kept so older command lines and README's encode A/B/A windows mean what they say; `--truecolor` wins if both are given |
+| `--colors N` | palette size for the indexed file (default 256) |
 | `--chunk N`, `--gap S` | raw upload chunk size, and the one pause between the `transport` announcement and the first file byte (the vendor app: 1000 bytes; the pause is 0.02 s and see §6 before setting it to 0) |
 | `--overlay` | old name for `--bg clear`, kept so earlier command lines still work |
 | `--no-state` | skip the metrics blob entirely |
@@ -912,32 +915,48 @@ is whether that picture read well, because nobody was recorded as looking at tha
 python3 -m xigmalcd --theme alpha --fps 1 --duration 120 --no-mp4 --title "EYEBALL ALPHA"
 ```
 
-The same plain loop is also how the two encoders were put on the glass for one picture, in
-three windows straight after each other on 2026-11-06: RGBA for 60 s at 20:17:08
-(**61 of 61** frames, 42 585-45 040 B each), the same frame encoded 256-colour with
-`--palette` for 60 s at 20:18:13 (**61 of 61**, 12 342-13 699 B), then RGBA again for 30 s at
-20:19:17 (**31 of 31**, 42 001-45 597 B). All three logs say what they ran and what they
-cannot claim:
+The same plain loop is also how the two encoders were put on the glass for one picture. The
+first attempt, on 2026-11-06, settled the panel's half and missed the human one: three windows
+straight after each other - RGBA for 60 s at 20:17:08 (**61 of 61** frames, 42 585-45 040 B
+each), the same frame 256-colour with `--palette` for 60 s at 20:18:13 (**61 of 61**,
+12 342-13 699 B), RGBA again for 30 s at 20:19:17 (**31 of 31**, 42 001-45 597 B) - and nobody
+was at the glass for any of them, so their logs say so in their own headers
+(`data/glass/2026-11-06-201708-encode-A-rgba.txt`,
+`data/glass/2026-11-06-201813-encode-B-indexed.txt`,
+`data/glass/2026-11-06-201917-encode-A2-rgba.txt`). What that pair of RGBA windows against the
+indexed one established is that a transparent 256-colour overlay of the ringed picture is
+accepted exactly like the RGBA one, nothing refused, means **43 304 B against 12 655 B**.
+
+The same three windows, run again an hour later with a person at the panel, settled the rest:
+RGBA 60 s at 00:24:34 (**61 of 61**, 42 560-46 415 B), `--palette` 60 s at 00:25:40 (**61 of
+61**, 12 169-12 401 B), RGBA 30 s at 00:26:46 (**31 of 31**, 41 856-42 471 B), each with its
+encoder in the on-screen heading so nobody had to be told which was which. The owner's account
+is **"no difference I could see"** - no steps in the arc's colour fill, no less solid text - and
+the CPU sat at 45-49 °C across all three, so both arcs were filled a little under half: the
+mid-range case, not the red end of the ramp and not three-digit values
+(`data/glass/2026-11-07-002434-encode-Awatch-rgba.txt`,
+`data/glass/2026-11-07-002540-encode-Bwatch-indexed.txt`,
+`data/glass/2026-11-07-002646-encode-A2watch-rgba.txt`).
+
+So the smaller file won, and the two owners of the port now agree: `xigmalcd` uploads the
+256-colour PNG on every canvas, which is what `xigmaui/panel.py` has always done, and
+`--truecolor` is how the exact RGBA file is put back on the wire. One window confirms the new
+default end to end: `ENCODE DEFAULT` at 00:32:17, no encoder flag given, **31 of 31** frames at
+**12 322-13 372 B** where the same theme as RGBA had logged 42 560-46 415 B
+(`data/glass/2026-11-07-003217-encode-DEFAULT-indexed.txt`). The offline cost of that choice is
+written down rather than hidden - the gauge ramp is drawn in 80 colours and comes back in 13,
+one flat colour every ~12 px of arc, and 11 149 fully opaque pixels come back with only 74 of
+them still at alpha 255 - and `tools/selftest.sh` prints those numbers on every run, so the
+trade cannot quietly go stale. To repeat the comparison:
 
 ```bash
 python3 -m xigmalcd --theme alpha --fps 1 --duration 60 --no-mp4 \
-    --title "ENCODE A RGBA" 2>&1 | tee data/glass/$(date +%F-%H%M%S)-encode-A-rgba.txt
+    --title "ENCODE A RGBA" 2>&1 | tee data/glass/$(date +%F-%H%M%S)-encode-Awatch-rgba.txt
 python3 -m xigmalcd --theme alpha --fps 1 --duration 60 --no-mp4 --palette \
-    --title "ENCODE B INDEXED" 2>&1 | tee data/glass/$(date +%F-%H%M%S)-encode-B-indexed.txt
+    --title "ENCODE B INDEXED" 2>&1 | tee data/glass/$(date +%F-%H%M%S)-encode-Bwatch-indexed.txt
 python3 -m xigmalcd --theme alpha --fps 1 --duration 30 --no-mp4 \
-    --title "ENCODE A2 RGBA" 2>&1 | tee data/glass/$(date +%F-%H%M%S)-encode-A2-rgba.txt
+    --title "ENCODE A2 RGBA" 2>&1 | tee data/glass/$(date +%F-%H%M%S)-encode-A2watch-rgba.txt
 ```
-
-What those three settled is the panel's side: a transparent 256-colour overlay of the ringed
-picture is accepted exactly like the RGBA one, nothing refused, means 43 304 B against
-12 655 B (`data/glass/2026-11-06-201708-encode-A-rgba.txt`,
-`data/glass/2026-11-06-201813-encode-B-indexed.txt`,
-`data/glass/2026-11-06-201917-encode-A2-rgba.txt`). What they did not settle is the human side,
-because nobody is recorded as being at the glass for them - the heading names the encoder, so
-the window is ready to be judged by a person without anyone having to say which is which, and
-the two things the offline numbers predict are steps in the arc's colour fill (80 ramp colours
-become 13, one flat colour every ~12 px of arc) and text that reads less solid, since 11 149
-fully opaque pixels come back with only 74 of them still at alpha 255.
 
 Nine minutes of `alpha` rather than a minute of it, with headings naming what each phase
 is, is the `LIVE alpha` phase made longer: add `--baseline 300` to the command above and
@@ -1192,12 +1211,15 @@ metrics schema; `xigmalcd/render.py` is the drawing; `xigmalcd/main.py` is the l
   goes from 9.0 ms to **12.2 ms** median; and the painting is graded, not binary - 29 700 of
   those 40 806 painted pixels sit at an alpha between 1 and 254, which is the track's
   translucency and the anti-aliasing. The indexed PNG goes from 9.2-9.8 KB to
-  **12.1-13.6 KB**, but the daemon does not use it over a transparent canvas: `main._png`
-  keeps the alpha exact there, so the frame it uploads is full RGBA. What the same
-  change costs on the wire:
+  **12.1-13.6 KB**, and that is the file the daemon uploads now; at the time the wire numbers
+  below were taken it did not, because `main._png` still kept the alpha exact over a
+  transparent canvas and put full RGBA on the wire. What the rings cost there:
   **44 388-46 014 B per frame against 30 710-32 157 B for the same theme before the rings** -
   about +13 KB, **+44 %**, measured across two full windows in `data/glass/` (the 16:14:44 and
-  18:01:09 runs, `gauge` frames unchanged in both as the control on the link). At 3 fps with
+  18:01:09 runs, `gauge` frames unchanged in both as the control on the link). Both of those
+  are RGBA-era numbers: the same theme on today's indexed default logs **12 322-13 372 B** a
+  frame (`data/glass/2026-11-07-003217-encode-DEFAULT-indexed.txt`), and the rings' cost in
+  that shape is the offline pair above rather than a measured window pair. At 3 fps with
   the rings the panel still refused nothing: **91 of 91** frames confirmed in a 30 s window at
   18:12:51 (`data/glass/2026-11-06-181251-fps3-alpha.txt`), frames 39 400-45 244 B, so the
   re-measured claim that "the panel takes 3 without refusing" now covers the ringed picture
@@ -1213,27 +1235,29 @@ metrics schema; `xigmalcd/render.py` is the drawing; `xigmalcd/main.py` is the l
   missing reading, so `--°C` with no arc is unseen too. The older sighting (60 s at 5 fps,
   300/300 frames, 2026-11-06) belongs to the earlier single-line fan layout and does not
   vouch for this one.
-* **Two owners of the port, two different files for one picture.** `xigmalcd` - the daemon and
-  the plain loop - encodes over a transparent canvas as 32-bit RGBA, about **40.8 KB** for one
-  ringed `alpha` frame offline, and only offers the 256-colour file when the canvas is opaque
-  (`--palette` asks for it anyway, `--truecolor` forbids it either way). The window's direct-port
-  path calls `render.to_png` with no argument and uploads the indexed file whatever the canvas:
-  about **12.2 KB** for that same frame, and the two watched GUI runs log it as `one frame sent:
-  alpha, 9 KiB PNG, notice 200` (14:26:47 and 14:42:49, before the rings went in). Both shapes
-  have now been on glass for the ringed picture, back to back at 1 fps on 2026-11-06: RGBA 60 s
-  (**61 of 61**, 42 585-45 040 B), `--palette` 60 s (**61 of 61**, 12 342-13 699 B), RGBA again
-  30 s (**31 of 31**, 42 001-45 597 B) - nothing refused, means **43 304 B against 12 655 B,
-  3.4x** (`data/glass/2026-11-06-201708-encode-A-rgba.txt` and the two logs named after it). So
-  the always-on loop writes about **3.4x** what the window would for the same screen, and the
-  panel does not care which file it is given. Indexed is the cheaper picture, not the same one:
-  offline, of the frame's **11 149 fully opaque pixels only 74 keep alpha 255** - PIL's octree
-  quantiser treats RGBA as one four-channel colour, so a palette entry shared by a glyph pixel
-  and a half-transparent track pixel averages both - and the gauge ramp, drawn in 80 colours
-  along its fill, comes back in **13**, one flat colour every ~12 px of arc. The half-transparent
-  track is what survives: 4 029 pixels at alpha 150, all back within 11/255, only 16 of them by
-  more than 1. Those are `tools/selftest.sh` numbers. The eye's verdict is the missing half:
-  nobody is recorded as watching those three windows, so which file to prefer is still open, and
-  nothing today makes the window match the daemon.
+* **Two owners of the port, and the one file they now send.** `xigmalcd` - the daemon and the
+  plain loop - used to encode over a transparent canvas as 32-bit RGBA (about **40.8 KB** for one
+  ringed `alpha` frame offline, 42-46 KB on the glass), while the window's direct-port path
+  handed the same picture to `render.to_png` and uploaded the indexed file (about **12.2 KB**)
+  whatever the canvas: the always-on loop wrote **3.4x** what the window did for one screen, and
+  that was an accident of which module was calling. It is closed: `main._png` now uses the
+  256-colour PNG on every canvas and `--truecolor` is how the exact RGBA file goes back on the
+  wire, so the daemon, the plain loop and `xigmaui/panel.py` all send the same file. The reason
+  is a glass comparison rather than a size argument. The same frame went up both ways twice:
+  2026-11-06 at 20:17:08 / 20:18:13 / 20:19:17 is wire and acceptance evidence only (**61 of
+  61**, **61 of 61**, **31 of 31**; 42 585-45 040 B against 12 342-13 699 B, nobody recorded as
+  watching), and 2026-11-07 at 00:24:34 / 00:25:40 / 00:26:46 was watched, with the encoder in
+  each window's on-screen heading, and the owner's verdict was **"no difference I could see"**
+  (**61 of 61**, **61 of 61**, **31 of 31**; 42 560-46 415 B against 12 169-12 401 B). What the
+  indexed file does give up, printed by `tools/selftest.sh` on every run so it cannot go stale:
+  it keeps a graded alpha, and the half-transparent gauge track - 4 029 pixels at alpha 150 -
+  comes back within 11/255, but PIL's octree quantiser treats RGBA as one four-channel colour,
+  so of 11 149 pixels drawn fully opaque only **74** still carry alpha 255, and the gauge ramp,
+  drawn in 80 colours along its fill, comes back in **13**, one flat colour every ~12 px of arc.
+  None of that read at the 45-49 deg C those windows ran at, which is the mid-range case: the red
+  end of the ramp, a three-digit temperature and the `--°C`-with-no-arc frame have still never
+  been on glass. If one of those ever shows the banding, the answer is `--truecolor`, not an
+  argument.
 * **Where the defaults come from.** `alpha` is not a guess: it is the theme the vendor app on
   this machine currently has selected, read from `%APPDATA%/alpha/store.json` -
   `currentThemeId 1785506775818` is entry 26 of that file's `presetTheme` list (eight
@@ -1255,8 +1279,17 @@ metrics schema; `xigmalcd/render.py` is the drawing; `xigmalcd/main.py` is the l
   `doughnut-node`, `process-bar-node`, `chart-node`) are readable without decompiling
   anything; only `out/main/index.jsc` needs the V8 route in PROTOCOL.md §10. Re-derive it
   any time with `python3 tools/theme.py` and `python3 tools/vendor_log.py`.
-* Not in version control yet, and nothing is upstream; the protocol notes in
-  PROTOCOL.md are the part worth publishing.
+* **Version control: local, started 2026-11-06.** `git init` in this directory and
+  one baseline commit, whose message lists what is and is not established at it.
+  Nothing is upstream, nothing is pushed, and there is no remote. Tracked: the two
+  Eltima **.txt** captures (37 MB - `tools/verify_protocol.py` and
+  `tools/vendor_capture.py` read them, so a clone can re-derive the protocol
+  rather than trust these notes), the three vendored clips in `media/`, and all
+  sixteen `data/glass/` logs. Not tracked, and said so in `.gitignore`: the
+  `.spm` binaries of the same two sessions, which only the Windows monitoring
+  tool opens, the 65 `.osd` payloads under `data/vendor_frames/` (which
+  `tools/vendor_capture.py` takes back out of the tracked capture), and the
+  usual python noise.
 
 ## Credit
 
