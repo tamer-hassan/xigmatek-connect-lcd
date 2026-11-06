@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+docs/scratch/
+*.tmp
+data/vendor_frames/
+
+# The Eltima captures' own binary format.  The protocol work reads the .txt
+# renders of the same two sessions (tools/verify_protocol.py), and those are
+# tracked, so a clone can re-verify every PROTOCOL.md claim without the 5 MB of
+# binary captures that only the Windows monitoring tool can open.
+*.spm
+
+# python packaging and editors
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+.idea/
+.vscode/
+.DS_Store

@@ -1,0 +1,16 @@
+[project]
+name = "xigmalcd"
+version = "0.1"
+description = "Show Linux system stats on the LCD built into Xigmatek Connect AIO coolers"
+requires-python = ">=3.9"
+dependencies = ["pyserial>=3.5", "pillow>=9.0"]
+
+[project.scripts]
+xigmalcd = "xigmalcd.main:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["xigmalcd"]

@@ -1,0 +1,24 @@
+[Unit]
+Description=Xigmatek Connect LCD - show system stats on the AIO's front panel
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+WorkingDirectory=@DIR@
+ExecStartPre=/bin/sleep 5
+# This one process is the only opener of the serial port, and it listens on a
+# control socket while it draws: $XDG_RUNTIME_DIR/xigmalcd.sock, which systemd
+# sets for a user unit.  That is how the desktop window and `python3 -m xigmalcd
+# --status` reach the glass without stopping this unit - see xigmalcd/control.py.
+# Add --allow-reset to ExecStart only if you want the socket to be able to send
+# the vendor's `recovery` (it re-enumerates the USB device and drops the stored
+# background); tools/reset_panel.py --yes is the deliberate way.
+ExecStart=@PYTHON@ -m xigmalcd --theme @THEME@ --fps @FPS@
+Restart=on-failure
+RestartSec=10
+# the panel is a nicety, not a service: keep it off the way of real work
+Nice=10
+
+[Install]
+WantedBy=default.target

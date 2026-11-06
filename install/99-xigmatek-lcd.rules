@@ -1,0 +1,13 @@
+# Xigmatek Connect AIO front-panel LCD (USB CDC-ACM).
+#
+# Install as /etc/udev/rules.d/99-xigmatek-lcd.rules, then
+#   sudo udevadm control --reload && sudo udevadm trigger
+#
+# The panel reports the generic Linux Foundation USB id (1d6b:0109), so the
+# product string is matched as well to keep this rule off other CDC devices.
+# ID_MM_DEVICE_IGNORE stops ModemManager from firing AT commands at the panel.
+
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1d6b", ATTRS{idProduct}=="0109", \
+    ATTRS{product}=="Xigmatek USB Device", \
+    SYMLINK+="xigmatek-lcd", GROUP="dialout", MODE="0660", \
+    TAG+="uaccess", ENV{ID_MM_DEVICE_IGNORE}="1"
