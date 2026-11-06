@@ -445,6 +445,38 @@ for junk in ("", "{", "[]", '{"theme": "nope", "clock_size": 9999, "canvas": "x"
 print("  junk refused           empty, truncated, wrong type, out of range")
 PY
 
+echo
+# The package as a person installs it, not as the repo happens to sit on disk:
+# both importable packages, Qt kept in the extra, and both console scripts
+# resolving to something callable.
+python3 - <<'PY' || { echo "packaging FAILED"; exit 1; }
+import importlib
+try:
+    import tomllib
+except ImportError:
+    try:
+        import tomli as tomllib
+    except ImportError:
+        print("  packaging        skipped: no tomllib (python 3.11+) and no tomli")
+        raise SystemExit(0)
+with open("pyproject.toml", "rb") as fh:
+    cfg = tomllib.load(fh)
+pk = cfg["tool"]["setuptools"]["packages"]
+assert "xigmalcd" in pk and "xigmaui" in pk, pk
+gui = cfg["project"]["optional-dependencies"]["gui"]
+assert any("PyQt6" in d for d in gui), gui
+assert not any("PyQt6" in d for d in cfg["project"]["dependencies"]), \
+    "Qt belongs in the [gui] extra: the display loop runs without it"
+scripts = cfg["project"]["scripts"]
+assert set(scripts) == {"xigmalcd", "xigmaui"}, scripts
+for name, target in sorted(scripts.items()):
+    mod, _, attr = target.partition(":")
+    assert callable(getattr(importlib.import_module(mod), attr)), (name, target)
+print(f"  packaging        packages {' + '.join(pk)}, scripts "
+      f"{'+'.join(sorted(scripts))} both resolve, Qt in the [gui] extra only "
+      f"({', '.join(gui)})")
+PY
+
 echo "== the launcher, its icon and the login unit"
 deskdir=$(mktemp -d)
 sed -e "s|@DIR@|$PWD|g" -e "s|@PYTHON@|$(command -v python3)|g" \

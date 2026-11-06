@@ -98,6 +98,16 @@ AT commands at the display. Then:
 python3 -m xigmalcd --device /dev/xigmatek-lcd --theme gauge
 ```
 
+Everything here also installs as a package, and the two halves install separately on
+purpose: `pip install .` gives the display loop and the `xigmalcd` command, `pip install
+.[gui]` adds PyQt6 and the `xigmaui` command with it. Qt is an extra because the loop that
+holds the port runs without it - the same reason `install/install.sh` only checks
+`import PyQt6` and names `python3-pyqt6` when it is missing, rather than installing Qt for a
+headless box. Both packages are shipped (`xigmalcd` and `xigmaui`), and `tools/selftest.sh`
+reads `pyproject.toml` to keep that true: both packages listed, PyQt6 in the extra and not in
+the base dependencies, and both console-script targets resolving to something callable. Run
+from a checkout, the commands are `python3 -m xigmalcd` and `python3 -m xigmaui` either way.
+
 ## Run it at login
 
 ```bash
@@ -314,14 +324,15 @@ where a long run would first be seen.
 * `tools/selftest.sh` — the offline checks: capture round-trip, a render of every
   theme, encode/decode round-trips including the panel's malformed-reply case, the encoder
   switches read out of the PNG each dry run writes, what the indexed file gives up next to
-  RGBA, the pinned-metrics promise (a pinned frame draws the far end of the ramp and
-  sends no metrics blob at all), the window's saved-state round-trip, the `.desktop`
-  entry and its icon, the GUI built offscreen against a port that does not exist (clip
-  sizes and lumas, five themes previewed, the scrim rule, the reset gate, the four panel
-  actions against a stubbed `Link`), the wall-clock cost of the window re-measured rather
-  than remembered, and the GUI ledger's own numbers re-read out of `data/glass/` so the
-  table in "The GUI" cannot quietly become folklore. Needs no hardware, so it is what to
-  run after editing `protocol.py`, `render.py` or `xigmaui/`.
+  RGBA, the pinned-metrics promise (a pinned frame draws the far end of the ramp and sends no
+  metrics blob at all), `pyproject.toml` read as an installed person would meet it, the
+  window's saved-state round-trip, the `.desktop` entry and its icon, the GUI built
+  offscreen against a port that does not exist (clip sizes and lumas, five themes
+  previewed, the scrim rule, the reset gate, the four panel actions against a stubbed
+  `Link`), the wall-clock cost of the window re-measured rather than remembered, and the
+  GUI ledger's own numbers re-read out of `data/glass/` so the table in "The GUI" cannot
+  quietly become folklore. Needs no hardware, so it is what to run after editing
+  `protocol.py`, `render.py` or `xigmaui/`.
 * `tools/gui_glass.py` — the GUI's drawing paths against the real glass, in one
   continuous labelled run: status, background upload, one frame, `--live-seconds`
   at `--fps`, with the phase name as the theme title so whatever you saw has a name
