@@ -297,6 +297,27 @@ where a long run would first be seen.
 
 ## Tools
 
+**Which tool answers which question.** The list below says what each tool is; this is the
+way in from a symptom. Nothing here sends firmware-shaped traffic, and the only tool that
+touches `recovery` is `reset_panel.py`, which you invoke by hand.
+
+| If the question is | run | what it answers |
+|---|---|---|
+| is the panel healthy after a boot or a reset? | `tools/state.py`, then `tools/bootcheck.py` | the `conn` snapshot, read-only; then two small and two full uploads. `logo`/`mode` at `2147483647` means it is not healthy |
+| did my edit break the wire format? | `tools/selftest.sh`, then `tools/verify_protocol.py COM3_windows_dumps/*.txt` | fourteen offline sections with no hardware, then every captured Windows frame re-encoded and diffed: **130 frames, 0 mismatches** |
+| does this firmware know that topic at all? | `tools/fuzz.py`, `tools/probe.py` | no answer = no topic, `400` = topic exists and the body was wrong, `200` = the JSON parsed — which is not the same as the write landing |
+| will the panel take *my* file? | `tools/send_image.py FILE`; `tools/fileshape.py` if the file's shape is the question | one upload, judged by the panel's own file notice; the second rotates RGBA, indexed, flat and the vendor's own `.osd` files through one session |
+| how fast does the glass tick, and why does the clock only move every 20-40 s? | `tools/frame_lag.py`, `tools/indexprobe.py`, `tools/watchtest.py` | a big frame number and the wall clock painted on the glass, so the answer is a glance rather than a stopwatch. Needs eyes on the unit |
+| why did uploads go quiet after a few hundred files? | `tools/session_limit.py` | pushes until the panel stops answering, then tries re-handshake, a DTR pulse and a port reopen in that order and says which one worked |
+| is the 0.02 s pause before the bytes load-bearing, and is the order of `transported`? | `tools/writebench.py`, `tools/order_probe.py` | both measured on this panel: **361 of 361** at 0.02 s against **0 of 128** at 0 s, and `transported` acked **0 in 8** right after the last byte against **8 in 8** after the notice |
+| can the panel draw the numbers itself, with no uploads? | `tools/realtime.py` | answered on this firmware: no — static logo only, the topic is a display-layer toggle |
+| which tachometer channel is the CPU fan? | `tools/fanscan.py --watch 90` | which channel moves with the CPU, from sysfs only; never touches a PWM |
+| does the always-on model work — display process plus window on one port? | `tools/display_glass.py` | starts the loop, then behaves only as a client of its control socket through every phase, ~9 min, and exits 1 listing what it did *not* show |
+| do the window's own buttons work on real glass? | `tools/gui_glass.py` | the same kind of labelled run through `xigmaui.panel.Panel`, the window's own worker |
+| what did the vendor app itself actually send? | `tools/log_timeline.py LOG`, `tools/capdump.py`, `tools/vendor_capture.py` | ALPHA's 6-17 MB logs folded into a request sequence, the Windows IRP captures parsed without a Windows box, and the `.osd` payloads taken back out of them |
+| the panel is white from the first second | `tools/reset_panel.py --yes` | the vendor's `recovery`, byte-identical to the frame in its own log; the only repair for fields stuck at `2147483647` |
+| what would a frame look like, with no panel in the loop? | `python3 -m xigmalcd --dry-run DIR`, `tools/previews.py` | PNGs on disk from the same render path; previews composite over the shipped clip the way the panel composites |
+
 * `tools/probe.py` — the body-key question: does the panel validate bodies, and
   which key names does it know?  Walks eight display topics (`logo`,
   `presetThemeId`, `rotate`, `osdState`, `sysinfoDisplay`, `displayInSleep`,
