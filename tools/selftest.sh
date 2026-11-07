@@ -1395,7 +1395,7 @@ assert wide_visible >= 8, (wide_visible, "the full-HD window is back to two rows
 # package, while the bench has 69 and a mounted Windows partition has 115.
 print(f"  clip list               rows {row_h} px: {visible} rows in view at "
       f"{settings.DEFAULTS['size'][0]}x{settings.DEFAULTS['size'][1]}, "
-      f"{wide_visible} at 1919x1055, where it used be 2 "
+      f"{wide_visible} at 1919x1055, where it used to be 2 "
       f"({win.clips.count()} clips on this machine)")
 
 # the detail line under the list repeats nothing: the row above it already says
