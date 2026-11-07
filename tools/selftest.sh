@@ -6,7 +6,22 @@ set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 echo "== protocol round-trip against the Windows captures"
-python3 tools/verify_protocol.py COM3_windows_dumps/*.txt | tail -4
+# data/ is gitignored, so a clone has no captures to re-encode.  Say that out loud
+# rather than reporting a pass: the figures below are what the same command printed
+# on the author's bench, and they are what PROTOCOL.md quotes.
+caps=(data/captures/*.txt)
+if [ -f "${caps[0]}" ]; then
+    python3 tools/verify_protocol.py "${caps[@]}" | tail -4
+else
+    echo "  SKIPPED: no capture at data/captures/, so nothing was re-encoded here."
+    echo "  On the author's bench this same command -"
+    echo "    python3 tools/verify_protocol.py data/captures/*.txt"
+    echo "  re-creates all 181 captured host->panel frames byte for byte (130 in the"
+    echo "  long session, 51 in the one that starts at power-on), all 267 captured"
+    echo "  panel replies pass the strict checksum, and mismatched frames: 0."
+    echo "  Point it at a capture of your own to check those numbers; every section"
+    echo "  after this one needs no capture."
+fi
 
 echo
 echo "== renders (every theme, real sensors, PNG encoding)"
@@ -448,7 +463,7 @@ for line, obj in cases:
 # escaping: 0x5A would end the frame and 0x5B starts an escape, so both get
 # quoted; a JSON array opener or a serial number with a Z in it has to come
 # back out unchanged
-for body in (b'{"sn":"<panel-serial-redacted>"}',
+for body in (b'{"sn":"FAKE-SN-WITH-Z-0001"}',
              b'{"attribute":["Status","Fan","Pump"]}'):
     fr = p.encode("1 200", {"SeqNumber": 1}, body)
     assert p.unescape(p.escape(body)) == body
@@ -458,7 +473,7 @@ print("  escaped payloads         0x5A/0x5B quoted, round-trip clean")
 
 # reading a stream: escaping makes the wire longer than the declared length, so
 # the splitter unescapes as it walks and ends the frame on the right byte
-body = {"attribute": ["Status", "Fan", "Pump"], "sn": "<panel-serial-redacted>"}
+body = {"attribute": ["Status", "Fan", "Pump"], "sn": "FAKE-SN-WITH-Z-0001"}
 fr = p.encode("1 200", {"AckNumber": 1, "ContentType": "json"}, body)
 assert len(fr) > p.inner(fr)[0] << 8 | p.inner(fr)[1], "this frame is escaped"
 assert p.read_frame(b"junk" + fr + b"tail", 4) == (fr, 4 + len(fr))
@@ -1475,11 +1490,8 @@ echo "  exit $rc, no $ctltmp/dead.sock: a window must not think a display is up"
 
 echo
 echo "== the glass ledger: the numbers README quotes have a file behind them"
-python3 - <<'PY' || { echo "glass ledger FAILED"; exit 1; }
+python3 - <<'PY' || { echo "glass ledger driver FAILED"; exit 1; }
 import ast
-import glob
-import os
-import re
 
 # Before reading any log: the driver that makes these logs must actually run every
 # phase it lists.  It once did not - a phase labelled "the command-line client"
@@ -1516,6 +1528,16 @@ assert "problems.append" in body, \
     "a stopped run adds no problem, so it can still claim every phase ran"
 assert "running[0]" in body, "the stopped run does not say which phase it lost"
 print("  ^C mid-phase is written down as a problem, naming the phase")
+PY
+
+# The rest of this section reads the logs themselves, and `data/` is gitignored, so a
+# clone has none of them.  That part is skipped out loud rather than reported as a
+# pass: what it checks is that README's ledger is the logs and not a memory of them.
+if ls data/glass/*.txt >/dev/null 2>&1; then
+python3 - <<'PY' || { echo "glass ledger FAILED"; exit 1; }
+import glob
+import os
+import re
 
 runs = sorted(glob.glob("data/glass/*.txt"))
 assert runs, ("no glass log kept, so the README's ledger table has nothing "
@@ -1672,6 +1694,15 @@ print(f"  {path}: {silence.group(1)} s paused moved {silence.group(2)} frames an
       f"uploads right after; the --status client answered in {len(cli)} lines")
 print(f"  {len(runs)} glass log(s) in data/glass/, each stamped with its window")
 PY
+else
+    echo "  SKIPPED: no window-run log under data/glass/, so the ledger was not read"
+    echo "  back here at all.  On the author's bench this part re-reads all twenty:"
+    echo "  every frame total and frame-size range README quotes is taken out of the"
+    echo "  log it names, every kept log is checked to be named in README, and a log"
+    echo "  cut short may only be cited for the phases it reached.  It passed there"
+    echo "  at the time of this commit; run the driver above against your own logs to"
+    echo "  see it work."
+fi
 
 echo
 echo "all offline checks passed"

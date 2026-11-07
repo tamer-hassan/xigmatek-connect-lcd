@@ -6,10 +6,15 @@ and the 480×480 LCD mounted in the front of Xigmatek Connect series AIO coolers
 
 Two independent sources, and they agree:
 
-* two Eltima serial captures of ALPHA on COM3 (`COM3_windows_dumps/`), checked against
-  the live panel on Linux — the encoder in `xigmalcd/protocol.py` re-creates **all 181
-  captured TX frames byte for byte** and all **267 captured panel replies pass the
-  strict checksum** (`tools/verify_protocol.py`);
+* two serial-monitor captures of ALPHA on COM3 (27 MB and 9.5 MB of UTF-16 text) — **bench
+  files, not in this repo**: they sit under `data/captures/`, which `.gitignore` keeps out
+  because they carry this panel's serial number and the rest of that Windows session with it.
+  Checked against the live panel on Linux: the encoder in `xigmalcd/protocol.py` re-creates
+  **all 181 captured host→panel frames byte for byte** (130 in the long session, 51 in the one
+  that starts at power-on) and all **267 captured panel replies pass the strict checksum**,
+  with `mismatched frames: 0` — that is what
+  `python3 tools/verify_protocol.py data/captures/*.txt` prints on the author's bench, and the
+  same command against a capture of your own is how to check it here;
 * **ALPHA's own code**: `resources/app.asar/out/main/index.jsc` is Ignition (Node
   11.4.183.29) bytecode; patched `d8` plus View8 decompiles it to JS. That gives the
   command registry, the payload builders and the frame packer verbatim, so the
@@ -459,7 +464,7 @@ stored MP4 to a *chosen* theme without a `presetThemeId` write (§11).
  "space":69604,
  "brightness":0,
  "degree":0,
- "sn":"<panel-serial-redacted>",
+ "sn":"<redacted>",
  "osdState":1,
  "mode":0,
  "logo":3,
@@ -482,13 +487,16 @@ stored MP4 to a *chosen* theme without a `presetThemeId` write (§11).
 * `brightness` — 0 while asleep, 100 after `power resume`. `degree` — temperature unit
   (0 = °C). `timeout` — what `POST timeout 1` set. `osdState`, `mode`, `logo` — panel
   state, observed but not mapped.
-* `sn` reads `<panel-serial-redacted>`. Earlier notes had `BY[L…`: that was the escaping
-  misread — on the wire the `Z` is quoted as `5B 01` and the real byte is `Z`.
+* `sn` — this panel's own serial number, **redacted here**: it identifies the unit, not the
+  protocol, and nothing in this repo needs it.  It is 20 ASCII characters and it contains a
+  `Z`, and that is the fact the protocol cares about.  Earlier notes had `BY[L…` for its
+  first bytes: that was the escaping misread — on the wire the `Z` is quoted as `5B 01` and
+  the real byte is `Z`.
 * `"OS":"Linux"` is a firmware build string, nothing to do with the host.
 
-This frame is **escaped** (its payload contains `[`, `]` and `Z`), which is the one to
-test any reader against: 309 wire bytes for a declared length of 307, and a checksum that
-only matches after the escaping is undone.
+This frame is **escaped** (its payload contains `[`, `]` and the `Z` of the serial), which is
+the one to test any reader against: 309 wire bytes for a declared length of 307, and a
+checksum that only matches after the escaping is undone.
 
 ## 8. `STATE all 1` — the metrics blob
 
@@ -727,8 +735,9 @@ re-helloes without pushing it again.
   1024-byte blocks.  **The block size does nothing; the ordering is the whole of it.**
   The wire measurement agrees without needing any of this: only the ordering was varied
   there, at 1000-byte blocks, and the `transported` ack count went 1/6 → 6/6.
-* **What ALPHA paints, measured off its 65 captured `.osd` frames** (`data/vendor_frames`,
-  and the reason our first live runs looked wrong next to its):
+* **What ALPHA paints, measured off its 65 captured `.osd` frames** (`data/vendor_frames/`,
+  bench-only and gitignored — `tools/vendor_capture.py --extract` takes them back out of a
+  capture — and the reason our first live runs looked wrong next to its):
   * **4.6 % of the pixels are painted** — 9 162 opaque plus 10 807 translucent out of
     230 400, the rest fully transparent, bounding box (106,10)-(367,468).  That is how its
     picture keeps the stored background playing: our opaque black canvas covered it, which
@@ -768,6 +777,45 @@ re-helloes without pushing it again.
     "the arc swings every second successfully".
   * text: title and digits white (digits 52 px tall, centred at (239,236)), caption mint
     green 12 px at y312-323, clock mint (0,250,232) 18 px tall, x187-305, y450-467.
+* **The capture's own cadence, and what actually carries the value.**  Both sessions upload
+  **exactly one overlay a second**: 65 `POST transport` announcements spread over 64 s in the
+  long session (15:50:03–15:51:07, 2026-11-02) and 23 over 22 s in the one that starts at
+    power-on (07:21:36–07:21:58, 2026-11-05) — every gap 1 s at the capture's one-second
+  resolution, every payload a 480×480 RGBA PNG of 24 550–25 647 B.  The metrics blob is a
+  different matter: `STATE all 1` is written **twice** in the power-on session (07:21:35 and
+  07:21:36, whose own `timestamp` fields are 1 005 ms apart) and **not once** in the long one.
+  The panel is fed pixels; the numbers only go to whoever asked.  Which is why the text the
+  panel shows — `HH:MM`, `Week_en`, `kb/s` — has to be read out of the vendor's pictures and
+  its bytecode rather than expected on the wire (§8, §10).
+* **The ring follows the digits it paints, not the newest sample it was given.**  In the
+  power-on session the app sent `cpu.temperature` 57 then 56 and never sent the blob again,
+  while over those same 23 frames the digit it painted fell 57, 56, 54, 52, 50, 48, 47, 46,
+  45, 44, 43, 42 (read off the contact sheet, by eye) and the ring's stop moved with the
+  **painted** digit in every frame, never with the 56 still on the wire.  So a `STATE all`
+  body and the overlay that follows it are not a pair: on this bench they were two seconds
+  and fifteen degrees apart by the end of the session.  `tools/theme_check.py --arc` pairs a
+  frame's ring stop to its painted digits for that reason — by grouping frames by the pixels
+  they paint for the arc's own `source` — and does not use the blob at all.
+* **The ring's geometry and value law, re-measured against the layout — this supersedes the
+  "outer radius 127 … 22 px thick … scale near 30..75" reading above.**  That reading came
+  from one frame, a max-alpha-along-a-radius sampler in 5° bins, and digits read by eye; what
+  follows comes from the theme's own layout (`themes/alpha/layouts/480X480/1757491588836.json`)
+  and from all 88 frames of both sessions, read as alpha crossings at half of each side's own
+  plateau (`tools/theme_check.py --arc`, and `themes/alpha/README.md` has the full table):
+
+  | | the old reading | measured now |
+  |---|---|---|
+  | centre | (236,236) | (237,236), which is the layout's box (107,106) 260×260 |
+  | stroke band | radius 109–132, "23 px" | 19.75–20.50 px wide, centre at radius 119.38–121.00 — the layout's `radius 110` + `width 20` |
+  | sweep | 269° of solid ink, 136°→45° | 135°→405° with **butt caps at the declared angles**: the fill's near edge crosses half coverage at +0.015° in all 88 frames |
+  | value law | scale "near 30..75", 2.2 % of the arc per °C | `(value − minValue)/(maxValue − minValue) × sweep` with the declared 0/100, i.e. **2.7082° per unit** measured against 2.7000 declared, worst residual 0.32° |
+  | unfilled track | "same colour pale at alpha 128" | confirmed at exactly **128** = `rgba(161, 246, 255, 0.5)`, painted at the same 20 px width to the end of the sweep |
+
+  Note the old 57 °C frame fits the new law: 57/100 × 270° = 153.9°, inside the 144–158° the
+  old sampler gave, so the "30..75" scale was inferred from a reading too coarse to need it.
+  One frame is the exception on purpose: `2026-11-05_07-21-36-052.osd`, the first of the
+  power-on session, paints `57°C` with its fill at **135.06°** — the ring was still animating
+  up to the value while the digits were already there.
 * **The on-screen clock is stale by up to one frame period, and that is arithmetic, not a
   bug.** The picture you see is the newest frame the panel has committed, and that frame was
   rendered and uploaded a moment ago: render, `transport`, bytes, notice, `transported` and

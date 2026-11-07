@@ -28,15 +28,22 @@ What is being compared, and why each comparison is fair:
   separate columns, and ink is compared as coverage - the sum of alpha over 255,
   i.e. how much of a solid glyph each one paints - because a count of pixels
   above a threshold is a property of the threshold.
-* **the ring** - the one `arc` in the library is the default theme, and the
-  default theme is what this panel displays, so the app's own uploads show it:
-  65 overlays in one capture, 24-25 KB PNGs, RGBA, 480x480.  Geometry is
-  measurable from them without knowing any value - ink radius, the sweep's ends
-  in Pillow's angles, and the caps, read as alpha rather than ink/not-ink
-  because both ends of the sweep land between pixels.  Where a value enters is
-  the filled fraction, and that is reported twice: as a fraction for every
-  frame, and against the temperature the app itself sent in the `STATE all`
-  request that precedes a frame, in the capture that contains such requests.
+* **the ring** (`--arc`) - the one `arc` in the library is the default theme, and
+  the default theme is what the app was displaying while it was being watched, so
+  the app's own uploads show it being drawn: 65 overlays in one capture, 24-25 KB
+  PNGs, RGBA, 480x480, plus 23 more in the session that starts at power-on.
+  Geometry needs no value at all: ink radii, the sweep's ends in Pillow's angles,
+  the stroke's band, and the caps, read as alpha crossings at half of each side's
+  own plateau (the fill plateaus at 255, the unfilled track at 128) rather than at
+  an ink/not-ink threshold, because both ends of the sweep land between pixels.
+  Where a value enters is how far the fill runs, and that pairing is done without
+  any reading of the digits: frames are grouped by the exact pixels they paint for
+  the arc's own `source`, each group carries one ring stop, and the digit that
+  stop carries is read off the `--digits` sheet by eye - and labelled a reading
+  wherever it is quoted.  The `STATE all` body is deliberately *not* used for the
+  pairing: over the power-on session the app sent the blob twice (57, then 56) and
+  painted 57..42 while the ring followed the painted digit, so the blob and the
+  frame are not a pair - PROTOCOL.md §9 writes that up.
 
 Both halves report; neither asserts a threshold.  The point is the number, and
 the README quotes it.
@@ -60,7 +67,7 @@ from xigmalcd.render import SS                                # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 THEMES = os.path.join(ROOT, "themes", "alpha")
-CAPTURES = os.path.join(ROOT, "COM3_windows_dumps")
+CAPTURES = os.path.join(ROOT, "data", "captures")
 INK = 8                      # alpha at or above this counts as ink: the vendor's
 #                             overlays are antialiased (one of them has 8 407
 #                             solid and 10 716 partial-alpha pixels)
@@ -993,8 +1000,13 @@ def main(argv=None) -> int:
                     digits = f"{root}-{i + 1}{ext}"
                 arc_audit(p, digits=digits)
         else:
-            print("\n(no capture on disk, so the ring audit had nothing to read;"
-                  "\n the captures live on the `data` branch of this repo)")
+            print(f"\n  skipping the ring audit out loud: no capture at "
+                  f"{CAPTURES!r}.  The two Windows sessions are bench files and "
+                  f"`data/` is gitignored, so a clone does not carry them.  On "
+                  f"the author's bench the audit reads them and prints the "
+                  f"numbers README.md and\n  themes/alpha/README.md quote:\n"
+                  f"    python3 tools/theme_check.py --arc "
+                  f"--digits /tmp/opencode/ring-digits.png")
     return 0
 
 

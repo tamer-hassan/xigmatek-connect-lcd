@@ -14,6 +14,12 @@ PNG frames. Verified on real hardware (Connect 360, firmware `V1.2.3`): handshak
 metrics blob and picture upload all work from Kubuntu — the drawn frame is what the
 display shows.
 
+**Unofficial, and it says so.** Nothing here is affiliated with, endorsed by or
+approved by XIGMATEK; `Xigmatek`, `Connect` and `ALPHA` are their owner's names. The
+code — `xigmalcd/`, `xigmaui/`, `tools/`, `install/` — is GPL-3.0-or-later (`LICENSE`),
+and the vendor's own files this repo carries as evidence and test assets are labelled
+as such wherever they appear ("Licence", at the end).
+
 The previews below are the transparent OSD frames composited over one frame of the
 vendor's own background MP4 - the same two-layer picture the panel puts on the glass.
 
@@ -751,7 +757,7 @@ on 2026-11-06; the first, 13:25:31 to 13:26:06:
 
 | action | what the panel said | what the glass did |
 |---|---|---|
-| status | `conn 1` with all fourteen fields, twice (`sn=<panel-serial-redacted>`, app V1.0.2, firmware V1.2.3, hardware V2.0, `space 62428`, `brightness 100`, `logo 3`, `mode 0`, `osdState 1`, `timeout 60`) | writes, not reads: `conn 1`, `power resume`, `timeout 60` |
+| status | `conn 1` with all fourteen fields, twice (`sn=<this panel's serial, redacted>`, app V1.0.2, firmware V1.2.3, hardware V2.0, `space 62428`, `brightness 100`, `logo 3`, `mode 0`, `osdState 1`, `timeout 60`) | writes, not reads: `conn 1`, `power resume`, `timeout 60` |
 | upload background | notice `200`, 214 917 B in 0.4 s, `space 62428 -> 62424` | the clip played, seen by eye |
 | one frame | notice `200`, one 9 KiB `.osd` PNG | the alpha overlay was on the glass |
 | live 30 s at 2 fps | **60 sent, 0 refused**, no session renewal needed at this length | overlay present for the whole window |
@@ -1399,27 +1405,58 @@ metrics schema; `xigmalcd/render.py` is the drawing; `xigmalcd/main.py` is the l
   2026-11-07 the themes themselves are readable too, keys and all - the whole library is in
   `themes/alpha/`, see that directory's README. Re-derive it
   any time with `python3 tools/theme.py` and `python3 tools/vendor_log.py`.
-* **Version control: local, started 2026-11-06.** `git init` in this directory and
-  one baseline commit, whose message lists what is and is not established at it.
-  Nothing is upstream, nothing is pushed, and there is no remote. Tracked: the two
-  Eltima **.txt** captures (37 MB - `tools/verify_protocol.py` and
-  `tools/vendor_capture.py` read them, so a clone can re-derive the protocol
-  rather than trust these notes), the three vendored clips in `media/`, the vendor's
-  theme library in `themes/alpha/` (145 MB: 27 `.thm` originals as shipped, 27 decrypted
-  layouts, 44 clips, 27 baked overlay PNGs, and a `manifest.json` hashing all 152 of
-  them), the theme contact sheets in `docs/previews/`, the project mark and the files
-  generated from it (`install/artwork/xigma-penguin.jpg`, `install/xigmaui.png`,
-  `install/xigmaui.ico`, `docs/logo.png`), all
-  twenty `data/glass/` logs, and the three pinned-number fixtures in
-  `tools/metrics/`. Not tracked, and said so in `.gitignore`: the
-  `.spm` binaries of the same two sessions, which only the Windows monitoring
-  tool opens, the 65 `.osd` payloads under `data/vendor_frames/` (which
-  `tools/vendor_capture.py` takes back out of the tracked capture), and the
-  usual python noise.
+* **Version control: local `git` since 2026-11-06, published 2026-11-07** as
+  `tamer-hassan/xigmatek-connect-lcd`, public, `main` only. Tracked: the three vendored
+  clips in `media/`, the vendor's theme library in `themes/alpha/` (145 MB: 27 `.thm`
+  originals as shipped, 27 decrypted layouts, 44 clips, 27 baked overlay PNGs, and a
+  `manifest.json` hashing all 152 of them), the theme contact sheets in `docs/previews/`,
+  the project mark and the files generated from it (`install/artwork/xigma-penguin.jpg`,
+  `install/xigmaui.png`, `install/xigmaui.ico`, `docs/logo.png`), and the three
+  pinned-number fixtures in `tools/metrics/`. Not tracked, and said so in `.gitignore`:
+  **everything under `data/`** — the two Windows serial-monitor sessions (37 MB of text,
+  plus the `.spm` binaries of the same sessions, which only the Windows monitoring tool
+  opens), the logs of every window run made against the real panel in `data/glass/`, and the
+  65 vendor `.osd` payloads under `data/vendor_frames/` that `tools/vendor_capture.py` takes
+  back out of the captures — plus the usual python noise.  What keeps them out is this
+  panel's own serial number, which the captures and the logs both carry: blanking it by
+  editing a log would be tampering with the evidence rather than redacting it, so those files
+  stay on the bench and the serial is redacted wherever prose quotes one of their fields.
+  **What that costs, said plainly:** a clone cannot re-run `tools/verify_protocol.py`,
+  `tools/theme_check.py --arc`, or the two `tools/selftest.sh` sections that call them.
+  Every wall-clock, byte-count and pixel figure in this README and in `PROTOCOL.md` names the
+  bench file it was read out of, so that the run can be **repeated** rather than trusted — not
+  so that it can be read here.  Those tools, and both selftest sections, print that they
+  skipped instead of reporting a pass.
+
+## Licence
+
+**The code is GPL-3.0-or-later** — `xigmalcd/`, `xigmaui/`, `tools/`, `install/`, and
+the text of this README and `PROTOCOL.md`. `LICENSE` carries the GNU GPL version 3, and
+`pyproject.toml` declares it that way (`license`, with the file named again in
+`license-files`).  Nothing in the dependency tree gets in the way of that: `pillow` is
+MIT (HPND/CMU-style, GPL-compatible), `pyserial` is BSD-3-clause, and the optional GUI
+extra needs `PyQt6`, itself GPL/CECPL — which is why it is an extra and why `install.sh`
+checks `import PyQt6` and names the distro package instead of pip-installing a second Qt
+into a user's session.
+
+**What is not ours, and is marked as such.** ALPHA's theme library (`themes/alpha/`:
+the 27 `.thm` files as shipped, their decrypted layouts, its 44 background clips and 27
+baked overlay PNGs) and the three background clips in `media/` are XIGMATEK's files,
+copied byte for byte out of the vendor installation on the author's bench — for the
+record, not by permission. They are in the repo because every claim this project makes
+about the themes is a claim about those bytes, and a reader should be able to hash them.
+`themes/alpha/README.md` names the installation path they came from and the tool that
+took them out; `manifest.json` hashes all 152 files. If any of this should not be
+redistributed, say so to the address in the git log and it comes down.
+
+**What is on the wire is not a trade secret or a licence.** Everything in `PROTOCOL.md`
+was measured against the panel from Linux, by hand, with no vendor documentation of any
+kind — there is none.
 
 ## Credit
 
-The protocol was recovered from two Eltima serial captures of `ALPHA.exe` on COM3
-(`COM3_windows_dumps/`), from ALPHA's own frame-level log files under
-`AppData/Roaming/alpha/logs/`, and from live probing of the panel — not from any vendor
-documentation, of which there is none.
+The protocol was recovered from two serial captures of `ALPHA.exe` on COM3 — the author's
+bench files, under `data/captures/` and gitignored — from ALPHA's own frame-level log files
+under `AppData/Roaming/alpha/logs/`, and from live probing of the panel; from ALPHA's
+`app.asar`, its V8 bytecode and its theme files; and from no vendor documentation at all, of
+which there is none.

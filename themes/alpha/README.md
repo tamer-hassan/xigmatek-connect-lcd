@@ -247,6 +247,62 @@ What the layouts do **not** say, and where the answer comes from instead:
 * **whether the value is clamped** — `minValue`/`maxValue` are given (bars 0–100; the one
   arc 0–100), nothing says what happens outside them.
 
+### The one `arc`, measured against the app's own frames
+
+The library holds exactly one `arc`: `layouts/480X480/1757491588836.json`
+(`default.thm`), `source CPU Temperature`, `minValue`/`maxValue` `0`/`100`.  It is also the
+theme the app was displaying while its COM3 traffic was watched, so its own uploads are a
+recording of that arc being drawn — 65 overlays in one session, 23 more in the session that
+starts at power-on, each a 480×480 RGBA PNG of 24–25 KB.  Every number a renderer needs is
+measured out of those frames by `tools/theme_check.py --arc`:
+
+| the layout says | what the app painted | the rule that follows |
+|---|---|---|
+| `angleStart` 45, `angleEnd` 315 | ink from 135° to 405° in the angles a raster arc takes (0° at 3 o'clock, growing towards 6 o'clock) | the app's 0° is the **bottom** of the circle and grows the same way the raster's does: `pil = app + 90` |
+| `x` 107, `y` 106, `sizeWidth`/`sizeHeight` 260 | the ring's ink box ends at x=367 | `x`,`y` is the **top-left of the box**, not the centre |
+| `radius` 110, `width` 20 | a stroke band 19.75–20.50 px wide whose centre sits at radius 119.38–121.00 px, probed along 53 rays (ours: 120.00–120.62) | `radius` is the **inner** edge, `width` the stroke; the band is where `radius + width/2` puts it, and the vendor's own rasterisation is the noisier of the two, by ±0.75 px |
+| a 270° sweep, `cornerRadius: false` | ink reaches offset 270 and stops dead at 271, and there is none at −1 | both ends are **butt caps, at the declared angle**: the fill's near edge crosses half of its own coverage at **+0.015°** in all 88 frames |
+| `minValue` 0, `maxValue` 100 | the fill's far edge at 113.14 / 115.87 / 118.48 / 121.32 / 124.01 / 126.68 / 129.44 / 135.06 / 140.20 / 145.75 / 151.15° for the frames painting 42 / 43 / 44 / 45 / 46 / 47 / 48 / 50 / 52 / 54 / 56, and 153.90 / 156.45 / 159.30 / 161.94 / 164.79 / 167.44° for 57 / 58 / 59 / 60 / 61 / 62 | `(value − min) / (max − min) × sweep`, clamped — worst residual **0.32°** over both captures. The slope needs no reading at all: 13.541° across five one-unit steps is **2.7082°/unit** where the layout declares 2.7000 |
+
+Two things about that table are methods, not results, and they are worth stating because
+they are what makes the numbers fair.  Every crossing above is an **alpha crossing at half
+of that side's own plateau** — the fill plateaus at 255, the unfilled track at 128 — never an
+ink/not-ink threshold, because a threshold is a property of the threshold.  And the pairing
+of frame to value is **reading-free**: frames are grouped by the exact pixels they paint for
+the arc's own `source`, so each group carries one ring stop, and the digit that stop carries
+was then read off a contact sheet (`--digits`) **by eye** — wherever a digit from this table
+is quoted elsewhere in this repo it is labelled as a reading, not a measurement.
+
+One frame does not fit the rule, and it is the first frame of the power-on session:
+`2026-11-05_07-21-36-052.osd` paints `57°C` with its fill at **135.06°**, where every other
+frame painting 57 sits at 153.90°.  The ring was still animating up to its value; the digits
+were already there.
+
+**The fill's colour is not the lerp the fields suggest.**  `startColor` is
+`rgba(0, 247, 255, 1)`, `endColor` `rgba(0, 255, 113, 1)`, and a renderer that interpolated
+one into the other along the sweep would be wrong by up to 17/255 per channel.  Sampling
+along the middle of the stroke (radius 116/120/124, alpha 250+ only, averaged over every
+frame that reaches the degree) says the colour is a function of the **angle alone** — across
+the stroke it varies by ≤2/255, and it does not move with the value at all, which only
+decides how far the fill runs.  What the app actually paints: `startColor` held exactly to
+32°, ramping 33°→120° down to `rgb(0, 251, 184)`, then flat at `rgb(0, 251, 184)` from 121°
+to 165°, the deepest either session ever filled.  **`endColor` appears in no frame of
+either capture**, so 166°..270° is a gap and not a plateau: `xigmalcd/layout.py`
+`ARC_COLOUR_MEASURED` carries the 22 sampled degrees (reproducing the vendor's pixels at
+worst 2.4/255, mean 0.09, against 16.9 worst / 2.97 mean for the straight lerp), it is keyed
+by the declared colour pair so it can only ever apply to the theme it was measured on, and
+any other pair falls back to the lerp with `draw_arc` saying so out loud.
+
+The unfilled part of the sweep is painted, not left empty: a flat
+`rgba(161, 246, 255, 0.5)` track, and its coverage reads exactly **128** — the declared 0.5
+alpha, so the app rounds half up.  It runs at the same 20 px width as the fill, to the end of
+the sweep.
+
+None of this is on the wire yet: `xigmalcd/layout.py` is the interpreter and
+`tools/theme_check.py` is the ruler, and the loop that feeds the panel still draws the
+hand-made `alpha` theme in `xigmalcd/render.py`.  See "What is reproduced here" below.
+
+
 ## How ALPHA itself holds these at runtime
 
 Worth recording, because it is how the app's live state connects to this directory.
@@ -257,8 +313,10 @@ re-instantiates its own library at install time.  Pairing them by exact widget p
 the same order (presets 0–3 are the four 320×240 themes, presets 4–26 the 23 480×480
 ones, `default.thm` at index 4).
 
-That resolves a loose end in `xigmalcd/render.py`: this panel's
-`devicesInfo.BYZL24…currentThemeId` is `1785506775818`, i.e. `presetTheme[26]`, and its
+That resolves a loose end in `xigmalcd/render.py`: the store's
+`devicesInfo` entry for this panel (keyed by its serial number, which is redacted
+throughout this repo) has `currentThemeId` `1785506775818`, i.e.
+`presetTheme[26]`, and its
 eight widgets are the ones in `layouts/480X480/1757491589871.json` (bar 2, data 3,
 text 3, bars at 100,330 and 100,400 sized 280×10 in `rgba(192, 66, 255, 1)` →
 `rgba(143, 78, 255, 1)` over a `rgba(196, 162, 255, 1)` track) — the numbers that page's
@@ -273,21 +331,64 @@ PNG is *not* the one in the `.thm` — the app re-renders a preview when it impo
 Reproduced: the files themselves, their container, their schema, and the vendor's
 compositing (previews above).
 
-Not yet: **a renderer that draws these layouts live.**  That is the open work — walk
-`osd.widget[]`, place `text`/`data` at `x`,`y` with the layout's own `fontSize` and
-`textColor`, fill `bar` between `minValue`/`maxValue` with the layout's `startColor` →
-`endColor` over its `bgColor`, sweep the `arc` from `angleStart` to `angleEnd`, and feed
-it `sensors.py` instead of the app's metrics.  The primitives (arc, gauge, bar, text and
-the font loader) are already in `xigmalcd/render.py`; the alpha theme there is a
-hand-drawn reproduction of one of these layouts, not a general layout interpreter.
+**A layout interpreter now exists: `xigmalcd/layout.py`.**  It walks `osd.widget[]` and
+draws `text`/`data` at `x`,`y` with the layout's own `fontFamily`, `fontSize`, `bold` and
+`textColor`, fills `bar` from `minValue`/`maxValue` with `startColor` over `bgColor`, sweeps
+the `arc` exactly as measured above, and returns `(image, notes)` where the notes name every
+font it substituted, every `source` it had no value for, and every gap it had to guess at.
+`tools/theme_check.py` is the ruler that keeps it honest, drawing a copied layout and
+comparing it, in pixels, against pictures the vendor drew itself.
 
-Fonts are a known substitution, and it is a real difference, not a cosmetic one: **this
-box has no Microsoft fonts.**  `Arial` → Liberation Sans (metric-compatible), `simsun`
-and `宋体` → Noto Sans CJK, `Verdana` → DejaVu Sans.  Liberation Sans matches Arial's
-advance widths, so text placement survives; Verdana is wider than DejaVu Sans, so a
-`Verdana` widget may ink a few pixels differently.  Whether the difference is visible on
-a 480×480 1-inch panel is an eye question, and no eye has seen it yet — the substitution
-is not on the wire.
+What is **not** done: it is not wired to the panel.  The loop that feeds the display still
+draws the hand-made `alpha` theme in `xigmalcd/render.py`; `xigmalcd` has no
+`--theme-file` switch.  Running a copied theme is therefore a claim about offline PNGs, and
+nothing in this repo has put one on the glass.
+
+Three holes in the schema are still open, and each says what it is waiting for:
+
+* **the text a `data` widget paints** — `Time` as `HH:MM` or `HH:MM:SS`, `Week` in which
+  language, `kb/s` or `KB/s`, how many decimals on a frequency.  The layouts never say, the
+  panel is never given the text (PROTOCOL.md §8: the metrics blob is numbers only), and the
+  formats live in the app's V8 bytecode — reachable through the `d8` + View8 route of
+  PROTOCOL.md §10 but not yet read out of it.  `layout.FORMATS_MEASURED` carries what has
+  been read off the vendor's own baked overlays and marks the rest as a choice made here.
+* **a `line` widget's colour and thickness** — none of the four carries either.  What is
+  used is the app's own renderer default, read out of its bundle
+  (`lineColor: "rgba(19, 206, 102, 1)"`, `lineWidth: 2`, `maxTickCount: 10`), and
+  `draw_theme` records `"line colour"` as a gap every time it paints one.
+* **`arc` colour past 165° of the sweep**, and for any `startColor`/`endColor` pair other
+  than the one measured above: there it falls back to a straight lerp and says so.
+
+Fonts are a known substitution, and the measurement of it is now in the open rather than in
+a hunch.  **This box has no Microsoft fonts**, so `Arial` → Liberation Sans, `simsun` and
+`宋体` → Noto Sans CJK, `Verdana` → DejaVu Sans.  Over all **66 static `text` widgets in the
+27 themes, all 66 were compared and none was unresolvable** (`tools/theme_check.py`, which
+compares ink boxes and ink *coverage* — sum of alpha over 255 — inside the widget's declared
+window):
+
+| declared | drawn with | ink box, ours minus the vendor's | ink coverage, vendor vs ours |
+|---|---|---|---|
+| `arial` 12 / 16 / 20 / 24 / 40, regular | Liberation Sans | width −4…+0 px, height −4…+1 px | 26 354 vs 21 536 |
+| `arial` 14 (the two widgets that hold CJK) | Liberation Sans, CJK from Noto | width −13…−11 px | 419 vs 83 |
+| `arial` bold 20 / 32 | Liberation Sans Bold | width **−19…−11** px, height +0…+1 px | 8 861 vs 5 939 |
+| `Verdana` bold 20 | DejaVu Sans Bold | width +0 px, height +0 px | 1 167 vs 1 028 |
+| `simsun` 14 / 24 / 24 bold | Noto Sans CJK | width +1…+10 px, height +0…+4 px | 1 089 vs 1 485 |
+
+Read the columns per face, never pooled across them: Liberation Sans reproduces Arial's
+advance widths for the regular faces (−4…0 px over a whole string, and the −4 of the height
+column is one `↑CPU` arrow), while **bold is the real difference** — `CPU TEMP` at
+`arial/32b` comes out 19 px narrower and far lighter than the vendor's (coverage 2 192
+against our 1 564).  The CJK rows point the other way: where a widget holds Latin text
+declared in `simsun`, Noto's Latin is wider than SimSun's (+9…+10 px), and where one holds
+CJK declared in `Arial`, the vendor's fallback painted far heavier glyphs than Noto manages
+at that size (`频率` at 14 px: 30×12 px and coverage 171, against our 19×10 px and
+coverage 33).  And on placement, one shared rule and one gap: the vendor's ink starts
+**+1…+5 px below** the declared `y` — which is what settled the anchor convention as the top
+of the em box — while ours starts +2…+10 px below it, worst on CJK.  So every widget of
+ours sits a little lower than the vendor's, by 1 to 5 px.
+
+Whether any of that is visible on a 480×480 panel of about one square inch is an eye
+question, and no eye has seen a copied theme on glass yet — none of this is on the wire.
 
 Vendor `path` strings inside every theme point at
 `C:\Users\Administrator\AppData\Roaming\alpha\…` — the vendor's own build machine user,

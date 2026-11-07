@@ -2,13 +2,23 @@ __pycache__/
 *.pyc
 docs/scratch/
 *.tmp
-data/vendor_frames/
 
-# The Eltima captures' own binary format.  The protocol work reads the .txt
-# renders of the same two sessions (tools/verify_protocol.py), and those are
-# tracked, so a clone can re-verify every PROTOCOL.md claim without the 5 MB of
-# binary captures that only the Windows monitoring tool can open.
-*.spm
+# What is measured on the bench stays on the bench.  `data/` holds the three kinds
+# of bench artifact: `data/captures/` the two Windows serial-monitor sessions the
+# vendor app was watched through (39 MB of text, plus the `.spm` binaries only the
+# monitoring tool can open), `data/glass/` the log of every window run made against
+# the real panel, `data/vendor_frames/` the 65 `.osd` payloads lifted out of the
+# captures by `tools/vendor_capture.py --extract`.  None of it is published: the
+# captures and the logs both carry this panel's own serial number, and editing a
+# log to take it out would be tampering with the evidence rather than redacting it.
+#
+# The consequence is stated where it matters rather than here: every wall-clock,
+# byte-count and pixel figure in README.md and PROTOCOL.md traces to a file in this
+# directory on the author's machine, and the file names are quoted so a run can be
+# repeated, not so it can be read here.  The checks that would read them -
+# `tools/verify_protocol.py`, `tools/theme_check.py --arc`, and the two selftest
+# sections that call them - say out loud that they are skipping instead of passing.
+data/
 
 # python packaging and editors
 build/

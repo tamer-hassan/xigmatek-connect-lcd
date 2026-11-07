@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Take the real `.osd` payloads out of a Windows serial-monitor capture.
 
-`COM3_windows_dumps/COM3 Monitoring Session.txt` is a serial monitor log in
-UTF-16 with one row per serial IRP:
+`data/captures/COM3 Monitoring Session.txt` (bench-only: `data/` is gitignored) is
+a serial monitor log in UTF-16 with one row per serial IRP:
 
     #  Time  Function  Direction  Status  Data  Data (chars)  Data length ...
 
