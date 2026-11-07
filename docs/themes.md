@@ -47,7 +47,12 @@ measured geometry the `alpha` preset was redrawn from (`xigmalcd/layout.py`, and
 paragraph below about rings and text sizes), and its media is uploadable -
 43 clips and 28 images per install, all 43 clips under the socket gate's 8 MB ceiling
 (largest `clips/Theme_22.mp4`, 7 662 077 B) - and note what ffprobe says about them: 40
-of the 43 are 480×480 like the panel, **3 are 320×240**, so the vendor's own library
+of the 43 are 480×480 like the panel, **3 are 320×240**, and by rate **23 are 24 fps and
+20 are 20 fps** (the 20 fps group is 17 of the 480×480 files plus all three 320×240 ones;
+loop lengths 0.96 s to 34.04 s, median 9.96 s). That rate split is why the window's
+playing preview paces by the file's own `r_frame_rate` rather than by a constant: a
+hard-coded 24 would play nearly half the library at the wrong speed, and 22 ms of ffprobe
+per clip is what buys that (docs/gui.md). so the vendor's own library
 ships backgrounds the glass is not the size of and nothing here has measured what the
 panel does with one (docs/limits.md). Two uploads from that library have been measured on
 the packaged unit's own path: `themes/alpha/clips/theme_47.mp4` at 1 211 106 B,

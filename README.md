@@ -22,20 +22,36 @@ as such wherever they appear ("Licence", at the end).
 
 ## What it draws
 
-The five previews below are the transparent OSD frames composited over one frame of the
-vendor's own background MP4 — the same two-layer picture the panel puts on the glass.
+The five previews below **play**: our transparent OSD layer composited over the vendor's
+own background MP4 running on repeat — the same two-layer picture the panel puts on the
+glass, and the same loop whose restart seam PROTOCOL.md §9 measures there.
 
 | `alpha` (default) | `gauge` |
 |---|---|
-| ![alpha](docs/preview-alpha.png) | ![gauge](docs/preview-gauge.png) |
+| ![alpha](docs/preview-alpha.gif) | ![gauge](docs/preview-gauge.gif) |
 
 | `dual` | `clock` |
 |---|---|
-| ![dual](docs/preview-dual.png) | ![clock](docs/preview-clock.png) |
+| ![dual](docs/preview-dual.gif) | ![clock](docs/preview-clock.gif) |
 
 | `bars` | |
 |---|---|
-| ![bars](docs/preview-bars.png) | |
+| ![bars](docs/preview-bars.gif) | |
+
+They are GIFs because GitHub renders an `.mp4` in a README as an `<img>` no browser
+plays, so motion here has to be a GIF. `tools/preview_gif.py` writes them through the
+same path the window's preview pane uses — `clips.ClipPlayer` decoding the file,
+`render.draw` drawing our layer over it — at 320 px, 12 frames, a 170 ms delay, 128
+colours. What is *not* live: the digits are one dated sample from the author's bench
+under a stated load (CPU 73 °C at 89.8 % load, CPU fan 2 238 RPM, 82 of 123 GB of
+memory), the same pinned readings every time, so the picture says the same thing on
+every machine. The GIF's palette is ffmpeg's, not the 256-colour PNG the panel is fed;
+measured back out of the encoded files, the drawn colours land 0-2 per channel from
+what `render.py` asked for. And because a GIF carries a length, the restart is worth
+measuring rather than trusting: by PROTOCOL.md §9's own metric the five files join at
+2.05-2.36 against typical steps of 2.15-2.52, so the restart never stands out — and it
+is smoother than that same clip's raw join measured there (2.50 against 1.51), because
+our redrawn layer raises every ordinary step.
 
 `alpha` is the vendor's currently selected theme redrawn widget for widget, with the
 things that theme has no widget for added: a GPU-temperature column, a gauge arc
@@ -55,12 +71,16 @@ And because this panel cannot be asked what it is showing, the window says what 
 *knows*: the background the running display reported putting there, and the last six
 things it did on the port. Three columns — preview, controls, clip library — with an
 `advanced controls` switch that folds the secondary knobs away without changing their
-values - and one row, always in sight, for the colour of the text it draws. This is a capture of the real program (`tools/screenshot.py`, no panel attached),
-with this machine's live readings in the preview:
+values, a `playing` box that decodes the background in sequence so the preview moves
+under our layer instead of showing one still frame of it, and one row that is always in
+sight, for the colour of the text it draws. This is a capture of the real program
+(`tools/screenshot.py`, no panel attached), with this machine's live readings in the
+preview:
 
-![xigmaui, the window in three columns: the preview and the log on the left, the
-running display's status and the theme pickers in the middle, and the background clip
-library on the right, showing twenty of this machine's 69 clips](docs/screenshot-xigmaui.png)
+![xigmaui, the window in three columns: the playing preview and the log on the left,
+the display's status, the theme picker and the text-colour row in the middle, and the
+background clip library on the right showing eight whole rows of this machine's 69
+clips](docs/screenshot-xigmaui.png)
 
 It talks to a display loop that is already running when one is running, and drives the
 port itself when nothing is — which is the part that needs care, because the panel
@@ -134,7 +154,7 @@ names, so the default glass is what `ALPHA` showed you on Windows.
 | [PROTOCOL.md](PROTOCOL.md) | the wire: the handshake, the frame format, the media upload, the session limit — every claim from a capture |
 
 Everything in those files is measured on the author's bench or read out of a kept log,
-and the gaps are named as gaps. `tools/selftest.sh` runs the eighteen offline sections
+and the gaps are named as gaps. `tools/selftest.sh` runs the nineteen offline sections
 that hold the claims which do not need hardware — it is what CI runs first, on a machine
 that has never seen a panel.
 

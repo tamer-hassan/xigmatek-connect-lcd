@@ -404,6 +404,45 @@ What has been measured on glass, by whom, with how many frames - and what has no
   2026-11-07 the themes themselves are readable too, keys and all - the whole library is in
   `themes/alpha/`, see that directory's README. Re-derive it
   any time with `python3 tools/theme.py` and `python3 tools/vendor_log.py`.
+* **The README's previews move, and moving costs: GIF, and measured GIF.** Motion has to be
+  a GIF here because GitHub renders an MP4 written as a markdown image link as an `<img>`
+  tag, which no browser plays - checked against GitHub's own markdown endpoint, not
+  remembered. (The shape of that sentence matters here: writing the link syntax inside
+  docs/ to explain it makes the suite's link checker look for a file that does not exist,
+  which is how this paragraph was caught on its first run.) Every other setting came
+  out of a measurement rather than out of taste:
+  * **GitHub renders this README's body 624 px wide** in a 1 000 px window, and displayed the
+    old 480 px PNGs at **281-289 px** inside the two-column table. So the GIFs are 320 px
+    (**471 305-585 559 B** each) and not 480 px (**1.05-1.18 MB** each): at the size they are
+    drawn, the extra half-megabyte a file is invisible.
+  * **128 colours for the whole animation** (`palettegen`), measured **23 % smaller** than 256
+    with the drawn colour still within 1/255 at 480 px either way. 64 colours at 320 px is
+    where ink starts to move (**7/255**) and 32 colours gives 4-5/255. Dither off is ~10 %
+    smaller and bands the gradients; `stats_mode=diff` measured 2-3 % *bigger* here.
+  * **A frame delay is 170 ms, not 167.** GIF stores delays in 10 ms units, so the "6 fps"
+    request lands at 5.9 fps and the 12-frame file runs **2.04 s**.
+  * **The GIF's join is smaller than the clip's own join.** `Theme_25.mp4` loops in 0.958 s, so
+    12 frames at 170 ms restarts 0.12 s into a fresh pass - which is only a problem if it reads
+    as a jump. Measured with §9's own metric (mean absolute difference of the gray plane, against
+    the median step inside the loop), the five README files land at **seam 2.05-2.36 against a
+    typical step of 2.15-2.52** - the join is never larger than an ordinary frame step, and on
+    `alpha` it is 2.30 against 2.33. Against the same clip with nothing drawn on it, §9 measured
+    **2.50 against 1.51**: the raw clip does jump once per second, and it is *our layer* that
+    raises the ordinary step (a redrawn OSD is a constant difference between frames) so the join
+    stops standing out. That is §9's seam seen from the host side instead of the glass side, and
+    the suite asserts it on the shipped files.
+  * **Repeating frames is not a saving.** Decoding at the clip's own 24 fps and letting ffmpeg
+    drop to 8 costs **7 205 675 B** for the animation that sampling at the target rate writes
+    in **1 510 157 B** - GIF's whole size model is inter-frame difference, so a frame shown
+    three times pays for the deltas twice.
+  And what those pictures are not: the digits are one dated pinned sample (CPU 73 °C at 89.8 %
+  load, CPU fan 2 238 RPM, the set `tools/preview_gif.py` carries, taken under a stated ffmpeg
+  load and re-derivable there), the palette is ffmpeg's animation palette and not the
+  256-colour PNG the upload path uses (§10 measures that drift at 1/255 per channel), and §11
+  still means none of it is a photograph of the glass. Re-derive any figure above with
+  `tools/preview_gif.py --scale … --colors … --frames … --gif-fps … --ink … [--live]`: it
+  prints the byte size, the delay the written file actually holds, and the nearest drawn colour
+  to the ink asked for, every single time.
 * **`pip install .` carries no clips, and that is a hole rather than a design.** The three
   MP4s this repo vendors live in `media/`, which is not a Python package, and
   `pyproject.toml` declares no package data for them — so an installed `xigmalcd` finds them

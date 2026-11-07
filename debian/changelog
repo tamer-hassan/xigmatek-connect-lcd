@@ -44,10 +44,76 @@ xigmatek-connect-lcd (0.3) UNRELEASED; urgency=medium
     says which one it left alone, and the state line reads `text not reported by
     this display` rather than the misleading `text theme default`.
 
-  * tools/selftest.sh, eighteen offline sections; tools/screenshot.py frames the
+  * The preview pane plays.  A `playing` box above the picture decodes the
+    background in sequence through one streaming ffmpeg (`clips.ClipPlayer`) and
+    composites our layer over each frame; still mode keeps the seek-to-mid-loop
+    thumbnail path, which is the right shape for one image and an order of
+    magnitude worse for a loop - twelve frames out of one process took 0.03 s,
+    while twelve seeks cost the better part of a second, and the seek is what
+    would hitch.  The rate comes from the file: `_ffprobe_look` now asks ffprobe
+    for `r_frame_rate` too, and of the 43 clips the themes package installs 23
+    are 24 fps and 20 are 20 fps (17 of the 480x480 ones plus all three
+    320x240), so a hard-coded 24 would play nearly half the library at the wrong
+    speed.  Two clocks, measured rather than assumed: the layer redraws at
+    `--preview-fps` (85.6 ms a tick, 71.8 ms of it `sensors.collect`) and the
+    background plays on its own `QTimer` at the file's rate (41 ms for a 24 fps
+    clip), pasting the cached layer over each decoded frame - a background tick
+    is 0.54 ms (decode 1.06 ms with it, composite 0.26 ms, an identity
+    480x480 resize 0.02 ms).  The first cut drove both from the preview timer,
+    which made the animation's rate equal `--preview-fps`: on this bench's own
+    saved `preview_fps: 1.0` that was a 1 fps slideshow, correctly reported as
+    "very slow and stutters at about 1 fps", and the split takes the same window
+    to 24.3 fps of background with a 1 fps layer (23.3 at 2).  Rate capped at
+    30, floored at 5; a file whose rate ffprobe will not give is played at 24
+    and the line under the picture says so.  A hidden window decodes nothing:
+    `hideEvent` closes the ffmpeg and stops both timers, 2 s hidden shows and
+    decodes zero frames, and a `black` canvas never opens a stream because no
+    background shows there.  Remembered as `animate`.  The seam the viewer sees
+    is the file's own and is not a splice: 23-24 frames a pass, and the
+    first frame of three successive passes is byte-identical
+    (f7e5ded0b703).  The two lines under the picture change with the
+    state rather than at the next preview tick: a window at `preview_fps
+    1.0` otherwise went on saying "one mid-loop frame" for a second
+    after `playing` was ticked or the canvas switched, and the caption's
+    second half had no separator before the file's own note, printing
+    "...measures those.background Theme_25.mp4 at mid-loop".  Both were
+    caught by the suite's new assertions - one of them as a race, which
+    is the honest way to find it - and the caption now names the loop's
+    own facts instead: `Theme_25.mp4 is 0.96 s at 24 fps, 480x480`.
+    Measured with the layer clock stopped and the background's running:
+    46 frames reached the label in 2.0 s at a 1 fps layer.
+
+  * tools/preview_gif.py writes that composite out as an animated GIF, and the
+    README's five theme previews are GIFs now - 320 px, 12 frames at a 170 ms
+    delay, 128 colours, 471 305-585 559 B each, 2.04 s - where the five still
+    PNGs used to be; the PNGs are still written by tools/previews.py and are no
+    longer tracked.  GIF because GitHub renders an MP4 written as a markdown
+    image link as an `<img>` no browser plays.  320 px because GitHub displays
+    this README's body 624 px wide in a 1 000 px window and showed the old
+    480 px PNGs at 281-289 px, so 480 px GIFs (1.05-1.18 MB each) buy nothing at
+    the size they are drawn.  128 colours because it measures 23 % smaller than
+    256 with the drawn colour within 1/255 at 480 px either way.  And the loop
+    join is measured with PROTOCOL.md's own seam metric rather than trusted:
+    2.05-2.36 against typical steps of 2.15-2.52 on the six shipped files,
+    against 2.50/1.51 for the same clip with nothing drawn on it.  docs/gui.md
+    carries an ink figure - alpha over the vendored clip, text in #ffc400 -
+    whose nearest drawn colour measures 2/255 from the amber asked for; that is
+    ffmpeg's animation palette and not the 256-colour PNG the upload path uses,
+    and the documents say so beside the picture rather than leaving it assumed.
+
+  * tools/selftest.sh, nineteen offline sections; tools/screenshot.py frames the
     window at 1380x860 and finishes probing the rows a picture can show;
     tools/display_glass.py's Apply phase sends the colour command along with the
-    rest, so the next bench run can settle the glass half.
+    rest, so the next bench run can settle the glass half.  The new section
+    checks the README's GIFs as documents (320x320, 12 frames, 170 ms, under
+    700 KB, a join no larger than an ordinary frame step, ink within 3/255 of
+    what was asked) and pointedly not by byte hash, runs the tool for all five
+    themes at 160 px - the themes take different render options, and passing one
+    option bag straight through died with `theme_alpha() got an unexpected
+    keyword argument 'source'` - and asserts the two clocks are separate: with
+    the layer timer stopped, a window at `preview_fps 1.0` has to move the
+    picture at least ten times in two seconds while its layer tick count does
+    not move at all.
 
  -- Tamer Hassan <thameruddin@gmail.com>  Sat, 07 Nov 2026 09:45:00 +0200
 xigmatek-connect-lcd (0.2) resolute; urgency=medium

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Regenerate docs/screenshot-xigmaui.png: the real window, captured offscreen.
 
-The README's five `docs/preview-*.png` files are what the *panel* draws - one frame
-from each theme, composited the way the glass composites (`tools/previews.py`).  This
-is the picture of the *window*: the same Qt application a reader gets from `xigmaui`,
+The README's five `docs/preview-*.gif` files are what the *panel* draws, playing:
+our layer over the vendor's background running, written by `tools/preview_gif.py`
+(the still version of the same composite is `tools/previews.py`).  This is the
+picture of the *window*: the same Qt application a reader gets from `xigmaui`,
 with its theme picker, its preview, its clip library and its status box, exactly as it
 lays itself out on first run.
 

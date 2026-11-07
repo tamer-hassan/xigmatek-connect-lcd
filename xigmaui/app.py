@@ -174,6 +174,12 @@ class Window(QMainWindow):
         self.setWindowTitle(TITLE)
         self.port = port or self.cfg["device"]
         self.preview_fps = preview_fps or self.cfg["preview_fps"]
+        self.player: clipdb.ClipPlayer | None = None   # the preview's decode stream
+        self._dead_clips: set[str] = set()   # files whose stream produced nothing
+        self._osd: Image.Image | None = None  # our layer, redrawn at preview_fps
+        self._played = 0        # frames the pane has actually shown (for docs/measuring)
+        self.bg_timer = QTimer(self)          # the background's own clock
+        self.bg_timer.timeout.connect(self._play_tick)   # connected once, here
         self.mp4 = self.cfg["clip"]
         self.tray_wanted = self.cfg["tray"] if tray is None else tray
         self._quitting = False
@@ -241,6 +247,35 @@ class Window(QMainWindow):
     def _build(self) -> None:
         left = QWidget()
         lay = QVBoxLayout(left)
+        # `playing`: the preview pane can show the background moving rather than
+        # one mid-loop frame of it.  Host-side only - it sends nothing, changes
+        # nothing on the display, and is a preview of our own compositing in both
+        # modes (§11).  It is here rather than behind the advanced switch because
+        # it is about what the reader is looking at, and because the one thing it
+        # can cost is CPU, which the tooltip says.
+        arow = QHBoxLayout()
+        self.anim_toggle = QCheckBox("playing")
+        self.anim_toggle.setChecked(bool(self.cfg.get("animate")))
+        self.anim_toggle.setToolTip(
+            "decode the background clip in sequence and show it moving under our "
+            "layer, instead of one still frame of it. Nothing goes out on the "
+            "wire either way: this is this machine's own ffmpeg decode of the "
+            "file plus `render.draw`'s layer on top, and the panel is never asked "
+            "what it is showing, so it is still not a picture of the glass. The "
+            "clip plays on its own timer at its own measured rate (23 of the "
+            "vendor's 43 clips are 24 fps, 20 are 20 fps, capped here at 30), while "
+            "our layer and the sensor readings behind it are redrawn at "
+            "--preview-fps. The two are deliberately separate clocks: reading the "
+            "sensors is ~72 ms of an ~86 ms layer tick, and pasting the layer over "
+            "the next frame of the clip is ~0.5 ms, so tying them together makes a "
+            "24 fps clip into a slideshow at the preview rate. Measured figures in "
+            "docs/gui.md")
+        arow.addWidget(self.anim_toggle)
+        self.anim_note = QLabel()
+        self.anim_note.setStyleSheet("color:#888;font-style:italic;")
+        self.anim_note.setWordWrap(True)
+        arow.addWidget(self.anim_note, 1)
+        lay.addLayout(arow)
         self.preview = QLabel()
         self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         # small minima: a preview pane that cannot shrink drags a horizontal
@@ -294,6 +329,7 @@ class Window(QMainWindow):
             "shown is still what is set, and Apply sends it either way")
         self.adv_toggle.setChecked(bool(self.cfg.get("advanced")))
         self.adv_toggle.toggled.connect(self._set_advanced)
+        self.anim_toggle.toggled.connect(self._set_animate)
         head.addWidget(self.adv_toggle)
         self.adv_note = QLabel("canvas, scrim, fans, the event log, panel hello")
         self.adv_note.setStyleSheet("color:#888;font-style:italic;")
@@ -506,6 +542,7 @@ class Window(QMainWindow):
                                 Qt.ItemDataRole.ToolTipRole)
         self.canvas.setCurrentIndex(1 if self.cfg["canvas"] == "black" else 0)
         self.canvas.currentIndexChanged.connect(self._changed)
+        self.canvas.currentIndexChanged.connect(lambda _i: self._set_player())
         adv_row("canvas", self.canvas)
         self.scrim = QSpinBox()
         self.scrim.setRange(-1, 255)
@@ -809,10 +846,22 @@ class Window(QMainWindow):
         return {k: v for k, v in kw.items() if k in params} | {"scrim": want}
 
     def _repaint(self) -> None:
+        """Redraw **our layer** from fresh readings, then show it.
+
+        This is the expensive half, and it is deliberately the only half tied to
+        `--preview-fps`: `sensors.collect()` is 71.8 ms and `render.draw` another
+        11.9 ms measured here, so a tick of this costs ~84 ms.  The background does
+        not move at this rate and never should have: it plays on `bg_timer`, at the
+        file's own rate, compositing over the layer cached here (`self._osd`).
+        Before that split the pane's redraw rate *was* the animation rate, and a
+        24 fps clip at the default 2 fps - or the author's own saved 1 fps - was a
+        slideshow, which is what "it stutters at about 1 fps" meant.
+        """
         m = sensors.collect()
         self._last = m
         theme = self.theme.currentText()
         img = render.draw(m, theme, **self._render_kw())
+        self._osd = img
         self._seq += 1
         self.metrics.setText(
             f"cpu {(m.get('cpu') or {}).get('temperature')}°C  "
@@ -821,20 +870,90 @@ class Window(QMainWindow):
             f"gpu fan {(m.get('gpu') or {}).get('fan')}%  "
             + "  ".join(f"{f['name']} {f['value']}" for f in m.get("fans") or [])
             + f"   frame #{self._seq} ({render.frame_name()})")
+        if self.player is not None:
+            # the cheap path: the new layer goes over the frame we already have,
+            # without pulling another clip frame for this tick
+            self._play_tick(redraw=False)
+        else:
+            comp = img
+            if self.bg_frame is not None and self.canvas.currentIndex() == 0:
+                comp = self.bg_frame.resize(img.size, Image.Resampling.LANCZOS).copy()
+                comp.alpha_composite(img)
+            self._show(comp)
+        self._captions()
+
+    def _play_tick(self, redraw: bool = True) -> None:
+        """One frame of the background, shown.  This is the animation's clock.
+
+        Cheap by measurement, which is the whole reason it can run at the file's
+        20-24 fps while the layer under `preview_fps` does not: the decode is 1.06 ms
+        (one frame out of `ClipPlayer`), and pasting the cached layer over it -
+        copy, `alpha_composite`, `convert`, `tobytes` - is 0.26 ms more, with the
+        resize of a 480x480 frame to the panel's own 480x480 a no-op at 0.02 ms.
+        What is left is Qt putting the pixels on a label: the pane's `_fit`.
+
+        `redraw=False` is `preview_fps`'s tick arriving with a layer that is newer
+        than the frame: show what we have without pulling another clip frame.
+        """
+        if self.player is not None and redraw:
+            self._advance()
+        img = self._osd
+        if img is None:
+            return
         comp = img
         if self.bg_frame is not None and self.canvas.currentIndex() == 0:
-            comp = self.bg_frame.resize(img.size, Image.Resampling.LANCZOS).copy()
+            base = (self.bg_frame if self.bg_frame.size == img.size
+                    else self.bg_frame.resize(img.size, Image.Resampling.LANCZOS))
+            comp = base.copy()
             comp.alpha_composite(img)
-        rgb = comp.convert("RGB")
-        q = QImage(rgb.tobytes("raw", "RGB"), img.width, img.height,
-                   QImage.Format.Format_RGB888).copy()
+        self._played += 1
+        self._show(comp)
+
+    def _show(self, comp: Image.Image) -> None:
+        """Hand one image to the label.  Nothing about it is expensive enough to
+        need its own timer, which is why the split above works."""
+        q = QImage(comp.convert("RGB").tobytes("raw", "RGB"), comp.width,
+                   comp.height, QImage.Format.Format_RGB888).copy()
         self._pix = QPixmap.fromImage(q)
         self._fit()
-        self.caption.setText(
-            "Preview: our composite of the stored background frame plus the OSD "
-            "layer we would send. This panel has no readback, so it is not a "
-            "picture of the glass. "
-            + self.bg_note)
+
+    def _captions(self) -> None:
+        """The two lines under the picture, and the seam claim they carry.
+
+        Said once per *layer* tick rather than once per shown frame: the text does
+        not change 24 times a second, and `setText` on a wrapped QLabel is not free
+        either.
+        """
+        played = self.player is not None
+        if played:
+            # the loop's own facts, from the probe the player already did, instead of
+            # the still frame's note: the two used to be concatenated without a
+            # separator, which printed "...measures those.background Theme_25.mp4 at
+            # mid-loop" - and said "mid-loop" about a clip that was not showing one.
+            self.caption.setText(
+                "Preview: our composite of the background clip playing under the "
+                "OSD layer we would send. This panel has no readback, so it is not "
+                "a picture of the glass; the loop seam that arrives here is the "
+                "file's own, and PROTOCOL.md \u00a79 measures those.  "
+                f"{os.path.basename(self.mp4 or '')} is {self.player.seconds:.2f} s "
+                f"at {self.player.fps:g} fps, {self.player.wide}x{self.player.tall}.")
+        else:
+            self.caption.setText(
+                "Preview: our composite of one mid-loop frame of the background "
+                "under the OSD layer we would send. This panel has no readback, so "
+                "it is not a picture of the glass. " + self.bg_note)
+        if played:
+            rate = min(max(self.player.fps or 24.0, 5.0), 30.0)
+            self.anim_note.setText(
+                f"background {os.path.basename(self.mp4 or '')} playing at "
+                f"{rate:g} fps"
+                + ("" if not self.player.fps or abs(self.player.fps - rate) < 0.05
+                   else f" (the file says {self.player.fps:g}, shown at {rate:g})")
+                + f"; our layer and the readings behind it redrawn at "
+                  f"{self.preview_fps:g} fps")
+        else:
+            self.anim_note.setText(
+                f"still frame; the pane is redrawn at {self.preview_fps:g} fps")
 
     def _fit(self) -> None:
         """Show the preview as large as the pane allows, never larger than 1:1.
@@ -888,7 +1007,101 @@ class Window(QMainWindow):
         self.bg_frame = clipdb.frame(path)
         self.bg_note = (f"background {os.path.basename(path)} at mid-loop"
                         if self.bg_frame else f"no frame from {path}")
+        self._set_player()
         self._repaint()
+
+    def _set_player(self) -> None:
+        """Start, restart or put away the decode stream behind the preview.
+
+        A still frame comes from `clipdb.frame`, which spawns one ffmpeg and seeks
+        - the right shape for a thumbnail and a poor one for a loop, measured at
+        an order of magnitude per frame more than a single streaming process.  So
+        one process stays open while `playing` is on, and nothing is decoded at
+        all while it is off, while the window is hidden, or while the picture is a
+        `black` canvas (where the background shows nowhere).
+        """
+        want = (bool(self.anim_toggle.isChecked()) and self.isVisible()
+                # a minimised window is still `isVisible()` to Qt, so `hideEvent`
+                # never fires for it - and it draws nothing either
+                and not self.isMinimized()
+                and self.canvas.currentIndex() == 0
+                and (self.mp4 or "").lower().endswith(".mp4")
+                # a file that gave not one frame: retried once per tick, that is a
+                # fresh ffmpeg and a fresh probe twice a second for a picture that
+                # will never move, so it is refused here and said out loud below
+                and self.mp4 not in self._dead_clips)
+        if not want:
+            self._close_player()
+            # the two lines under the picture say what the pane is doing, so they
+            # have to change when this does - not at the next preview tick, which at
+            # `preview_fps 1.0` is up to a second of stale text.  The suite's first
+            # attempt at asserting them caught that as a race: the caption still read
+            # "one mid-loop frame" a moment after the stream had started.
+            self._captions()
+            return
+        if self.player is not None and self.player.path == self.mp4:
+            self._captions()
+            return
+        self._close_player()
+        self.player = clipdb.ClipPlayer(self.mp4)
+        self._play_t0 = time.monotonic()
+        self._play_due = 0.0
+        # the file's rate, not the pane's: 41-50 ms, and never faster than 30 fps,
+        # because past that the difference is not something an eye separates and the
+        # cost is one full composite plus one `_fit` per frame
+        rate = min(max(self.player.fps or 24.0, 5.0), 30.0)
+        self.bg_timer.setInterval(max(33, int(1000 / rate)))
+        self.bg_timer.start()                 # connected once in __init__: a second
+        # connect here would run the tick twice per timer fire and play the clip at
+        # double speed, which is the kind of bug a rate split invites
+        self._captions()
+
+    def _close_player(self) -> None:
+        self.bg_timer.stop()
+        if self.player is not None:
+            self.player.close()
+            self.player = None
+
+    def _advance(self) -> None:
+        """Pull as many clip frames as real time is worth, and keep the last one.
+
+        The file's own rate is what paces this: the panel plays its stored MP4 at
+        that rate, and the preview's redraw rate is ours (2 fps by default), so
+        one tick of the preview is worth a dozen decoded frames of a 24 fps clip.
+        Reading them is not free but it is small and measured - about 2 ms a frame
+        here - and the cap keeps a window that was stopped (hidden, or suspended
+        by a desktop) from decoding minutes of catch-up in one click.
+        """
+        if self.player is None:
+            return
+        now = time.monotonic()
+        gap = min(1.0, now - self._play_t0)      # never more than a second of it
+        self._play_t0 = now
+        rate = self.player.fps or 24.0
+        self._play_due += gap * rate
+        want = int(self._play_due)
+        self._play_due -= want
+        if want < 1:
+            return
+        frame = None
+        for _ in range(min(want, 60)):
+            got = self.player.frame()
+            if got is None:
+                break
+            frame = got
+        if self.player.dead:
+            # The stream died, so the honest thing is to stop claiming it is
+            # playing: fall back to the still frame we already have, name the
+            # reason in the line under the picture, and remember the file so the
+            # next tick does not start another ffmpeg over it.
+            self._dead_clips.add(self.player.path)
+            self._close_player()
+            self.bg_note = (f"no frame could be decoded from "
+                            f"{os.path.basename(self.mp4 or '')}: showing the still "
+                            f"frame instead (this machine's ffmpeg is what said so)")
+            return
+        if frame is not None:
+            self.bg_frame = frame
 
     # ---- settings --------------------------------------------------------
     def _changed(self, *_a) -> None:
@@ -903,6 +1116,7 @@ class Window(QMainWindow):
                 "canvas": "black" if self.canvas.currentIndex() else "clear",
                 "scrim": self.scrim.value(), "fans": self.fanline.isChecked(),
                 "preview_fps": self.preview_fps, "clip": self.mp4,
+                "animate": self.anim_toggle.isChecked(),
                 "advanced": self.adv_toggle.isChecked(),
                 "size": [self.width(), self.height()],
                 # the split as it stands, not as it was saved: the splitter's
@@ -1069,6 +1283,18 @@ class Window(QMainWindow):
                         f"\nsending it replaces what the panel stores; only the "
                         f"factory reset clears it again")
         return ""
+
+    # ---- the preview's own motion ---------------------------------------
+    def _set_animate(self, on: bool) -> None:
+        """Play the background, or go back to the one still frame.
+
+        The still stays as the fallback for everything that cannot stream: no
+        ffmpeg on the box, an unreadable file, a `black` canvas where no
+        background is visible anyway, and a hidden window.
+        """
+        self._set_player()
+        self._repaint()
+        self.save_timer.start()
 
     # ---- the advanced switch --------------------------------------------
     def _set_advanced(self, on: bool) -> None:
@@ -1378,6 +1604,36 @@ class Window(QMainWindow):
                              "tree's `python3 -m xigmalcd`, or update the "
                              "package, and the choice becomes sendable"))
 
+    def changeEvent(self, event) -> None:         # noqa: N802
+        """Minimised is the other way a window draws nothing.
+
+        Qt keeps reporting a minimised window as `isVisible()`, so `hideEvent` never
+        runs for it: the decode stream and the two timers would go on producing a
+        picture no one can see, with an ffmpeg holding the file open.  Same
+        treatment, same reversal.
+        """
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.WindowStateChange:
+            if self.isMinimized():
+                self.preview_timer.stop()
+                self._close_player()
+            elif self.isVisible():
+                self.preview_timer.start(max(200, int(1000 / self.preview_fps)))
+                self._set_player()
+
+    def hideEvent(self, event) -> None:           # noqa: N802
+        """A hidden window draws nothing, so it should decode and render nothing.
+
+        Closing the decode stream here is the point: an ffmpeg holding an open
+        file for a window that is in the tray is waste the user cannot see, and
+        the preview timer at 2 fps is another thing ticking away behind it.  Both
+        come back in `showEvent`, and the clip restarts at its beginning rather
+        than resuming somewhere in the middle of a loop nobody watched.
+        """
+        self.preview_timer.stop()
+        self._close_player()          # stops bg_timer with it: nothing to show
+        super().hideEvent(event)
+
     def _display_changed(self, present: bool) -> None:
         self._sync_ink_control()
         if present:
@@ -1557,6 +1813,12 @@ class Window(QMainWindow):
         super().showEvent(event)
         if hasattr(self, "thumb_timer") and getattr(self, "_pending", None):
             self.thumb_timer.start(0)      # the ffmpeg pass carries on from here
+        # the other half of what `hideEvent` stopped: the preview's redraw timer,
+        # and the decode stream behind it, which starts again at the top of the
+        # clip rather than in the middle of a loop nobody watched
+        if hasattr(self, "preview_timer"):
+            self.preview_timer.start(max(200, int(1000 / self.preview_fps)))
+        self._set_player()
         self.statusBar().showMessage(self._owner_line())
 
     def closeEvent(self, event) -> None:                 # noqa: N802
@@ -1577,6 +1839,10 @@ class Window(QMainWindow):
         self.daemon_timer.stop()
         if hasattr(self, "thumb_timer"):
             self.thumb_timer.stop()     # only created once clips were found
+        # an ffmpeg left streaming a clip for a preview nobody will see again is a
+        # child process outliving its reason.  `hideEvent` covers the tray path;
+        # this is the way out.
+        self._close_player()
         self.save_timer.stop()
         self._save_now()        # the way it looks now is the way it starts next
         self.panel.stop()

@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Regenerate docs/preview-*.png so the README shows what the code actually draws.
+"""Regenerate the **still** version of the previews: docs/preview-<theme>.png.
+
+Since 0.3 the README embeds animated previews instead, and those come from
+`tools/preview_gif.py` - the same composite, moving.  This tool is still the one the
+window's documentation points at for the picture *at rest*, and the fastest way to look
+at a change to the skin without waiting for an encoder, so its PNGs are written here on
+demand and not tracked (`.gitignore` says so).
 
 The pictures are composited the way the panel composites them: the theme draws on a
 transparent canvas (ALPHA's frames paint 4.6 percent of their pixels, PROTOCOL.md §9)
@@ -8,7 +14,11 @@ lifted out of ALPHA's own theme MP4 with ffmpeg, so a preview is what the glass 
 rather than a drawing on a flat field.
 
 Numbers are pinned rather than read from this box, so re-running does not churn the
-images every time the CPU happens to be warm.
+images every time the CPU happens to be warm.  The set below is not the set
+`tools/preview_gif.py` pins (that one is a dated load-state sample, because a moving
+picture reads better with the meters somewhere other than empty); each tool's own
+provenance is written next to its `PINNED`, and a figure quoted from a picture has to
+say which picture it is.
 """
 import os
 import subprocess

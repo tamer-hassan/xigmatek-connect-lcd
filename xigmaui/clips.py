@@ -46,6 +46,14 @@ from dataclasses import dataclass, field
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from PIL import Image                                            # noqa: E402
 
+from xigmalcd import render                                      # noqa: E402
+# `render` for one thing: the panel's own geometry, as the fallback when ffprobe
+# cannot read a file.  `xigmalcd.main` stays a function-level import (it is the CLI,
+# with argparse and the media roots in it); `xigmalcd.render` is PIL and stdlib only,
+# so taking it at module level costs nothing and a missing name costs a crash: the
+# line below once read `int(wide or render.W)` with no import at all, and survived
+# only because `wide or ...` short-circuits whenever ffprobe answers.
+
 _FRAME_CACHE: dict[tuple[str, float], Image.Image] = {}
 
 
@@ -56,6 +64,7 @@ class Clip:
     bytes: int = 0
     seconds: float = 0.0
     px: tuple = (0, 0)             # width, height; (0, 0) until probed
+    fps: float = 0.0               # the file's own rate; 0.0 until probed
     luma: float = -1.0           # mean of 0-255, -1 until measured
     note: str = ""
     thumbs: dict = field(default_factory=dict, repr=False)
@@ -77,8 +86,16 @@ class Clip:
             else f"{self.bytes / 1024 / 1024:.1f} MiB"
 
 
-def _ffprobe_look(path: str) -> tuple[float, int, int]:
-    """One ffprobe, three numbers: seconds, and the frame's width and height.
+def _ffprobe_look(path: str) -> tuple[float, int, int, float]:
+    """One ffprobe, four numbers: seconds, the frame's width and height, and the
+    frame rate.
+
+    The rate is what makes an honest *played* preview possible: the player paces
+    by wall-clock time, so it has to know how many frames of the file a second of
+    real time is worth.  `r_frame_rate` is ffprobe's own "real base framerate"
+    (a rational like `24/1`), which is the number to pace against; the container's
+    average rate can differ after variable-frame-rate edits, and neither is
+    something the panel is asked about (§11).
 
     The geometry is not decoration.  Of the 43 clips the themes package installs,
     40 are 480x480 - the panel's own size - and **3 are 320x240** (measured on the
@@ -92,14 +109,31 @@ def _ffprobe_look(path: str) -> tuple[float, int, int]:
     try:
         out = subprocess.run(
             ["ffprobe", "-v", "error", "-select_streams", "v:0",
-             "-show_entries", "stream=width,height", "-show_entries",
-             "format=duration", "-of", "default=nw=1:nk=1", path],
+             "-show_entries", "stream=width,height,r_frame_rate",
+             "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", path],
             capture_output=True, text=True, check=True)
         numbers = [ln.strip() for ln in out.stdout.splitlines() if ln.strip()]
-        w, h = (int(numbers[0]), int(numbers[1])) if len(numbers) >= 3 else (0, 0)
-        return float(numbers[-1]), w, h
-    except (OSError, ValueError, IndexError, subprocess.CalledProcessError):
-        return 0.0, 0, 0
+    except (OSError, subprocess.CalledProcessError):
+        return 0.0, 0, 0, 0.0
+    try:
+        w, h = (int(numbers[0]), int(numbers[1])) if len(numbers) >= 4 else (0, 0)
+        fps = _rate(numbers[2]) if len(numbers) >= 4 else 0.0
+        return float(numbers[-1]), w, h, fps
+    except (ValueError, IndexError):
+        return 0.0, 0, 0, 0.0
+
+
+def _rate(text: str) -> float:
+    """`24/1`, `30000/1001` or `24` -> frames per second, 0.0 when unspecced."""
+    try:
+        if "/" in text:
+            num, den = text.split("/", 1)
+            den = float(den)
+            return float(num) / den if den else 0.0
+        return float(text)
+    except (ValueError, ZeroDivisionError):
+        return 0.0
 
 
 def letterbox(img: Image.Image, side: int) -> Image.Image:
@@ -134,7 +168,7 @@ def frame(path: str, at: float = 0.5) -> Image.Image | None:
     hit = _FRAME_CACHE.get(key)
     if hit is not None:
         return hit.copy()
-    dur, _wide, _tall = _ffprobe_look(path)   # the size is for the picker
+    dur, _wide, _tall, _fps = _ffprobe_look(path)   # size and rate are for the picker/player
     seek = dur * at if dur > 0.2 else 0.0
     try:
         out = subprocess.run(
@@ -148,6 +182,118 @@ def frame(path: str, at: float = 0.5) -> Image.Image | None:
     img = Image.open(io.BytesIO(out.stdout)).convert("RGBA")
     _FRAME_CACHE[key] = img
     return img.copy()
+
+
+class ClipPlayer:
+    """One clip, decoded in order, so the window can *play* a background.
+
+    Why not the `frame()` above, once per preview tick: that function spawns an
+    ffmpeg per frame and seeks, which is the right shape for a thumbnail (one
+    image, never again) and the wrong shape for a loop.  Measured on this bench
+    over `Theme_25.mp4`: twelve frames through one streaming process took
+    0.03 s - about 2.5 ms each - while twelve seeks cost an order of magnitude
+    more, and the seek is what would put a visible hitch in the playback.
+
+    One process stays open, raw RGBA frames come out of it in order, and at EOF
+    it is restarted - so the viewer sees the same loop seam the panel sees, and
+    PROTOCOL.md §9 measures those seams (which is why they are worth seeing).
+    Nothing seeks: the panel's loop restarts at frame 0 too, so the restart point
+    is part of what is being shown rather than a detail to hide.
+
+    Nothing here is measured on the panel: this decodes and shows the file on
+    *this* machine, and §11 still means the glass cannot be asked what it is
+    doing.
+    """
+
+    def __init__(self, path: str):
+        self.path = path
+        # probed once, here, before a single frame is read - because the window
+        # prints the rate beside the picture, and a player that only learned its own
+        # frame rate at the first `frame()` spent one redraw saying "at 0 fps".  The
+        # suite caught exactly that as `AssertionError: 0.0`.  One ffprobe is 22 ms
+        # measured across the 46 clips this box can see: too much to do per frame,
+        # cheap to do once.
+        dur, wide, tall, fps = _ffprobe_look(path)
+        self.seconds = dur
+        self.wide, self.tall = int(wide or render.W), int(tall or render.H)
+        self.fps = float(fps)      # 0.0 = ffprobe did not say; callers pace at 24
+        self._proc: subprocess.Popen | None = None
+        self._left = b""
+        self.frames = 0          # frames since the last loop restart
+        self.decoded = 0         # frames ever produced: the number worth measuring
+        self.loops = 0           # end-of-file restarts, i.e. the seams a viewer saw
+        self.dead = False        # a stream that produced no frame: stop, don't spin
+
+    def _spawn(self) -> None:
+        self.close()
+        self._left = b""
+        try:
+            self._proc = subprocess.Popen(
+                ["ffmpeg", "-v", "error", "-i", self.path, "-f", "rawvideo",
+                 "-pix_fmt", "rgba", "-"],
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        except OSError:
+            self._proc = None
+            return
+
+    def frame(self) -> Image.Image | None:
+        """The next frame, or None if ffmpeg is not available at all.
+
+        Blocks for the length of one decode - a few milliseconds, measured above
+        - which at the window's preview rate is nothing; a non-blocking version
+        would need a thread and a queue to drop the same frames a human could
+        not tell apart.
+
+        Once a stream has failed - see `dead` - it stays failed and says so
+        instead of being started again.
+        """
+        if self.dead:
+            return None
+        if self._proc is None:
+            self._spawn()
+        if self._proc is None:
+            return None
+        need = self.wide * self.tall * 4
+        buf = self._left
+        while len(buf) < need:
+            chunk = self._proc.stdout.read(need - len(buf))
+            if not chunk:                      # end of file: the loop restarts
+                if self.frames == 0:
+                    # ...unless this spawn never produced a frame at all, which is
+                    # not a loop seam but a failure: a missing file, an undecodable
+                    # stream, an ffmpeg without the codec.  Restarting there is an
+                    # infinite loop - measured, in the sense that it ate a 16-minute
+                    # harness timeout on a path that only ever needed one honest
+                    # `None`.  So: give up, once, and let the caller fall back to the
+                    # still frame it already has.
+                    self.dead = True
+                    self.close()
+                    return None
+                self.frames = 0
+                self.loops += 1
+                self._spawn()
+                if self._proc is None:
+                    return None
+                continue
+            buf += chunk
+        self._left = buf[need:]
+        self.frames += 1
+        self.decoded += 1
+        return Image.frombytes("RGBA", (self.wide, self.tall), buf[:need])
+
+    def close(self) -> None:
+        if self._proc is not None:
+            try:
+                if self._proc.stdout:
+                    self._proc.stdout.close()
+            except (OSError, ValueError):
+                pass
+            self._proc.terminate()
+            try:
+                self._proc.wait(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                self._proc.kill()
+            self._proc = None
 
 
 def luma(img: Image.Image) -> float:
@@ -239,7 +385,7 @@ def list_clips(extra: str = "") -> list[Clip]:
 def probe(clip: Clip) -> float:
     """Measure one clip's loop length and frame size. One row at a time."""
     if not clip.seconds or not clip.px[0]:
-        clip.seconds, w, h = _ffprobe_look(clip.path)
+        clip.seconds, w, h, clip.fps = _ffprobe_look(clip.path)
         clip.px = (w, h)
     return clip.seconds
 

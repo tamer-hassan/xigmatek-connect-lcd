@@ -17,7 +17,7 @@ lintian ../xigmatek-connect-lcd_*.changes
 ```
 
 Before either package is worth building there is one gate, and CI puts it first: the
-offline suite - eighteen offline sections with no panel in sight - and the `.deb` job
+offline suite - nineteen offline sections with no panel in sight - and the `.deb` job
 `needs`
 it, so a tree that fails a check never produces a package (`.github/workflows/ci.yml`).
 
@@ -165,10 +165,11 @@ Two measurements decided how the package carries them:
   the prose and the transcripts plain; the changelog still gets compressed, as usual. It
   costs about 90 KB and buys a doc set that reads on an installed machine.
 
-What the images do **not** do is get packaged: `docs/logo.png`, the five
-`docs/preview-*.png`, `docs/screenshot-xigmaui.png` and the two theme contact sheets are
-3.5 MB of rendered PNG, and part of that is rendered from XIGMATEK's theme library, which
-is the other package's files and its own licence question. So an installed README shows
+What the images do **not** do is get packaged: `docs/logo.png`, the six
+`docs/preview-*.gif` (the five themes, plus the text-colour figure docs/gui.md carries),
+`docs/screenshot-xigmaui.png` and the two theme contact sheets - **5 845 093 B** of
+them, 3.2 MB of it the animated GIFs - and part of that is rendered from XIGMATEK's theme
+library, which is the other package's files and its own licence question. So an installed README shows
 prose with repo-relative image links, and that is said here rather than discovered by a
 reader.
 

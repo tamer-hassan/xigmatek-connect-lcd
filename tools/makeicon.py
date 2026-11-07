@@ -79,7 +79,8 @@ CHECK_FILL = 128
 ICO_SIZES = ((16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128),
              (256, 256))
 
-# what ALPHA's own captured frame reads, so --draw matches docs/preview-*.png
+# what ALPHA's own captured frame reads, so --draw matches the stills previews.py
+# writes (the README's own previews are GIFs from tools/preview_gif.py)
 PINNED = {"cpu": {"temperature": 57.0, "load": 42.0},
           "gpu": {"temperature": 47.0, "load": 38.0, "fan": 45}}
 

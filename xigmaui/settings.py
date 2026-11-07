@@ -34,6 +34,7 @@ DEFAULTS: dict = {
     "fans": True,
     "preview_fps": 2.0,        # host-side only; a frame renders in ~9 ms
     "advanced": False,         # the folded-away knobs: see app.py:_set_advanced
+    "animate": True,           # the preview pane plays the clip; False = one frame
     "size": [1180, 780],       # the window as you left it: wide enough for the
                                # three columns, and short enough for a 1080p screen
     "split": [520, 460, 560],  # the three columns, as you left the splitter between
@@ -98,6 +99,8 @@ def _clean(loaded: dict) -> dict:
         out["tray"] = loaded["tray"]
     if isinstance(loaded.get("advanced"), bool):
         out["advanced"] = loaded["advanced"]
+    if isinstance(loaded.get("animate"), bool):
+        out["animate"] = loaded["animate"]
     try:
         fps = float(loaded["preview_fps"])
         if 0.5 <= fps <= 10:

@@ -70,7 +70,7 @@ one of them (see "How the three columns get their sizes", after the table):
 | box | column | what it does | what lands on the wire |
 |---|---|---|---|
 | the running display | controls | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. It also spells out the settings that display is running with - canvas, clock size, scrim, fans, and **the text colour it holds, as the hex it will answer again** (`text #ffc400`), which is the only place in the window you can see a colour you did not pick yourself. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Measured 1 ms for the commands Apply sends - six on the 0.2 bench ledgers below, seven in the tree, and the suite re-measures the line every run |
-| preview | preview | the stored background frame with `render.draw`'s OSD layer composited on top, refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How the three columns get their sizes" below | nothing |
+| preview | preview | the background with `render.draw`'s OSD layer composited on top - playing, via one streaming ffmpeg, or as one mid-loop frame (`playing` box, see "The preview plays" below), refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How the three columns get their sizes" below | nothing |
 | theme | controls | the five themes, clock size, **the colour of the text it draws**, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
 | clips | library | every MP4 the roots hold, listed once per clip - **69 rows** on this box: 3 vendored here, 40 more from the vendor's library, 26 more from the 69 files the Windows app has pushed to this panel (the rest are byte-identical re-uploads); the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
 | background state | library | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the gate refuses says so, in the gate's words, before the button is pressed | nothing: it is a readout |
@@ -133,6 +133,90 @@ The fresh window default is **1180×780** (`xigmaui/settings.py`) - wide enough 
 three columns, short enough for a 1080p screen - and the README's capture frames it at
 1380×860. Both figures are asserted against the code by the suite, so neither sentence
 can go stale.
+
+### The preview plays, or shows one frame
+
+Above the picture there is a `playing` box, and beside it a line that says what the
+pane is actually doing (`Theme_25.mp4 at 24 fps, this pane redrawn at 8 fps`, or
+`still frame; the pane is redrawn at 2 fps`). It is host-side and sends nothing: the
+choice changes only what this machine decodes and composites, and the glass is never
+asked what it is showing (§11) either way.
+
+Two decode shapes, and the difference is measured:
+
+* **still** (the old behaviour, and the fallback) asks `clips.frame()`, which spawns
+  one ffmpeg and **seeks** to the middle of the loop. Right for a thumbnail, wrong for
+  a loop: twelve frames that way cost an order of magnitude more than twelve out of one
+  streaming process, and the seek is what would hitch.
+* **playing** holds one `clips.ClipPlayer` open, reads raw RGBA frames in order, and at
+  end of file restarts the process - so the seam the viewer sees is the file's own
+  seam, which PROTOCOL.md §9 measures on the panel. Nothing seeks, because the panel's
+  loop restarts at frame 0 too.
+
+The rate comes from the file: `_ffprobe_look` now asks ffprobe for `r_frame_rate` as
+well as the geometry, and the player paces by **wall clock** against it, because the
+pane's redraw rate (2 fps by default) is ours and the clip's is the vendor's. Of the 43
+clips the themes package installs, **23 are 24 fps and 20 are 20 fps** (the 20: 17 of
+the 480×480 ones plus all three 320×240 files), so a hard-coded 24 would play a fifth
+of the library at the wrong speed. One tick pulls as many frames as the elapsed real
+time is worth, with the gap clamped at 1 s and the catch-up at 60 frames, so a window
+that was suspended over lunch does not decode an hour in one click.
+
+What it costs, timed on this bench with the window offscreen but live
+(`sensors.collect` → `render.draw` → player → whole tick):
+
+| what | per call |
+|---|---|
+| `sensors.collect()` | **71.8 ms** |
+| `render.draw()` with fixed metrics | **11.9 ms** |
+| one frame out of `ClipPlayer` | **1.06 ms** |
+| pasting the layer over that frame (`copy` + `alpha_composite` + `convert` + `tobytes`) | **0.26 ms** |
+| a resize of a 480×480 frame to the panel's own 480×480 | **0.02 ms** (PIL short-circuits an identity resize; a 320×240 frame costs 2.36 ms) |
+| one background tick (`_play_tick`) | **0.54 ms** |
+| one layer tick (`_repaint`, the old whole tick) | **85.6 ms** |
+
+That table is the argument for **two clocks**, which is what the pane has now: the
+layer is redrawn at `--preview-fps` (the expensive half, dominated by reading the
+sensors) and the background plays on its own `QTimer` at the file's rate, pasting the
+cached layer over each decoded frame. The first version drove both from the preview
+timer, so the pane's redraw rate *was* the animation rate: at the author's saved
+`preview_fps: 1.0` a 24 fps clip played as **1 fps of slideshow**, which is what a
+reader would call broken, and the same pane measured at the default 2 fps showed
+2 fps. After the split, the same window with the same 1 fps setting shows
+**24.3 frames a second** (23.3 at a 2 fps layer), because a background tick costs
+~0.5 ms and only the layer tick pays the ~86 ms.
+
+Both rates are visible in the line under the picture - `background Theme_25.mp4
+playing at 24 fps; our layer and the readings behind it redrawn at 1 fps` - and the
+suite asserts the separation rather than the average machine: with the layer timer
+stopped, a window at `preview_fps 1.0` has to move the picture at least ten times in
+two seconds while its layer tick count does not move at all.
+
+What rate you actually get depends on what else the window is doing, and both figures
+are measured here rather than quoted as a spec: **24.3 fps** for a pane whose clip
+library had finished its ffmpeg thumbnail pass, **19 fps** (40 frames in 2.1 s) for the
+window the suite drives while the suite itself runs five other sections' processes
+alongside it.  Frames are dropped rather than queued - `_advance` pulls as many as real
+time is worth and keeps the last one, so a slow moment costs a frame of the animation
+and never a backlog that plays later as a burst.
+
+The rate is capped at 30 fps and floored at 5 (`_set_player`), because past 30 the
+difference is not something an eye separates and every extra frame is a composite and
+a paint; a file whose rate ffprobe will not give is played at 24 and the line says so. A hidden window decodes nothing at all: `hideEvent` stops
+the preview timer and closes the ffmpeg, `showEvent` restarts both at the top of the
+clip, and a `black` canvas never opens one, because on black the background shows
+nowhere. Measured by watching the counters: 200 event spins with the window hidden
+advance no frames.
+
+The seam is visible in the pane, and it is the file's — and it is a step no larger than
+ordinary motion once our layer is on top (2.30 seam against a 2.33 typical step by PROTOCOL.md
+§9's metric for the README's `alpha` file, against 2.50/1.51 for the bare clip there). The
+number the suite asserts. The seam is visible in the pane, and it is the file's: `Theme_25.mp4` is 0.9583 s, which
+at 24 fps is 23-24 frames a pass (measured 24, then 23, then 23 - the last pass is short
+by the fraction of a frame the resampler drops), and the **first frame of successive
+passes is byte-identical** (`f7e5ded0b703` three times), so the restart never splices a
+half frame together. That is the same loop the panel plays, and it is why the README's
+GIFs can claim a measured seam rather than a hope (docs/limits.md).
 
 ### The advanced switch
 
@@ -246,6 +330,24 @@ One interaction to know about: the automatic scrim plate is a rule measured for
 Choosing a dark ink over a bright field is a combination nothing here has measured, so
 `auto` stays the daemon's white-ink rule rather than inventing a second one - if you pick
 a dark colour over a bright clip, set the scrim yourself and judge it on the glass.
+
+The same layer in motion, as a file rather than as a description - the alpha theme over
+the vendored `Theme_25.mp4` running, its text in amber:
+
+![the alpha theme's OSD layer over the vendor's own background playing, with the text
+drawn in #ffc400 instead of the theme's white](preview-alpha-text-ffc400.gif)
+
+`tools/preview_gif.py --clip media/Theme_25.mp4 --theme alpha --ink amber --scale 320
+--colors 128 --frames 12 --gif-fps 6 --clock 11:07:42` writes that file, and it is the
+same composite the `playing` pane shows: `ClipPlayer` in sequence, `render.draw` on top,
+and the pinned readings rather than live ones (so the digits say the same thing on
+every machine). The GIF's own loss is measured off the encoded file rather than assumed:
+the nearest colour that file actually holds to the amber `render.py` asked for is
+**(253, 195, 0), 2/255 away**. That is the GIF's palette - ffmpeg's `palettegen`, 128
+colours for the whole animation - and not the 256-colour PNG the upload path sends,
+whose drift the suite measures separately at 1/255 per channel (§10). Nothing here was
+put on glass to be photographed: the panel cannot be asked what it shows (§11), so this
+is our compositing, encoded.
 
 ### Two shortcuts, and why they are the ones they are
 

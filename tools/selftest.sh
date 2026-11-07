@@ -482,7 +482,185 @@ for path, size, md5 in ((DEFAULT_MP4, 214_917, "b818b7d3294b3625e9f143e920ccc9b0
 PY
 
 echo
+echo "== the animated previews: the GIFs the README embeds, and the tool that writes them"
+# README's five theme previews now *play*, which puts a moving picture underneath two
+# written claims: README's caption ("position *and* colour carry the value") and
+# PROTOCOL.md §9's loop seams.  So the files are checked as documents, not as blobs:
+# geometry, frame count, delay, size band, and the text colour measured out of the
+# decoded frames.  Deliberately no byte hash - GIF output is ffmpeg's version's
+# business, and a different runner could write a palette one byte away while the
+# picture stays the same.  Everything here runs with no device and no network.
+python3 - <<'PY' || { echo "preview gifs FAILED"; exit 1; }
+import os, re, subprocess, sys, tempfile, time
+sys.path.insert(0, ".")
+sys.path.insert(0, "tools")
+from PIL import Image, ImageChops, ImageStat
+
+from xigmalcd import render
+import preview_gif
+
+EDGE, FRAMES, DELAY, CEILING = 320, 12, 170, 700_000
+THEME_FILES = {t: f"docs/preview-{t}.gif" for t in sorted(render.THEMES)}
+INK_FILE = "docs/preview-alpha-text-ffc400.gif"
+
+# the pinned readings, which are what the previews' digits say: memory and disk are
+# in megabytes, the vendor's units.  That is not pedantry - the first version of this
+# dict had bytes from a guess, `bars` printed `used // 1024` and called the result
+# GB, and the picture came out reading "RAM 8 089 595 GB" with no warning of any
+# kind.  So the scale is asserted, not assumed.
+mem = preview_gif.PINNED["memory"]
+assert mem["used"] < mem["total"] < 10 ** 7, mem
+assert 1 <= mem["used"] // 1024 <= 1024, (mem["used"] // 1024,)
+assert preview_gif.PINNED["cpu"]["temperature"], preview_gif.PINNED["cpu"]
+
+
+def decoded(path):
+    im = Image.open(path)
+    out = []
+    try:
+        while True:
+            out.append(im.convert("RGB"))
+            im.seek(len(out))
+    except EOFError:
+        pass
+    return out, im.info.get("duration")
+
+
+def nearest(path, want):
+    """The colour actually present in the decoded frames that is nearest to `want`,
+    and how far.  `getcolors` because a palettised GIF frame holds at most 256
+    distinct values, not a quarter of a million."""
+    best = (999, None)
+    for fr in decoded(path)[0]:
+        for _n, px in fr.getcolors(maxcolors=1 << 20):
+            d = max(abs(a - b) for a, b in zip(px, want))
+            if d < best[0]:
+                best = (d, px)
+    return best[1], best[0]
+
+
+def step(a, b):
+    """PROTOCOL.md §9's own seam metric: the mean absolute difference of the gray
+    plane between two frames.  Same shape as the table that measures the vendor's 40
+    clips, so the composites' numbers here are comparable with the clips' numbers
+    there - which is the whole reason to measure a GIF's seam this way."""
+    diff = ImageChops.difference(a.convert("L"), b.convert("L"))
+    return ImageStat.Stat(diff).mean[0]
+
+
+total = 0
+for theme, path in THEME_FILES.items():
+    fr, dur = decoded(path)
+    im = Image.open(path)
+    assert im.size == (EDGE, EDGE), (path, im.size)
+    assert len(fr) == FRAMES, (path, len(fr))
+    assert dur == DELAY, (path, dur)
+    size = os.path.getsize(path)
+    assert size < CEILING, (path, size)
+    total += size
+    # the loop seam: 12 frames at a 170 ms delay is 2.04 s, and the vendored clip's
+    # own loop is 0.958 s, so the GIF restarts 0.12 s into a fresh pass.  That is
+    # only a problem if it reads as a jump, so it is measured: the seam has to be no
+    # bigger than an ordinary step between neighbouring frames.
+    inside = sorted(step(a, b) for a, b in zip(fr, fr[1:]))
+    typical = inside[len(inside) // 2]        # §9 compares a join with the median step
+    seam = step(fr[-1], fr[0])
+    assert seam <= typical * 1.25, (path, seam, typical)
+    # and the glyphs are still the theme's own colour, not lost in the palette
+    near, dist = nearest(path, (255, 255, 255))
+    print(f"  {path:34} {im.size[0]}x{im.size[1]} {len(fr)} fr @ {dur} ms "
+          f"= {len(fr) * dur / 1000:.2f} s  {size:>7,} B  seam {seam:5.2f} vs "
+          f"typical {typical:5.2f}  nearest to white {near} off {dist}")
+
+fr, dur = decoded(INK_FILE)
+assert Image.open(INK_FILE).size == (EDGE, EDGE) and len(fr) == FRAMES
+near, dist = nearest(INK_FILE, render.AMBER[:3])
+assert dist <= 3, (near, dist)             # measured off the file the README ships
+total += os.path.getsize(INK_FILE)
+print(f"  {INK_FILE:34} the ink in the file is {near}, {dist}/255 from "
+      f"{render.AMBER[:3]} (the GIF's palette is ffmpeg's, not the wire's)")
+
+# the README embeds exactly these five, and no still PNGs left behind by the change
+readme = open("README.md", encoding="utf-8").read()
+for theme, path in THEME_FILES.items():
+    assert f"]({path})" in readme, (theme, path)
+    assert f"docs/preview-{theme}.png" not in readme, theme
+    # and not tracked either.  `tools/previews.py` still writes those PNGs, so a
+    # developer's own run can leave them in the working tree; what must not happen is
+    # the repository carrying both shapes of the same picture, which is why they are
+    # in .gitignore and why this asks git rather than the filesystem.
+    tracked = subprocess.run(["git", "ls-files", f"docs/preview-{theme}.png"],
+                             capture_output=True, text=True)
+    if tracked.returncode == 0:
+        assert not tracked.stdout.strip(), (theme, tracked.stdout.strip())
+assert "](" + INK_FILE + ")" not in readme      # it belongs to docs/gui.md
+gui = open("docs/gui.md", encoding="utf-8").read()
+hit = re.search(r"\]\(([^)]*preview-alpha-text-ffc400\.gif)\)", gui)
+assert hit, "docs/gui.md does not link the ink figure"
+# resolved against the document it is written in, the way the link section does: the
+# figure sits in docs/ and gui.md lives there too, so the link is just the name
+assert os.path.exists(os.path.join("docs", hit.group(1))), hit.group(1)
+print(f"  README embeds {len(THEME_FILES)} animated previews; the ink figure "
+      f"lives in docs/gui.md; {total:,} B of GIFs in the tree")
+
+# the tool has to still work on this machine, at a size that costs nothing, for every
+# theme.  The five themes take different render options - `alpha` has no `title`,
+# `clock` has no gauge `source` - and when this passed one option bag straight through
+# it died with `theme_alpha() got an unexpected keyword argument 'source'`.  The
+# signature filter is what fixes it, and this is what keeps it fixed.
+with tempfile.TemporaryDirectory() as tmp:
+    for theme in sorted(render.THEMES):
+        ims = preview_gif.frames("media/Theme_25.mp4", theme, None, "11:07:42",
+                                 {"bg": render.OVERLAY}, 2, 6.0)
+        assert len(ims) == 2, (theme, len(ims))
+        assert ims[0].size == (render.W, render.H), (theme, ims[0].size)
+        where = os.path.join(tmp, f"{theme}.gif")
+        preview_gif.write_gif(ims, where, 6.0, 160, 32)
+        back, d2 = decoded(where)
+        assert Image.open(where).size == (160, 160) and len(back) == 2, theme
+        os.remove(where)
+    print("  every theme renders through the tool at 160 px: the option filter holds")
+
+# the player behind all of this, asked two questions it got wrong on the first try.
+# (1) It has to know the file's rate and geometry *before* the first frame, because
+# the window prints the rate next to the picture: probing on the first `frame()` made
+# it say "at 0 fps" for one redraw, and the suite caught that as `0.0`.  (2) A stream
+# that yields not one frame is a failure, not a loop seam, and restarting it forever
+# is an infinite loop: a missing file once spun ffmpeg for sixteen minutes of a
+# harness timeout.  One honest None, quickly, is what belongs here.
+from xigmaui import clips as clipdb
+known = clipdb.ClipPlayer("media/Theme_11.mp4")
+assert known.fps > 0 and known.wide == 480 and known.seconds > 1, (
+    known.fps, known.wide, known.seconds)
+assert known.frames == 0 and known.decoded == 0, "knowing the rate is not decoding"
+print(f"  the player knows       {known.wide}x{known.tall} at {known.fps:g} fps, "
+      f"loop {known.seconds:.2f} s, before reading a single frame")
+known.close()
+t0 = time.perf_counter()
+gone = clipdb.ClipPlayer("/nonexistent/xigma-no-such-clip.mp4")
+assert gone.frame() is None, "an undecodable file answers None"
+assert gone.dead and gone.loops == 0, (gone.dead, gone.loops)
+assert gone.frame() is None, "and it stays answered, it does not restart"
+took = time.perf_counter() - t0
+assert took < 2.0, took
+print(f"  a file that is not there  None in {took * 1000:.0f} ms, "
+      f"{gone.loops} restarts, dead={gone.dead}")
+gone.close()
+
+# and the switches the documents promise are the switches the tool has
+help_out = subprocess.run([sys.executable, "tools/preview_gif.py", "--help"],                          capture_output=True, text=True)
+assert help_out.returncode == 0, help_out.stderr[:200]
+for flag in ("--clip", "--theme", "--ink", "--frames", "--gif-fps", "--scale",
+             "--colors", "--clock", "--scrim", "--out", "--mp4", "--live"):
+    assert flag in help_out.stdout, flag
+print(f"  tools/preview_gif.py --help  {len(help_out.stdout)} B, all the documented "
+      f"switches present")
+PY
+
+
+echo
 echo "== where clips are looked up: the roots a package install has to get right"
+
 # A checkout is not the only place this code runs.  `pip install .` and the .deb
 # built from debian/ put the modules where the repository tree is not, so the
 # three roots of xigmalcd.main (env, checkout, /usr/share/xigmalcd/media) are what
@@ -1451,6 +1629,88 @@ assert again.clock_size.value() == 44 and again.mp4 == saved["clip"]
 assert again.preview_fps == 1.0 and again.port == bad
 row = again.clips.currentRow()          # the list has to land on the remembered clip
 assert again.all_clips[row].path == saved["clip"], (row, again.all_clips[row].path)
+# The `playing` pane, on a window that was *restored* rather than handed a rate:
+# that is the shape the author's own `python3 -m xigmaui` takes, and it is the shape
+# a half-applied edit once left with `preview_fps` None and the caption's `:g` format
+# dying in a terminal.  The assertion above is what keeps that from coming back;
+# these keep the animation itself honest.
+assert again.anim_toggle.isChecked(), "the preview plays by default"
+again.canvas.setCurrentIndex(0)         # `clear`: on black there is nothing to play
+again.show()
+for _ in range(20):
+    appq.processEvents()
+assert again.player is not None and again.player.path == saved["clip"], again.player
+assert again.player.fps > 0, again.player.fps    # ffprobe's r_frame_rate, not a guess
+note = again.anim_note.text()
+assert "playing at" in note and f"{again.preview_fps:g} fps" in note, note
+cap = again.caption.text()
+# the two sentences under the picture used to be joined without a separator, which
+# printed "...measures those.background Theme_25.mp4 at mid-loop" - and called a
+# playing clip "mid-loop".  Both halves of that are assertions now.
+assert "those.  " in cap, cap[-90:]
+assert "mid-loop" not in cap, cap
+assert f"{again.player.seconds:.2f} s" in cap, cap
+assert f"{again.player.wide}x{again.player.tall}" in cap, cap
+print(f"  caption under it     {cap[:118]}...")
+again.preview_timer.stop()                       # this harness drives the ticks
+again._advance()
+assert again.player.decoded > 0, "the pane pulled at least one frame"
+# ...and the two clocks really are separate.  This window runs at `preview_fps` 1.0 -
+# the author's own saved setting, and the reason the pane looked like a 1 fps
+# slideshow: the pane's redraw rate *was* the animation rate.  The background now
+# plays on its own timer at the file's rate, so frames reach the label at ~24 fps
+# while `sensors.collect()` runs once a second.  Asserted as a floor rather than an
+# exact rate, because a loaded CI runner paints slower; the layer's own tick count
+# not moving at all is the exact half.
+assert 33 <= again.bg_timer.interval() <= 60, again.bg_timer.interval()
+seq0, shown0 = again._seq, again._played
+t0 = time.monotonic()
+while time.monotonic() - t0 < 2.0:
+    appq.processEvents()
+shown = again._played - shown0
+assert again._seq == seq0, "the layer was not redrawn by this loop at all"
+assert shown >= 10, (shown, again.bg_timer.interval())
+print(f"  the two clocks       {again.bg_timer.interval()} ms background "
+      f"({again.player.fps:g} fps in the file) against a "
+      f"{again.preview_fps:g} fps layer: {shown} frames shown in "
+      f"{time.monotonic() - t0:.1f} s with no layer tick")
+seams = again.player.loops
+# minimised is the other shape of "nobody can see this": Qt still reports the window
+# as visible, so `hideEvent` never runs and the decode would go on behind an icon.
+again.showMinimized()
+for _ in range(20):
+    appq.processEvents()
+assert again.player is None and not again.bg_timer.isActive(), "minimised: no stream"
+assert not again.preview_timer.isActive(), "minimised: no redraw"
+shown_min = again._played
+t0 = time.monotonic()
+while time.monotonic() - t0 < 1.5:
+    appq.processEvents()
+assert again._played == shown_min, "and nothing reaches the label behind an icon"
+again.showNormal()
+for _ in range(20):
+    appq.processEvents()
+assert again.player is not None and again.bg_timer.isActive(), "restored, playing"
+print(f"  minimised stops it   no stream, no redraw, {again._played - shown_min} frames "
+      f"shown in 1.5 s behind an icon; restoring plays again")
+again.hide()
+for _ in range(10):
+    appq.processEvents()
+assert again.player is None, "a hidden window holds no ffmpeg"
+for _ in range(200):
+    appq.processEvents()
+assert again.player is None, "nothing decodes behind a hidden window"
+assert not again.preview_timer.isActive(), "and nothing redraws either"
+again.show()
+for _ in range(20):
+    appq.processEvents()
+assert again.player is not None, "showing the window starts the stream again"
+assert again.player.loops >= seams
+print(f"  the preview plays      {os.path.basename(again.mp4)} "
+      f"{again.player.seconds:.2f} s loop at {again.player.fps:g} fps, "
+      f"{again.player.wide}x{again.player.tall}; hidden or minimised holds no "
+      f"ffmpeg and shows nothing")
+again._close_player()
 print(f"  widgets remembered      theme {saved['theme']}, clock "
       f"{saved['clock_size']}, {os.path.basename(saved['clip'])}, "
       f"{saved['preview_fps']} fps, size {saved['size']}")
@@ -2211,9 +2471,20 @@ qapp.processEvents()
 win.tray = QSystemTrayIcon()         # what a desktop with a tray gives us
 win.tray_wanted = True
 win.close()
-assert not win.isVisible() and win.preview_timer.isActive() and win.daemon.present
+assert not win.isVisible() and win.daemon.present
+# Hiding to the tray stops the pane's redraw and puts the decode stream away, and
+# keeps polling the display: nothing is being drawn, so nothing should be decoded
+# (`hideEvent`), while the tray menu still has to know what the other process is
+# doing, so the daemon's poll goes on.  Both halves are the point of the split, and
+# `showEvent` reverses the first pair.
+assert not win.preview_timer.isActive(), "a hidden window does not redraw"
+assert win.player is None, "and holds no ffmpeg either"
+assert win.daemon_timer.isActive(), "but it still follows the running display"
 assert "hidden to the tray" in win.log_view.text()
 assert looked == [], looked          # hiding never touches the port
+win.show()
+qapp.processEvents()
+assert win.preview_timer.isActive(), "showing starts the pane again"
 win._quitting = True
 win.close()
 assert not win.preview_timer.isActive() and not win.daemon_timer.isActive()
