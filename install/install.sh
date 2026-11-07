@@ -112,8 +112,9 @@ elif ! "$PY" -c 'import PyQt6' 2>/dev/null; then
     echo "the daemon itself does not need it."
 else
     if [ ! -s "$ICON" ]; then
-        # the picture is not artwork: tools/makeicon.py draws it with the same
-        # render code the daemon uploads from, over a frame of the shipped clip
+        # the mark is install/artwork/xigma-penguin.jpg with its baked-in
+        # checkerboard turned into real alpha (a JPEG cannot carry alpha);
+        # tools/makeicon.py --draw falls back to the picture the glass shows
         (cd "$DIR" && "$PY" tools/makeicon.py)
     fi
     mkdir -p "$(dirname "$DESK")"

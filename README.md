@@ -1,5 +1,8 @@
 # xigmalcd — system stats on the Xigmatek Connect AIO's built-in LCD
 
+<img src="docs/logo.png" width="220" align="right" hspace="14" alt="the project's mark: a
+penguin standing in front of a Connect AIO water block, whose LCD reads 39°C">
+
 Linux counterpart of the Windows `ALPHA` app that ships with Xigmatek **Connect**
 series AIO coolers. Those coolers have a 480×480 LCD in a USB port header on the
 water block; on Windows the vendor app draws CPU/GPU temps, clocks and fan speeds on
@@ -130,11 +133,15 @@ immediately. Check on it with
 
 When PyQt6 imports, it also writes the window's menu entry,
 `~/.local/share/applications/xigmaui.desktop`,
-pointed at `install/xigmaui.png` (the icon is not artwork: `tools/makeicon.py` draws it
-with the same `render.draw` the daemon uploads from, over a frame of
-`media/Theme_25.mp4`, so a wrong icon means wrong display code; the window sets the same
-picture as its own icon, which is why the `.desktop` entry names the file by path
-instead of an icon-theme name). The installer regenerates that PNG only if it is
+pointed at `install/xigmaui.png` (the icon is the project's mark - the penguin at
+`install/artwork/xigma-penguin.jpg`, with the transparency checkerboard that the JPEG
+carries painted into it turned into real alpha by `tools/makeicon.py`, which also writes
+`install/xigmaui.ico` with 16 px through 256 px.  `tools/makeicon.py --draw` still makes
+the other icon: the picture the glass actually shows, drawn with the same `render.draw`
+the daemon uploads from, over a frame of `media/Theme_25.mp4`, which is the one to look at
+when the question is whether the display code is right.  The window sets the same file as
+its own icon, which is why the `.desktop` entry names it by path instead of an icon-theme
+name). The installer regenerates that PNG only if it is
 missing or empty, and then validates the entry with `desktop-file-validate` when that
 command exists, so a broken `.desktop` is caught at install time rather than by a menu
 that silently shows nothing. `tools/selftest.sh` checks the shipped `.png` and validates
@@ -388,10 +395,15 @@ touches `recovery` is `reset_panel.py`, which you invoke by hand.
   arrive, or if no renewal came. Nothing here can send `recovery` — the display is
   started without the flag that would allow it — and nothing sends anything
   firmware-shaped. ~9 min at `--fps 1`, and the log belongs in `data/glass/`.
-* `tools/makeicon.py` — redoes `install/xigmaui.png`, the menu icon, by drawing the
-  alpha theme with the daemon's own `render.draw` over a frame of the shipped clip.
-  Numbers pinned, so it does not churn; the point is that the icon is the real
-  rendering and not a picture of one.
+* `tools/makeicon.py` — redoes the project's mark: `install/xigmaui.png` (256 px, what
+  the menu entry and the window use), `install/xigmaui.ico` (the same mark at 16 px
+  through 256 px) and `docs/logo.png`.  The source is the committed artwork
+  `install/artwork/xigma-penguin.jpg`; because a JPEG cannot carry alpha, the tool
+  turns the transparency checkerboard painted into that JPEG into real alpha, keeping
+  only the grid the picture's border can reach so the penguin's equally white belly
+  survives.  `--draw` makes the other icon instead: the alpha theme drawn by the
+  daemon's own `render.draw` over a frame of the shipped clip, numbers pinned, which
+  is the one to look at when the question is whether the display code is right.
 * `tools/session_limit.py` — push frames until the panel stops answering, then try the
   three candidate cures in order (re-handshake, DTR pulse, port reopen) and report
   which one works. This is how the session-limit behaviour and the cure were pinned
@@ -1395,7 +1407,9 @@ metrics schema; `xigmalcd/render.py` is the drawing; `xigmalcd/main.py` is the l
   rather than trust these notes), the three vendored clips in `media/`, the vendor's
   theme library in `themes/alpha/` (145 MB: 27 `.thm` originals as shipped, 27 decrypted
   layouts, 44 clips, 27 baked overlay PNGs, and a `manifest.json` hashing all 152 of
-  them), the theme contact sheets in `docs/previews/`, all
+  them), the theme contact sheets in `docs/previews/`, the project mark and the files
+  generated from it (`install/artwork/xigma-penguin.jpg`, `install/xigmaui.png`,
+  `install/xigmaui.ico`, `docs/logo.png`), all
   twenty `data/glass/` logs, and the three pinned-number fixtures in
   `tools/metrics/`. Not tracked, and said so in `.gitignore`: the
   `.spm` binaries of the same two sessions, which only the Windows monitoring

@@ -597,11 +597,58 @@ assert "--hidden" in src and "--no-tray" in src, "the flags the entry uses"
 icon = "install/xigmaui.png"          # selftest runs from the repository root
 im = Image.open(icon)
 assert im.size == (256, 256) and im.mode == "RGBA", (im.size, im.mode)
-# the launcher icon is drawn by the same code as the glass, so it is not allowed
-# to be blank: 256x256 of the alpha theme over the shipped clip is ~90 KB
+# A mark, not a plate: the artwork arrives as a JPEG with a transparency
+# checkerboard painted into it, so if that grid ever survives the extraction the
+# icon is a photo of a grey grid.  The corners are where it would show.
+corners = [im.getpixel(xy)[3] for xy in ((0, 0), (255, 0), (0, 255), (255, 255))]
+assert all(a == 0 for a in corners), corners
 assert os.path.getsize(icon) > 20_000, os.path.getsize(icon)
 print(f"  icon                   {icon} {im.size[0]}x{im.size[1]} "
-      f"{im.mode} {os.path.getsize(icon)} B")
+      f"{im.mode} {os.path.getsize(icon)} B, corners transparent")
+# the same mark as a multi-size .ico, so a Windows shell or an icon theme that
+# wants one gets 16 px through 256 px rather than one shrunken bitmap
+ico = "install/xigmaui.ico"
+sizes = Image.open(ico).info["sizes"]
+assert (16, 16) in sizes and (256, 256) in sizes, sorted(sizes)
+assert os.path.getsize(ico) > 20_000, os.path.getsize(ico)
+print(f"  ico                    {ico} {os.path.getsize(ico)} B, "
+      f"{len(sizes)} sizes {min(s[0] for s in sizes)}..{max(s[0] for s in sizes)} px")
+# The strongest version of both checks: regenerate the shipped files from the
+# committed artwork with the committed tool and require the same bytes.  In
+# artwork mode makeicon.py reads no clock and no live metrics, so it is
+# deterministic; a difference means a generated file was edited by hand instead
+# of its source.
+import hashlib
+import subprocess
+import tempfile
+
+
+def sha(path):
+    return hashlib.sha256(open(path, "rb").read()).hexdigest()
+
+
+art = "install/artwork/xigma-penguin.jpg"
+want = sha(art)
+assert want == ("3774623ba3c4e934d2f40932f2037712f617cad877e2c3d65e8063b97a1e69aa"), \
+    want                                    # the hash makeicon.py's docstring names
+assert want in open("tools/makeicon.py", encoding="utf-8").read(), \
+    "the tool's docstring no longer names this artwork"
+with tempfile.TemporaryDirectory() as td:
+    out, outico = (os.path.join(td, n) for n in ("i.png", "i.ico"))
+    subprocess.run([sys.executable, "tools/makeicon.py", "-o", out, "--ico", outico],
+                   check=True, capture_output=True)
+    for shipped, made in ((icon, out), (ico, outico)):
+        assert sha(shipped) == sha(made), (shipped, sha(shipped)[:12], sha(made)[:12])
+print(f"  regenerates          {icon} + {ico} byte-identical from {art} "
+      f"{os.path.getsize(art)} B {want[:16]}")
+# and the logo the README shows at the top: the same mark, untrimmed into a square,
+# on alpha, and actually referenced by the README
+logo = "docs/logo.png"
+lg = Image.open(logo)
+assert lg.mode == "RGBA" and lg.width > lg.height, (lg.size, lg.mode)
+assert f'"{logo}"' in open("README.md", encoding="utf-8").read(), "README: no logo"
+print(f"  logo                   {logo} {lg.size[0]}x{lg.size[1]} {lg.mode} "
+      f"{os.path.getsize(logo)} B")
 
 # The unit is the always-on path, and it is a template.  Three things are checked
 # against the code rather than against a copy of the list: that the only holes in
