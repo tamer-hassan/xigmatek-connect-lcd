@@ -1390,9 +1390,13 @@ for _ in range(10):
     appq.processEvents()
 wide_visible = win.clips.viewport().height() // max(1, row_h)
 assert wide_visible >= 8, (wide_visible, "the full-HD window is back to two rows")
-print(f"  clip list               rows {row_h} px: {visible} of {win.clips.count()} "
-      f"clips at {settings.DEFAULTS['size'][0]}x{settings.DEFAULTS['size'][1]}, "
-      f"{wide_visible} at 1919x1055 (it was 2 there)")
+# "rows in view" is capacity, not a claim about how many clips a machine has: the
+# selftest job runs against a checkout with the three vendored clips and no themes
+# package, while the bench has 69 and a mounted Windows partition has 115.
+print(f"  clip list               rows {row_h} px: {visible} rows in view at "
+      f"{settings.DEFAULTS['size'][0]}x{settings.DEFAULTS['size'][1]}, "
+      f"{wide_visible} at 1919x1055, where it used be 2 "
+      f"({win.clips.count()} clips on this machine)")
 
 # the detail line under the list repeats nothing: the row above it already says
 # what the file is called, its size, its length and where it came from

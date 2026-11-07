@@ -107,7 +107,9 @@ number in that shape comes from a measurement, most of them of a failure:
   (`CLIP_ICON`), and `ResizeMode.Adjust` - which lays rows out against the viewport
   and is what painted one selected clip as a block taller than the list - went to
   `Fixed` with uniform rows. Measured afterwards, and printed by the suite:
-  **66 px rows, 7 clips in view at the fresh 1180×780 window, 12 at 1919×1055**;
+  **66 px rows, and room for 7 clips at the fresh 1180×780 window, 12 at
+  1919×1055** — rows in view, which is capacity: this bench has 69 clips to put in
+  them, a CI checkout with no themes package has 3;
 * **the log sits under the picture**, in the preview column, because that is the one
   place with height to spare: the frame is 480 px and is never scaled up, so a tall
   window leaves room there nothing else can honestly fill - while every pixel of the
