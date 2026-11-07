@@ -257,11 +257,12 @@ POST recovery 1        {"enable":true}         109-byte frame -> 1 200 in 6 ms
 
 Nine seconds later that log reads `logo 2147483647 -> 3`,
 `mode 2147483647 -> 0`, `osdState 1 -> 0`, `space 69252 -> 69664`. Reproducing
-that one frame from Linux (`tools/reset_panel.py --yes`, byte-identical to the
+that one frame from Linux (`xigmalcd-reset --yes`, or `tools/reset_panel.py --yes` from
+a checkout — both are `xigmalcd/reset.py`, and byte-identical to the
 logged frame) does the same thing here: `logo -> 3`, `mode -> 0`,
 `space -> 69664`, device back after ~9 s. It is a reset, not a firmware write —
 it drops the stored picture and re-enumerates the USB device — but it is still
-sent by exactly one hand-invoked tool and by nothing in the client.
+sent by exactly one hand-invoked command and by nothing in the client.
 
 `md5` is the literal string `todo` in ALPHA's own traffic (`basename(file)` is the only
 other key), so the panel is not checking a digest.
@@ -922,7 +923,9 @@ re-helloes without pushing it again.
   reading a measurement off the panel after a run, and it means "the picture is frozen"
   is not a fault.
 * **`recovery {"enable":true}` is the cure for a blanked panel** and is now on the wire
-  in one place only, `tools/reset_panel.py`, which is dry-run unless given `--yes` and
+  in one place only, `xigmalcd/reset.py` — met as `xigmalcd-reset` on an installed system
+  and as `tools/reset_panel.py` (a wrapper over the same module) in a checkout. It is
+  dry-run unless given `--yes` and
   prints the frame it will send. Reproducing it here took the unit from
   `logo=2147483647 mode=2147483647 space=68912` to `logo=3 mode=0 space=69664` in ~9 s
   with the device re-enumerating, which is the same free-space value the vendor's own

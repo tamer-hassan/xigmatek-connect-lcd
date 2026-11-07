@@ -165,6 +165,79 @@ display keeps drawing when the window is closed - it hides to the tray, whose me
 has the display's status line, pause/resume and the five themes. See "Two
 processes, one port" below for what the socket accepts and what it refuses.
 
+## Install from a .deb
+
+The tree packages itself: `debian/` is debhelper 13 with dh-python
+(`dh $@ --with python3 --buildsystem=pybuild`), and it builds **two** binary packages
+because the second one is not ours to license.
+
+```bash
+sudo apt install devscripts debhelper dh-python pybuild-plugin-pyproject python3-all \
+                 python3-setuptools python3-wheel desktop-file-utils lintian
+dpkg-buildpackage -us -uc -b          # the .deb files land one directory up
+lintian ../xigmatek-connect-lcd_*.changes
+```
+
+That package list is `debian/control`'s own Build-Depends plus `devscripts` (which is
+where `dpkg-buildpackage` and `lintian` come from). `pybuild-plugin-pyproject` is not
+decoration: `debian/rules` records the build stopping at "PEP517 plugin dependencies are
+not available" without it.
+
+| file | what is in it | `.deb` | contents |
+|---|---|---|---|
+| `xigmatek-connect-lcd_0.1_all.deb` | the three commands in `/usr/bin`, `xigmalcd/` and `xigmaui/` in `/usr/lib/python3/dist-packages`, the three vendored clips in `/usr/share/xigmalcd/media`, the udev rule in `/usr/lib/udev/rules.d`, the user unit in `/usr/lib/systemd/user`, the menu entry in `/usr/share/applications`, the icon in `/usr/share/icons/hicolor/256x256/apps`, `README.md` and `PROTOCOL.md` in `/usr/share/doc` | 5.2 MB | 37 files |
+| `xigmatek-connect-lcd-themes_0.1_all.deb` | ALPHA's own library under `/usr/share/xigmalcd/themes/alpha`: 27 `.thm` files, their decrypted layouts, 44 background clips (43 MP4 and one PNG), 27 baked overlay PNGs, and `manifest.json`, which hashes all 152 entries of the 125 distinct files | 146 MB | 129 files |
+
+Both rows are one build on the author's bench, 2026-11-07: Ubuntu 26.04 "resolute",
+debhelper 13.31ubuntu1, dh-python 7.20260309, python3-all 3.14.3-0ubuntu2,
+python3-setuptools 78.1.1-0.1build1, `dpkg-buildpackage -us -uc -b` exit 0. The file
+counts are `dpkg-deb -c | grep -c`; the byte figures are rounded on purpose, because
+this file is installed *inside* the first .deb and a size quoted here would otherwise
+move every time the sentence describing it is edited. The exact hashes and sizes of what
+a tag builds are written out by the release job from the files it is uploading. The
+themes package is a versioned `Recommends` of the code package, so `apt install` takes it
+by default and `apt remove xigmatek-connect-lcd-themes` takes exactly its 129 files away -
+it owns its own directory rather than symlinking clips into `media/`.
+
+Four things an install does that a checkout does not:
+
+* the modules go to `/usr/lib/python3/dist-packages`, the directory this distro's
+  interpreter is on (`python3 -m site`), not the versioned one pybuild defaults to -
+  `debian/rules` pins it and says why, because the first two builds measured the
+  difference rather than guessing it;
+* `postinst` byte-compiles with `py3compile` and then runs
+  `deb-systemd-helper --user enable xigmalcd.service`: the unit is **enabled**, not
+  started, so an install does not take `/dev/ttyACM0` in the middle of a session. It is
+  the only opener from the next login on; `systemctl --user disable --now xigmalcd`
+  takes that back, and `loginctl enable-linger $USER` is what makes it run with no
+  graphical session at all;
+* no `.pyc` is in either `.deb` - they are written on the target, by the target's
+  interpreter;
+* the udev rule lands in `/usr/lib/udev/rules.d`, the distro's own directory rather than
+  `/etc/udev/rules.d`, so removing the package removes the rule with it.
+
+And `tools/` is installed by neither package, which is the reason the reset command is a
+command of its own - see "If the panel goes white".
+
+What has been measured about those bytes without installing them: `lintian
+2.129.0ubuntu2.1` on the `.changes` says **0 errors, 0 warnings, 0 infos**; unpacked into
+a plain directory, with nothing of ours on the import path, the three commands answer
+`--help` (9 808, 1 498 and 637 bytes), `import xigmalcd.protocol` resolves inside the
+unpacked tree, the packaged code finds its own three clips by its own root rules at the
+sizes and md5s the suite pins, `xigmalcd --dry-run DIR --once` writes one 480×480 PNG and
+opens no port, `xigmalcd-reset` with no `--yes` prints the 109-byte frame and sends
+nothing, the themes tree re-hashes to its manifest (152 entries, 125 distinct paths, 127
+files on disk), and `desktop-file-validate` is clean on the installed menu entry.
+
+What has **not** been measured is the one thing that needs root: `apt install` of these
+files on this bench and `debian/tests/smoke` against the result - the test of the layout
+an install actually makes, rather than an unpacking of it. CI
+(`.github/workflows/ci.yml`) runs that pair on a runner that has never seen this tree:
+the seventeen-section offline suite, the build, `lintian` with warnings as failures, then
+`sudo apt install ./debs/*.deb` and `debian/tests/smoke`; on a `v*` tag the same two
+files become a GitHub Release. Until the bench install is done, that CI pair is what the
+packaging claims rest on, and it is said here rather than in the release notes.
+
 ## What the panel gets
 
 Two things, in this order:
@@ -212,7 +285,7 @@ Put the module in `/etc/modules-load.d/` if you want it at every boot.
 | `--dry-run DIR` | render to PNGs in DIR, never touch the port (test a theme) |
 | `--bg clear\|black` | `clear` (default) draws on a transparent canvas, so the panel's own background layer keeps playing behind our glyphs - the way ALPHA's `.osd` files do, which paint 4.6 percent of their pixels. `black` is the old opaque picture, which covers that layer completely |
 | `--mp4 [PATH]` | upload a 480×480 H.264 MP4 as the panel's background layer at session start, as ALPHA does with its theme background. **On by default**, with `media/Theme_25.mp4` from this repo (214 917 B, 23 frames at 24 fps, a 0.96 s loop, byte-identical to the copy `currentThemeBg` names in `%APPDATA%/alpha`, mean luma 18.7 of 255 so it is dark under white glyphs, 0 black frames). Its measured weakness is the loop join: 2.50 against 1.51 typical frame-to-frame motion, i.e. a small jump once per second. It is the default because it is the vendor's own pairing, not because it measures best; the two measured-quieter vendored clips are one flag away - `--mp4 media/Theme_11.mp4` (3 402 098 B, 363 frames at 24 fps, a 15.1 s loop, luma 13.3-24.1, 0 black frames, join 0.11 against 2.54 - the smoothest loop in the vendor's library, taken in **2.4 s**) and `--mp4 media/theme_48.mp4` (1 333 649 B, 10.85 s, luma 227.3, a near-white field for white text and a join of 4.50 against 0.60, hence the automatic `--scrim`). All figures come from decoding all 40 vendor clips, not from sampling ("Where the defaults come from"). `Theme_24.mp4` in the vendor tree is the smallest upload that still reads seamless (0.94 MB, 4.04 s, join 1.55 vs 2.93) |
-| `--no-mp4` | skip the upload and leave the panel's stored background playing. The panel plays the last media file it took, so what is stored now is whatever the last run uploaded (`Theme_25.mp4` after the 11:04 run); only `tools/reset_panel.py --yes` clears it, which puts the still logo back |
+| `--no-mp4` | skip the upload and leave the panel's stored background playing. The panel plays the last media file it took, so what is stored now is whatever the last run uploaded (`Theme_25.mp4` after the 11:04 run); only a reset clears it — `xigmalcd-reset --yes` on an installed system, `tools/reset_panel.py --yes` in a checkout — which puts the still logo back |
 | `--clock-size N` | how tall the clock's digits are, in pixels, for themes that draw one. Default 26 of the panel's 480 |
 | `--gauge-source temperature\|load` | what the arc follows. `temperature` is what ALPHA uses, and on an idle desktop CPU it barely moves (across ALPHA's own 65 captured frames the tip travelled 14 degrees in 43 s); `load` follows CPU busy percent, which moves every second |
 | `--cold N`, `--hot N` | the gauge's scale. Default 30/75, measured off ALPHA: its digits read 57 °C at 55-61 percent of the sweep |
@@ -233,7 +306,7 @@ Put the module in `/etc/modules-load.d/` if you want it at every boot.
 | `--session-ttl N` | also renew it every N seconds of session life (default 300, 0 = never) |
 | `--socket PATH` | where to listen for control requests while drawing. Default: `$XIGMA_SOCKET`, else `$XDG_RUNTIME_DIR/xigmalcd.sock`, else `/run/user/UID`, `~/.local/run`, `/tmp/xigma-UID.sock`. The directory is created 0700 and the socket chmodded 0600, and the peer's uid is checked with `SO_PEERCRED`. See "Two processes, one port" |
 | `--no-control` | do not listen on a control socket at all (also implied by `--once`: a single frame has nothing to control, and a socket left behind by a finished run would only invite a client to knock on a dead link) |
-| `--allow-reset` | let the control socket reach `recovery`, which re-enumerates the USB device and drops the stored background. Off by default; `tools/reset_panel.py --yes` stays the deliberate way |
+| `--allow-reset` | let the control socket reach `recovery`, which re-enumerates the USB device and drops the stored background. Off by default; `xigmalcd-reset --yes` (in a checkout, `tools/reset_panel.py --yes`) stays the deliberate way |
 | `--status` | ask the display that is already running what it is showing, print it, exit. One line on the control socket: the serial port is never opened, so this works while the loop runs. Exit 1 with "no display answering" when nothing is listening |
 | `--list` | list candidate ports with their USB descriptions |
 | `-v, --verbose` | log every frame in both directions |
@@ -316,13 +389,15 @@ where a long run would first be seen.
 ## Tools
 
 **Which tool answers which question.** The list below says what each tool is; this is the
-way in from a symptom. Nothing here sends firmware-shaped traffic, and the only tool that
-touches `recovery` is `reset_panel.py`, which you invoke by hand.
+way in from a symptom. Nothing here sends firmware-shaped traffic, and the only thing that
+ever touches `recovery` is the reset command: `tools/reset_panel.py` in a checkout, and
+`xigmalcd-reset` on a system that installed the package (where `tools/` is not installed at
+all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it by hand.
 
 | If the question is | run | what it answers |
 |---|---|---|
 | is the panel healthy after a boot or a reset? | `tools/state.py`, then `tools/bootcheck.py` | the `conn` snapshot, read-only; then two small and two full uploads. `logo`/`mode` at `2147483647` means it is not healthy |
-| did my edit break the wire format? | `tools/selftest.sh`, then `tools/verify_protocol.py data/captures/*.txt` | fifteen offline sections with no hardware, then every captured Windows frame re-encoded and diffed: **181 frames, 0 mismatches** (130 in one session, 51 in the other). The captures are bench files, so in a fresh clone the first section prints those figures and says it did not re-derive them |
+| did my edit break the wire format? | `tools/selftest.sh`, then `tools/verify_protocol.py data/captures/*.txt` | seventeen offline sections with no hardware, then every captured Windows frame re-encoded and diffed: **181 frames, 0 mismatches** (130 in one session, 51 in the other). The captures are bench files, so in a fresh clone the first section prints those figures and says it did not re-derive them |
 | does this firmware know that topic at all? | `tools/fuzz.py`, `tools/probe.py` | no answer = no topic, `400` = topic exists and the body was wrong, `200` = the JSON parsed — which is not the same as the write landing |
 | will the panel take *my* file? | `tools/send_image.py FILE`; `tools/fileshape.py` if the file's shape is the question | one upload, judged by the panel's own file notice; the second rotates RGBA, indexed, flat and the vendor's own `.osd` files through one session |
 | how fast does the glass tick, and why does the clock only move every 20-40 s? | `tools/frame_lag.py`, `tools/indexprobe.py`, `tools/watchtest.py` | a big frame number and the wall clock painted on the glass, so the answer is a glance rather than a stopwatch. Needs eyes on the unit |
@@ -333,7 +408,7 @@ touches `recovery` is `reset_panel.py`, which you invoke by hand.
 | does the always-on model work — display process plus window on one port? | `tools/display_glass.py` | starts the loop, then behaves only as a client of its control socket through every phase, ~9 min, and exits 1 listing what it did *not* show |
 | do the window's own buttons work on real glass? | `tools/gui_glass.py` | the same kind of labelled run through `xigmaui.panel.Panel`, the window's own worker |
 | what did the vendor app itself actually send? | `tools/log_timeline.py LOG`, `tools/capdump.py`, `tools/vendor_capture.py` | ALPHA's 6-17 MB logs folded into a request sequence, the Windows IRP captures parsed without a Windows box, and the `.osd` payloads taken back out of them |
-| the panel is white from the first second | `tools/reset_panel.py --yes` | the vendor's `recovery`, byte-identical to the frame in its own log; the only repair for fields stuck at `2147483647` |
+| the panel is white from the first second | `xigmalcd-reset --yes` (installed) / `tools/reset_panel.py --yes` (checkout) | the vendor's `recovery`, byte-identical to the frame in its own log; the only repair for fields stuck at `2147483647` |
 | what would a frame look like, with no panel in the loop? | `python3 -m xigmalcd --dry-run DIR`, `tools/previews.py` | PNGs on disk from the same render path; previews composite over the shipped clip the way the panel composites |
 | what are ALPHA's theme files, and what do its themes actually contain? | `tools/thm_unlock.py`, `tools/theme_previews.py` | the `.thm` container opened with the app's own constants: 27 layouts, 44 clips, 27 baked overlays in `themes/alpha/`, every byte hashed; and a sheet showing each theme over its own clip |
 
@@ -372,8 +447,15 @@ touches `recovery` is `reset_panel.py`, which you invoke by hand.
   RGBA, the pinned-metrics promise (a pinned frame draws the far end of the ramp and sends no
   metrics blob at all), the vendor theme library re-hashed against its own manifest (all 152
   files, the dedup rule, the root-vendored clips, the contact sheets, and the
-  `store.json`/`.thm` pairing when the Windows volume is mounted),
-  `pyproject.toml` read as an installed person would meet it, the
+  `store.json`/`.thm` pairing when the Windows volume is mounted), where the shipped clips
+  are looked up (checkout, `$XIGMA_MEDIA`, `/usr/share/xigmalcd/media`, and the Windows
+  partition's copies, in that order, checked against fake roots), the packaged copies of
+  the login unit and the menu entry compared key for key against the checkout's
+  (`debian/xigmalcd.service` and `debian/xigmaui.desktop` against
+  `install/*.in`, including that neither `ExecStart` arms `--allow-reset` and that the
+  program's name is one string in both files and in `xigmaui/app.py`),
+  `pyproject.toml` read as an installed person would meet it (including `xigmalcd-reset`
+  called with no `--yes`, which must print its frame and send nothing), the
   window's saved-state round-trip, the `.desktop` entry and its icon, the GUI built
   offscreen against a port that does not exist (clip sizes and lumas, five themes
   previewed, the scrim rule, the reset gate, the four panel actions against a stubbed
@@ -428,16 +510,19 @@ touches `recovery` is `reset_panel.py`, which you invoke by hand.
   time, with the panel's verdict; `--shapes` also probes topics ALPHA registers but never
   calls, `--list` prints the table without touching the port. It no longer sends
   `presetThemeId` (that entry in its old SAFE list is what blanked a unit — see the danger
-  note below) and its `--risky recovery` flag is gone: `recovery` belongs to
-  `tools/reset_panel.py` only.
+  note below) and its `--risky recovery` flag is gone: `recovery` belongs to the reset
+  command only.
 * `tools/realtime.py` — `realtimeDisplay {"enable":true}` plus a metrics heartbeat, with
   no uploads during the experiment itself, to ask whether the panel can draw the numbers
   itself. **Answered, on this firmware: it cannot.** The screen showed only its static
   logo; the topic acts as a display-layer toggle (`--disable` to turn it back off), and
   the tool ends by uploading one gauge frame so the glass is left showing something.
 * `tools/reset_panel.py` — the vendor app's own reset, one request, sent by exactly one
-  hand-invoked tool. Dry run by default; `--yes` sends `POST recovery 1 {"enable":true}`,
-  byte-identical to the frame in ALPHA's log at 18:39:48 on 2026-11-05, prints the frame
+  hand-invoked command. In a checkout that command is this script, a thin wrapper over
+  `xigmalcd/reset.py`; on an installed system it is `xigmalcd-reset`, the same module
+  through pyproject.toml's entry point, because an installed box has no `tools/` to run.
+  Dry run by default; `--yes` sends `POST recovery 1 {"enable":true}`, byte-identical to
+  the frame in ALPHA's log at 18:39:48 on 2026-11-05, prints the frame
   first, and then waits for the USB device to come back and re-reads the state. This is
   the only thing that repairs a panel whose `logo`/`mode` sit at `2147483647`.
 * `tools/theme.py` — read-only by default: reports `mode`, `logo`, `osdState`, `space`
@@ -625,8 +710,13 @@ python3 -m xigmaui        # --device PATH, --preview-fps N, --fresh, --socket PA
 ```
 
 `install/install.sh` also puts it in the application menu, where the entry is called
-**Xigma - Xigmatek Connect 360** (`install/xigmaui.desktop.in`, see "Run it at login"
-above).
+**Xigmatek Connect LCD** (`install/xigmaui.desktop.in`, and `debian/xigmaui.desktop`
+after an install; see "Run it at login" above). That name is the Connect *family*, not
+the author's model - every measurement in this repo was taken on a Connect 360, no other
+Connect has been tested, and the entry just declines to tell the owner of another Connect
+that this is not for their port. `connect 360` stays in the entry's `Keywords`, and the
+window's own title bar and tray tooltip say the same thing as the menu (`xigmaui/app.py`,
+checked against both files by `tools/selftest.sh`).
 
 **It has two roles and picks one at startup by looking.** Only one process can hold
 the port (PROTOCOL.md §1), so:
@@ -729,8 +819,9 @@ Two side effects worth knowing, because they are writes and not reads:
   re-enumerates (seen here ~3 s, ~9 s in the vendor's own log), and uploads
   afterwards would start with `1 400` until the link is renewed - so the GUI
   closes the port, waits for the node to reappear, and reads status again
-  rather than carrying on with the old session. `tools/reset_panel.py --yes`
-  is the same frame if you would rather see every byte. **With a display
+  rather than carrying on with the old session. The reset command — `xigmalcd-reset --yes`
+  on an installed system, `tools/reset_panel.py --yes` in a checkout — is the same frame
+  if you would rather see every byte. **With a display
   running, the button is refused** unless that display was started
   `--allow-reset`: the window does not go around a gate, it quotes the reason
   the daemon gave.
@@ -821,8 +912,9 @@ The one gap left in that ledger is reset, and it is a decision rather than an
 oversight: `Panel._reset` is the vendor's `recovery`, the only destructive thing
 in the app, so it stays covered only by the offline checks (the gate refuses
 without the typed word, and exactly one of the stubbed opens in the whole block asks
-for a destructive link) and by `tools/reset_panel.py`, which sends the same frame from
-the command line where every byte is printed. The four actions above are also the
+for a destructive link) and by the reset command, which sends the same frame from
+the command line where every byte is printed (`xigmalcd-reset` from a package install,
+`tools/reset_panel.py` from a checkout). The four actions above are also the
 same functions the CLI has already proven - `main._upload_background`,
 `Link.send_media` in the `notice` order - but they were reached through the GUI's
 worker this time, which is the part that had not been pressed. One thing does
@@ -1106,6 +1198,42 @@ session limits, and how to read the vendor app yourself.
 metrics schema; `xigmalcd/render.py` is the drawing; `xigmalcd/main.py` is the loop;
 `xigmaui/` is the Qt window over the same four modules.
 
+## If the panel goes white
+
+The symptom, as it happened on this unit: the fields read `2147483647`, the panel's own
+"not set", the display still looks fine, and then the next cold boot is **white from the
+first second of POST** with its stored theme media gone. Power cycling does not fix it,
+and neither does writing the fields: `logo`, `mode` and `presetThemeId` answer `200` to
+every body tried and leave the value at `2147483647` anyway ("Danger" under "Notes and
+known limits"). The way back is the vendor's own `recovery` request, and this project
+sends it from exactly one place, by hand:
+
+```bash
+xigmalcd-reset              # dry run: prints the 109-byte frame, sends nothing
+xigmalcd-reset --yes        # send it once, wait for the port back, re-read the state
+```
+
+In a checkout the command is `tools/reset_panel.py`; both are `xigmalcd/reset.py`, and
+the installed spelling exists because a system that came from a `.deb` has no `tools/`
+directory to run. What it does, measured against real glass and written up in
+PROTOCOL.md §5: `logo` goes `2147483647 -> 3` and `mode` `2147483647 -> 0`, free space
+moves to `69664` (the same figure the vendor's own log recorded), the panel's stored
+background is dropped, and the USB device re-enumerates - the port disappears and comes
+back on its own, which is why the command waits for the node to reappear instead of
+sleeping a fixed time. PROTOCOL.md §5 has ~9 s for that reproduction; the window's own
+reset path has seen it in ~3 s ("The GUI"), and both are logged rather than averaged.
+The next run re-uploads the background, since that is what `--mp4` does at session start.
+
+**Nothing in this project sends it on its own initiative.** Not a maintainer script, not
+the systemd unit - `debian/xigmalcd.service`'s `ExecStart` is `/usr/bin/xigmalcd --theme
+alpha --fps 2` and `debian/tests/smoke` fails an install whose unit ever grows
+`--allow-reset`. The control socket refuses `reset` unless the display loop was started
+with `--allow-reset`, and the window quotes that refusal rather than working around it.
+And without `--yes` the command is a printout: `tools/selftest.sh` asserts "dry run:
+nothing sent" plus the 109-byte frame length, from the entry point itself, and
+`debian/tests/smoke` asserts the same two things against `/usr/bin/xigmalcd-reset` after
+an install.
+
 ## Notes and known limits
 
 * **A frame costs one upload, and its verdict is read as part of it.** The loop sends
@@ -1191,7 +1319,8 @@ metrics schema; `xigmalcd/render.py` is the drawing; `xigmalcd/main.py` is the l
   a panel that was reporting `logo=3` clears it. The display keeps working, so the unit
   looks fine, and then the next cold boot is **white from the first second of POST** and
   the panel's stored theme media is gone. A power cycle does not fix it; `recovery` does
-  (`tools/reset_panel.py`), and that is the vendor's own reset from ALPHA's "AIO Theme"
+  (the reset command: `xigmalcd-reset` once installed, `tools/reset_panel.py` in a
+  checkout), and that is the vendor's own reset from ALPHA's "AIO Theme"
   screen, reproduced byte for byte from its log. `Link` refuses all three topics plus
   `recovery`, `config`, `firmware`, `update` and `upgrade` unless explicitly built with
   `allow_destructive=True`, and `send_media()` only ever sends `type:"media"` — a `.zip`

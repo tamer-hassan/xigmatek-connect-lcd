@@ -1,0 +1,339 @@
+# CI for a project whose whole claim is "every number in the documentation has a log
+# behind it", so the jobs here are the parts of the record that can be re-derived
+# without the author's hardware, and nothing pretends to re-derive the rest.
+#
+# What runs:
+#   selftest  tools/selftest.sh, the offline suite.  No port is opened, so a runner
+#             with no panel in it is exactly the right machine for it.
+#   deb       dpkg-buildpackage -us -uc -b, then lintian on the result.
+#   install   apt install the .deb that job just produced, on a runner that had
+#             nothing of ours on it, then debian/tests/smoke - the checks that only
+#             mean something once the files are in the layout an install makes.
+#   release   only on a v* tag: publish the same bytes those jobs checked.
+#
+# Every job runs on `ubuntu-26.04`, the GitHub-hosted image for the Ubuntu release
+# debian/changelog names (`resolute`) and the release the author's bench runs.  Not
+# `ubuntu-latest`: while this file was written that label was still moving from 24.04
+# to 26.04 (actions/runner-images#14748, roll-out 2026-10-19 to 2026-11-19), and the
+# debhelper, dh-python and lintian that this packaging was measured against should not
+# depend on which week a run happened in.  If that label is ever retired, the failure
+# is loud - "no runner matching label" - rather than a silent distro change.
+#
+# What no job here does: touch /dev/ttyACM0, send a frame, or claim anything about
+# real glass.  The measurements about the panel live in README.md and PROTOCOL.md with
+# the bench log they came from; a runner cannot re-derive those, so it does not cite
+# them.  The two places where the suite could reach for hardware are guarded and stay
+# guarded: the reset command runs here without --yes (xigmalcd/reset.py, and the
+# suite's own pyproject section asserts "dry run: nothing sent"), and the packaged
+# smoke test renders to a PNG in a temporary directory.
+#
+# The 146 MB themes package is not uploaded on a pull request - a reviewer of a code
+# change does not need somebody else's 146 MB, and the artifact storage is not free.
+# It is built on every run (so `dh_missing --fail-missing` and lintian still see it),
+# uploaded and installed on a tag, and the suite re-hashes those same files from the
+# checkout on every run anyway ("the vendor theme library" section).
+
+name: package
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+
+jobs:
+  selftest:
+    name: offline suite, no panel
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: what the suite imports
+        # Not a guessed list: PIL, pyserial and PyQt6 are what tools/selftest.sh
+        # imports (its own header says so), desktop-file-utils is the one external
+        # command it looks for with `command -v`, and the two font packages are what
+        # xigmalcd/render.py resolves - the gauge-geometry section measures ink
+        # against the ring's stroke, so it is measuring *these* glyphs.
+        # requirements.txt and pyproject.toml name the same runtime deps for a pip
+        # install; apt is the shorter way to the same three on this distro.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3 python3-pil python3-serial python3-pyqt6 python3-setuptools \
+            fonts-dejavu-core fonts-liberation desktop-file-utils
+          python3 -c 'import PIL, serial, PyQt6.QtWidgets, sys; print(" ", sys.version.split()[0], "Pillow", PIL.__version__)'
+
+      - name: tools/selftest.sh
+        run: tools/selftest.sh
+
+      - name: README's section count is the suite's section count
+        # README's Tools table says how many offline sections the suite has, and
+        # debian/changelog says it in the packaged form.  Both are digits someone has
+        # to remember, so here is the arithmetic: a section added without updating the
+        # prose fails CI, which is cheaper than a README that quietly becomes folklore.
+        run: |
+          python3 - <<'PY'
+          import re
+          words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+                   "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
+                   "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
+                   "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19,
+                   "twenty": 20}
+          n = sum(1 for ln in open("tools/selftest.sh", encoding="utf-8")
+                  if ln.startswith('echo "== '))
+          where = ["README.md", "debian/changelog"]
+          bad = []
+          for path in where:
+              for claim in re.findall(r"(\w+) offline sections",
+                                      open(path, encoding="utf-8").read()):
+                  if words.get(claim.lower()) != n:
+                      bad.append((path, claim))
+          if bad:
+              print(f"the suite has {n} sections, but these files disagree: {bad}")
+              raise SystemExit(1)
+          print(f"  {n} offline sections, and README.md and debian/changelog both say so")
+          PY
+
+  deb:
+    name: build the .deb files
+    needs: selftest
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build-Depends, taken out of debian/control rather than repeated here
+        # Repeating them in this file would be a second list to keep honest, and
+        # debian/control is the one dpkg-checkbuilddeps reads.  grep-dctrl (devscripts)
+        # pulls the field out of the source stanza; the sed drops the version
+        # constraints, because apt resolves those itself and `debhelper-compat (= 13)`
+        # has to become `debhelper-compat` to be an apt argument at all.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends devscripts lintian
+          deps=$(grep-dctrl -n -s Build-Depends '' < debian/control \
+                 | tr ',' '\n' | sed -e 's/([^)]*)//g' \
+                                        -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+                                        -e '/^$/d' | tr '\n' ' ')
+          echo "installing: $deps"
+          sudo apt-get install -y --no-install-recommends $deps
+          dpkg-checkbuilddeps            # the check that debian/control and this box agree
+          dpkg -l debhelper dh-python pybuild-plugin-pyproject lintian \
+               | awk '/^ii/{printf "  %-28s %s\n", $2, $3}'
+
+      - name: the version, where it is written
+        # debian/changelog, pyproject.toml (which is also what the wheel's METADATA
+        # and the installed dist-info say) and, on a tag, the tag itself: three
+        # spellings of one number, and debian/README.source promises they are kept
+        # equal.  dpkg-parsechangelog prints 0.1 for this changelog.
+        run: |
+          set -eu
+          d=$(dpkg-parsechangelog -SVersion)
+          p=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')
+          echo "debian/changelog $d, pyproject.toml $p"
+          test "$d" = "$p" || { echo "the two moved apart"; exit 1; }
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+              t=${GITHUB_REF_NAME#v}
+              echo "tag $GITHUB_REF_NAME -> $t"
+              test "$t" = "$d" || { echo "tag and changelog disagree"; exit 1; }
+          fi
+
+      - name: dpkg-buildpackage -us -uc -b
+        # -us -uc: unsigned, as debian/README.source explains - a GitHub Release
+        # carries no OpenPGP signature in any case.  The artifacts land one directory
+        # above the checkout, outside the source tree.
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: lintian
+        # --tag-display-limit 0 so nothing is folded away ("and 7 more"), and the
+        # gate is errors *and* warnings: the build on the author's bench measured 0
+        # errors, 0 warnings, 0 info (2026-11-07, lintian 2.129.0ubuntu2.1), and what
+        # this project does with a new tag is fix it or explain it in
+        # debian/xigmatek-connect-lcd.lintian-overrides, not silence it.  An info is
+        # printed and not failed on, because infos are lintian's opinions about a
+        # future policy, not a defect in these bytes.
+        run: |
+          set -euo pipefail
+          lintian --tag-display-limit 0 --fail-on error,warning ../*.changes \
+            | tee "$GITHUB_WORKSPACE/../lintian.log"
+          {
+            echo "lintian $(lintian --version | head -1)"
+            echo "run $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "errors=$(grep -c '^E:' "$GITHUB_WORKSPACE/../lintian.log" || true) warnings=$(grep -c '^W:' "$GITHUB_WORKSPACE/../lintian.log" || true) infos=$(grep -c '^I:' "$GITHUB_WORKSPACE/../lintian.log" || true)"
+          } | tee "$GITHUB_WORKSPACE/../lintian-summary.txt"
+
+      - name: what came out of the build
+        run: |
+          ls -l ../*.deb ../*.changes ../*.buildinfo
+          dpkg-deb -I ../xigmatek-connect-lcd_*_all.deb | sed -n '1,3p'
+          dpkg-deb -c ../xigmatek-connect-lcd_*_all.deb | grep -c '^-[^d]' \
+            | sed 's/^/  code package, files: /'
+          dpkg-deb -c ../xigmatek-connect-lcd-themes_*_all.deb | grep -c '^-[^d]' \
+            | sed 's/^/  themes package, files: /'
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: deb-code
+          path: |
+            ../xigmatek-connect-lcd_*_all.deb
+            ../xigmatek-connect-lcd_*_amd64.changes
+            ../xigmatek-connect-lcd_*_amd64.buildinfo
+            ../lintian.log
+            ../lintian-summary.txt
+          compression-level: 0        # already xz'd inside the .deb
+          retention-days: 14
+          if-no-files-found: error
+
+      # Only on a tag, and only because the install job below then gets to check the
+      # 146 MB against manifest.json on a machine that has never seen this tree.
+      - uses: actions/upload-artifact@v7
+        if: github.ref_type == 'tag'
+        with:
+          name: deb-themes
+          path: ../xigmatek-connect-lcd-themes_*_all.deb
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
+
+  install:
+    name: apt install them, then debian/tests/smoke
+    needs: deb
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: deb-code
+          path: debs
+
+      - uses: actions/download-artifact@v8
+        if: github.ref_type == 'tag'
+        with:
+          name: deb-themes
+          path: debs
+
+      - name: install
+        # Two things deliberately not left to apt's defaults.
+        #
+        # python3-pyqt6 is a Suggest, not a Depends, precisely because the display
+        # loop runs without Qt - so apt will not pull it in here, and the smoke test
+        # would spend the run reporting SKIPPED for the window's --help and for
+        # QIcon.fromTheme.  Installing it makes that half of the test real.
+        #
+        # The .deb files are installed from ./debs in one command, which is what lets
+        # apt see that the code package's `Recommends: xigmatek-connect-lcd-themes
+        # (= 0.1)` is satisfiable by the other file on the same command line.  When
+        # only the code package is present (a pull request), apt plans the install and
+        # prints `Recommended packages: xigmatek-connect-lcd-themes` without failing;
+        # that was checked on the bench with `apt-get -s install`, not assumed.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            desktop-file-utils python3-pyqt6
+          sudo apt-get install -y ./debs/*.deb
+          dpkg-query -W -f='${Package} ${Version} ${Architecture} installed-size ${Installed-Size} KB\n' \
+            'xigmatek-connect-lcd*'
+
+      - name: debian/tests/smoke
+        # The same script autopkgtest would run (debian/tests/control); run directly
+        # here because autopkgtest wants to build its own container or VM and this job
+        # already is a clean machine with the packages installed.
+        run: debian/tests/smoke
+
+  release:
+    name: publish the .deb files on the tag
+    needs: [deb, install]
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: deb-code
+          path: debs
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: deb-themes
+          path: debs
+
+      - name: the assets, with their sizes and hashes
+        id: assets
+        run: |
+          set -eu
+          for f in debs/*.deb; do
+              printf '| `%s` | %s B | `%s` |\n' "$(basename "$f")" \
+                  "$(stat -c %s "$f")" "$(sha256sum "$f" | cut -d' ' -f1)"
+          done | tee "$RUNNER_TEMP/assets.md"
+
+      - name: notes
+        # Everything in here is either a fact about the two files or a pointer to the
+        # run that checked them.  What the panel-facing claims rest on is README's and
+        # PROTOCOL.md's own bench logs, and this says so rather than borrowing their
+        # authority.
+        run: |
+          set -eu
+          {
+            echo "Unofficial: not affiliated with, endorsed by or approved by"
+            echo "XIGMATEK. The display loop says the same thing on the panel."
+            echo
+            echo "Two .deb files, built by this run from the tree at this tag on"
+            echo "\`ubuntu-26.04\` (\`dpkg-buildpackage -us -uc -b\`, no OpenPGP"
+            echo "signature - the hashes below and HTTPS are what a release asset"
+            echo "carries):"
+            echo
+            echo "| file | bytes | sha256 |"
+            echo "|---|---|---|"
+            cat "$RUNNER_TEMP/assets.md"
+            echo
+            echo '```'
+            cat "$GITHUB_WORKSPACE/../lintian-summary.txt"
+            echo '```'
+            echo
+            echo "Install both, in one command, from the directory holding them:"
+            echo
+            echo '```bash'
+            echo 'sudo apt install ./xigmatek-connect-lcd_*.deb ./xigmatek-connect-lcd-themes_*.deb'
+            echo 'sudo loginctl enable-linger "$USER"'
+            echo 'systemctl --user start xigmalcd.service'
+            echo '```'
+            echo
+            echo "The themes package is optional and separate on purpose: it is"
+            echo "XIGMATEK's own library, copied byte for byte out of the vendor"
+            echo "installation and hashed by its own \`.json\` manifest so the copy can"
+            echo "be checked rather than trusted. \`debian/copyright\` in the source"
+            echo "tree says what was done to obtain those files; nothing here licenses"
+            echo "them."
+            echo
+            echo "Nothing in this run touches a panel. The offline suite"
+            echo "(\`tools/selftest.sh\`), the build, \`lintian\`, and the post-install"
+            echo "checks (\`debian/tests/smoke\`) all pass with no serial port present,"
+            echo "and the suite's own reset gate check asserts that \`xigmalcd-reset\`"
+            echo "without \`--yes\` prints the frame and sends nothing."
+            echo
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: gh release create
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            debs/*.deb debs/*.changes debs/*.buildinfo
+          gh release view "$GITHUB_REF_NAME" --json name,assets \
+            --jq '.name + ": " + ([.assets[].name] | join(", "))'
