@@ -2,6 +2,34 @@
 
 The five themes this project draws, what `alpha` is a redraw *of*, and the geometry that decides how big a number can be inside a gauge ring. The vendor's own library - 27 themes, their layouts, their clips and their baked overlays - is in `themes/alpha/`, and that directory's `README.md` is the write-up of the container, the cipher and the layout schema.
 
+## The 27 vendor themes are not in the picker, and that is not an oversight
+
+`xigmaui`'s theme list and `xigmalcd --theme` both take `sorted(render.THEMES)`:
+`alpha`, `bars`, `clock`, `dual`, `gauge`. Those are the pictures **this program**
+renders from live readings. The vendor's 27 are files in the vendor's own format, and
+nothing in this project has ever put one on the wire or read one back:
+
+* the `.thm` files (27 of them, 6.8 MB at the largest) are the panel-side theme
+  definitions the Windows app decrypts and interprets - `tools/thm_unlock.py` opened
+  them with the app's constants to learn what is in them, which is a *reading*, not a
+  path back to the device;
+* the control socket's file gate (`xigmalcd/control.py:check_media_file`) accepts
+  `.mp4`, `.png` and `.osd` only, so a `.thm` could not be uploaded through it even
+  by hand;
+* and the panel is not asked what theme it holds, because it cannot be
+  (PROTOCOL.md §11).
+
+What the library **is** good for here, both of them used: its 27 layouts are the
+measured geometry the `alpha` preset was redrawn from (`xigmalcd/layout.py`, and the
+paragraph below about rings and text sizes), and its media is uploadable -
+43 clips and 28 images per install, all 43 clips under the socket gate's 8 MB ceiling
+(largest `clips/Theme_22.mp4`, 7 662 077 B). Two of those uploads have been measured on
+the packaged unit's own path: `themes/alpha/clips/theme_47.mp4` at 1 211 106 B,
+`notice 200 in 1.0 s`, and `themes/alpha/foreground/1757492775624.png` at 3 409 B,
+`notice 200 in 0.3 s`. Whether the panel *displays* a still PNG is the one half of that
+nobody has looked at the glass to confirm, so the window's picker still lists MP4 rows
+only (docs/limits.md keeps that as an open item).
+
 ## The `alpha` theme, and its rings
 
 `alpha` is the vendor theme made by redrawing, widget for widget, the theme the vendor app

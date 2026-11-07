@@ -225,7 +225,11 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   pumped until the clip rows have their ffmpeg thumbnails, then `grab()`ed. It refuses to run
   if the `--device` path exists, because in this mode the window's own status read opens the
   port, and a screenshot is not the thing to take someone's panel over with; the default is
-  `/dev/xigmatek-lcd`, which on a capture machine has nothing behind it.
+  `/dev/xigmatek-lcd`, which on a capture machine has nothing behind it.  `--size WxH`
+  frames it (1180x860 for the README's picture): the window's own default is 1000x620, and
+  at that size the controls column - taller than 620 px - would be cut off below the clip
+  list. Nothing about the layout is fixed by that: the preview column caps itself at the
+  480 px frame and the splitter is the user's, which is what the suite asserts instead.
 * `tools/asar_extract.py ASAR` — read an Electron `.asar` without node: list, unpack,
   `--cat` one file, or `--find TEXT` to grep file *contents*, which is how the string
   constants in the app's compiled main process (`out/main/index.jsc`) get mined.

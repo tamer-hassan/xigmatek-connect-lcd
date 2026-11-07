@@ -8,9 +8,9 @@ drawing a blank preview.
 
 Nothing here decides a wire rule. What is stored is only what the window would
 have looked like: port, theme, clock size, canvas, scrim, fan figures, preview
-rate, whether closing the window hides it to the tray, and the clip that was
-selected. The panel itself is never asked what it remembers, because it cannot
-be (PROTOCOL.md §11).
+rate, whether closing the window hides it to the tray, the clip that was
+selected, and how wide the two columns were. The panel itself is never asked
+what it remembers, because it cannot be (PROTOCOL.md §11).
 """
 from __future__ import annotations
 
@@ -31,6 +31,11 @@ DEFAULTS: dict = {
     "fans": True,
     "preview_fps": 2.0,        # host-side only; a frame renders in ~9 ms
     "size": [1000, 620],       # the window as you left it
+    "split": [520, 900],       # the two columns, as you left the splitter between
+                               # them.  The left one is capped by the window at
+                               # the width of the 480 px frame (see app.py:
+                               # _fit never scales *up*), so these numbers decide
+                               # how much of the window the controls get.
     "tray": True,              # close hides it to the tray; False quits on close
 }
 
@@ -82,6 +87,14 @@ def _clean(loaded: dict) -> dict:
     if (isinstance(size, (list, tuple)) and len(size) == 2
             and all(isinstance(n, (int, float)) and 400 <= n <= 8000 for n in size)):
         out["size"] = [int(n) for n in size]
+    split = loaded.get("split")
+    # the splitter's two widths.  Like `size`, only accepted if they are two
+    # numbers a layout could honour: 0 is what a collapsed pane reports, and
+    # restoring that leaves a window with an invisible half.
+    if (isinstance(split, (list, tuple)) and len(split) == 2
+            and all(isinstance(n, (int, float)) and 160 <= n <= 6000
+                    for n in split)):
+        out["split"] = [int(n) for n in split]
     clip = loaded.get("clip")
     if isinstance(clip, str) and os.path.isfile(clip):
         # DEFAULT_MP4 is built relative to the module, so it arrives as

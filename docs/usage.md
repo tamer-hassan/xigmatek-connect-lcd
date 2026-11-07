@@ -118,6 +118,29 @@ That is a real answer, taken out of `data/glass/2026-11-06-161444-socket-run.txt
 `--status` client ran against a display that was mid-run at 1 fps, and nothing about the
 display changed because it asked.
 
+The reply also carries the daemon's **event ring** - the last twenty things it chose to
+record about the port, six of them in every status answer - and `--status` prints them
+under the counters. That ring is the only way a client learns the *verdict* on a
+background upload, because the socket answer on its own says only `queued` (the frame
+loop owns the port and does the sending):
+
+```
+$ python3 -m xigmalcd --status      # the packaged unit on this bench, 08:09 local
+  counters: 5720/5726 uploads the panel confirmed, 6 refused, 0 link errors, 11 session renewals, this session 220 uploads 109 s old
+  07:51:50 queued upload: /usr/share/xigmalcd/themes/alpha/clips/theme_47.mp4
+  07:51:51 background theme_47.mp4 accepted
+  07:54:08 queued upload: /usr/share/xigmalcd/themes/alpha/foreground/1757492775624.png
+  07:54:09 background 1757492775624.png accepted
+```
+
+What that transcript cannot tell you is what the unit had put on the panel *before*
+anyone asked: its session-start background upload (07:21:58) is not in the ring, because
+that upload ran in the loop before any client could have queried it and nothing noted it.
+The tree has since closed that gap - the session-start upload now lands in the ring as
+`background <name> accepted at session start: this is what the panel stores under our
+frames` - and that is what lets `xigmaui` answer "the panel stores X" instead of
+"I have not seen an accept" ([docs/gui.md](gui.md)).
+
 One JSON object per line in each direction, and the same fields back:
 
 | command | what it does |

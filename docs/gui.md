@@ -66,14 +66,74 @@ there is one place to change when a number is re-measured.
 
 | pane | what it does | what lands on the wire |
 |---|---|---|
-| the running display | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), and the daemon's recent events. Pause, one frame, an fps spin, `Apply these settings`, upload | socket only; the port is never opened. Measured 1 ms for the six commands Apply sends |
-| preview | the stored background frame with `render.draw`'s OSD layer composited on top, refreshed at `--preview-fps` (default 2) | nothing |
-| theme | the five themes, clock size, `clear`/`black` canvas, scrim, fan figures | nothing until you press Apply (display running) or one of the send buttons (not running) |
-| clips | every MP4 the roots hold, listed once per clip - **69 rows** on this box: 3 vendored here, 40 more from the vendor's library, 26 more from the 69 files the Windows app has pushed to this panel (the rest are byte-identical re-uploads); the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. Each row gets an ffmpeg thumbnail and its measured mean luma | `Upload background`: `STATE all 1` twice, then the whole file as one media file |
-| `Send one frame` | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
+| the running display | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Measured 1 ms for the six commands Apply sends |
+| preview | the stored background frame with `render.draw`'s OSD layer composited on top, refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How wide each half gets" below | nothing |
+| theme | the five themes, clock size, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
+| clips | every MP4 the roots hold, listed once per clip - **69 rows** on this box: 3 vendored here, 40 more from the vendor's library, 26 more from the 69 files the Windows app has pushed to this panel (the rest are byte-identical re-uploads); the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. Each row gets an ffmpeg thumbnail and its measured mean luma. One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+U): `STATE all 1` twice, then the whole file as one media file |
+| background state | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept. A file the gate refuses says so, in the gate's words, before the button is pressed | nothing: it is a readout |
+| `One frame now` | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
 | `Send frames for 30 s` | the picture loop, so you can watch the real glass | `STATE all 1` twice, then 60 uploads at 2 fps |
 | status | the panel's `conn 1` reply: sn, versions, `space`, `brightness`, `mode`, `logo`, `osdState`, `timeout`, each annotated only where PROTOCOL.md records what it means | `conn 1`, `power resume`, `timeout 60` - and no metrics blob, because it puts no picture on the glass. With a display running there is no fresh `conn 1` to ask for, so the box shows the one that display read at its own session start, labelled as such |
 | reset | the vendor's `recovery` | needs the word `reset` typed in, then a confirm dialog. With a display running it goes over the socket, which refuses it unless that display was started `--allow-reset`, and the refusal is quoted in the daemon's words |
+
+### How wide each half gets, and why the preview is never bigger than the glass
+
+The two columns sit in a splitter, and three measured rules decide its shape rather
+than a designer's taste:
+
+* the frame `render.draw` produces is **480×480**, exactly what the panel is, and
+  `_fit()` caps the pixmap at that size. Qt's `scaled(KeepAspectRatio)` grows a
+  pixmap without being told not to, and on a wide window the old code drew the
+  480 px picture at 502 px - a picture of the glass containing 22 px of invented
+  detail. The suite pins both directions: 1:1 on a wide window, and shrunk to the
+  pane when the handle is dragged narrow (`xigmaui/app.py:_fit`);
+* so a preview column wider than 480 px + chrome is dead space. The left pane gets
+  a maximum width (`render.W + PANE_CHROME`, 532 px here) and the controls get the
+  rest. Before that cap, a 2 259 px window gave the preview column ~993 px for a
+  480 px picture - and, with the upscale bug above, drew that picture at ~993 px -
+  while the parts you actually work with shared 1 266 px. The floor on the other
+  side is a measurement too: the first version of the cap applied its sizes before
+  the splitter had ever been laid out, and at 2 259 px the controls column came back
+  **116 px** wide. That is the "invisible half" failure, and it is why the sizes are
+  set after the window's own `resize`, why the right pane has a 320 px minimum, and
+  why the suite asserts both. Where the handle ends up is remembered - the settings
+  file's `split` key - and a restored `0` width is rejected rather than restored, so
+  a pane hidden by an over-eager drag cannot come back as a permanent hole.
+* and the picture refits when the **label** resizes, not when the window does:
+  dragging the splitter never fired the window's `resizeEvent`, which is why the
+  preview used to stay at its old scale while its pane changed shape.
+
+### What the window can and cannot tell you about the background
+
+There is no readback from this panel (PROTOCOL.md §11), so the one sentence that
+matters - *what is the picture under our frame right now* - cannot be asked of the
+device. What it can be read from is the running display's own event ring, the last
+twenty things it chose to record about the port, which every status reply carries:
+
+```
+07:51:50 queued upload: /usr/share/xigmalcd/themes/alpha/clips/theme_47.mp4
+07:51:51 background theme_47.mp4 accepted
+```
+
+Both halves of that are load-bearing, and the window now shows the ring (under
+"The running display") plus the derived line (`the panel stores: theme_47.mp4`) -
+because a socket `upload` answers `ok` in milliseconds and that `ok` only means
+the file got into the loop's one action slot. The verdict is the second line.
+
+The bench found the cost of not having that readout, and it is worth writing down
+because it looked like a broken feature rather than a missing label: a background
+was picked from the list **three times**, three different clips, and the panel kept
+drawing the picture it already had. Nothing on screen said why. What had actually
+happened is that `Apply these settings` had been pressed each time, and Apply sends
+six settings - theme, clock size, canvas, scrim, fans, fps - and *never a file*, by
+design, because a background upload overwrites what the panel stores and only the
+guarded factory reset undoes that. Picking a row is a selection; the clips box is
+what sends it. Three things came out of that afternoon, all in the window now:
+the one state line, the ring, and Apply saying out loud which background it left
+alone. The author's own `~/.config/xigmaui/config.json` at 07:33 holds
+`clip: /usr/share/xigmalcd/themes/alpha/clips/theme_47.mp4` and `clock_size: 30`,
+which is the fingerprint of those three picks: the clip moved, the glass did not.
+
 
 The twice-per-session metrics blob is not decoration: PROTOCOL.md §8 measures that
 `STATE all 1` goes out at the head of a session and nowhere else (TX frames 3 and 4 of
@@ -282,34 +342,48 @@ counters included, and the display never noticed the difference.
 
 **A fifth window, which nobody drove.** After the 0.2 upgrade, the packaged user unit
 started on its own (docs/packaging.md keeps that story, including what is not established
-about it) and drew unattended for 14 minutes: `/usr/bin/xigmalcd --theme alpha --fps 2`,
-one process, `NRestarts=0`. The evidence is the unit's own journal plus three reads over
-the control socket, kept as `data/glass/2026-11-07-072155-service-2fps-journal.log`, and
-it is thinner by design than a `tools/display_glass.py` log: no phases, no per-frame byte
-sizes, no client actions. What it does say:
+about it) and drew unattended for **56 minutes up to where this file stops** - the unit was
+still running when it was read: `/usr/bin/xigmalcd --theme alpha --fps 2`, one process,
+`NRestarts=0`. The evidence is the unit's own journal plus reads
+over the control socket, kept as `data/glass/2026-11-07-072155-service-2fps-journal.log`,
+and it is thinner by design than a `tools/display_glass.py` log: no phases, no per-frame
+byte sizes. `tools/selftest.sh` re-derives every number in the table below out of that
+file rather than trusting this prose. What it says, at two instants of the same process:
 
-| | |
-|---|---|
-| uploads | **1 667** in 13.9 min at 2 fps: **1 664 confirmed, 3 refused**, 0 link errors |
-| session renewals | 3, each logged `session renewed after 500 uploads, 250 s` - the packaged unit passes no session flags, so this is the defaults, and at 2 fps the **500-upload** limit is what fires: 500 uploads is 250 s, inside the 300 s age limit (`--session-max`, `--session-ttl` in the options table) |
-| the upload the panel refused | all three refusals are `device refused the file: 400 b''` on ordinary frames (1029, 1097, 1167), ~34 s apart, in the 4 minutes after a renewal; unlike the four refusals in the table above, no client `upload` was in flight - the `upload` rows above are deliberate requests, these are the loop's own frames. Nothing in this tree explains a `400` on a `.osd` file, so it is recorded as seen, not as understood ("Notes and known limits") |
-| the background at start | `Theme_25.mp4 refused (device refused the file: 400 b''); retrying once` at 07:21:57, then `214917 B -> notice 200 in 2.3 s, space 69084 -> 69104` at 07:21:58 - the retry path doing its job, and the same `400 b''` answer as the frame refusals |
-| what it costs | systemd's own accounting at 13.9 min: `CPUUsageNSec=75 192 540 000`, `MemoryPeak=36 003 840 B` (36.0 MB), `NRestarts=0`. That is **45.2 ms of CPU per confirmed frame**, or **9.0 % of one core** sustained at 2 fps |
+| | at 13.9 min (07:36) | at 47.7 min (08:09) |
+|---|---|---|
+| uploads | **1 667** in 13.9 min at 2 fps: **1 664 confirmed, 3 refused**, 0 link errors | **5 726**: **5 720 confirmed, 6 refused**, 0 link errors |
+| session renewals | 3, each logged `session renewed after 500 uploads, 250 s` - the packaged unit passes no session flags, so this is the defaults, and at 2 fps the **500-upload** limit is what fires: 500 uploads is 250 s, inside the 300 s age limit (`--session-max`, `--session-ttl` in the options table) | 11, all on the same 500-upload limit, 250-251 s apart |
+| the uploads the panel refused | all three are `device refused the file: 400 b''` on ordinary frames (**1029, 1097, 1167**), ~34 s apart, in the 4 minutes after a renewal | seven by the time this file was closed at 08:18:02: **1029, 1097, 1167, 2268, 3162, 3266, 6471** - the same shape, spread over 56 min, each followed by a frame that landed |
+| backgrounds | `Theme_25.mp4 refused (device refused the file: 400 b''); retrying once` at 07:21:57, then `214 917 B -> notice 200 in 2.3 s, space 69084 -> 69104` at 07:21:58 - the retry path doing its job, and the same `400 b''` answer as the frame refusals | two asked for over the control socket, and this is the first time this project's *packaged* path has been driven through an upload rather than watched: `theme_47.mp4 1 211 106 B -> notice 200 in 1.0 s, space 69100 -> 67844` at 07:51:51 and `1757492775624.png 3 409 B -> notice 200 in 0.3 s, space 67844 -> 68032` at 07:54:09. Both files come from the themes package (`themes/alpha/clips/`, `themes/alpha/foreground/`). Whether the panel *displays* a still PNG is a glass question this file cannot answer (§11); what it answers is the notice |
+| what it costs | `CPUUsageNSec=75 192 540 000`, `MemoryPeak=36 003 840 B` (36.0 MB), `NRestarts=0` → **45.2 ms of CPU per confirmed frame**, **9.0 % of one core** sustained at 2 fps | `CPUUsageNSec=270 998 249 000`, `MemoryPeak=36 048 896 B` (36.0 MB), `NRestarts=0` → **47.4 ms of CPU per confirmed frame**, **9.5 % of one core** |
 
-That last row is the loop's cost, and it is worth setting beside the window's: the Cost
-section above measures `render.draw` at 12.4-14.1 ms and draw-plus-PNG-encode at about
-23 ms, because a preview neither writes the metrics blob nor pushes a file nor pumps a
-serial session. The real path costs roughly twice that, and 9 % of a core sustained is
-still nowhere near the reason not to run it - the reason is the upload count (172 800
-a day at 2 fps against 86 400 at 1, the `--fps` row in the options table).
+The two cost rows are the same process measured twice, and they agree: about 45-47 ms
+of CPU a frame. That is worth setting beside the window's Cost section, which measures
+`render.draw` at 12.4-14.1 ms and draw-plus-PNG-encode at about 23 ms, because a preview
+neither writes the metrics blob nor pushes a file nor pumps a serial session. The real
+path costs roughly twice that, and 9 % of a core sustained is still nowhere near the
+reason to think about the frame rate - the reason is the upload count (172 800 a day at
+2 fps against 86 400 at 1, the `--fps` row in the options table). Nothing in the 56 minutes
+this file covers restarted the process, lost the port, or reported a link error.
 
-One honesty note about that 14 minutes, because the counters are steadier than the
-picture was: two reads four minutes apart reported different settings - `clock 44` at
-07:26 and `clock 30` at 07:30 - while the packaged `ExecStart` passes no `--clock-size`
-at all. A client sent a settings change over the socket in between (the `Apply` row
-above is that path); nothing in the kept file says who or when, so this window supports
-statements about counters, renewals and cost, and not about what the glass looked like
-frame by frame.
+Two honesty notes, both of them learned rather than assumed:
+
+* the counters of that 48 minutes are steadier than the picture was. Two reads four
+  minutes apart reported different settings - `clock 44` at 07:26 and `clock 30` at
+  07:30 - while the packaged `ExecStart` passes no `--clock-size` at all. That one is
+  now explained rather than open: the author's own window sent both, one `Apply these
+  settings` each, and `~/.config/xigmaui/config.json` carries `clock_size: 30` from the
+  second. So this window supports statements about counters, renewals, uploads and cost,
+  and still not about what the glass looked like frame by frame;
+* the seven refusals are **not** those three background picks. A background request that
+  reaches this process leaves two records - a `queued upload: <path>` note in the ring
+  and a `background <name> …` line in the journal - and there is neither anywhere between
+  07:21:58 and 07:51:50, which is the window those picks fell in. The wording separates
+  the paths on its own: the frame loop prints `! frame N: device refused the file`, while
+  a refused clip prints `background <name> refused (…); retrying once`. The picks never
+  reached the port at all (see "What the window can and cannot tell you"), so the seven
+  refusals stay unexplained, and [Notes and known limits](limits.md) keeps them that way.
 
 The fifth window is the watched one, and it is also the one that caught the driver being
 dishonest about itself. It ran 16:55:49-17:00:58 and had reached the renewal wait when the

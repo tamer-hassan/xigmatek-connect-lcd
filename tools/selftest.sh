@@ -1305,6 +1305,129 @@ wired = inspect.getsource(app.Window._build).count("fans=self.fanline.isChecked(
 assert wired == 3, wired
 print("  all three drawing buttons hand the fan flag to the worker")
 
+# ---- the two columns, and what the preview is allowed to do with its pixels ----
+# The preview column's width is capped at the picture's own size plus the pane's
+# chrome, because `_fit()` must never draw the 480 px frame larger than 480:
+# Qt's `scaled(KeepAspectRatio)` happily grows a pixmap, and on a wide window that
+# showed a 502 px picture of a 480 px panel.  Both halves of that rule are checks.
+pane_l, pane_r = win.split.widget(0), win.split.widget(1)
+assert pane_l.maximumWidth() == render.W + app.PANE_CHROME, (
+    pane_l.maximumWidth(), render.W, app.PANE_CHROME)
+assert pane_l.maximumWidth() >= render.W, "the frame could never be shown 1:1"
+assert pane_r.minimumWidth() >= 300, pane_r.minimumWidth()
+win.show()
+for _ in range(6):
+    appq.processEvents()
+win.resize(1600, 900)
+win.split.setSizes([1200, 380])        # the handle dragged as far right as it goes
+for _ in range(6):
+    appq.processEvents()
+assert pane_l.width() == pane_l.maximumWidth(), (pane_l.width(),
+                                                 pane_l.maximumWidth())
+win._fit()
+assert win.preview.width() >= render.W, win.preview.width()
+assert win.preview.pixmap().width() == render.W, win.preview.pixmap().size()
+win.split.setSizes([180, 1400])        # and as far left
+for _ in range(6):
+    appq.processEvents()
+win._fit()
+assert win.preview.pixmap().width() == win.preview.width() < render.W, \
+    (win.preview.pixmap().size(), win.preview.width())
+print(f"  preview column          capped at {pane_l.maximumWidth()} px for a "
+      f"{render.W} px frame: 1:1 on a wide window, {win.preview.pixmap().width()} "
+      f"px when the pane is dragged narrow, never bigger than the glass")
+# and the split is remembered, with a collapsed pane refused rather than restored
+moved = list(win.split.sizes())
+win._save_now()
+saved2 = settings.load()
+assert saved2["split"] == moved, (saved2["split"], moved)
+assert settings._clean({"split": [0, 700]})["split"] == settings.DEFAULTS["split"], \
+    "a collapsed pane came back as a collapsed pane"
+back = app.Window(bad, None, restore=True)
+assert back.cfg["split"] == moved, back.cfg["split"]
+for _t in (back.preview_timer, back.thumb_timer):
+    _t.stop()
+back.panel.stop()
+back.panel.wait(2000)
+print(f"  split remembered        {moved}, a 0-width pane rejected")
+
+# ---- one upload control, and the state it reports ----
+# There used to be two buttons labelled "Upload background", one per column, and
+# neither could say whether the panel had taken the file.  The bench proved what
+# that costs: a clip picked in the list, Apply pressed, and the glass going on
+# drawing over the old picture with nothing on screen to say so.
+assert not hasattr(win, "btn_dupload"), "a second upload button is back"
+assert sum(1 for b in (win.btn_upload,) if b.text() == "Upload background") == 0
+# the daemon's own ring is the only source for "the panel stores this", and the
+# session-start upload has to be in it or a client that connects later can never
+# know what is under its frames (the panel cannot be asked, PROTOCOL.md §11)
+daemon_src = open("xigmalcd/main.py").read()
+assert "accepted at session start" in daemon_src and "did not land at session start" in daemon_src
+win.daemon.present = True
+try:
+    win._stored_bg = win._queued_bg = ""
+    win._read_ring(["08:00:00 queued upload: /x/theme_47.mp4",
+                    "08:00:01 background theme_47.mp4 accepted"])
+    assert win._stored_bg == "theme_47.mp4", win._stored_bg
+    assert "the panel stores: theme_47.mp4" in win.d_stored.text(), \
+        win.d_stored.text()
+    chosen = byname["theme_48.mp4"].path
+    win._load_background(chosen)
+    win._refresh_clip_state()
+    assert "not on it" in win.clip_state.text(), win.clip_state.text()
+    assert win.btn_upload.text() == "Send this background to the panel"
+    win._stored_bg = os.path.basename(chosen)
+    win._refresh_clip_state()
+    assert win.btn_upload.text() == "Send this background again", win.btn_upload.text()
+    assert "stores " in win.clip_state.text() and "accepted it" in win.clip_state.text()
+    win._stored_bg = ""
+    win._refresh_clip_state()
+    assert "has not seen an accept" in win.clip_state.text(), win.clip_state.text()
+    # and a file the socket would refuse is reported before the press, in the
+    # gate's own words - not a button that looks like it worked
+    win._load_background(os.path.join("themes", "alpha", "manifest.json"))
+    win._refresh_clip_state()
+    assert not win.btn_upload.isEnabled(), "an unhidable refusal was clickable"
+    assert "cannot go to the panel" in win.btn_upload.text()
+    assert "not something the panel can store" in win.clip_state.text(), \
+        win.clip_state.text()
+    assert win.btn_upload.toolTip() == win.clip_state.text().split(" - ", 1)[1]
+    win._load_background(byname["Theme_25.mp4"].path)
+    win._refresh_clip_state()
+    assert win.btn_upload.isEnabled() and "Ctrl+U" in win.btn_upload.toolTip()
+    print("  background state        unknown / stores X / this clip, three "
+          "wordings, and the gate's refusal read before the click")
+finally:
+    win.daemon.present = False
+    win._refresh_clip_state()
+
+# the picker's filter: 69 rows on a bare box, 115 with the Windows partition
+# mounted, and no way to find one short of a scroll wheel
+win.clip_filter.setText("theme_48")
+appq.processEvents()
+shown = [win.clips.item(i).text() for i in range(win.clips.count())
+         if not win.clips.item(i).isHidden()]
+assert any("theme_48" in t for t in shown), shown
+assert len(shown) < win.clips.count(), "the filter hid nothing"
+assert win.clips.item(win.clips.currentRow()) is not None
+assert not win.clips.item(win.clips.currentRow()).isHidden(), \
+    "the selected row was hidden under the buttons that act on it"
+win.clip_filter.setText("")
+appq.processEvents()
+assert not any(win.clips.item(i).isHidden() for i in range(win.clips.count()))
+print(f"  picker filter           {len(shown)} of {win.clips.count()} rows match "
+      f"'theme_48', the selection stays visible")
+
+# the log keeps its last LOG_KEEP lines rather than every line it ever wrote:
+# the pane is one wrapped label re-set on every append
+for i in range(app.LOG_KEEP + 40):
+    win._log(f"heartbeat {i}")
+assert len(win._log_lines) == app.LOG_KEEP, len(win._log_lines)
+text = win.log_view.text()
+assert f"heartbeat {app.LOG_KEEP + 39}" in text and "heartbeat 0\n" not in text
+print(f"  log capped              {len(win._log_lines)} lines kept of "
+      f"{app.LOG_KEEP + 40} written")
+
 # The same four actions with the serial layer replaced by a stub: the wiring
 # around them - what bytes go up, which verdict decides success, who is allowed
 # to ask for a destructive link, where the metrics blob lands in a session -
@@ -2238,37 +2361,56 @@ else:
         # the packaged ExecStart passes no session flags, so the defaults are what fires:
         # --session-max 500, and the seconds have to be 500 uploads at the unit's fps
         fps = float(re.search(r"--fps (\d+)", text).group(1))
-        ups = int(ren[-1][0])
-        assert ups == 500, (path, "the packaged unit renewed at something other than the"
-                                  " default 500 uploads", ups)
-        assert abs(int(ren[-1][1]) - ups / fps) <= 3, (path, ren[-1], ups, fps)
+        ren_ups = int(ren[-1][0])
+        assert ren_ups == 500, (path, "the packaged unit renewed at something other "
+                                      "than the default 500 uploads", ren_ups)
+        assert abs(int(ren[-1][1]) - ren_ups / fps) <= 3, (path, ren[-1], ren_ups, fps)
         refuses = re.findall(r"! frame (\d+): device refused the file: 400", text)
         # and every refused frame the file names has to be named in the docs that quote it
         for n in refuses:
             assert n in gui_doc, (path, n, "a refusal the GUI ledger does not name")
             assert n in lim_doc, (path, n, "a refusal the limits write-up does not name")
-        cpu = re.search(r"CPUUsageNSec=(\d[\d ]*)", text)
-        mem = re.search(r"MemoryPeak=(\d[\d ]*)", text)
-        assert cpu and mem, (path, "no systemd accounting in this journal")
-        ns = int(cpu.group(1).replace(" ", ""))
-        peak = int(mem.group(1).replace(" ", ""))
-        ok, tot, ref = reads[-1]
-        ms = ns / 1e9 / ok * 1000
-        pct = ns / 1e9 / (tot / fps) * 100
-        assert f"{ms:.1f} ms of CPU per confirmed frame" in gui_doc, (ms, "gui.md's figure")
-        assert f"{pct:.1f} % of one core" in gui_doc, (pct, "gui.md's figure")
-        assert f"{peak / 1e6:.1f} MB" in gui_doc, (peak, "gui.md's memory figure")
-        # what the docs say about the refusals has to be in the file, in the same shape:
-        # the frame numbers, and the totals they are quoted under
-        assert refuses, path
-        for n, tot in ((c, t) for c, t, r in reads[-1:]):
-            assert f"{tot:,}".replace(",", " ") in gui_doc or str(tot) in gui_doc, \
-                (path, tot, "gui.md never names this total")
+        # Every "what the same process costs" block is a snapshot with its own
+        # counters named inside it, and the arithmetic divides those - not the
+        # last read in the file.  Each block's figures have to be quoted in the
+        # document, in this exact shape, or the doc has remembered a number the
+        # file does not say.
+        blocks = re.findall(r"=== what the same process costs[^\n]*\n(.*?)(?=\n\n|\Z)",
+                            text, re.S)
+        assert blocks, (path, "no systemd accounting block in this journal")
+        costs = []
+        for b in blocks:
+            cpu = re.search(r"CPUUsageNSec=([\d ]+)", b)
+            mem = re.search(r"MemoryPeak=([\d ]+)", b)
+            at = re.search(r"counters at that instant: (\d+)/(\d+) frames "
+                           r"confirmed, (\d+) refused", b)
+            assert cpu and mem and at, (path, b[:200], "an accounting block that "
+                                        "does not name its own counters")
+            ns, peak = int(cpu.group(1).replace(" ", "")), int(mem.group(1).replace(" ", ""))
+            ok, tot, ref = (int(x) for x in at.groups())
+            ms, pct = ns / 1e9 / ok * 1000, ns / 1e9 / (tot / fps) * 100
+            for want in (f"{ms:.1f} ms of CPU per confirmed frame",
+                         f"{pct:.1f} % of one core", f"{peak / 1e6:.1f} MB"):
+                assert want in gui_doc, (path, want,
+                                         "a cost figure the doc does not quote")
+            costs.append(f"{ms:.1f} ms/frame, {pct:.1f}% of a core at "
+                         f"{tot / fps / 60:.1f} min")
+        # and every background upload the journal records: the doc quoting this
+        # run has to carry the same byte count and the same seconds
+        ups = re.findall(r"background (\S+) ([\d ]+) B -> notice (\d+) in ([\d.]+) s",
+                         text)
+        for name, size, code, secs in ups:
+            assert f"{int(size):,}".replace(",", " ") + " B" in gui_doc, \
+                (path, name, size, "gui.md does not quote this upload's size")
+            assert f"{secs} s" in gui_doc, (path, name, secs,
+                                            "gui.md does not quote this upload's time")
+            assert code == "200", (path, name, "a notice the docs treat as accepted")
         print(f"  {os.path.basename(path)}: {len(reads)} counter reads, "
-              f"{ok}/{tot} confirmed/refused-accounted, {len(refuses)} refusals "
-              f"(frames {', '.join(refuses)}), renewal at {ups} uploads / {fps} fps, "
-              f"{ms:.1f} ms CPU per frame = {pct:.1f}% of a core, peak {peak/1e6:.1f} MB - "
-              f"all three cost figures re-derived from the file gui.md quotes them in")
+              f"{reads[-1][0]}/{reads[-1][1]} confirmed with {reads[-1][2]} refused "
+              f"(frames {', '.join(refuses)}), renewal at {ren_ups} uploads / {fps} fps, "
+              f"{len(ups)} background upload(s): {', '.join(n for n, *_ in ups)}, "
+              + "; ".join(costs) + f", {len(blocks)} accounting block(s) re-derived "
+              f"into the figures docs/gui.md quotes")
 print(f"  {len(runs)} glass log(s) in data/glass/, each stamped with its window")
 PY
 else

@@ -806,7 +806,20 @@ def main(argv=None) -> int:
             # this link, an accepted upload of either vendored clip returns its
             # notice in 0.25-2.4 s, so it is not repeated on a session renewal
             # only because the panel keeps the file.
-            _upload_background(link, args)
+            #
+            # Said into the control ring as well as into stderr, because the
+            # panel cannot be asked what it stores (§11) and a client that
+            # connects an hour later has no other way to learn it: the window
+            # shows this line as "the panel stores …".  Before it, the ring was
+            # empty until someone pressed an upload button, so the honest answer
+            # to "which background is on the glass" was "I do not know".
+            name = os.path.basename(args.mp4)
+            if _upload_background(link, args):
+                ctl.note(f"background {name} accepted at session start: this is "
+                         f"what the panel stores under our frames")
+            else:
+                ctl.note(f"background {name} did not land at session start: the "
+                         f"panel keeps whatever it already had")
             link.drain(0.2)
         deadline = time.monotonic() + args.duration if args.duration else 0
         n = ok = bad = bad_refused = 0

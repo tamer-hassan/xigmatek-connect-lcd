@@ -37,6 +37,13 @@ this script; that is why nothing in the README quotes them.
 `--seconds N` bounds how long the event loop is pumped: thumbnails arrive one batch per
 timer tick and they are the slow part of a first paint, so the loop is run until N rows
 have icons or the budget runs out.
+
+`--size WxH` (default 1180x860) resizes the window before the grab.  That is a framing
+choice, not a claim about a fixed layout: the window's own default is 1000x620 from
+`xigmaui/settings.py`, it is resizable, and its preview column caps itself at the 480 px
+frame - so at the default size the controls column, which is taller than 620 px, would be
+cut off below the clip list in a picture meant to show what the window is.  The suite
+checks the column rules themselves, not this picture (docs/gui.md).
 """
 from __future__ import annotations
 
@@ -57,6 +64,14 @@ def main() -> int:
                     help=f"port path the window names (default {DEFAULT_DEVICE}); it "
                          "must not exist, because in this mode the window would open it")
     ap.add_argument("-o", "--out", default=DEFAULT_OUT, help="where to write the PNG")
+    ap.add_argument("--size", default="1180x860", metavar="WxH",
+                    help="resize the window to this before grabbing it (default "
+                         "1180x860, which is what the README's picture uses: wide "
+                         "enough that the capped preview column and the whole "
+                         "controls column are both visible at once. The window's "
+                         "own default is settings.DEFAULTS['size'], 1000x620, and "
+                         "it is resizable - so this is a framing choice, not a "
+                         "claim about a fixed layout)")
     ap.add_argument("--seconds", type=float, default=14.0,
                     help="how long to pump the event loop for thumbnails")
     ap.add_argument("--keep-thumbnails", type=int, default=14,
@@ -97,6 +112,17 @@ def main() -> int:
     print(f"  code              {os.path.dirname(gui.__file__)}")
 
     win = gui.Window(a.device, 2.0, restore=False, tray=False)
+    # framed for the reader, then shown: the left column is capped at the picture's
+    # own width (xigmaui/app.py), so everything a wider window buys goes to the
+    # controls, which is the point of asking for a larger size here
+    try:
+        wide, tall = (int(x) for x in a.size.lower().replace("*", "x").split("x"))
+        assert wide >= 560 and tall >= 480
+    except (TypeError, ValueError, AssertionError):
+        print(f"--size {a.size!r}: needs WxH with W >= 560 and H >= 480, which is "
+              f"what the two columns need to be readable at all", file=sys.stderr)
+        return 2
+    win.resize(wide, tall)
     win.show()
     t0 = time.monotonic()
     while time.monotonic() - t0 < a.seconds:

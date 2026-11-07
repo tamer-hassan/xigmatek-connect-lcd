@@ -3,11 +3,21 @@
 Layout follows what this panel actually supports rather than what the vendor's
 window looks like:
 
-    +---------------------------+  theme + clock + canvas options
-    |  preview (480x480)        |  background clip list, with measured luma
-    |  "our composite, not a    |  status from the panel
-    |   mirror of the glass"    |  log pane
-    +---------------------------+  guarded reset
+    +----------------+-----------+  the running display: its counters, and
+    | preview        | theme +   |  the last things it did on the port
+    | (480x480,      | clock +   |  background clip list, with measured luma
+    |  our           | canvas    |  status from the panel
+    |  composite,    | pickers   |  log pane
+    |  not a mirror  | buttons   |  guarded reset
+    |  of the glass) |           |
+    +----------------+-----------+
+
+Two rules decide those proportions, and both come from measurements rather than
+taste.  The frame we draw is exactly 480x480 and `_fit()` never scales it up
+(showing pixels the glass does not have would be a lie), so a preview column
+wider than 480 px is dead space: it gets a maximum width and the controls get
+the rest.  And both columns sit in scroll areas, because on a laptop-height
+screen the right column is taller than the window.
 
 The preview is `tools/previews.py`'s composite running live: the stored
 background frame underneath, `render.draw` on top. It is labelled in the window
@@ -26,22 +36,26 @@ so this window has two roles and picks one at startup by looking:
 * **nothing is running**: the window uses the port itself, one short visit per
   button (`panel.py`).  Nothing reaches the panel without a deliberate click.
 
-The preview is `tools/previews.py`'s composite running live: the stored
-background frame underneath, `render.draw` on top. It is labelled in the window
-because there is no readback from this panel (PROTOCOL.md §11) - a preview here
-is a promise about what we will put on the wire, not a picture of the glass.
+The second bullet is why the buttons say what they say.  A clip picked in the
+list is only a *selection* until the upload button is pressed, and the window
+now reports which of the two the panel is holding: the daemon keeps the last
+six things it did on the port, and this window shows that ring, so "I chose it"
+and "the panel stores it" cannot be confused the way they were on the bench
+(docs/gui.md's walk-through, and the limits write-up).
 """
 from __future__ import annotations
 
 import inspect
 import os
+import re
 import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from PIL import Image                                            # noqa: E402
-from PyQt6.QtCore import QSize, Qt, QTimer                        # noqa: E402
-from PyQt6.QtGui import QAction, QIcon, QImage, QPixmap           # noqa: E402
+from PyQt6.QtCore import QEvent, QSize, Qt, QTimer        # noqa: E402
+from PyQt6.QtGui import (QAction, QBrush, QColor, QIcon, QImage,
+                         QKeySequence, QPixmap)                    # noqa: E402
 from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox,
                              QDoubleSpinBox, QFormLayout, QGroupBox,
                              QHBoxLayout, QLabel, QLineEdit, QListWidget,
@@ -76,6 +90,22 @@ ICON = next((p for p in ICONS if os.path.exists(p)), ICONS[0])
 # vendor's family, not the author's model - the paragraph in
 # install/xigmaui.desktop.in says what has actually been measured on which Connect.
 TITLE = "Xigmatek Connect LCD"
+
+# How much wider than the picture the preview column may get, in pixels: 22 px of
+# the column's own layout margins, 2 px of the preview label's border, ~16 px for
+# the vertical scrollbar a short window needs, and slack for a theme's frame.
+# The cap is what stops a 2 259 px window from spending half its width on black
+# around a 480 px picture (`_fit()` never scales up); _build() applies it and the
+# suite checks the arithmetic against the frame size itself.
+PANE_CHROME = 52
+
+#: How much of the window's own log is kept on screen, in lines.  Not taste: the
+#: log is one wrapped QLabel, so every new line re-sets the whole text, and a
+#: window left open over a long session would otherwise spend its afternoon
+#: redrawing 40 000 lines of heartbeat.  The newest 200 is what anyone reads
+#: back; the display's journal (`journalctl --user -u xigmalcd -f`, docs/usage.md)
+#: is where the full record of a run lives.
+LOG_KEEP = 200
 
 
 def app_icon() -> QIcon:
@@ -133,6 +163,16 @@ class Window(QMainWindow):
         self._last: dict = {}
         self._seq = 0
         self._pix = QPixmap()
+        # What the panel stores as its background layer, in the only words that
+        # can establish it: the running display's own event ring, which records
+        # `background <name> accepted` after it reads the file's notice off the
+        # wire.  The panel is never asked - it cannot answer (PROTOCOL.md §11) -
+        # so "" means "this window has not seen an accept yet", and the UI says
+        # exactly that rather than implying the preview is the glass.
+        self._stored_bg = ""
+        self._queued_bg = ""          # the clip this window last asked for
+        # what the log pane holds, newest last; capped at LOG_KEEP below
+        self._log_lines: list[str] = []
 
         self.panel = Panel(self.port, self)
         self.panel.log.connect(self._log)
@@ -155,6 +195,11 @@ class Window(QMainWindow):
 
         self._build()
         self.resize(*self.cfg["size"])       # as you left it
+        # ...and only now the two columns: a splitter that has never been laid
+        # out treats setSizes as a wish, and the second half of the window is
+        # what loses.  Verified offscreen: setting it inside _build left the
+        # controls 116 px wide at a 2 259 px window.
+        self.split.setSizes(self.cfg["split"])
         self._build_tray()
         self.preview_timer = QTimer(self)
         self.preview_timer.timeout.connect(self._repaint)
@@ -187,6 +232,13 @@ class Window(QMainWindow):
         self.preview.setSizePolicy(QSizePolicy.Policy.Ignored,
                                    QSizePolicy.Policy.Ignored)
         self.preview.setStyleSheet("background:#101014;border:1px solid #333;")
+        # The picture has to refit when *this label* changes size, not when the
+        # window does: the splitter can resize one column without the window's
+        # own resizeEvent ever firing, and dragging the handle while the frame
+        # stayed at its old scale is what made the preview pane look stuck.  An
+        # event filter on the label is the one hook that sees every way the pane
+        # can move.
+        self.preview.installEventFilter(self)
         lay.addWidget(self.preview, 1)      # stretch: the frame keeps its square
         self.caption = QLabel()
         self.caption.setWordWrap(True)
@@ -245,19 +297,31 @@ class Window(QMainWindow):
                               "correction")
         rowe.addWidget(self.d_fps)
         self.btn_apply = QPushButton("Apply these settings")
-        self.btn_apply.setToolTip("send the theme, clock size, canvas, scrim, "
-                                  "fans and fps on this window to the display "
-                                  "that is running. Nothing on this window "
-                                  "changes the glass until you press it")
+        self.btn_apply.setShortcut(QKeySequence("Ctrl+Return"))
+        self.btn_apply.setToolTip(
+            "send the theme, clock size, canvas, scrim, fans and fps on this "
+            "window to the display that is running. Nothing on this window "
+            "changes the glass until you press it - and the background clip is "
+            "not one of these settings: that goes with the button in the clips "
+            "box, because it overwrites what the panel stores")
         self.btn_apply.clicked.connect(self._apply_to_display)
         rowe.addWidget(self.btn_apply)
-        self.btn_dupload = QPushButton("Upload background")
-        self.btn_dupload.setToolTip("queue this clip for the running display's "
-                                    "frame loop. It replaces the panel's stored "
-                                    "background; only a reset clears it")
-        self.btn_dupload.clicked.connect(lambda: self.daemon.upload(self.mp4))
-        rowe.addWidget(self.btn_dupload)
         llay.addLayout(rowe)
+        # One upload button in the whole window, and it lives with the list you
+        # pick from.  This box used to carry a second one with the same label and
+        # the same action, which meant a clip could look "sent" from either place
+        # and neither said whether it had landed.  What this box shows instead is
+        # the answer the panel's side of the wire actually gives.
+        self.d_stored = QLabel()
+        self.d_stored.setWordWrap(True)
+        self.d_stored.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.d_stored.setStyleSheet("font-family:monospace;color:#bbb;")
+        llay.addWidget(self.d_stored)
+        # the daemon's own record of what it did on the port, last six: a queued
+        # upload and its verdict.  Without this the window can only say "asked",
+        # and an upload that the panel refused looks exactly like one that never
+        # left the socket (xigmalcd/control.py:261 keeps the ring).
         self.d_events = QLabel()
         self.d_events.setWordWrap(True)
         self.d_events.setTextInteractionFlags(
@@ -273,7 +337,29 @@ class Window(QMainWindow):
         self.theme.addItems(sorted(render.THEMES))
         self.theme.setCurrentText(self.cfg["theme"])
         self.theme.currentTextChanged.connect(self._changed)
+        self.theme.setToolTip(
+            "the drawings `xigmalcd` renders itself, from live sensor readings. "
+            "The vendor's 27 themes are not among them, and this list is not "
+            "missing them: those are files for the panel's own firmware and "
+            "nothing here sends or interprets them. docs/themes.md says what the "
+            "library is used for (its layouts are what `alpha` was measured "
+            "against) and what its clips can be used as (a background)")
         form.addRow("theme", self.theme)
+        # the question this combo provokes, answered where it is asked: the
+        # `xigmatek-connect-lcd-themes` package is on the machine, so why is not
+        # its 27 themes in the list?  Because that package's contents are the
+        # vendor's own files - .thm themes, layouts, baked overlays, clips - and
+        # this project has measured one use for them: as background media.  It
+        # has never sent a .thm, and it cannot draw one.
+        vendor = QLabel(
+            "the five names are what this program draws. The vendor's 27 themes "
+            "are its own files for the panel's firmware: nothing here can draw "
+            "one, and nothing here has ever sent one. What the themes package "
+            "does give this window is its clips and images, in the list below "
+            "(docs/themes.md)")
+        vendor.setWordWrap(True)
+        vendor.setStyleSheet("color:#888;font-style:italic;")
+        form.addRow("", vendor)
         self.clock_size = QSpinBox()
         self.clock_size.setRange(16, 96)
         self.clock_size.setValue(self.cfg["clock_size"])
@@ -316,8 +402,17 @@ class Window(QMainWindow):
         form.addRow("fans", self.fanline)
         col.addWidget(theme)
 
-        media = QGroupBox("Background clips")
+        media = QGroupBox("Background: the layer under our frame")
         mlay = QVBoxLayout(media)
+        # the library is 69 rows on this box and 115 with the Windows partition
+        # mounted, and the row you want is a scroll wheel and a search away:
+        # one filter field, matching what a row already shows (name, size, loop
+        # length, where it came from), so finding a clip does not need a terminal
+        self.clip_filter = QLineEdit()
+        self.clip_filter.setPlaceholderText("filter: name, size, length or origin")
+        self.clip_filter.setClearButtonEnabled(True)
+        self.clip_filter.textChanged.connect(self._filter_clips)
+        mlay.addWidget(self.clip_filter)
         self.clips = QListWidget()
         self.clips.setIconSize(QSize(112, 112))
         # elide rather than scroll: a horizontal bar inside a column that also
@@ -329,11 +424,16 @@ class Window(QMainWindow):
         self.clip_info = QLabel()
         self.clip_info.setWordWrap(True)
         mlay.addWidget(self.clip_info)
+        # the send-state, in one line the eye lands on: what the panel stores
+        # now, and whether this selection is on it.  `_refresh_clip_state` owns
+        # the words; the box title and the button label follow the same rule.
+        self.clip_state = QLabel()
+        self.clip_state.setWordWrap(True)
+        self.clip_state.setStyleSheet("font-family:monospace;")
+        mlay.addWidget(self.clip_state)
         row = QHBoxLayout()
-        self.btn_upload = QPushButton("Upload background")
-        self.btn_upload.setToolTip("send the selected MP4 to the panel as its "
-                                   "stored background layer. This overwrites "
-                                   "what is stored; only a reset clears it.")
+        self.btn_upload = QPushButton("Send this background to the panel")
+        self.btn_upload.setShortcut(QKeySequence("Ctrl+U"))
         self.btn_upload.clicked.connect(lambda: self.queue(
             "upload", path=self.mp4,
             # the two upload knobs come from the protocol module rather than
@@ -342,9 +442,12 @@ class Window(QMainWindow):
             gap=protocol.MEDIA_GAP, chunk=protocol.MEDIA_CHUNK,
             fans=self.fanline.isChecked()))
         row.addWidget(self.btn_upload)
-        self.btn_frame = QPushButton("Send one frame")
-        self.btn_frame.setToolTip("render the preview frame now and put it on the "
-                                  "glass as one `.osd` upload")
+        self.btn_frame = QPushButton("One frame now")
+        self.btn_frame.setToolTip(
+            "with a display running: ask it for a single frame, queued for its "
+            "own frame loop.  With none running: render this window's preview "
+            "frame and put it on the glass as one `.osd` upload.  Either way "
+            "the OSD layer only - the panel's stored background is untouched")
         self.btn_frame.clicked.connect(lambda: self.queue(
             "frame", theme=self.theme.currentText(), kw=self._render_kw(),
             fans=self.fanline.isChecked()))
@@ -356,6 +459,7 @@ class Window(QMainWindow):
         self.progress.hide()
         mlay.addWidget(self.progress)
         col.addWidget(media)
+        self._refresh_clip_state()
 
         status = QGroupBox("Panel status (what conn 1 reports)")
         slay = QVBoxLayout(status)
@@ -418,9 +522,32 @@ class Window(QMainWindow):
         col.addWidget(slog)
 
         split = QSplitter()
-        split.addWidget(_scroll(left))
-        split.addWidget(_scroll(right))
-        split.setSizes([440, 560])
+        # The preview column gets exactly the room the picture can use and no
+        # more.  `_fit()` refuses to scale the 480x480 frame above 1:1 (pixels
+        # the glass does not have would only be a bigger lie), so on a 2 259 px
+        # window a 440 px share for the left pane meant ~1 000 px of it and a
+        # very wide caption for a 480 px picture, while the clip list and the
+        # status boxes - the parts you actually work with - were squeezed.  The
+        # cap is the frame plus the pane's own chrome; the splitter still
+        # drags the preview down to a 160 px thumbnail, and where it lands is
+        # remembered (settings.py's `split`).
+        pane = _scroll(left)
+        pane.setMinimumWidth(200)
+        pane.setMaximumWidth(render.W + PANE_CHROME)
+        # the other side of the same rule: a handle dragged to the right can
+        # otherwise eat the controls column until its wrapped labels and two
+        # buttons per row are unreadable, and the window then has an invisible
+        # half rather than a narrow one
+        controls = _scroll(right)
+        controls.setMinimumWidth(320)
+        split.addWidget(pane)
+        split.addWidget(controls)
+        split.setCollapsible(0, False)
+        split.setCollapsible(1, False)
+        split.setStretchFactor(1, 1)
+        split.setSizes(self.cfg["split"])
+        split.splitterMoved.connect(lambda *_a: self.save_timer.start())
+        self.split = split
         self.setCentralWidget(split)
         self.statusBar().showMessage(f"port {self.port}")
         self._populate_clips()
@@ -485,17 +612,30 @@ class Window(QMainWindow):
 
         The frame is exactly 480x480 - what the glass is - so scaling *up* would
         show pixels that are not there, and scaling down is the only way the
-        pane can be smaller than the panel.
+        pane can be smaller than the panel.  The cap is in here rather than
+        left to the layout because `scaled(KeepAspectRatio)` *does* grow a
+        pixmap: measured on this box, a 502 px pane drew the 480 px frame at
+        502, which is the lie the docstring above this method promised against.
         """
         if not hasattr(self, "_pix"):
             return
+        room = self.preview.size()
+        side = max(16, min(room.width(), room.height(), render.W))
         self.preview.setPixmap(self._pix.scaled(
-            self.preview.size(), Qt.AspectRatioMode.KeepAspectRatio,
+            side, side, Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation))
 
-    def resizeEvent(self, event) -> None:              # noqa: N802
-        super().resizeEvent(event)
-        self._fit()
+    def eventFilter(self, obj, event) -> bool:         # noqa: N802
+        """Refit the preview whenever the pane itself changed shape.
+
+        Three ways that happens - the window resized, the splitter handle
+        dragged, the caption or metrics line wrapping to a different number of
+        lines - and only the first used to repaint the picture, which is why a
+        dragged handle left the frame at the old scale.
+        """
+        if obj is self.preview and event.type() == QEvent.Type.Resize:
+            self._fit()
+        return super().eventFilter(obj, event)
 
     def _load_background(self, path: str) -> None:
         self.mp4 = path
@@ -516,7 +656,12 @@ class Window(QMainWindow):
                 "canvas": "black" if self.canvas.currentIndex() else "clear",
                 "scrim": self.scrim.value(), "fans": self.fanline.isChecked(),
                 "preview_fps": self.preview_fps, "clip": self.mp4,
-                "size": [self.width(), self.height()]}
+                "size": [self.width(), self.height()],
+                # the split as it stands, not as it was saved: the splitter's
+                # own handle position is the thing the user moved, and the left
+                # pane's cap in _build() is what keeps the preview honest
+                "split": list(self.split.sizes()) if hasattr(self, "split")
+                        else self.cfg["split"]}
 
     def _save_now(self) -> str | None:
         where = settings.save(self._state())
@@ -550,7 +695,17 @@ class Window(QMainWindow):
         for c in self.all_clips:
             item = QListWidgetItem(self._row(c))
             item.setData(Qt.ItemDataRole.UserRole, c.path)
-            item.setToolTip(c.path + (f"\n{c.note}" if c.note else ""))
+            # the daemon's own gate, run here: a row that would come back
+            # "the display refused upload: …" is marked before it is ever
+            # clicked, with the daemon's words as the reason.  Not a second rule
+            # - one call into xigmalcd.control.check_media_file, so the window
+            # can never disagree with what the socket will actually accept.
+            ok, why = wire.check_media_file(c.path)
+            if not ok:
+                item.setForeground(QBrush(QColor("#7d7d7d")))
+            item.setToolTip(c.path + (f"\n{c.note}" if c.note else "")
+                            + ("" if ok else f"\nthe display would refuse "
+                                             f"this: {why}"))
             self.clips.addItem(item)
         first = next((i for i, c in enumerate(self.all_clips)
                       if c.path == self.mp4), 0)
@@ -562,6 +717,24 @@ class Window(QMainWindow):
         self.thumb_timer = QTimer(self)
         self.thumb_timer.timeout.connect(self._thumb_batch)
         self.thumb_timer.start(0)
+
+    def _filter_clips(self, text: str = "") -> None:
+        """Hide the rows this text does not appear in.
+
+        Matching the row's own words, not a separate index: a row already says
+        the name, the size, the measured loop length and where the file came
+        from (`vendored`, `vendor library`, `app upload`), so `2 MiB`, `theme_47`
+        and `vendored` each find what they should.  The row that is currently
+        selected stays visible either way - a hidden selection is a selection
+        the buttons still act on, and that is a worse surprise than a stray row.
+        """
+        want = " ".join(str(text).split()).lower()
+        for i, c in enumerate(self.all_clips):
+            row = self.clips.item(i)
+            if row is None:
+                continue
+            hide = bool(want) and want not in row.text().lower()
+            row.setHidden(hide and i != self.clips.currentRow())
 
     def _thumb_batch(self) -> None:
         """One clip per tick: probe its loop, draw its thumbnail, move on.
@@ -600,6 +773,8 @@ class Window(QMainWindow):
             clipdb.probe(self.all_clips[i])       # picked before its tick came round
             item.setText(self._row(self.all_clips[i]))
         self._load_background(path)
+        self._queued_bg = ""          # a new pick has not been asked for yet
+        self._refresh_clip_state()
         self.save_timer.start()          # next start opens on the clip you chose
         self.clip_info.setText(item.text() + self._clip_detail(path))
 
@@ -615,6 +790,94 @@ class Window(QMainWindow):
                         f"\nsending it overwrites what the panel stores, and "
                         f"only a reset clears that again.")
         return ""
+
+    # ---- what the panel actually holds ----------------------------------
+    def _read_ring(self, events: list) -> None:
+        """Learn from the display's record which background it put on the panel.
+
+        That ring is the only account of the *verdict*.  An `upload` over the
+        socket answers `queued` in a few milliseconds, because the frame loop -
+        never the socket - owns the port (`xigmalcd/control.py`), so the panel's
+        answer arrives later and only as a note.  A window that ignored the ring
+        could say "I asked" but not "it is there", which is exactly the gap the
+        bench fell into when a background change looked like it had done nothing.
+        """
+        for line in events:
+            m = re.search(r"background (\S+) accepted", line)
+            if m:
+                self._stored_bg = m.group(1)
+                continue
+            m = re.search(r"queued upload: (\S+)", line)
+            if m:
+                self._queued_bg = os.path.basename(m.group(1))
+        self._refresh_clip_state()
+
+    def _refresh_clip_state(self) -> None:
+        """One line that keeps 'I picked this' and 'the panel stores this' apart.
+
+        Three states, because that is all there is evidence for: the display
+        reported an accept of this clip, it reported an accept of something
+        else, or this window has not seen one.  There is no way to ask the panel
+        (PROTOCOL.md §11), so the third is shown as unknown rather than guessed
+        from the preview - the preview is our composite, not the glass.
+        """
+        want = os.path.basename(self.mp4)
+        # First the file itself, with the daemon's own rule (control.py's
+        # `check_media_file` - one implementation, so the window can never
+        # promise something the socket would refuse).  A clip the gate refuses is
+        # said out loud before the button is ever pressed: the bench's whole
+        # afternoon of "the background change failed" started with a refusal that
+        # had no place to be read.
+        ok, why = wire.check_media_file(self.mp4)
+        if not ok:
+            self.btn_upload.setEnabled(False)
+            self.btn_upload.setText("This file cannot go to the panel")
+            self.btn_upload.setToolTip(why)
+            self.clip_state.setStyleSheet("font-family:monospace;color:#c66;")
+            self.clip_state.setText(f"{want}: the display's own gate refuses it - "
+                                    f"{why}")
+            return
+        self.btn_upload.setEnabled(True)
+        self.btn_upload.setToolTip(
+            "send the selected file to the panel as its stored background layer, "
+            "under the frame we draw. This overwrites what is stored, and only "
+            "the guarded factory reset clears it (docs/troubleshooting.md). "
+            "Ctrl+U")
+        if not self.daemon.present:
+            self.btn_upload.setText("Send this background to the panel")
+            self.clip_state.setStyleSheet("font-family:monospace;color:#888;")
+            self.clip_state.setText(
+                "no display running, so this window visits the port itself: the "
+                "panel stores whatever the last upload left there, and the log "
+                "says what the panel answered to each one")
+            self.d_stored.setText("the panel stores: only this window's own "
+                                  "uploads, one visit at a time")
+            return
+        if self._stored_bg == want:
+            self.btn_upload.setText("Send this background again")
+            self.clip_state.setStyleSheet("font-family:monospace;color:#7a7;")
+            self.clip_state.setText(
+                f"the panel stores {want}: the display reported it accepted it, "
+                f"so the frames on the glass are drawing over that picture")
+            self.d_stored.setText(f"the panel stores: {want}")
+        elif self._stored_bg:
+            self.btn_upload.setText("Send this background to the panel")
+            self.clip_state.setStyleSheet("font-family:monospace;color:#ca5;")
+            self.clip_state.setText(
+                f"the panel stores {self._stored_bg}, and this pick ({want}) is "
+                f"not on it"
+                + (", though you have just asked for it - waiting for the "
+                   "display's answer" if self._queued_bg == want else ""))
+            self.d_stored.setText(f"the panel stores: {self._stored_bg}")
+        else:
+            self.btn_upload.setText("Send this background to the panel")
+            self.clip_state.setStyleSheet("font-family:monospace;color:#888;")
+            self.clip_state.setText(
+                "the panel's stored background: this window has not seen an "
+                "accept from the display yet, and the panel itself cannot be "
+                "asked - the 'last things it did' list below is the record")
+            self.d_stored.setText("the panel stores: not reported by the "
+                                  "display since this window started watching")
 
     # ---- actions ---------------------------------------------------------
     def queue(self, kind: str, **kw) -> None:
@@ -647,7 +910,18 @@ class Window(QMainWindow):
                 self.daemon.frame()
                 return
             if kind == "upload":
-                self.daemon.upload(kw.get("path") or self.mp4)
+                path = kw.get("path") or self.mp4
+                self._queued_bg = os.path.basename(path)
+                rep = self.daemon.upload(path)
+                if rep.get("ok"):
+                    # `ok` here only means the gate let it into the loop's one
+                    # action slot.  The panel's verdict is a separate thing, and
+                    # it is the display's own list that carries it.
+                    self._log(f"asked the running display for {self._queued_bg}: "
+                              f"queued for its frame loop, which is the only "
+                              f"thing holding the port. Its list under 'The "
+                              f"running display' says when it landed")
+                self._refresh_clip_state()
                 return
             if kind == "reset":
                 # the daemon's gate, not ours: `recovery` over the socket needs
@@ -681,6 +955,17 @@ class Window(QMainWindow):
                                      else self._owner_line())
 
     def _done(self, kind: str, ok: bool) -> None:
+        if ok and kind == "upload" and self.daemon.present:
+            # `ok` here came back off a unix socket in a few milliseconds, so it
+            # cannot be the panel's answer: the frame loop owns the port and has
+            # not touched the file yet.  Saying "upload: ok" over a socket is how
+            # a queued-but-refused upload reads as a finished one, which is the
+            # confusion this whole box exists to avoid.
+            self._refresh_clip_state()
+            self.statusBar().showMessage(
+                "upload: queued for the display - its own line under 'The "
+                "running display' says whether the panel took it")
+            return
         self.statusBar().showMessage(f"{kind}: {'ok' if ok else 'failed'}")
 
     def _show_status(self, info: dict) -> None:
@@ -698,8 +983,7 @@ class Window(QMainWindow):
 
     # ---- the running display --------------------------------------------
     def _set_display_widgets(self, on: bool) -> None:
-        for w in (self.btn_pause, self.btn_dframe, self.btn_apply,
-                  self.btn_dupload, self.d_fps):
+        for w in (self.btn_pause, self.btn_dframe, self.btn_apply, self.d_fps):
             w.setEnabled(on)
 
     def _show_display(self, st: dict) -> None:
@@ -728,7 +1012,12 @@ class Window(QMainWindow):
             f"{'auto' if st.get('scrim') is None else st.get('scrim')}, fans "
             f"{'on' if st.get('fans') else 'off'}, pending "
             f"{st.get('pending') or '-'}, space={dev.get('space')}")
-        self.d_events.setText("\n".join(st.get("events") or []))
+        self.d_events.setText(
+            "what the display has done on the port, oldest first:\n"
+            + "\n".join(st.get("events")
+                        or ["   (nothing it has chosen to report since it "
+                            "started)"]))
+        self._read_ring(st.get("events") or [])
         # the panel-status box, too: over the socket there is no fresh `conn 1`,
         # but the display published the one it got at its session start, and a
         # labelled copy of that is worth more here than "not asked yet".
@@ -761,6 +1050,7 @@ class Window(QMainWindow):
                                 "the login unit if you installed it, and this "
                                 "window becomes a remote instead of a driver")
         self.d_events.setText("")
+        self._refresh_clip_state()
         self.statusBar().showMessage(self._owner_line())
 
     def _toggle_pause(self, on: bool) -> None:
@@ -778,7 +1068,7 @@ class Window(QMainWindow):
         because there is no readback with which to undo a change (§11).  The
         scrim goes as the widget has it, so -1 stays `auto` and the daemon's own
         clip-luma rule stays the daemon's."""
-        self.daemon.apply({
+        applied = self.daemon.apply({
             "theme": self.theme.currentText(),
             "clock_size": self.clock_size.value(),
             "canvas": "black" if self.canvas.currentIndex() else "clear",
@@ -786,6 +1076,20 @@ class Window(QMainWindow):
             "fans": self.fanline.isChecked(),
             "fps": self.d_fps.value(),
         })
+        # and what it deliberately left alone, said out loud.  A background is
+        # not one of these six settings - it is a file that overwrites what the
+        # panel stores - so Apply never sends one, and on the bench that
+        # distinction read as a broken picker: a clip selected in the list, Apply
+        # pressed, and the glass going on drawing over the old picture.
+        if applied:
+            want = os.path.basename(self.mp4)
+            if self._stored_bg and self._stored_bg != want:
+                self._log(f"settings sent; the background did not go with them. "
+                          f"The panel stores {self._stored_bg} and this window "
+                          f"has {want} selected: the clips box sends it (Ctrl+U)")
+            elif self._stored_bg == want:
+                self._log(f"settings sent; the panel already stores {want}, so "
+                          f"the layer under the frame stayed as it was")
 
     # ---- tray ------------------------------------------------------------
     def _build_tray(self) -> None:
@@ -896,8 +1200,10 @@ class Window(QMainWindow):
     # ---- log -------------------------------------------------------------
     def _log(self, msg: str) -> None:
         line = time.strftime("%H:%M:%S") + "  " + str(msg).strip()
-        cur = self.log_view.text()
-        self.log_view.setText((cur + "\n" if cur else "") + line)
+        self._log_lines.append(line)
+        if len(self._log_lines) > LOG_KEEP:
+            del self._log_lines[:-LOG_KEEP]
+        self.log_view.setText("\n".join(self._log_lines))
         bar = self.log_scroll.verticalScrollBar()
         bar.setValue(bar.maximum())         # keep the newest line in view
 

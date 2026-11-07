@@ -114,32 +114,65 @@ What has been measured on glass, by whom, with how many frames - and what has no
   `send_media()` raises instead of calling that success. Reading that notice is the
   only reliable check: `transported` answers `{"state":"success"}` even for a refused
   file, and `space` does not move for accepted uploads either.
-* **Three refusals in fourteen unattended minutes, and no explanation for them.** The
+* **Seven refusals in fifty-six unattended minutes, and no explanation for them.** The
   packaged unit, left drawing `alpha` at 2 fps after the 0.2 upgrade, logged
-  `! frame 1029 / 1097 / 1167: device refused the file: 400 b''` - three `1 400` notices
-  on ordinary frames, about 34 s apart, inside the four minutes after a session renewal,
-  with `1 664 of 1 667` uploads confirmed and 0 link errors around them
+  `! frame 1029 / 1097 / 1167 / 2268 / 3162 / 3266 / 6471: device refused the file: 400 b''` -
+  seven `1 400` notices on ordinary frames inside 56 minutes, in which the same process
+  made **6 694** uploads with `6 687 confirmed` and 0 link errors, `NRestarts=0`
   (`data/glass/2026-11-07-072155-service-2fps-journal.log`). What makes them worth
-  writing down is what they are *not*: every other `400` in this tree's logs is a
+  writing down is what they are *not*. Every other `400` in this tree's logs is a
   background `.mp4` the panel declined, in a window where a client had deliberately asked
   for an upload (the four cases in the GUI ledger). Here nothing asked - it was the loop's
-  own frame, one of the three between renewals, and the next frame landed normally. The
-  same `400 b''` did appear at 07:21:57 for the background at session start and was
+  own frame, and the frame after each one landed normally. The three background picks the
+  author made in `xigmaui` at 07:30-07:33, which was the first explanation offered for
+  these, are ruled out by the record: a request that reaches this process leaves a
+  `queued upload: <path>` ring note *and* a `background <name> …` journal line, and
+  neither appears anywhere between 07:21:58 and 07:51:50, while the two that really did
+  arrive are at 07:51:51 and 07:54:09 and both read `notice 200`. The two paths print
+  differently too: the loop says `! frame N: device refused the file`, a refused clip says
+  `background <name> refused (…); retrying once` (`xigmalcd/main.py:_upload_background`).
+  The same `400 b''` did appear at 07:21:57 for the background at session start and was
   accepted 2.3 s after the retry, so the answer is at least transient rather than fatal.
-  Not established: whether a renewal in flight raced the upload, whether the panel
-  refuses a `.osd` file that arrives while it is committing the previous one, or whether
-  this has been happening in the 1 fps windows too and simply never reached 3 in one. What
-  would settle it is an instrumented run of the service path (`-v`, both directions
-  logged, and `tools/display_glass.py` phases over a unit-started display rather than a
-  hand-started one), which is the gap in the next bullet. Until then the honest statement
-  is the rate: 3 of 1 667, self-recovered, unexplained.
-* **The service path has been observed, not instrumented.** Everything in the GUI
+  Not established, and the shape keeps moving: the first three sat 16-85 s *after* a
+  renewal, while the seventh (frame 6471, 08:16:09) came 2 min 40 s after the sixth and
+  18 s *before* one, so "just after a renewal" was already the wrong model. Candidates
+  left untested: a renewal in flight racing the upload, a panel refusing an `.osd` file
+  that arrives while it is still committing the previous one, and a rate that has always
+  been present at 1 fps too and never reached a count anyone was watching. What would
+  settle it is the run that has only half happened: the packaged path with `-v`, both
+  directions logged, and `tools/display_glass.py`'s phases driven over a **unit-started**
+  display rather than a hand-started one. Two socket uploads have since been carried by
+  that unit, which is the first time this project's packaged path has done an upload at
+  all - but the frames of that window were never byte-logged, so what happened inside
+  them is still only counters and notices.
+* **The service path has been observed, and only lightly driven.** Everything in the GUI
   ledger's always-on column was produced by `tools/display_glass.py` driving a
   hand-started display, so it has per-frame byte sizes, phase checks and a client. The
-  packaged unit - the thing a person who ran `apt install` actually gets - has been
-  watched (counters, renewals, cost, journal) and never driven through the same phases.
-  A soak of an installed system at 2 fps, with the phases and the byte log, is still
-  unclaimed.
+  packaged unit - the thing a person who ran `apt install` actually gets - has now been
+  watched for 56 unattended minutes (counters, renewals, cost, journal) and asked for two
+  backgrounds over its socket, both accepted. It has never been run through the driver's
+  phases: pause and resume across a session TTL, a replug, the per-frame byte log, the
+  refusal storm. A soak of an installed system at 2 fps, with the phases and the byte
+  log, is still unclaimed.
+* **Whether the panel shows a still image as its background is unverified.** Its file
+  channel takes one: a 3 409 B PNG out of the vendor's own library went up over the
+  packaged unit's socket and came back `notice 200 in 0.3 s` at 07:54:09, and a
+  1 211 106 B MP4 from the same package in 1.0 s at 07:51:51. What the glass then looked
+  like is the part no log here can supply, because the panel has no readback (§11) and
+  nobody at the desk was asked. So `xigmaui` offers MP4 rows only, and the package's 28
+  images stay out of the picker until that observation has been made.
+* **The themes package is media and reference material, not a theme list.**
+  `xigmatek-connect-lcd-themes` installs the vendor's own 125 files - 27 `.thm` themes,
+  27 layouts, 27 background and 27 foreground images, 43 clips, under
+  `/usr/share/xigmalcd/themes/alpha/`, re-hashed 152/152 against their manifest by
+  `debian/tests/smoke`. None of it is a theme this program can select: the window's theme
+  picker lists `sorted(render.THEMES)`, the five drawings this project renders, because
+  nothing here has ever sent a `.thm` to the panel or read one back, and the control
+  socket's own `check_media_file` gate does not accept that extension. What that library
+  is used for here is measured: its layouts are what the `alpha` preset was redrawn from
+  (docs/themes.md, `xigmalcd/layout.py`), and its clips are backgrounds that can be
+  uploaded - all 43 of them sit under the socket gate's 8 MB ceiling, the largest being
+  `clips/Theme_22.mp4` at 7 662 077 B.
 * Uploads are **timing sensitive**, and this is the part that cost the most time. The
   whole exchange — `POST transport`, the raw file, `POST transported` — has to go out as
   one burst, and the first file byte must land at least ~20 ms after the announcement.

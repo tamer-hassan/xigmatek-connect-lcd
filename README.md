@@ -51,8 +51,11 @@ contact sheet of it is
 
 The same controls in a Qt application: pick a theme, pick a background from every clip
 the machine can find, watch the preview, put one frame or the whole loop on the glass.
-This is a capture of the real program (`tools/screenshot.py`, no panel attached), with
-this machine's live readings in the preview:
+And because this panel cannot be asked what it is showing, the window says what it
+*knows*: the background the running display reported putting there, and the last six
+things it did on the port. This is a capture of the real program
+(`tools/screenshot.py`, no panel attached), with this machine's live readings in the
+preview:
 
 ![xigmaui, the window: preview on the left, the running display's status, theme
 picker and background clips on the right](docs/screenshot-xigmaui.png)
