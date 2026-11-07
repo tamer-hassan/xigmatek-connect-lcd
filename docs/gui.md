@@ -70,7 +70,7 @@ there is one place to change when a number is re-measured.
 | preview | the stored background frame with `render.draw`'s OSD layer composited on top, refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How wide each half gets" below | nothing |
 | theme | the five themes, clock size, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
 | clips | every MP4 the roots hold, listed once per clip - **69 rows** on this box: 3 vendored here, 40 more from the vendor's library, 26 more from the 69 files the Windows app has pushed to this panel (the rest are byte-identical re-uploads); the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. Each row gets an ffmpeg thumbnail and its measured mean luma. One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+U): `STATE all 1` twice, then the whole file as one media file |
-| background state | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept. A file the gate refuses says so, in the gate's words, before the button is pressed | nothing: it is a readout |
+| background state | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the gate refuses says so, in the gate's words, before the button is pressed | nothing: it is a readout |
 | `One frame now` | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
 | `Send frames for 30 s` | the picture loop, so you can watch the real glass | `STATE all 1` twice, then 60 uploads at 2 fps |
 | status | the panel's `conn 1` reply: sn, versions, `space`, `brightness`, `mode`, `logo`, `osdState`, `timeout`, each annotated only where PROTOCOL.md records what it means | `conn 1`, `power resume`, `timeout 60` - and no metrics blob, because it puts no picture on the glass. With a display running there is no fresh `conn 1` to ask for, so the box shows the one that display read at its own session start, labelled as such |
@@ -119,6 +119,10 @@ Both halves of that are load-bearing, and the window now shows the ring (under
 "The running display") plus the derived line (`the panel stores: theme_47.mp4`) -
 because a socket `upload` answers `ok` in milliseconds and that `ok` only means
 the file got into the loop's one action slot. The verdict is the second line.
+In the list itself, the row for that clip is drawn **bold**: in a 69-row library
+(115 with the Windows partition mounted) that is the fastest way to see whether the
+row you are looking at is the picture the panel is storing under our frame, and no
+row is bold when the display has not reported one.
 
 The bench found the cost of not having that readout, and it is worth writing down
 because it looked like a broken feature rather than a missing label: a background

@@ -1378,6 +1378,13 @@ try:
     assert win.btn_upload.text() == "Send this background to the panel"
     win._stored_bg = os.path.basename(chosen)
     win._refresh_clip_state()
+    # and the 69-row list marks the one that is on the glass, with no help from
+    # the panel, which cannot be asked (§11)
+    at = next(i for i, c in enumerate(win.all_clips) if c.path == chosen)
+    assert win.clips.item(at).font().bold(), "the stored clip is not marked"
+    assert not any(win.clips.item(i).font().bold()
+                   for i in range(win.clips.count()) if i != at), \
+        "more than one row claims to be on the panel"
     assert win.btn_upload.text() == "Send this background again", win.btn_upload.text()
     assert "stores " in win.clip_state.text() and "accepted it" in win.clip_state.text()
     win._stored_bg = ""

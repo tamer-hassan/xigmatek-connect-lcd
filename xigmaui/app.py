@@ -171,6 +171,7 @@ class Window(QMainWindow):
         # exactly that rather than implying the preview is the glass.
         self._stored_bg = ""
         self._queued_bg = ""          # the clip this window last asked for
+        self._marked_bg = None        # which row is bold right now ("" = none)
         # what the log pane holds, newest last; capped at LOG_KEEP below
         self._log_lines: list[str] = []
 
@@ -459,7 +460,6 @@ class Window(QMainWindow):
         self.progress.hide()
         mlay.addWidget(self.progress)
         col.addWidget(media)
-        self._refresh_clip_state()
 
         status = QGroupBox("Panel status (what conn 1 reports)")
         slay = QVBoxLayout(status)
@@ -549,8 +549,11 @@ class Window(QMainWindow):
         split.splitterMoved.connect(lambda *_a: self.save_timer.start())
         self.split = split
         self.setCentralWidget(split)
+        # order matters here: the list has to exist before the send-state line
+        # can say which row, if any, the display reports is on the panel
         self.statusBar().showMessage(f"port {self.port}")
         self._populate_clips()
+        self._refresh_clip_state()
 
     # ---- preview ---------------------------------------------------------
     def _render_kw(self) -> dict:
@@ -822,6 +825,22 @@ class Window(QMainWindow):
         from the preview - the preview is our composite, not the glass.
         """
         want = os.path.basename(self.mp4)
+        # mark the row that is on the glass, if this window knows: in a 69-row
+        # list (115 with the Windows partition mounted) "which of these is the
+        # panel actually storing" is the first question, and the answer comes
+        # from the display's ring, not from the panel.  Only touched when the
+        # answer changed - the status poll runs every 2 s.
+        if self._stored_bg != self._marked_bg:
+            # the first time _build() reaches here the list has not been
+            # populated yet, so there are no rows to mark
+            for i, c in enumerate(getattr(self, "all_clips", [])):
+                row = self.clips.item(i)
+                if row is None:
+                    continue
+                font = row.font()
+                font.setBold(os.path.basename(c.path) == self._stored_bg)
+                row.setFont(font)
+            self._marked_bg = self._stored_bg
         # First the file itself, with the daemon's own rule (control.py's
         # `check_media_file` - one implementation, so the window can never
         # promise something the socket would refuse).  A clip the gate refuses is
