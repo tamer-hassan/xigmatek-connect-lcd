@@ -81,3 +81,15 @@ debian/rules' override_dh_auto_test: two of its sections read the author's bench
 files under data/ (the Windows captures, the glass logs) and several measure wall
 clock timings, so a build that failed because a runner was slow would be a build
 failure that means nothing.
+
+What pybuild does instead, left alone, is worse than nothing.  With no test suite to
+find it still runs `python3 -m unittest discover -v` in the built tree, and that
+command's result belongs to the machine rather than to the package: here it reports
+"Ran 0 tests / NO TESTS RAN", while with the distro's dist-packages off the path the
+same command errors out at `from . import protocol, render, sensors` because
+python3-serial and python3-pil are runtime Depends, not Build-Depends.  That is what
+the first CI build did - `unittest.loader._FailedTest`, `ModuleNotFoundError: No
+module named 'PIL'`, `dh_auto_test ... exit code 13` - and the reason it never showed
+up on this bench is that this bench has Pillow installed.  debian/rules therefore
+exports PYBUILD_DISABLE=test; the suite that actually tests something is the CI job
+named above, and debian/tests/smoke is what tests the install.

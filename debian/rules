@@ -40,8 +40,9 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 # /usr/lib/python{version}/dist-packages (dh-python's build/options.py:30).  It
 # expects dh_python3 to move those files afterwards - dhpython/fs.py:fix_locations
 # walks interpreter.old_sitedirs(), whose OLD_SITE_DIRS list (dhpython/__init__.py)
-# includes /usr/lib/python{version}/dist-packages, and relocates them into /usr/lib/python3/dist-packages.  That works for a one-package
-# python3-foo source, where pybuild installs straight into debian/<package>.  It
+# includes /usr/lib/python{version}/dist-packages, and relocates them into
+# /usr/lib/python3/dist-packages.  That works for a one-package python3-foo source,
+# where pybuild installs straight into debian/<package>.  It
 # does not work here: this source builds two binary packages, so files are staged in
 # debian/tmp and split by .install files at dh_install time, which is *before* that
 # move.  Measured on the first two builds: with the default, dh_install matched
@@ -53,6 +54,28 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 # python3-pil, python3-serial, python3-pyqt6).  dh_python3 still runs after this and
 # does the byte-compiling and ${python3:Depends} generation.
 export PYBUILD_INSTALL_DIR = /usr/lib/python3/dist-packages
+
+# The test step is switched off, and the reason is a difference between this bench
+# and every other machine, which is the worst kind of thing for a build to depend on.
+# With no test suite of its own to find, pybuild picks unittest's loader anyway
+# ("No test runner selected, defaulting to unittest, ignoring test discovery
+# problems") and runs `python3.14 -m unittest discover -v` inside the built tree.  Two
+# things follow from that, both measured in .pybuild/cpython3_3.14/build here: with
+# this distro's dist-packages on the path, it reports `Ran 0 tests / NO TESTS RAN`;
+# with them off the path, the loader turns the package itself into one failed
+# pseudo-test - `xigmalcd (unittest.loader._FailedTest...)`, ImportError at
+# `from . import protocol, render, sensors` because `import serial` (or `from PIL
+# import Image` on the CI runner) is not a Build-Depend and nobody installed it.  So
+# on this bench the step proved nothing and on a clean runner it failed the build for
+# a reason that had nothing to do with the package's correctness.
+#
+# The suite that does test something is tools/selftest.sh, and it runs as its own CI
+# job before this build does - see debian/README.source, "Testing", for why it is not
+# wired into dh_auto_test instead.  `PYBUILD_DISABLE=test` is how dh-python spells it
+# (pybuild's is_disabled() compares the item against the step name); a builder who
+# wants the default back can still ask for it with DEB_BUILD_OPTIONS, and
+# `nocheck` skips the same step independently.
+export PYBUILD_DISABLE = test
 
 TMP := debian/tmp
 
