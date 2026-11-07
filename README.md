@@ -28,15 +28,15 @@ glass, and the same loop whose restart seam PROTOCOL.md §9 measures there.
 
 | `alpha` (default) | `gauge` |
 |---|---|
-| ![alpha](docs/preview-alpha.gif) | ![gauge](docs/preview-gauge.gif) |
+| ![the alpha theme's layer over the vendored background, running: two ring gauges reading CPU 73 °C and GPU 34 °C, the hotter one's arc curving far round the ring in warm colours and the cooler's a short arc in green, fan figures of 2 238 RPM and 35 %, load bars at 90 % and 0 %, clock 11:07:42](docs/preview-alpha.gif) | ![the gauge theme, running: one large ring gauge reading 73 °C with the arc's length and colour both carrying the value, the clock under it](docs/preview-gauge.gif) |
 
 | `dual` | `clock` |
 |---|---|
-| ![dual](docs/preview-dual.gif) | ![clock](docs/preview-clock.gif) |
+| ![the dual theme, running: two rings side by side reading 73 and 34 with the numbers inside them and a load and memory line under each](docs/preview-dual.gif) | ![the clock theme, running: 11:07:42 across the middle, Saturday 07 November 2026 under it, CPU, GPU and fan figures along the bottom](docs/preview-clock.gif) |
 
 | `bars` | |
 |---|---|
-| ![bars](docs/preview-bars.gif) | |
+| ![the bars theme, running: SYSTEM MONITOR with a row and a meter for CPU, GPU, BOARD, LOAD, RAM, VRAM and two fans, each value printed at the right of its row](docs/preview-bars.gif) | |
 
 They are GIFs because GitHub renders an `.mp4` in a README as an `<img>` no browser
 plays, so motion here has to be a GIF. `tools/preview_gif.py` writes them through the
@@ -48,6 +48,16 @@ memory), the same pinned readings every time, so the picture says the same thing
 every machine. The GIF's palette is ffmpeg's, not the 256-colour PNG the panel is fed;
 measured back out of the encoded files, the drawn colours land 0-2 per channel from
 what `render.py` asked for. And because a GIF carries a length, the restart is worth
+A word for readers who cannot see the motion: GitHub documents that animated GIFs
+follow the reader's system reduced-motion preference by default, under
+**Settings → Accessibility → Motion → "Autoplay animated images"**
+([Managing accessibility settings](https://docs.github.com/en/account-and-profile/how-tos/account-settings/managing-accessibility-settings)),
+so these five may reach you as a still frame. The files themselves loop for ever
+(`loop = 0` in each, asserted by the suite), the first frame of each is a real composited
+frame rather than a fade-in, and the alt text above says what each picture shows - which
+is what has to carry the description when the motion does not.
+
+And because a GIF carries a length, the restart is worth
 measuring rather than trusting: by PROTOCOL.md §9's own metric the five files join at
 2.05-2.36 against typical steps of 2.15-2.52, so the restart never stands out — and it
 is smoother than that same clip's raw join measured there (2.50 against 1.51), because

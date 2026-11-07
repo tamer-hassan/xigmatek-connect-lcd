@@ -419,6 +419,13 @@ What has been measured on glass, by whom, with how many frames - and what has no
     with the drawn colour still within 1/255 at 480 px either way. 64 colours at 320 px is
     where ink starts to move (**7/255**) and 32 colours gives 4-5/255. Dither off is ~10 %
     smaller and bands the gradients; `stats_mode=diff` measured 2-3 % *bigger* here.
+  * **Whether the reader sees it move is their setting, not ours.** GitHub's own docs
+    ("Managing accessibility settings", "Managing motion") say animated GIFs follow the
+    system reduced-motion preference by default, with Settings → Accessibility → Motion →
+    "Autoplay animated images" offering Sync with system / Enabled / Disabled. So the README
+    says what each preview shows in its alt text and in the sentence beside it, the first
+    frame of every file is a real composited frame (not a fade-in), and the suite asserts
+    `loop == 0` on all six - a GIF that stops after one pass was encoded that way.
   * **A frame delay is 170 ms, not 167.** GIF stores delays in 10 ms units, so the "6 fps"
     request lands at 5.9 fps and the 12-frame file runs **2.04 s**.
   * **The GIF's join is smaller than the clip's own join.** `Theme_25.mp4` loops in 0.958 s, so

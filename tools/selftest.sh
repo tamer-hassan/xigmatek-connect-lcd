@@ -555,6 +555,10 @@ for theme, path in THEME_FILES.items():
     assert im.size == (EDGE, EDGE), (path, im.size)
     assert len(fr) == FRAMES, (path, len(fr))
     assert dur == DELAY, (path, dur)
+    # ...and that it loops for ever, which is the other half of a README GIF working:
+    # GitHub's own guidance says a GIF that stops after one pass was *made* that way.
+    # ffmpeg's GIF muxer writes `-loop 0` for infinite, and Pillow reads it back as 0.
+    assert im.info.get("loop") == 0, (path, im.info.get("loop"))
     size = os.path.getsize(path)
     assert size < CEILING, (path, size)
     total += size
