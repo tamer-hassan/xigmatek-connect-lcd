@@ -11,7 +11,7 @@ echo "== protocol round-trip against the Windows captures"
 # on the author's bench, and they are what PROTOCOL.md quotes.
 caps=(data/captures/*.txt)
 if [ -f "${caps[0]}" ]; then
-    python3 tools/verify_protocol.py "${caps[@]}" | tail -4
+    python3 tools/verify_protocol.py "${caps[@]}"
 else
     echo "  SKIPPED: no capture at data/captures/, so nothing was re-encoded here."
     echo "  On the author's bench this same command -"
@@ -555,6 +555,26 @@ assert set(scripts) == {"xigmalcd", "xigmaui"}, scripts
 for name, target in sorted(scripts.items()):
     mod, _, attr = target.partition(":")
     assert callable(getattr(importlib.import_module(mod), attr)), (name, target)
+
+# the licence the README states and the licence the package declares have to be
+# the same thing, and the file it points at has to be the licence itself rather
+# than a stub: GPL-3.0-or-later as the SPDX expression, and LICENSE byte-identical
+# to the FSF's gpl-3.0.txt (that sha256 is of the text fetched from
+# https://www.gnu.org/licenses/gpl-3.0.txt on 2026-11-07).  `license` as a string
+# plus `license-files` is PEP 639, which is why [build-system] asks for
+# setuptools >=77.
+import hashlib
+declared = cfg["project"].get("license")
+assert declared == "GPL-3.0-or-later", declared
+lfiles = cfg["project"].get("license-files")
+assert lfiles == ["LICENSE"], lfiles
+raw = open(lfiles[0], "rb").read()
+assert b"GNU GENERAL PUBLIC LICENSE\n                       Version 3" in raw, raw[:60]
+GPL3 = "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+sha = hashlib.sha256(raw).hexdigest()
+assert sha == GPL3, (sha, len(raw), "LICENSE is not the FSF's gpl-3.0.txt")
+print(f"  licence            {declared}; LICENSE is the GPL-3 text verbatim "
+      f"({len(raw)} B, sha256 {sha[:16]}...)")
 print(f"  packaging        packages {' + '.join(pk)}, scripts "
       f"{'+'.join(sorted(scripts))} both resolve, Qt in the [gui] extra only "
       f"({', '.join(gui)})")

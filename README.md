@@ -322,7 +322,7 @@ touches `recovery` is `reset_panel.py`, which you invoke by hand.
 | If the question is | run | what it answers |
 |---|---|---|
 | is the panel healthy after a boot or a reset? | `tools/state.py`, then `tools/bootcheck.py` | the `conn` snapshot, read-only; then two small and two full uploads. `logo`/`mode` at `2147483647` means it is not healthy |
-| did my edit break the wire format? | `tools/selftest.sh`, then `tools/verify_protocol.py COM3_windows_dumps/*.txt` | fifteen offline sections with no hardware, then every captured Windows frame re-encoded and diffed: **130 frames, 0 mismatches** |
+| did my edit break the wire format? | `tools/selftest.sh`, then `tools/verify_protocol.py data/captures/*.txt` | fifteen offline sections with no hardware, then every captured Windows frame re-encoded and diffed: **181 frames, 0 mismatches** (130 in one session, 51 in the other). The captures are bench files, so in a fresh clone the first section prints those figures and says it did not re-derive them |
 | does this firmware know that topic at all? | `tools/fuzz.py`, `tools/probe.py` | no answer = no topic, `400` = topic exists and the body was wrong, `200` = the JSON parsed — which is not the same as the write landing |
 | will the panel take *my* file? | `tools/send_image.py FILE`; `tools/fileshape.py` if the file's shape is the question | one upload, judged by the panel's own file notice; the second rotates RGBA, indexed, flat and the vendor's own `.osd` files through one session |
 | how fast does the glass tick, and why does the clock only move every 20-40 s? | `tools/frame_lag.py`, `tools/indexprobe.py`, `tools/watchtest.py` | a big frame number and the wall clock painted on the glass, so the answer is a glance rather than a stopwatch. Needs eyes on the unit |
@@ -354,13 +354,18 @@ touches `recovery` is `reset_panel.py`, which you invoke by hand.
   for a picture you drew and not what you want to test a captured file with.
   Good for testing whether the panel's decoder accepts your file without touching
   the render code.
-* `tools/verify_protocol.py COM3_windows_dumps/*.txt` — re-encode every frame captured
-  on Windows and diff it against the capture, byte for byte. On the main capture
-  (`COM3 Monitoring Session.txt`) alone: **130 frames, 0 mismatches** (65
-  `transport`/`transported` pairs), and `ContentLength` equals the unescaped JSON
-  length in 130 of 130; the glob over both captures in that directory reports the
-  same zero mismatches over 180 frames (88 pairs). If you change `protocol.py`,
-  run this.
+* `tools/verify_protocol.py data/captures/*.txt` — re-encode every frame captured on
+  Windows and diff it against the capture byte for byte, then run the strict checksum
+  over every frame the panel answered with. The two sessions are bench files: they carry
+  this panel's serial number, so `.gitignore` keeps `data/` out of the repo and a clone
+  has nothing to point at here — which the tool says out loud instead of printing zeros.
+  What they gave on the author's bench, over both files: **181 host→panel frames
+  re-encoded, `mismatched frames: 0`** (130 in the long session, 51 in the one that
+  starts at power-on; 88 `transport`/`transported` pairs), `ContentLength` equal to the
+  unescaped JSON length in 180 of 181 — the one that declares none is the bodyless
+  `conn 1` — and **267 panel replies read, 267 checksum-clean**. Against the long
+  session alone: **130 and 0**, 65 pairs, `ContentLength` matching in 130 of 130. If
+  you change `protocol.py`, run this.
 * `tools/selftest.sh` — the offline checks: capture round-trip, a render of every
   theme, encode/decode round-trips including the panel's malformed-reply case, the encoder
   switches read out of the PNG each dry run writes, what the indexed file gives up next to
@@ -578,10 +583,10 @@ touches `recovery` is `reset_panel.py`, which you invoke by hand.
   for byte (**1672/1672** on the current app), `--uploads` lists upload pairs with timing,
   `--space` tracks the panel's free space, `--dump N` prints exchanges.
 * `tools/vendor_capture.py CAPTURE` — the IRP-level Windows monitor log
-  (`COM3_windows_dumps/*.txt`, UTF-16) also contains the raw file stream that ALPHA never
-  logged. It rebuilds every upload byte for byte: **65/65 payloads match their declared
-  `fileSize`**, all 480×480 8-bit RGBA PNGs, streamed in 1000-byte writes. `--extract N`
-  saves them as known-good test files.
+  (`data/captures/*.txt`, UTF-16, also bench-only for the same reason) also contains the
+  raw file stream that ALPHA never logged. It rebuilds every upload byte for byte: **65/65
+  payloads match their declared `fileSize`**, all 480×480 8-bit RGBA PNGs, streamed in
+  1000-byte writes. `--extract N` saves them as known-good test files.
 * `tools/bootcheck.py` — the panel's state plus a small and a full-size upload, twice
   each (`--n`, default 2), in one short run: the first thing to run after the panel has
   been power-cycled.
@@ -1431,13 +1436,17 @@ metrics schema; `xigmalcd/render.py` is the drawing; `xigmalcd/main.py` is the l
 ## Licence
 
 **The code is GPL-3.0-or-later** — `xigmalcd/`, `xigmaui/`, `tools/`, `install/`, and
-the text of this README and `PROTOCOL.md`. `LICENSE` carries the GNU GPL version 3, and
-`pyproject.toml` declares it that way (`license`, with the file named again in
-`license-files`).  Nothing in the dependency tree gets in the way of that: `pillow` is
-MIT (HPND/CMU-style, GPL-compatible), `pyserial` is BSD-3-clause, and the optional GUI
-extra needs `PyQt6`, itself GPL/CECPL — which is why it is an extra and why `install.sh`
-checks `import PyQt6` and names the distro package instead of pip-installing a second Qt
-into a user's session.
+the text of this README and `PROTOCOL.md`. `LICENSE` is the FSF's `gpl-3.0.txt`
+verbatim — 35 149 bytes, sha256 `3972dc97…36986` — and `pyproject.toml` declares the
+same thing twice over: `license = "GPL-3.0-or-later"` plus `license-files = ["LICENSE"]`
+(PEP 639, hence `requires = ["setuptools>=77"]`).  Built here with setuptools 78.1.1, the
+wheel's metadata reads `License-Expression: GPL-3.0-or-later` and
+`License-File: LICENSE`, and `tools/selftest.sh` fails if the declaration, the file and
+that hash ever disagree.  Nothing in the dependency tree gets in the way of that:
+`pillow` is MIT (HPND/CMU-style, GPL-compatible), `pyserial` is BSD-3-clause, and the
+optional GUI extra needs `PyQt6`, itself GPL/CECPL — which is why it is an extra and why
+`install.sh` checks `import PyQt6` and names the distro package instead of pip-installing
+a second Qt into a user's session.
 
 **What is not ours, and is marked as such.** ALPHA's theme library (`themes/alpha/`:
 the 27 `.thm` files as shipped, their decrypted layouts, its 44 background clips and 27
