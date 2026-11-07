@@ -511,7 +511,20 @@ What has been measured on glass, by whom, with how many frames - and what has no
     Verified by re-rendering `clock-Theme_07.mp4` through the new path: byte-identical to
     the published file (`0f73b6be…`), because the date it drew at render time happened to be
     the sample's date too.  And verified across zones: the whole section prints the same
-    table under `TZ=UTC` and `TZ=Asia/Karachi`, glyph 241.0 / halo 106.4 / gap 134.6 in both.
+    table under `TZ=UTC` and `TZ=Asia/Karachi`, glyph 241.0 / halo 106.4 / gap 134.6 in both,
+    and the runner's own run of the same section (CI 42425440060) prints those same figures.
+  * **What a runner's sensors actually answer, printed rather than assumed.** The same CI
+    run is the first measurement of that: `sensors.collect()` there returned
+    `cpu, disk, memory, timestamp` - no `gpu`, no `fans`, no `motherboard`, and no
+    `cpu.temperature` - against this bench's seven sections.  The first version of the
+    preview section died on it (`KeyError: 'temperature'`), because the `--live-seconds`
+    step assumed a temperature exists.  It now prints whichever sections came back and
+    asserts only what that step is for: that two samples arrived, that a CPU load exists for
+    a meter to draw, and that `--record` wrote the zone it sampled in beside them.  Which is
+    the same shape as the packaging doc's VM finding (no thermal zones, no tach header, so
+    the fields draw `--`) measured one level down - and it is why `xigmalcd/sensors.py`
+    wraps every section in a try/except and `render` draws `--` for what is missing
+    (PROTOCOL.md §8).
   * **The scrim plate, measured on the animated path.** Over the bright clip
     (`Theme_07.mp4`, luma 176.2 of 255): with no plate, glyph 244.8 against its own halo
     191.3, a gap of 53.5; with the plate the window's auto rule puts there (150/255), glyph
