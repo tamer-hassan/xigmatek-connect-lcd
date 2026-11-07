@@ -1,0 +1,2460 @@
+{
+ "container": {
+  "cipher": "AES-256-CBC, PKCS#7",
+  "constants_found_in": "resources/app.asar -> out/main/index.jsc (V8 constant pool)",
+  "entry": "hex text",
+  "file": "ZIP, one entry '<themeId>.json'",
+  "iv": "427979656574656b427979656574656b",
+  "key": "sha256(b'Byyeetek2368')"
+ },
+ "counts": {
+  "background": 27,
+  "clip": 44,
+  "foreground": 27,
+  "layout": 27,
+  "thm": 27
+ },
+ "files": [
+  {
+   "bytes": 505547,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\320X240\\theme_1757492775547.thm"
+   },
+   "path": "thm/320X240/theme_1757492775547.thm",
+   "sha256": "5aeada3a8c10bee169059fcf62bb162e5e1dc8d71420c17d7b7cf768c38cdaad"
+  },
+  {
+   "bytes": 320375,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "2024-05-30_13-43-24-476.mp4"
+    ],
+    "thm": "theme_1757492775547.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757492775543.mp4"
+   },
+   "path": "clips/2024-05-30_13-43-24-476.mp4",
+   "sha256": "1c548c91f2e364d70805c389cfd1b28d9280c6f6839832ff7682476512733841"
+  },
+  {
+   "bytes": 8183,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757492775547.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757492775543.png"
+   },
+   "path": "foreground/1757492775543.png",
+   "sha256": "5c3a222f5f0bcdbe29f70a45d2b1744b4f65687021f1e513777d1c53d826bc59"
+  },
+  {
+   "bytes": 8147,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757492775547.thm"
+   },
+   "path": "layouts/320X240/1757492775547.json",
+   "sha256": "95019cd6169a4b1f51691497b64e267d6bd265e03238bd9c54eace7ae0ca3356"
+  },
+  {
+   "bytes": 652744,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\320X240\\theme_1757492775574.thm"
+   },
+   "path": "thm/320X240/theme_1757492775574.thm",
+   "sha256": "b583979c56e0200788ce4b33352d915c9659a00c2f5232a781cc6d900065c48e"
+  },
+  {
+   "bytes": 413584,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "2024-05-30_14-09-30-913.mp4"
+    ],
+    "thm": "theme_1757492775574.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757492775570.mp4"
+   },
+   "path": "clips/2024-05-30_14-09-30-913.mp4",
+   "sha256": "731620b20012a637004f5c050a0bc27b322ffed490b3f0d995997c734617410a"
+  },
+  {
+   "bytes": 12669,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757492775574.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757493849957.png"
+   },
+   "path": "foreground/1757493849957.png",
+   "sha256": "6650a1dc56b2ea458b94bfc39c645615ce132a345f9a346833349e0af1eaac0a"
+  },
+  {
+   "bytes": 6523,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757492775574.thm"
+   },
+   "path": "layouts/320X240/1757492775574.json",
+   "sha256": "4dfa01cda6e42275ff041e43a3508ccd0c82b84d61298eabae55e7eb45318e94"
+  },
+  {
+   "bytes": 616985,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\320X240\\theme_1757492775603.thm"
+   },
+   "path": "thm/320X240/theme_1757492775603.thm",
+   "sha256": "e3e8dcb2d5aec4113b67bd28cc3acc4e63da54afbc1284f9284d985e37d5f0d9"
+  },
+  {
+   "bytes": 397120,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "2024-05-31_15-01-03-396.mp4"
+    ],
+    "thm": "theme_1757492775603.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757492775600.mp4"
+   },
+   "path": "clips/2024-05-31_15-01-03-396.mp4",
+   "sha256": "62dbfd0b6ccba0ac5390e04a3dcf0b5f95e7ae5527e30b7cb015fa8f123cc766"
+  },
+  {
+   "bytes": 6306,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757492775603.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757494132152.png"
+   },
+   "path": "foreground/1757494132152.png",
+   "sha256": "9bebaff8bfedeae7d4e73e3a6ff65545dd9c740969297099399b32cbd8ea0e08"
+  },
+  {
+   "bytes": 5285,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757492775603.thm"
+   },
+   "path": "layouts/320X240/1757492775603.json",
+   "sha256": "28b02c0147a05bb24f87f254fa9de37a470de6d01d4c6edeafbb520d6301e95c"
+  },
+  {
+   "bytes": 327352,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\320X240\\theme_1757492775627.thm"
+   },
+   "path": "thm/320X240/theme_1757492775627.thm",
+   "sha256": "8dfd936d71b51a2e682e9761044419de3051d5b2339f11e0dfe16e9fdf903dd1"
+  },
+  {
+   "bytes": 209791,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "2024-05-31_15-00-10-394.png"
+    ],
+    "thm": "theme_1757492775627.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757492775624.png"
+   },
+   "path": "clips/2024-05-31_15-00-10-394.png",
+   "sha256": "0d3174e066d8ae1783f7a479135e787dcbf1879728d04bff830edfe0baee9acf"
+  },
+  {
+   "bytes": 3409,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757492775627.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757492775624.png"
+   },
+   "path": "foreground/1757492775624.png",
+   "sha256": "b97e3a94e72d697f71367253359aa60b516e3f3e60dbf66798af829f13f1b962"
+  },
+  {
+   "bytes": 4305,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757492775627.thm"
+   },
+   "path": "layouts/320X240/1757492775627.json",
+   "sha256": "ee67d40b9fafb39338fce94fa0f73acff7a3e115373c5f4fafac08a05eeb9929"
+  },
+  {
+   "bytes": 1045220,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\default.thm"
+   },
+   "path": "thm/480X480/default.thm",
+   "sha256": "b24ff23b69a2f634590e2561bf460879e94906580a8f80b3acc65a84d300582a"
+  },
+  {
+   "bytes": 659338,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "Theme_35.mp4"
+    ],
+    "thm": "default.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491588831.mp4"
+   },
+   "path": "clips/Theme_35.mp4",
+   "sha256": "fada63c3394e06540c369097dccc41f9976a5ab3c8203df03b73877304207c8b"
+  },
+  {
+   "bytes": 26389,
+   "kind": "foreground",
+   "origin": {
+    "thm": "default.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491588831.png"
+   },
+   "path": "foreground/1757491588831.png",
+   "sha256": "4d50df34f50a04ff606b0ef937c78fc8c3d7764574e2a49960aaf98b77d1ea5a"
+  },
+  {
+   "bytes": 4423,
+   "kind": "layout",
+   "origin": {
+    "thm": "default.thm"
+   },
+   "path": "layouts/480X480/1757491588836.json",
+   "sha256": "4f9e8c6a9a1c25bfd6dc2067510abda37e5a7c203f21e67c0b03807add3d8e3f"
+  },
+  {
+   "bytes": 3555730,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588063.thm"
+   },
+   "path": "thm/480X480/theme_1757491588063.thm",
+   "sha256": "30343a0388310804e8d348930737cee3fad566183146d350557ed672ddc9c506"
+  },
+  {
+   "bytes": 2325350,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "Theme_34.mp4"
+    ],
+    "thm": "theme_1757491588063.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491588049.mp4"
+   },
+   "path": "clips/Theme_34.mp4",
+   "sha256": "a4f49980a865a6125145d83a8cb9b37508ea930f038e77f347009548805a4892"
+  },
+  {
+   "bytes": 14107,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491588063.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491588049.png"
+   },
+   "path": "foreground/1757491588049.png",
+   "sha256": "2763295542e78384dfb9668c500f8d33b950a4c7a012560baaaa67386eb26d94"
+  },
+  {
+   "bytes": 3451,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491588063.thm"
+   },
+   "path": "layouts/480X480/1757491588063.json",
+   "sha256": "ebeaa3430f5405df58f1d6d40fdd170cfe33a34fea134d66aa7775a076694958"
+  },
+  {
+   "bytes": 1782056,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588126.thm"
+   },
+   "path": "thm/480X480/theme_1757491588126.thm",
+   "sha256": "4bc64dc6eef047c42f39bbbc7606c729008aa7b9f45f1501b52e38d1b15e8ab8"
+  },
+  {
+   "bytes": 1152859,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "Theme_01.mp4"
+    ],
+    "thm": "theme_1757491588126.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491588120.mp4"
+   },
+   "path": "clips/Theme_01.mp4",
+   "sha256": "28ebd18e412433a7a9440abd028b40ffd464206d7d46bc014d30b9f7feb7303c"
+  },
+  {
+   "bytes": 17206,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491588126.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491588120.png"
+   },
+   "path": "foreground/1757491588120.png",
+   "sha256": "20a0ca82739d33180d949e8f72bdd20d4d2bd0cd800952c3eeef49ea83006cce"
+  },
+  {
+   "bytes": 6581,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491588126.thm"
+   },
+   "path": "layouts/480X480/1757491588126.json",
+   "sha256": "f51e4a111994c3bf1c37c8b81b553cf367e096e388fc841200400b842b7b7ac3"
+  },
+  {
+   "bytes": 6848189,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588315.thm"
+   },
+   "path": "thm/480X480/theme_1757491588315.thm",
+   "sha256": "63c85939041fa87577fc8ec0d66b1a61082eb6646c5c7b9ae1f3bad8d33a72f0"
+  },
+  {
+   "bytes": 4495299,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "Theme_33.mp4"
+    ],
+    "thm": "theme_1757491588315.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491588297.mp4"
+   },
+   "path": "clips/Theme_33.mp4",
+   "sha256": "4505c5f03d812e3c45a41b90b62902e084401227474d2ffb051d8800516260a1"
+  },
+  {
+   "bytes": 12957,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491588315.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491588297.png"
+   },
+   "path": "foreground/1757491588297.png",
+   "sha256": "11a5356be2634dc4f84b8d188a578aa1207b402b1ff135844ae39538b92a3d85"
+  },
+  {
+   "bytes": 2679,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491588315.thm"
+   },
+   "path": "layouts/480X480/1757491588315.json",
+   "sha256": "ff55b0103f6260f81d2d2232444a2b923b7a2f9c021ba22ad9cb84de5126e79e"
+  },
+  {
+   "bytes": 6863675,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588497.thm"
+   },
+   "path": "thm/480X480/theme_1757491588497.thm",
+   "sha256": "ff6c38b14f302641801f64464da529201cfa171c94a53897ddaa922440ef9853"
+  },
+  {
+   "bytes": 4501258,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "Theme_14.mp4"
+    ],
+    "thm": "theme_1757491588497.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491588481.mp4"
+   },
+   "path": "clips/Theme_14.mp4",
+   "sha256": "0c4a42dcbd55ee84f9e94637fba04e92c529ed62ae2ae947da771dfea845ae58"
+  },
+  {
+   "bytes": 15710,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491588497.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491588481.png"
+   },
+   "path": "foreground/1757491588481.png",
+   "sha256": "0b776dca85d43b8dbd8a99eea7d5ef24674927db53adbcc92c1316447d49cedb"
+  },
+  {
+   "bytes": 4942,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491588497.thm"
+   },
+   "path": "layouts/480X480/1757491588497.json",
+   "sha256": "9b2e03f214f57e9f98a7a1dde6ccc0ddd10cfca3c630a649442796041bc66089"
+  },
+  {
+   "bytes": 5405873,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588618.thm"
+   },
+   "path": "thm/480X480/theme_1757491588618.thm",
+   "sha256": "36f94853677a7cf1bdd7ef7fe0b98199fb0444177c7e02ac29f74cc814a4a9da"
+  },
+  {
+   "bytes": 3537195,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "Theme_28.mp4"
+    ],
+    "thm": "theme_1757491588618.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491588604.mp4"
+   },
+   "path": "clips/Theme_28.mp4",
+   "sha256": "670e039d9c8e3169b9af082fbb5182dcc0ad5bcf3bb4a11315c243646b392fba"
+  },
+  {
+   "bytes": 19137,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491588618.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491588604.png"
+   },
+   "path": "foreground/1757491588604.png",
+   "sha256": "770c504629bfec8e827623aa5afbb30b57f00bdd1e7917e42a4027f24151e204"
+  },
+  {
+   "bytes": 5783,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491588618.thm"
+   },
+   "path": "layouts/480X480/1757491588618.json",
+   "sha256": "2d9ccf610ab985a52c2d7d37e9f45fc0d170490762e796472c6442376f1bf86e"
+  },
+  {
+   "bytes": 5393650,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588804.thm"
+   },
+   "path": "thm/480X480/theme_1757491588804.thm",
+   "sha256": "6c9e88edb71dd7df4bfee30fcb87325adcd9e2f4e476a80ef8992f6d6207b2ea"
+  },
+  {
+   "bytes": 3527291,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "Theme_07.mp4"
+    ],
+    "thm": "theme_1757491588804.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491588791.mp4"
+   },
+   "path": "clips/Theme_07.mp4",
+   "sha256": "7f94bb336c73d3c7f13a32599f346a9650f32d3e6ab44d4740ea293a808012fd"
+  },
+  {
+   "bytes": 21035,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491588804.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491588791.png"
+   },
+   "path": "foreground/1757491588791.png",
+   "sha256": "33eeb4cb0e82fb32ccae7df37bc9d12264ae83d4465383fed86d1bbfd618855a"
+  },
+  {
+   "bytes": 6742,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491588804.thm"
+   },
+   "path": "layouts/480X480/1757491588804.json",
+   "sha256": "d8de78e3d1fc249f53515fc36cb19dd5374ad3e0df5681cf1f6f9597bf914493"
+  },
+  {
+   "bytes": 1998709,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588891.thm"
+   },
+   "path": "thm/480X480/theme_1757491588891.thm",
+   "sha256": "cdecd0fdd7615727ccc9399a0eb2e3f298e58745873a9320342e22a218f147f9"
+  },
+  {
+   "bytes": 1298212,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "theme_52.mp4"
+    ],
+    "thm": "theme_1757491588891.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491588884.mp4"
+   },
+   "path": "clips/theme_52.mp4",
+   "sha256": "ff604e84d8813d32c11708c8268a30e14a757bc618f40195ad649ede3517afc3"
+  },
+  {
+   "bytes": 16181,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491588891.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491588884.png"
+   },
+   "path": "foreground/1757491588884.png",
+   "sha256": "f44479573743bd40a211fcb6db28739fe74837f291e48939ca2a99bade0aa79d"
+  },
+  {
+   "bytes": 2732,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491588891.thm"
+   },
+   "path": "layouts/480X480/1757491588891.json",
+   "sha256": "9abdb65339f7db40cf4655a0bc5b17fee4fa5a7bd478c5822d5ebbf742d95220"
+  },
+  {
+   "bytes": 1938913,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588945.thm"
+   },
+   "path": "thm/480X480/theme_1757491588945.thm",
+   "sha256": "d53efb191edeb183798dad0a525b8cfe1aca500c2c36ad719d9bd85c7e3137e7"
+  },
+  {
+   "bytes": 1254507,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "theme_40.mp4"
+    ],
+    "thm": "theme_1757491588945.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491588938.mp4"
+   },
+   "path": "clips/theme_40.mp4",
+   "sha256": "a35a903a8a18a40d5caf48577362653ac113a5ff570314c2368e9ce4c4081498"
+  },
+  {
+   "bytes": 18572,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491588945.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491588938.png"
+   },
+   "path": "foreground/1757491588938.png",
+   "sha256": "4340b1d05820e7c8c3cab2e96dfb470f265b58e495da0a5c33e53e48c03709fb"
+  },
+  {
+   "bytes": 6727,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491588945.thm"
+   },
+   "path": "layouts/480X480/1757491588945.json",
+   "sha256": "c20add7e448c3d159f2b2f4d424e3591132cd046be75138d692e374346e33aac"
+  },
+  {
+   "bytes": 2105673,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589004.thm"
+   },
+   "path": "thm/480X480/theme_1757491589004.thm",
+   "sha256": "b17aed9a2ad7ef1f916b9be9f5531a5a80c188827b2b75a2da5e087f2488d9a9"
+  },
+  {
+   "bytes": 1372694,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "theme_39.mp4"
+    ],
+    "thm": "theme_1757491589004.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491588997.mp4"
+   },
+   "path": "clips/theme_39.mp4",
+   "sha256": "bf491558c189ba9854b746cfdbbc857404f36ec0855988177148565b12d91135"
+  },
+  {
+   "bytes": 12141,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491589004.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491588997.png"
+   },
+   "path": "foreground/1757491588997.png",
+   "sha256": "15cb8e359e64039d21da802fc6f02b34f8b30bfb1cbbca3272746d7faf021b69"
+  },
+  {
+   "bytes": 2679,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491589004.thm"
+   },
+   "path": "layouts/480X480/1757491589004.json",
+   "sha256": "763ad8792bf871990bb8e3ade5904f872b040288f1155a0a2ebe02424043c1fe"
+  },
+  {
+   "bytes": 4418740,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589113.thm"
+   },
+   "path": "thm/480X480/theme_1757491589113.thm",
+   "sha256": "6c6dac447e7ab6e6ed3455bdaadef2e556eea606a86ce54ab0b67e0884b9e08b"
+  },
+  {
+   "bytes": 2888770,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "theme_37.mp4"
+    ],
+    "thm": "theme_1757491589113.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491589097.mp4"
+   },
+   "path": "clips/theme_37.mp4",
+   "sha256": "7b10eb00d6c5764b7def0c77bf5252333dff24ddd2f3b6bf2046014337991564"
+  },
+  {
+   "bytes": 17814,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491589113.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491589097.png"
+   },
+   "path": "foreground/1757491589097.png",
+   "sha256": "1bca250b1a9fec8743c46e5a5910232324fa2fa062f7c63b4b67679d4da25259"
+  },
+  {
+   "bytes": 5060,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491589113.thm"
+   },
+   "path": "layouts/480X480/1757491589113.json",
+   "sha256": "4511f0525e61a92568d0f335282bcbf0525ec4f19e257199ecf95f0cd27d7956"
+  },
+  {
+   "bytes": 3934905,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589217.thm"
+   },
+   "path": "thm/480X480/theme_1757491589217.thm",
+   "sha256": "bb0a2205370bac9ad721d2c873aacc562f8b7908f310986bb555541d235ae940"
+  },
+  {
+   "bytes": 2577837,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "Theme_27.mp4",
+     "theme_38.mp4"
+    ],
+    "thm": "theme_1757491589217.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491589206.mp4"
+   },
+   "path": "clips/Theme_27.mp4",
+   "sha256": "15bec2e97e678f83f1db2adb254eb79ba203355d2958439d2069273689998331"
+  },
+  {
+   "bytes": 11716,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491589217.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491589206.png"
+   },
+   "path": "foreground/1757491589206.png",
+   "sha256": "118b227fd97de4abf4052c5eb78a0f2709f7457692bf55b847032ced845b0755"
+  },
+  {
+   "bytes": 2678,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491589217.thm"
+   },
+   "path": "layouts/480X480/1757491589217.json",
+   "sha256": "d8d29dbc3906aaddb42988f8d41e1bfac474aa080ebed59b41eb9c69e02aca37"
+  },
+  {
+   "bytes": 353063,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589247.thm"
+   },
+   "path": "thm/480X480/theme_1757491589247.thm",
+   "sha256": "f2e54473e744bf97a7e398e17b67787590c694f1e3fa408a81e57c3591e731d1"
+  },
+  {
+   "bytes": 214917,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "Theme_25.mp4"
+    ],
+    "thm": "theme_1757491589247.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491589240.mp4"
+   },
+   "path": "clips/Theme_25.mp4",
+   "sha256": "39de20f0db3ca543bade61cd569550223940d0b9dd735c6f247c7014a204c76d"
+  },
+  {
+   "bytes": 15111,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491589247.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491589240.png"
+   },
+   "path": "foreground/1757491589240.png",
+   "sha256": "04429e426b781f7c69093af411012c9132882cac35157826d4af9cab1cdebc0b"
+  },
+  {
+   "bytes": 4235,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491589247.thm"
+   },
+   "path": "layouts/480X480/1757491589247.json",
+   "sha256": "c78f60895ae4fd750c3fdfd75d5d5aae3cfdfbf47aa79bb75269535e72ed6a21"
+  },
+  {
+   "bytes": 2210890,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589325.thm"
+   },
+   "path": "thm/480X480/theme_1757491589325.thm",
+   "sha256": "b2bc653816c72423501d24491b4bf4d6cf5a5209690579e53685dcf7bcc2dca2"
+  },
+  {
+   "bytes": 1433387,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "Theme_30.mp4"
+    ],
+    "thm": "theme_1757491589325.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491589317.mp4"
+   },
+   "path": "clips/Theme_30.mp4",
+   "sha256": "60397a1170ed60fd15226c120f568ccf970392ed08a03b712d735ac9e474d4f2"
+  },
+  {
+   "bytes": 18841,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491589325.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491589317.png"
+   },
+   "path": "foreground/1757491589317.png",
+   "sha256": "51ca69785682c2c0b9bb87e6843d640de5a616b1e8ca809c863b337ddba45621"
+  },
+  {
+   "bytes": 6583,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491589325.thm"
+   },
+   "path": "layouts/480X480/1757491589325.json",
+   "sha256": "f01c712c7f7cb31f2576ac01f81547c7a505fe03d0a9f74c79eae0618bf4103c"
+  },
+  {
+   "bytes": 2774962,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589401.thm"
+   },
+   "path": "thm/480X480/theme_1757491589401.thm",
+   "sha256": "9cbc79ba25a6dfbba58c17c8a220a8a0d820299592716d799d4772ed4da5f6cd"
+  },
+  {
+   "bytes": 1811136,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "theme_36.mp4"
+    ],
+    "thm": "theme_1757491589401.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491589392.mp4"
+   },
+   "path": "clips/theme_36.mp4",
+   "sha256": "48be56e13533f8d2898e6839e8ab8604c673fda9499165c415343b20785c3e94"
+  },
+  {
+   "bytes": 14297,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491589401.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491589392.png"
+   },
+   "path": "foreground/1757491589392.png",
+   "sha256": "bf276b44721e2fe47424c9e609e74347017505546a32571013c9180701b06d9e"
+  },
+  {
+   "bytes": 3452,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491589401.thm"
+   },
+   "path": "layouts/480X480/1757491589401.json",
+   "sha256": "351e45f49bc2e402a99ccf9d2a780da977a23ee4123a62c80341c163427d2c99"
+  },
+  {
+   "bytes": 3222437,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589484.thm"
+   },
+   "path": "thm/480X480/theme_1757491589484.thm",
+   "sha256": "7374552bf810294a7821a8c8efa37491286c3c35cc1c7062e8d591d536424bf8"
+  },
+  {
+   "bytes": 2106948,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "Theme_29.mp4",
+     "theme_51.mp4"
+    ],
+    "thm": "theme_1757491589484.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491589473.mp4"
+   },
+   "path": "clips/Theme_29.mp4",
+   "sha256": "317221d7a46a91035d8ffcf3dff9d7f99c19bb5490758739cca6bc1e979362cf"
+  },
+  {
+   "bytes": 13562,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491589484.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491589473.png"
+   },
+   "path": "foreground/1757491589473.png",
+   "sha256": "ffbcd4643df23bf7b760afcc2c15df0e3abf357358a9f8d7bf80a9cc527312ec"
+  },
+  {
+   "bytes": 2728,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491589484.thm"
+   },
+   "path": "layouts/480X480/1757491589484.json",
+   "sha256": "1380dbc1c9c14f5bc4acd585607791f1be30e597ad56f5e04a568332358cebd6"
+  },
+  {
+   "bytes": 2410941,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589554.thm"
+   },
+   "path": "thm/480X480/theme_1757491589554.thm",
+   "sha256": "ff1063768c242f5af38c79ff959bc15132c6a397a40ab1aee74ab2fa63dae71b"
+  },
+  {
+   "bytes": 1566530,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "theme_41.mp4"
+    ],
+    "thm": "theme_1757491589554.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491589547.mp4"
+   },
+   "path": "clips/theme_41.mp4",
+   "sha256": "7803a3450aa4a49b8e4b9aafa46d5fd2f4905851744a53428bb92a058f7be56f"
+  },
+  {
+   "bytes": 18213,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491589554.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491589547.png"
+   },
+   "path": "foreground/1757491589547.png",
+   "sha256": "13a4385e4987ca42d2d568fedd7014b7b9437e1abf8b377cc31412c36d0c625e"
+  },
+  {
+   "bytes": 5060,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491589554.thm"
+   },
+   "path": "layouts/480X480/1757491589554.json",
+   "sha256": "771285ec2db6c0482b98c2c9a5a32557c17480a8d63d69d73474c9d31a8a1315"
+  },
+  {
+   "bytes": 724629,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589585.thm"
+   },
+   "path": "thm/480X480/theme_1757491589585.thm",
+   "sha256": "958171e8e48b6f0fb976cdf1c3813799455abe4a717795b668ec93d80d467097"
+  },
+  {
+   "bytes": 462649,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "theme_45.mp4"
+    ],
+    "thm": "theme_1757491589585.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491589581.mp4"
+   },
+   "path": "clips/theme_45.mp4",
+   "sha256": "338ba5a9744a0da369d2fea6489159f4595530677102b416457f17022f6fb164"
+  },
+  {
+   "bytes": 12787,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491589585.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491589581.png"
+   },
+   "path": "foreground/1757491589581.png",
+   "sha256": "ecf7f27888bc3b0fc46f3de90bc1343f4aaaaa10dbf50584e006cd3cfe89145d"
+  },
+  {
+   "bytes": 2728,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491589585.thm"
+   },
+   "path": "layouts/480X480/1757491589585.json",
+   "sha256": "6191830a141a1e299bb56ef1514b58f9a491c5c7c05a1da1dcee94e1b7e4be5b"
+  },
+  {
+   "bytes": 664241,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589611.thm"
+   },
+   "path": "thm/480X480/theme_1757491589611.thm",
+   "sha256": "32e121ef93b7ced569782d8b683f42d49b1e8ecc75dca5685317c22837c079f0"
+  },
+  {
+   "bytes": 419763,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "theme_46.mp4"
+    ],
+    "thm": "theme_1757491589611.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491589608.mp4"
+   },
+   "path": "clips/theme_46.mp4",
+   "sha256": "b3d0380b86d239b4778f655a47834d41528ee06fa398130716d522d65c84bd90"
+  },
+  {
+   "bytes": 14844,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491589611.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491589608.png"
+   },
+   "path": "foreground/1757491589608.png",
+   "sha256": "6519c707246bdde694107aaa31341d2838a908d1af582a03bf8363be950a2135"
+  },
+  {
+   "bytes": 4942,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491589611.thm"
+   },
+   "path": "layouts/480X480/1757491589611.json",
+   "sha256": "803d64b10db84fd31669e73d24254a0ade0b9c118835982a863016da5d39be29"
+  },
+  {
+   "bytes": 1860678,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589687.thm"
+   },
+   "path": "thm/480X480/theme_1757491589687.thm",
+   "sha256": "e9cd61804d775256ea0f43a4880d01abaf1f3088254d9f9e6835a4261b759171"
+  },
+  {
+   "bytes": 1211106,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "theme_47.mp4"
+    ],
+    "thm": "theme_1757491589687.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491589673.mp4"
+   },
+   "path": "clips/theme_47.mp4",
+   "sha256": "b456eb145f750b3089004fdc00281867fee00eb0c56feaaa2724226fa4d4ad0c"
+  },
+  {
+   "bytes": 12141,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491589687.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491589673.png"
+   },
+   "path": "foreground/1757491589673.png",
+   "sha256": "15cb8e359e64039d21da802fc6f02b34f8b30bfb1cbbca3272746d7faf021b69"
+  },
+  {
+   "bytes": 2679,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491589687.thm"
+   },
+   "path": "layouts/480X480/1757491589687.json",
+   "sha256": "4af1abdb729641b721081f370dc32a47253b6bef49ce082bec09d27d46a698a2"
+  },
+  {
+   "bytes": 2061080,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589759.thm"
+   },
+   "path": "thm/480X480/theme_1757491589759.thm",
+   "sha256": "ce28b6ffa688d96ecc56652d9185ca83753b7978d0e2d3680088f34d46efdbdc"
+  },
+  {
+   "bytes": 1333649,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "theme_48.mp4"
+    ],
+    "thm": "theme_1757491589759.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491589745.mp4"
+   },
+   "path": "clips/theme_48.mp4",
+   "sha256": "5f7f3cc6a4fae3337ac05fad8438cac27c60e40b1ba3d43f78dd51ca3eccc883"
+  },
+  {
+   "bytes": 20393,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491589759.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491589745.png"
+   },
+   "path": "foreground/1757491589745.png",
+   "sha256": "122677024045e551aeba065cf560d64da342a3134da0e71a7bca7fceb03a2ba9"
+  },
+  {
+   "bytes": 5762,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491589759.thm"
+   },
+   "path": "layouts/480X480/1757491589759.json",
+   "sha256": "eae9f3bc95e1da081ef93018b4f693f2954b12010d04896b935a2ad3331bde07"
+  },
+  {
+   "bytes": 701859,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589804.thm"
+   },
+   "path": "thm/480X480/theme_1757491589804.thm",
+   "sha256": "170469fa7ae2686eeaad5985134038b151d70d31df1dbda765d030e42a09637c"
+  },
+  {
+   "bytes": 445318,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "theme_49.mp4"
+    ],
+    "thm": "theme_1757491589804.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491589800.mp4"
+   },
+   "path": "clips/theme_49.mp4",
+   "sha256": "0eb754b849707cf077fa7da052807976bae3a27520a58c5d8ef537dd7fe69db7"
+  },
+  {
+   "bytes": 14832,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491589804.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491589800.png"
+   },
+   "path": "foreground/1757491589800.png",
+   "sha256": "4adfc8248083f52e58a6ad98572b7cd74665ce08b28a3f6b5897e745b360332d"
+  },
+  {
+   "bytes": 3451,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491589804.thm"
+   },
+   "path": "layouts/480X480/1757491589804.json",
+   "sha256": "3074f1510e94a457190f41907f6fc562b29916c6ab032a9acff15bc5ef46759c"
+  },
+  {
+   "bytes": 1921341,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589871.thm"
+   },
+   "path": "thm/480X480/theme_1757491589871.thm",
+   "sha256": "729a6b85d3c76ee83f6b37eb9ba4d618ac3ad62eb48fec7673e2abd3e0049048"
+  },
+  {
+   "bytes": 1243040,
+   "kind": "background",
+   "origin": {
+    "heldBy": "clips",
+    "looseCopiesOfSameBytes": [
+     "theme_50.mp4"
+    ],
+    "thm": "theme_1757491589871.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491589862.mp4"
+   },
+   "path": "clips/theme_50.mp4",
+   "sha256": "c8f628cdd613ab0df3ff1b85338cf53951a6aa2dbd4fb07603d97e67182dcc99"
+  },
+  {
+   "bytes": 18542,
+   "kind": "foreground",
+   "origin": {
+    "thm": "theme_1757491589871.thm",
+    "vendorPath": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491589862.png"
+   },
+   "path": "foreground/1757491589862.png",
+   "sha256": "004e9b4dc407e1b97a67ef927fdbfcab605d3eb2fca39f6fe72054ac16df86e8"
+  },
+  {
+   "bytes": 6758,
+   "kind": "layout",
+   "origin": {
+    "thm": "theme_1757491589871.thm"
+   },
+   "path": "layouts/480X480/1757491589871.json",
+   "sha256": "0f7549f39c3cb5e0583d9dbc46ebe85874c88f8c05cb1d58a62ded8932f4497f"
+  },
+  {
+   "bytes": 364934,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\2.mp4"
+   },
+   "path": "clips/2.mp4",
+   "sha256": "1b50848f28c2502ae6ef4e94354b666e94db81bf7ffce37b4e895eabdf0b059c"
+  },
+  {
+   "bytes": 320375,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\2024-05-30_13-43-24-476.mp4"
+   },
+   "path": "clips/2024-05-30_13-43-24-476.mp4",
+   "sha256": "1c548c91f2e364d70805c389cfd1b28d9280c6f6839832ff7682476512733841"
+  },
+  {
+   "bytes": 413584,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\2024-05-30_14-09-30-913.mp4"
+   },
+   "path": "clips/2024-05-30_14-09-30-913.mp4",
+   "sha256": "731620b20012a637004f5c050a0bc27b322ffed490b3f0d995997c734617410a"
+  },
+  {
+   "bytes": 209791,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\2024-05-31_15-00-10-394.png"
+   },
+   "path": "clips/2024-05-31_15-00-10-394.png",
+   "sha256": "0d3174e066d8ae1783f7a479135e787dcbf1879728d04bff830edfe0baee9acf"
+  },
+  {
+   "bytes": 397120,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\2024-05-31_15-01-03-396.mp4"
+   },
+   "path": "clips/2024-05-31_15-01-03-396.mp4",
+   "sha256": "62dbfd0b6ccba0ac5390e04a3dcf0b5f95e7ae5527e30b7cb015fa8f123cc766"
+  },
+  {
+   "bytes": 290472,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\3.mp4"
+   },
+   "path": "clips/3.mp4",
+   "sha256": "8f5bc2ecb6b5b901274d8e12dc0261f4f167f2581a49287dbd3f1943043517a8"
+  },
+  {
+   "bytes": 461278,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\8.mp4"
+   },
+   "path": "clips/8.mp4",
+   "sha256": "cc70223bb65801e411601ba5e7018c1d35d1c60d3ae64227ec8194ea599a63b5"
+  },
+  {
+   "bytes": 656627,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\9.mp4"
+   },
+   "path": "clips/9.mp4",
+   "sha256": "7b3600a7ab18164e23c14a0cddf04afcbebd0881a5a2843823c8b6169b622889"
+  },
+  {
+   "bytes": 1152859,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_01.mp4"
+   },
+   "path": "clips/Theme_01.mp4",
+   "sha256": "28ebd18e412433a7a9440abd028b40ffd464206d7d46bc014d30b9f7feb7303c"
+  },
+  {
+   "bytes": 3527291,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_07.mp4"
+   },
+   "path": "clips/Theme_07.mp4",
+   "sha256": "7f94bb336c73d3c7f13a32599f346a9650f32d3e6ab44d4740ea293a808012fd"
+  },
+  {
+   "bytes": 3402098,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_11.mp4"
+   },
+   "path": "clips/Theme_11.mp4",
+   "sha256": "fc490a23ced111ff1b70b53733d0c2813a7f19c7a6570dd93f9e6fcab3f9f9d9"
+  },
+  {
+   "bytes": 452173,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_12.mp4"
+   },
+   "path": "clips/Theme_12.mp4",
+   "sha256": "e4a8790caec92c65f77d614f2b84fc893eb7cce5d49c2a95254f6b7fd07718b4"
+  },
+  {
+   "bytes": 442290,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_13.mp4"
+   },
+   "path": "clips/Theme_13.mp4",
+   "sha256": "7e45ba2ca1fa2fd2ff0b749ec48d8fe272c0f7f2f4ec32959a52d663d81e0581"
+  },
+  {
+   "bytes": 4501258,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_14.mp4"
+   },
+   "path": "clips/Theme_14.mp4",
+   "sha256": "0c4a42dcbd55ee84f9e94637fba04e92c529ed62ae2ae947da771dfea845ae58"
+  },
+  {
+   "bytes": 5725633,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_15.mp4"
+   },
+   "path": "clips/Theme_15.mp4",
+   "sha256": "b5c8389840a39506b82b3330db71d70595690ec961b80fe79957bca5cb219b3f"
+  },
+  {
+   "bytes": 1010639,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_16.mp4"
+   },
+   "path": "clips/Theme_16.mp4",
+   "sha256": "a7c2d7d4e2d06cb4eea1fac071d33ec2b165d7d4c1f8b7fc779a1c1be0adec2e"
+  },
+  {
+   "bytes": 4511569,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_17.mp4"
+   },
+   "path": "clips/Theme_17.mp4",
+   "sha256": "7a6d2e70d32a54e86ed5dbe33eb6cf0095ca53fc126028cdfd8e5d942fe31484"
+  },
+  {
+   "bytes": 7662077,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_22.mp4"
+   },
+   "path": "clips/Theme_22.mp4",
+   "sha256": "285cead6889974568f9060321e9df77e839c423b99f50f9f6e4a1397f59e5df1"
+  },
+  {
+   "bytes": 1561024,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_23.mp4"
+   },
+   "path": "clips/Theme_23.mp4",
+   "sha256": "d313b19d703ee407f7bb5158e9f8d85ff7dd68f36b59fae30e470b2f794dc95d"
+  },
+  {
+   "bytes": 937526,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_24.mp4"
+   },
+   "path": "clips/Theme_24.mp4",
+   "sha256": "22f109906b3c3f92cc27424da955297ea9bc8071ce0fc4ea3dcaff29c9b4560c"
+  },
+  {
+   "bytes": 214917,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_25.mp4"
+   },
+   "path": "clips/Theme_25.mp4",
+   "sha256": "39de20f0db3ca543bade61cd569550223940d0b9dd735c6f247c7014a204c76d"
+  },
+  {
+   "bytes": 4524641,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [
+     "Theme_31.mp4"
+    ],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_26.mp4"
+   },
+   "path": "clips/Theme_26.mp4",
+   "sha256": "b1e185d34bf63cff855882a4913d123a5034434671a4ee5cef0bce01da6647af"
+  },
+  {
+   "bytes": 2577837,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [
+     "theme_38.mp4"
+    ],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_27.mp4"
+   },
+   "path": "clips/Theme_27.mp4",
+   "sha256": "15bec2e97e678f83f1db2adb254eb79ba203355d2958439d2069273689998331"
+  },
+  {
+   "bytes": 3537195,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_28.mp4"
+   },
+   "path": "clips/Theme_28.mp4",
+   "sha256": "670e039d9c8e3169b9af082fbb5182dcc0ad5bcf3bb4a11315c243646b392fba"
+  },
+  {
+   "bytes": 2106948,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [
+     "theme_51.mp4"
+    ],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_29.mp4"
+   },
+   "path": "clips/Theme_29.mp4",
+   "sha256": "317221d7a46a91035d8ffcf3dff9d7f99c19bb5490758739cca6bc1e979362cf"
+  },
+  {
+   "bytes": 1433387,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_30.mp4"
+   },
+   "path": "clips/Theme_30.mp4",
+   "sha256": "60397a1170ed60fd15226c120f568ccf970392ed08a03b712d735ac9e474d4f2"
+  },
+  {
+   "bytes": 4524641,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [
+     "Theme_26.mp4"
+    ],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_31.mp4"
+   },
+   "path": "clips/Theme_31.mp4",
+   "sha256": "b1e185d34bf63cff855882a4913d123a5034434671a4ee5cef0bce01da6647af"
+  },
+  {
+   "bytes": 4495299,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_33.mp4"
+   },
+   "path": "clips/Theme_33.mp4",
+   "sha256": "4505c5f03d812e3c45a41b90b62902e084401227474d2ffb051d8800516260a1"
+  },
+  {
+   "bytes": 2325350,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_34.mp4"
+   },
+   "path": "clips/Theme_34.mp4",
+   "sha256": "a4f49980a865a6125145d83a8cb9b37508ea930f038e77f347009548805a4892"
+  },
+  {
+   "bytes": 659338,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\Theme_35.mp4"
+   },
+   "path": "clips/Theme_35.mp4",
+   "sha256": "fada63c3394e06540c369097dccc41f9976a5ab3c8203df03b73877304207c8b"
+  },
+  {
+   "bytes": 1811136,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\theme_36.mp4"
+   },
+   "path": "clips/theme_36.mp4",
+   "sha256": "48be56e13533f8d2898e6839e8ab8604c673fda9499165c415343b20785c3e94"
+  },
+  {
+   "bytes": 2888770,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\theme_37.mp4"
+   },
+   "path": "clips/theme_37.mp4",
+   "sha256": "7b10eb00d6c5764b7def0c77bf5252333dff24ddd2f3b6bf2046014337991564"
+  },
+  {
+   "bytes": 2577837,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [
+     "Theme_27.mp4"
+    ],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\theme_38.mp4"
+   },
+   "path": "clips/theme_38.mp4",
+   "sha256": "15bec2e97e678f83f1db2adb254eb79ba203355d2958439d2069273689998331"
+  },
+  {
+   "bytes": 1372694,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\theme_39.mp4"
+   },
+   "path": "clips/theme_39.mp4",
+   "sha256": "bf491558c189ba9854b746cfdbbc857404f36ec0855988177148565b12d91135"
+  },
+  {
+   "bytes": 1254507,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\theme_40.mp4"
+   },
+   "path": "clips/theme_40.mp4",
+   "sha256": "a35a903a8a18a40d5caf48577362653ac113a5ff570314c2368e9ce4c4081498"
+  },
+  {
+   "bytes": 1566530,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\theme_41.mp4"
+   },
+   "path": "clips/theme_41.mp4",
+   "sha256": "7803a3450aa4a49b8e4b9aafa46d5fd2f4905851744a53428bb92a058f7be56f"
+  },
+  {
+   "bytes": 462649,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\theme_45.mp4"
+   },
+   "path": "clips/theme_45.mp4",
+   "sha256": "338ba5a9744a0da369d2fea6489159f4595530677102b416457f17022f6fb164"
+  },
+  {
+   "bytes": 419763,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\theme_46.mp4"
+   },
+   "path": "clips/theme_46.mp4",
+   "sha256": "b3d0380b86d239b4778f655a47834d41528ee06fa398130716d522d65c84bd90"
+  },
+  {
+   "bytes": 1211106,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\theme_47.mp4"
+   },
+   "path": "clips/theme_47.mp4",
+   "sha256": "b456eb145f750b3089004fdc00281867fee00eb0c56feaaa2724226fa4d4ad0c"
+  },
+  {
+   "bytes": 1333649,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\theme_48.mp4"
+   },
+   "path": "clips/theme_48.mp4",
+   "sha256": "5f7f3cc6a4fae3337ac05fad8438cac27c60e40b1ba3d43f78dd51ca3eccc883"
+  },
+  {
+   "bytes": 445318,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\theme_49.mp4"
+   },
+   "path": "clips/theme_49.mp4",
+   "sha256": "0eb754b849707cf077fa7da052807976bae3a27520a58c5d8ef537dd7fe69db7"
+  },
+  {
+   "bytes": 1243040,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\theme_50.mp4"
+   },
+   "path": "clips/theme_50.mp4",
+   "sha256": "c8f628cdd613ab0df3ff1b85338cf53951a6aa2dbd4fb07603d97e67182dcc99"
+  },
+  {
+   "bytes": 2106948,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [
+     "Theme_29.mp4"
+    ],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\theme_51.mp4"
+   },
+   "path": "clips/theme_51.mp4",
+   "sha256": "317221d7a46a91035d8ffcf3dff9d7f99c19bb5490758739cca6bc1e979362cf"
+  },
+  {
+   "bytes": 1298212,
+   "kind": "clip",
+   "origin": {
+    "sameBytesAs": [],
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\media\\theme_52.mp4"
+   },
+   "path": "clips/theme_52.mp4",
+   "sha256": "ff604e84d8813d32c11708c8268a30e14a757bc618f40195ad649ede3517afc3"
+  }
+ ],
+ "source": {
+  "clips": "/media/windows-c/Program Files/ALPHA/resources/static/media",
+  "install": "C:\\Program Files\\ALPHA\\resources\\static",
+  "note": "read from the mounted Windows system volume; no file outside this repo was created or changed",
+  "themes": "/media/windows-c/Program Files/ALPHA/resources/static/theme/butt"
+ },
+ "themes": [
+  {
+   "backgroundBytes": 320375,
+   "backgroundFile": "clips/2024-05-30_13-43-24-476.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "1c548c91f2e364d70805c389cfd1b28d9280c6f6839832ff7682476512733841",
+   "canvas": [
+    320,
+    240
+   ],
+   "fonts": {
+    "Arial": 7,
+    "simsun": 1,
+    "\u5b8b\u4f53": 1
+   },
+   "foregroundBytes": 8183,
+   "foregroundFile": "foreground/1757492775543.png",
+   "foregroundSha256": "5c3a222f5f0bcdbe29f70a45d2b1744b4f65687021f1e513777d1c53d826bc59",
+   "id": "1757492775547",
+   "layout": "layouts/320X240/1757492775547.json",
+   "ratio": "320X240",
+   "ratioField": "4:3",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Frequency": 1,
+    "CPU Temperature": 2,
+    "CPU Usage": 1,
+    "Date": 1,
+    "Time": 1
+   },
+   "thm": "thm/320X240/theme_1757492775547.thm",
+   "widgetKinds": {
+    "bar": 1,
+    "data": 5,
+    "text": 4
+   }
+  },
+  {
+   "backgroundBytes": 413584,
+   "backgroundFile": "clips/2024-05-30_14-09-30-913.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "731620b20012a637004f5c050a0bc27b322ffed490b3f0d995997c734617410a",
+   "canvas": [
+    320,
+    240
+   ],
+   "fonts": {
+    "Arial": 6,
+    "simsun": 2
+   },
+   "foregroundBytes": 12669,
+   "foregroundFile": "foreground/1757493849957.png",
+   "foregroundSha256": "6650a1dc56b2ea458b94bfc39c645615ce132a345f9a346833349e0af1eaac0a",
+   "id": "1757492775574",
+   "layout": "layouts/320X240/1757492775574.json",
+   "ratio": "320X240",
+   "ratioField": "4:3",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Power": 1,
+    "CPU Temperature": 1,
+    "Date": 1,
+    "GPU Power": 1,
+    "GPU Temperature": 1
+   },
+   "thm": "thm/320X240/theme_1757492775574.thm",
+   "widgetKinds": {
+    "data": 5,
+    "text": 3
+   }
+  },
+  {
+   "backgroundBytes": 397120,
+   "backgroundFile": "clips/2024-05-31_15-01-03-396.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "62dbfd0b6ccba0ac5390e04a3dcf0b5f95e7ae5527e30b7cb015fa8f123cc766",
+   "canvas": [
+    320,
+    240
+   ],
+   "fonts": {
+    "simsun": 4
+   },
+   "foregroundBytes": 6306,
+   "foregroundFile": "foreground/1757494132152.png",
+   "foregroundSha256": "9bebaff8bfedeae7d4e73e3a6ff65545dd9c740969297099399b32cbd8ea0e08",
+   "id": "1757492775603",
+   "layout": "layouts/320X240/1757492775603.json",
+   "ratio": "320X240",
+   "ratioField": "4:3",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Temperature": 2,
+    "GPU Temperature": 2
+   },
+   "thm": "thm/320X240/theme_1757492775603.thm",
+   "widgetKinds": {
+    "bar": 2,
+    "data": 2,
+    "text": 2
+   }
+  },
+  {
+   "backgroundBytes": 209791,
+   "backgroundFile": "clips/2024-05-31_15-00-10-394.png",
+   "backgroundKind": "PNG",
+   "backgroundSha256": "0d3174e066d8ae1783f7a479135e787dcbf1879728d04bff830edfe0baee9acf",
+   "canvas": [
+    320,
+    240
+   ],
+   "fonts": {
+    "simsun": 5
+   },
+   "foregroundBytes": 3409,
+   "foregroundFile": "foreground/1757492775624.png",
+   "foregroundSha256": "b97e3a94e72d697f71367253359aa60b516e3f3e60dbf66798af829f13f1b962",
+   "id": "1757492775627",
+   "layout": "layouts/320X240/1757492775627.json",
+   "ratio": "320X240",
+   "ratioField": "4:3",
+   "screenStatus": "butt",
+   "sources": {
+    "Date": 1,
+    "Time": 1,
+    "Upload Speed": 1,
+    "Week": 1
+   },
+   "thm": "thm/320X240/theme_1757492775627.thm",
+   "widgetKinds": {
+    "data": 4,
+    "text": 1
+   }
+  },
+  {
+   "backgroundBytes": 659338,
+   "backgroundFile": "clips/Theme_35.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "fada63c3394e06540c369097dccc41f9976a5ab3c8203df03b73877304207c8b",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 1,
+    "Verdana": 3
+   },
+   "foregroundBytes": 26389,
+   "foregroundFile": "foreground/1757491588831.png",
+   "foregroundSha256": "4d50df34f50a04ff606b0ef937c78fc8c3d7764574e2a49960aaf98b77d1ea5a",
+   "id": "1757491588836",
+   "layout": "layouts/480X480/1757491588836.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Temperature": 2,
+    "Time": 1
+   },
+   "thm": "thm/480X480/default.thm",
+   "widgetKinds": {
+    "arc": 1,
+    "data": 2,
+    "text": 2
+   }
+  },
+  {
+   "backgroundBytes": 2325350,
+   "backgroundFile": "clips/Theme_34.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "a4f49980a865a6125145d83a8cb9b37508ea930f038e77f347009548805a4892",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 4
+   },
+   "foregroundBytes": 14107,
+   "foregroundFile": "foreground/1757491588049.png",
+   "foregroundSha256": "2763295542e78384dfb9668c500f8d33b950a4c7a012560baaaa67386eb26d94",
+   "id": "1757491588063",
+   "layout": "layouts/480X480/1757491588063.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Usage": 1,
+    "Pump Speed": 1
+   },
+   "thm": "thm/480X480/theme_1757491588063.thm",
+   "widgetKinds": {
+    "data": 2,
+    "text": 2
+   }
+  },
+  {
+   "backgroundBytes": 1152859,
+   "backgroundFile": "clips/Theme_01.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "28ebd18e412433a7a9440abd028b40ffd464206d7d46bc014d30b9f7feb7303c",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 6,
+    "simsun": 1
+   },
+   "foregroundBytes": 17206,
+   "foregroundFile": "foreground/1757491588120.png",
+   "foregroundSha256": "20a0ca82739d33180d949e8f72bdd20d4d2bd0cd800952c3eeef49ea83006cce",
+   "id": "1757491588126",
+   "layout": "layouts/480X480/1757491588126.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Frequency": 1,
+    "CPU Temperature": 2,
+    "CPU Usage": 1
+   },
+   "thm": "thm/480X480/theme_1757491588126.thm",
+   "widgetKinds": {
+    "bar": 1,
+    "data": 3,
+    "text": 4
+   }
+  },
+  {
+   "backgroundBytes": 4495299,
+   "backgroundFile": "clips/Theme_33.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "4505c5f03d812e3c45a41b90b62902e084401227474d2ffb051d8800516260a1",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 3
+   },
+   "foregroundBytes": 12957,
+   "foregroundFile": "foreground/1757491588297.png",
+   "foregroundSha256": "11a5356be2634dc4f84b8d188a578aa1207b402b1ff135844ae39538b92a3d85",
+   "id": "1757491588315",
+   "layout": "layouts/480X480/1757491588315.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Temperature": 1
+   },
+   "thm": "thm/480X480/theme_1757491588315.thm",
+   "widgetKinds": {
+    "data": 1,
+    "text": 2
+   }
+  },
+  {
+   "backgroundBytes": 4501258,
+   "backgroundFile": "clips/Theme_14.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "0c4a42dcbd55ee84f9e94637fba04e92c529ed62ae2ae947da771dfea845ae58",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 5
+   },
+   "foregroundBytes": 15710,
+   "foregroundFile": "foreground/1757491588481.png",
+   "foregroundSha256": "0b776dca85d43b8dbd8a99eea7d5ef24674927db53adbcc92c1316447d49cedb",
+   "id": "1757491588497",
+   "layout": "layouts/480X480/1757491588497.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Temperature": 1,
+    "GPU Temperature": 1,
+    "Time": 1
+   },
+   "thm": "thm/480X480/theme_1757491588497.thm",
+   "widgetKinds": {
+    "data": 3,
+    "line": 2,
+    "text": 2
+   }
+  },
+  {
+   "backgroundBytes": 3537195,
+   "backgroundFile": "clips/Theme_28.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "670e039d9c8e3169b9af082fbb5182dcc0ad5bcf3bb4a11315c243646b392fba",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 6
+   },
+   "foregroundBytes": 19137,
+   "foregroundFile": "foreground/1757491588604.png",
+   "foregroundSha256": "770c504629bfec8e827623aa5afbb30b57f00bdd1e7917e42a4027f24151e204",
+   "id": "1757491588618",
+   "layout": "layouts/480X480/1757491588618.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Usage": 1,
+    "Pump Speed": 1,
+    "Time": 1
+   },
+   "thm": "thm/480X480/theme_1757491588618.thm",
+   "widgetKinds": {
+    "bar": 1,
+    "data": 2,
+    "text": 4
+   }
+  },
+  {
+   "backgroundBytes": 3527291,
+   "backgroundFile": "clips/Theme_07.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "7f94bb336c73d3c7f13a32599f346a9650f32d3e6ab44d4740ea293a808012fd",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 6
+   },
+   "foregroundBytes": 21035,
+   "foregroundFile": "foreground/1757491588791.png",
+   "foregroundSha256": "33eeb4cb0e82fb32ccae7df37bc9d12264ae83d4465383fed86d1bbfd618855a",
+   "id": "1757491588804",
+   "layout": "layouts/480X480/1757491588804.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Temperature": 1,
+    "CPU Usage": 2,
+    "GPU Usage": 2
+   },
+   "thm": "thm/480X480/theme_1757491588804.thm",
+   "widgetKinds": {
+    "bar": 2,
+    "data": 3,
+    "text": 3
+   }
+  },
+  {
+   "backgroundBytes": 1298212,
+   "backgroundFile": "clips/theme_52.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "ff604e84d8813d32c11708c8268a30e14a757bc618f40195ad649ede3517afc3",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 3
+   },
+   "foregroundBytes": 16181,
+   "foregroundFile": "foreground/1757491588884.png",
+   "foregroundSha256": "f44479573743bd40a211fcb6db28739fe74837f291e48939ca2a99bade0aa79d",
+   "id": "1757491588891",
+   "layout": "layouts/480X480/1757491588891.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Temperature": 1,
+    "Time": 1
+   },
+   "thm": "thm/480X480/theme_1757491588891.thm",
+   "widgetKinds": {
+    "data": 2,
+    "text": 1
+   }
+  },
+  {
+   "backgroundBytes": 1254507,
+   "backgroundFile": "clips/theme_40.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "a35a903a8a18a40d5caf48577362653ac113a5ff570314c2368e9ce4c4081498",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 6
+   },
+   "foregroundBytes": 18572,
+   "foregroundFile": "foreground/1757491588938.png",
+   "foregroundSha256": "4340b1d05820e7c8c3cab2e96dfb470f265b58e495da0a5c33e53e48c03709fb",
+   "id": "1757491588945",
+   "layout": "layouts/480X480/1757491588945.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Temperature": 1,
+    "CPU Usage": 2,
+    "GPU Usage": 2
+   },
+   "thm": "thm/480X480/theme_1757491588945.thm",
+   "widgetKinds": {
+    "bar": 2,
+    "data": 3,
+    "text": 3
+   }
+  },
+  {
+   "backgroundBytes": 1372694,
+   "backgroundFile": "clips/theme_39.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "bf491558c189ba9854b746cfdbbc857404f36ec0855988177148565b12d91135",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 3
+   },
+   "foregroundBytes": 12141,
+   "foregroundFile": "foreground/1757491588997.png",
+   "foregroundSha256": "15cb8e359e64039d21da802fc6f02b34f8b30bfb1cbbca3272746d7faf021b69",
+   "id": "1757491589004",
+   "layout": "layouts/480X480/1757491589004.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Temperature": 1
+   },
+   "thm": "thm/480X480/theme_1757491589004.thm",
+   "widgetKinds": {
+    "data": 1,
+    "text": 2
+   }
+  },
+  {
+   "backgroundBytes": 2888770,
+   "backgroundFile": "clips/theme_37.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "7b10eb00d6c5764b7def0c77bf5252333dff24ddd2f3b6bf2046014337991564",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 5
+   },
+   "foregroundBytes": 17814,
+   "foregroundFile": "foreground/1757491589097.png",
+   "foregroundSha256": "1bca250b1a9fec8743c46e5a5910232324fa2fa062f7c63b4b67679d4da25259",
+   "id": "1757491589113",
+   "layout": "layouts/480X480/1757491589113.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Usage": 1,
+    "Pump Speed": 1,
+    "Time": 1
+   },
+   "thm": "thm/480X480/theme_1757491589113.thm",
+   "widgetKinds": {
+    "bar": 1,
+    "data": 2,
+    "text": 3
+   }
+  },
+  {
+   "backgroundBytes": 2577837,
+   "backgroundFile": "clips/Theme_27.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "15bec2e97e678f83f1db2adb254eb79ba203355d2958439d2069273689998331",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 3
+   },
+   "foregroundBytes": 11716,
+   "foregroundFile": "foreground/1757491589206.png",
+   "foregroundSha256": "118b227fd97de4abf4052c5eb78a0f2709f7457692bf55b847032ced845b0755",
+   "id": "1757491589217",
+   "layout": "layouts/480X480/1757491589217.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Temperature": 1
+   },
+   "thm": "thm/480X480/theme_1757491589217.thm",
+   "widgetKinds": {
+    "data": 1,
+    "text": 2
+   }
+  },
+  {
+   "backgroundBytes": 214917,
+   "backgroundFile": "clips/Theme_25.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "39de20f0db3ca543bade61cd569550223940d0b9dd735c6f247c7014a204c76d",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 5
+   },
+   "foregroundBytes": 15111,
+   "foregroundFile": "foreground/1757491589240.png",
+   "foregroundSha256": "04429e426b781f7c69093af411012c9132882cac35157826d4af9cab1cdebc0b",
+   "id": "1757491589247",
+   "layout": "layouts/480X480/1757491589247.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Temperature": 1,
+    "GPU Temperature": 1,
+    "Time": 1
+   },
+   "thm": "thm/480X480/theme_1757491589247.thm",
+   "widgetKinds": {
+    "data": 3,
+    "text": 2
+   }
+  },
+  {
+   "backgroundBytes": 1433387,
+   "backgroundFile": "clips/Theme_30.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "60397a1170ed60fd15226c120f568ccf970392ed08a03b712d735ac9e474d4f2",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 7
+   },
+   "foregroundBytes": 18841,
+   "foregroundFile": "foreground/1757491589317.png",
+   "foregroundSha256": "51ca69785682c2c0b9bb87e6843d640de5a616b1e8ca809c863b337ddba45621",
+   "id": "1757491589325",
+   "layout": "layouts/480X480/1757491589325.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Frequency": 1,
+    "CPU Temperature": 2,
+    "CPU Usage": 1
+   },
+   "thm": "thm/480X480/theme_1757491589325.thm",
+   "widgetKinds": {
+    "bar": 1,
+    "data": 3,
+    "text": 4
+   }
+  },
+  {
+   "backgroundBytes": 1811136,
+   "backgroundFile": "clips/theme_36.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "48be56e13533f8d2898e6839e8ab8604c673fda9499165c415343b20785c3e94",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 4
+   },
+   "foregroundBytes": 14297,
+   "foregroundFile": "foreground/1757491589392.png",
+   "foregroundSha256": "bf276b44721e2fe47424c9e609e74347017505546a32571013c9180701b06d9e",
+   "id": "1757491589401",
+   "layout": "layouts/480X480/1757491589401.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Usage": 1,
+    "Pump Speed": 1
+   },
+   "thm": "thm/480X480/theme_1757491589401.thm",
+   "widgetKinds": {
+    "data": 2,
+    "text": 2
+   }
+  },
+  {
+   "backgroundBytes": 2106948,
+   "backgroundFile": "clips/Theme_29.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "317221d7a46a91035d8ffcf3dff9d7f99c19bb5490758739cca6bc1e979362cf",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 3
+   },
+   "foregroundBytes": 13562,
+   "foregroundFile": "foreground/1757491589473.png",
+   "foregroundSha256": "ffbcd4643df23bf7b760afcc2c15df0e3abf357358a9f8d7bf80a9cc527312ec",
+   "id": "1757491589484",
+   "layout": "layouts/480X480/1757491589484.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "Pump Speed": 1,
+    "Time": 1
+   },
+   "thm": "thm/480X480/theme_1757491589484.thm",
+   "widgetKinds": {
+    "data": 2,
+    "text": 1
+   }
+  },
+  {
+   "backgroundBytes": 1566530,
+   "backgroundFile": "clips/theme_41.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "7803a3450aa4a49b8e4b9aafa46d5fd2f4905851744a53428bb92a058f7be56f",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 5
+   },
+   "foregroundBytes": 18213,
+   "foregroundFile": "foreground/1757491589547.png",
+   "foregroundSha256": "13a4385e4987ca42d2d568fedd7014b7b9437e1abf8b377cc31412c36d0c625e",
+   "id": "1757491589554",
+   "layout": "layouts/480X480/1757491589554.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Usage": 1,
+    "Pump Speed": 1,
+    "Time": 1
+   },
+   "thm": "thm/480X480/theme_1757491589554.thm",
+   "widgetKinds": {
+    "bar": 1,
+    "data": 2,
+    "text": 3
+   }
+  },
+  {
+   "backgroundBytes": 462649,
+   "backgroundFile": "clips/theme_45.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "338ba5a9744a0da369d2fea6489159f4595530677102b416457f17022f6fb164",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 3
+   },
+   "foregroundBytes": 12787,
+   "foregroundFile": "foreground/1757491589581.png",
+   "foregroundSha256": "ecf7f27888bc3b0fc46f3de90bc1343f4aaaaa10dbf50584e006cd3cfe89145d",
+   "id": "1757491589585",
+   "layout": "layouts/480X480/1757491589585.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "Pump Speed": 1,
+    "Time": 1
+   },
+   "thm": "thm/480X480/theme_1757491589585.thm",
+   "widgetKinds": {
+    "data": 2,
+    "text": 1
+   }
+  },
+  {
+   "backgroundBytes": 419763,
+   "backgroundFile": "clips/theme_46.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "b3d0380b86d239b4778f655a47834d41528ee06fa398130716d522d65c84bd90",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 5
+   },
+   "foregroundBytes": 14844,
+   "foregroundFile": "foreground/1757491589608.png",
+   "foregroundSha256": "6519c707246bdde694107aaa31341d2838a908d1af582a03bf8363be950a2135",
+   "id": "1757491589611",
+   "layout": "layouts/480X480/1757491589611.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Temperature": 1,
+    "GPU Temperature": 1,
+    "Time": 1
+   },
+   "thm": "thm/480X480/theme_1757491589611.thm",
+   "widgetKinds": {
+    "data": 3,
+    "line": 2,
+    "text": 2
+   }
+  },
+  {
+   "backgroundBytes": 1211106,
+   "backgroundFile": "clips/theme_47.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "b456eb145f750b3089004fdc00281867fee00eb0c56feaaa2724226fa4d4ad0c",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 3
+   },
+   "foregroundBytes": 12141,
+   "foregroundFile": "foreground/1757491589673.png",
+   "foregroundSha256": "15cb8e359e64039d21da802fc6f02b34f8b30bfb1cbbca3272746d7faf021b69",
+   "id": "1757491589687",
+   "layout": "layouts/480X480/1757491589687.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Temperature": 1
+   },
+   "thm": "thm/480X480/theme_1757491589687.thm",
+   "widgetKinds": {
+    "data": 1,
+    "text": 2
+   }
+  },
+  {
+   "backgroundBytes": 1333649,
+   "backgroundFile": "clips/theme_48.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "5f7f3cc6a4fae3337ac05fad8438cac27c60e40b1ba3d43f78dd51ca3eccc883",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 6
+   },
+   "foregroundBytes": 20393,
+   "foregroundFile": "foreground/1757491589745.png",
+   "foregroundSha256": "122677024045e551aeba065cf560d64da342a3134da0e71a7bca7fceb03a2ba9",
+   "id": "1757491589759",
+   "layout": "layouts/480X480/1757491589759.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Usage": 1,
+    "Pump Speed": 1,
+    "Time": 1
+   },
+   "thm": "thm/480X480/theme_1757491589759.thm",
+   "widgetKinds": {
+    "bar": 1,
+    "data": 2,
+    "text": 4
+   }
+  },
+  {
+   "backgroundBytes": 445318,
+   "backgroundFile": "clips/theme_49.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "0eb754b849707cf077fa7da052807976bae3a27520a58c5d8ef537dd7fe69db7",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 4
+   },
+   "foregroundBytes": 14832,
+   "foregroundFile": "foreground/1757491589800.png",
+   "foregroundSha256": "4adfc8248083f52e58a6ad98572b7cd74665ce08b28a3f6b5897e745b360332d",
+   "id": "1757491589804",
+   "layout": "layouts/480X480/1757491589804.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Usage": 1,
+    "Pump Speed": 1
+   },
+   "thm": "thm/480X480/theme_1757491589804.thm",
+   "widgetKinds": {
+    "data": 2,
+    "text": 2
+   }
+  },
+  {
+   "backgroundBytes": 1243040,
+   "backgroundFile": "clips/theme_50.mp4",
+   "backgroundKind": "MP4",
+   "backgroundSha256": "c8f628cdd613ab0df3ff1b85338cf53951a6aa2dbd4fb07603d97e67182dcc99",
+   "canvas": [
+    480,
+    480
+   ],
+   "fonts": {
+    "Arial": 6
+   },
+   "foregroundBytes": 18542,
+   "foregroundFile": "foreground/1757491589862.png",
+   "foregroundSha256": "004e9b4dc407e1b97a67ef927fdbfcab605d3eb2fca39f6fe72054ac16df86e8",
+   "id": "1757491589871",
+   "layout": "layouts/480X480/1757491589871.json",
+   "ratio": "480X480",
+   "ratioField": "1:1",
+   "screenStatus": "butt",
+   "sources": {
+    "CPU Temperature": 1,
+    "CPU Usage": 2,
+    "GPU Usage": 2
+   },
+   "thm": "thm/480X480/theme_1757491589871.thm",
+   "widgetKinds": {
+    "bar": 2,
+    "data": 3,
+    "text": 3
+   }
+  }
+ ]
+}

@@ -1,0 +1,332 @@
+{
+ "background": {
+  "mediaFile": "clips/theme_50.mp4",
+  "path": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757491589862.mp4",
+  "type": "MP4"
+ },
+ "height": 480,
+ "id": 1757491589871,
+ "osd": {
+  "mediaFile": "foreground/1757491589862.png",
+  "path": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757491589862.png",
+  "widget": [
+   {
+    "id": "76efbe1e-1f17-4f78-b46d-a5346082f119",
+    "layerIndex": 0,
+    "property": [
+     {
+      "bgColor": "rgba(196, 162, 255, 1)",
+      "canvasProperties": {
+       "height": 480,
+       "width": 480
+      },
+      "controlName": "",
+      "coordBoundary": {
+       "max": {
+        "x": 480,
+        "y": 480
+       },
+       "min": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "cornerRadius": 0,
+      "enableMove": false,
+      "endColor": "rgba(143, 78, 255, 1)",
+      "height": 10,
+      "italicAngle": 0,
+      "maxValue": 100,
+      "minValue": 0,
+      "rotate": 0,
+      "screenStatus": "butt",
+      "source": "CPU Usage",
+      "startColor": "rgba(192, 66, 255, 1)",
+      "time": 1725440142164,
+      "type": 3,
+      "valueChangeType": "none",
+      "width": 280,
+      "x": 100,
+      "y": 330
+     }
+    ],
+    "type": "bar",
+    "widgetContent": ""
+   },
+   {
+    "id": "68e30497-a28d-458e-8402-4b8c7cf6f55b",
+    "layerIndex": 0,
+    "property": [
+     {
+      "bgColor": "rgba(196, 162, 255, 1)",
+      "canvasProperties": {
+       "height": 480,
+       "width": 480
+      },
+      "controlName": "",
+      "coordBoundary": {
+       "max": {
+        "x": 480,
+        "y": 480
+       },
+       "min": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "cornerRadius": 0,
+      "enableMove": false,
+      "endColor": "rgba(143, 78, 255, 1)",
+      "height": 10,
+      "italicAngle": 0,
+      "maxValue": 100,
+      "minValue": 0,
+      "rotate": 0,
+      "screenStatus": "butt",
+      "source": "GPU Usage",
+      "startColor": "rgba(192, 66, 255, 1)",
+      "time": 1725440142164,
+      "type": 3,
+      "valueChangeType": "none",
+      "width": 280,
+      "x": 100,
+      "y": 400
+     }
+    ],
+    "type": "bar",
+    "widgetContent": ""
+   },
+   {
+    "id": "8d7f5704-a1d9-46e8-8044-62ad7974acea",
+    "layerIndex": 0,
+    "property": [
+     {
+      "bold": false,
+      "canvasProperties": {
+       "height": 480,
+       "width": 480
+      },
+      "content": "CPU USED",
+      "controlName": "",
+      "coordBoundary": {
+       "max": {
+        "x": 480,
+        "y": 480
+       },
+       "min": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "enableMove": false,
+      "fontFamily": "Arial",
+      "fontSize": 20,
+      "italic": false,
+      "screenStatus": "butt",
+      "textColor": "rgba(255, 255, 255, 1)",
+      "type": 0,
+      "underline": false,
+      "x": 100,
+      "y": 300
+     }
+    ],
+    "type": "text",
+    "widgetContent": ""
+   },
+   {
+    "id": "1b79d325-d142-486b-ade0-ca5cf8652eea",
+    "layerIndex": 0,
+    "property": [
+     {
+      "bold": true,
+      "canvasProperties": {
+       "height": 480,
+       "width": 480
+      },
+      "controlName": "",
+      "coordBoundary": {
+       "max": {
+        "x": 480,
+        "y": 480
+       },
+       "min": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "enableMove": false,
+      "fontFamily": "Arial",
+      "fontSize": 100,
+      "italic": false,
+      "screenStatus": "butt",
+      "source": "CPU Temperature",
+      "textColor": "rgba(255, 255, 255, 1)",
+      "time": 1725440142164,
+      "type": 1,
+      "underline": false,
+      "valueChangeType": "none",
+      "x": 106,
+      "y": 120
+     }
+    ],
+    "type": "data",
+    "widgetContent": ""
+   },
+   {
+    "id": "657edb81-eb26-46be-98fe-bfdb69d94622",
+    "layerIndex": 0,
+    "property": [
+     {
+      "bold": true,
+      "canvasProperties": {
+       "height": 480,
+       "width": 480
+      },
+      "content": "CPU TEMP",
+      "controlName": "",
+      "coordBoundary": {
+       "max": {
+        "x": 480,
+        "y": 480
+       },
+       "min": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "enableMove": false,
+      "fontFamily": "Arial",
+      "fontSize": 32,
+      "italic": false,
+      "screenStatus": "butt",
+      "textColor": "rgba(255, 255, 255, 1)",
+      "type": 0,
+      "underline": false,
+      "x": 110,
+      "y": 80
+     }
+    ],
+    "type": "text",
+    "widgetContent": ""
+   },
+   {
+    "id": "88cc9392-57f5-4290-a5fd-ce2f90836661",
+    "layerIndex": 0,
+    "property": [
+     {
+      "bold": false,
+      "canvasProperties": {
+       "height": 480,
+       "width": 480
+      },
+      "controlName": "",
+      "coordBoundary": {
+       "max": {
+        "x": 480,
+        "y": 480
+       },
+       "min": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "enableMove": false,
+      "fontFamily": "Arial",
+      "fontSize": 32,
+      "italic": false,
+      "screenStatus": "butt",
+      "source": "CPU Usage",
+      "textColor": "rgba(255, 255, 255, 1)",
+      "time": 1725440142164,
+      "type": 1,
+      "underline": false,
+      "valueChangeType": "none",
+      "x": 320,
+      "y": 290
+     }
+    ],
+    "type": "data",
+    "widgetContent": ""
+   },
+   {
+    "id": "ac717811-81b5-46f0-b5c0-afd6ad98aad0",
+    "layerIndex": 0,
+    "property": [
+     {
+      "bold": false,
+      "canvasProperties": {
+       "height": 480,
+       "width": 480
+      },
+      "content": "GPU USED",
+      "controlName": "",
+      "coordBoundary": {
+       "max": {
+        "x": 480,
+        "y": 480
+       },
+       "min": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "enableMove": false,
+      "fontFamily": "Arial",
+      "fontSize": 20,
+      "italic": false,
+      "screenStatus": "butt",
+      "textColor": "rgba(255, 255, 255, 1)",
+      "type": 0,
+      "underline": false,
+      "x": 100,
+      "y": 370
+     }
+    ],
+    "type": "text",
+    "widgetContent": ""
+   },
+   {
+    "id": "e3b4e75b-7980-4434-84cc-065cbe26ce28",
+    "layerIndex": 0,
+    "property": [
+     {
+      "bold": false,
+      "canvasProperties": {
+       "height": 480,
+       "width": 480
+      },
+      "controlName": "",
+      "coordBoundary": {
+       "max": {
+        "x": 480,
+        "y": 480
+       },
+       "min": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "enableMove": false,
+      "fontFamily": "Arial",
+      "fontSize": 32,
+      "italic": false,
+      "screenStatus": "butt",
+      "source": "GPU Usage",
+      "textColor": "rgba(255, 255, 255, 1)",
+      "time": 1725440142164,
+      "type": 1,
+      "underline": false,
+      "valueChangeType": "none",
+      "x": 322,
+      "y": 362
+     }
+    ],
+    "type": "data",
+    "widgetContent": ""
+   }
+  ]
+ },
+ "ratio": "1:1",
+ "screenStatus": "butt",
+ "width": 480
+}

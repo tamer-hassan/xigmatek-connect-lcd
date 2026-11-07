@@ -384,7 +384,13 @@ def theme_bars(m, clock=True, bg=OVERLAY):
 #
 # Which theme: Windows AppData/Roaming/alpha/store.json says
 # devicesInfo.<sn>.currentThemeId = 1785506775818, which is presetTheme[26],
-# and currentThemeBg = media/background/Theme_25.mp4.  Its eight widgets, as
+# and currentThemeBg = media/background/Theme_25.mp4.  Named exactly since
+# 2026-11-07: pairing the store's 27 presetTheme entries with the 27 .thm files
+# the installer ships (widget properties compared) is 27 of 27 one-to-one, and
+# entry 26 is the vendor's theme 1757491589871 - the store re-ids the library at
+# install time.  That theme ships with theme_50.mp4; the Theme_25.mp4 here is a
+# background the app changed on its own (changeThemeBgBySn).  The layout is
+# themes/alpha/layouts/480X480/1757491589871.json.  Its eight widgets, as
 # stored (480x480 canvas, all coordinates device pixels, every text colour
 # rgba(255,255,255,1)):
 #

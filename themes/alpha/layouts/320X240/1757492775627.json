@@ -1,0 +1,211 @@
+{
+ "background": {
+  "mediaFile": "clips/2024-05-31_15-00-10-394.png",
+  "path": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\background\\1757492775624.png",
+  "type": "PNG"
+ },
+ "height": 240,
+ "id": 1757492775627,
+ "osd": {
+  "mediaFile": "foreground/1757492775624.png",
+  "path": "C:\\Users\\Administrator\\AppData\\Roaming\\alpha\\media\\foreground\\1757492775624.png",
+  "widget": [
+   {
+    "id": "5ebade25-fb0a-4641-ab38-354fde08ebca",
+    "layerIndex": 0,
+    "property": [
+     {
+      "bold": false,
+      "canvasProperties": {
+       "height": 240,
+       "width": 320
+      },
+      "content": "上传速度",
+      "controlName": "",
+      "coordBoundary": {
+       "max": {
+        "x": 320,
+        "y": 240
+       },
+       "min": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "enableMove": false,
+      "fontFamily": "simsun",
+      "fontSize": 14,
+      "italic": false,
+      "screenStatus": "butt",
+      "textColor": "rgba(235, 233, 213, 1)",
+      "type": 0,
+      "underline": false,
+      "x": 220,
+      "y": 60
+     }
+    ],
+    "type": "text",
+    "widgetContent": ""
+   },
+   {
+    "id": "e56bb800-ea3b-4242-8346-54f9b7a37cdd",
+    "layerIndex": 0,
+    "property": [
+     {
+      "bold": false,
+      "canvasProperties": {
+       "height": 240,
+       "width": 320
+      },
+      "controlName": "",
+      "coordBoundary": {
+       "max": {
+        "x": 320,
+        "y": 240
+       },
+       "min": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "enableMove": false,
+      "fontFamily": "simsun",
+      "fontSize": 14,
+      "italic": false,
+      "screenStatus": "butt",
+      "source": "Upload Speed",
+      "textColor": "rgba(235, 233, 213, 1)",
+      "time": 1717139788860,
+      "type": 1,
+      "underline": false,
+      "valueChangeType": "none",
+      "x": 240,
+      "y": 90
+     }
+    ],
+    "type": "data",
+    "widgetContent": ""
+   },
+   {
+    "id": "a2c53052-f18e-4fae-a4b5-8c53e5dbdd4f",
+    "layerIndex": 0,
+    "property": [
+     {
+      "bold": false,
+      "canvasProperties": {
+       "height": 240,
+       "width": 320
+      },
+      "controlName": "",
+      "coordBoundary": {
+       "max": {
+        "x": 320,
+        "y": 240
+       },
+       "min": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "enableMove": false,
+      "fontFamily": "simsun",
+      "fontSize": 14,
+      "italic": false,
+      "screenStatus": "butt",
+      "source": "Date",
+      "textColor": "rgba(235, 233, 213, 1)",
+      "time": 1717139788860,
+      "type": 1,
+      "underline": false,
+      "valueChangeType": "none",
+      "x": 42,
+      "y": 22
+     }
+    ],
+    "type": "data",
+    "widgetContent": ""
+   },
+   {
+    "id": "84c910da-b6ce-429e-95bc-b76cbc60ab03",
+    "layerIndex": 0,
+    "property": [
+     {
+      "bold": false,
+      "canvasProperties": {
+       "height": 240,
+       "width": 320
+      },
+      "controlName": "",
+      "coordBoundary": {
+       "max": {
+        "x": 320,
+        "y": 240
+       },
+       "min": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "enableMove": false,
+      "fontFamily": "simsun",
+      "fontSize": 14,
+      "italic": false,
+      "screenStatus": "butt",
+      "source": "Time",
+      "textColor": "rgba(235, 233, 213, 1)",
+      "time": 1717139788860,
+      "type": 1,
+      "underline": false,
+      "valueChangeType": "none",
+      "x": 20,
+      "y": 54
+     }
+    ],
+    "type": "data",
+    "widgetContent": ""
+   },
+   {
+    "id": "c4b85e67-20de-48ce-b155-41ccd6642d25",
+    "layerIndex": 0,
+    "property": [
+     {
+      "bold": false,
+      "canvasProperties": {
+       "height": 240,
+       "width": 320
+      },
+      "controlName": "",
+      "coordBoundary": {
+       "max": {
+        "x": 320,
+        "y": 240
+       },
+       "min": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "enableMove": false,
+      "fontFamily": "simsun",
+      "fontSize": 12,
+      "italic": false,
+      "screenStatus": "butt",
+      "source": "Week",
+      "textColor": "rgba(235, 233, 213, 1)",
+      "time": 1717139788860,
+      "type": 1,
+      "underline": false,
+      "valueChangeType": "none",
+      "x": 102,
+      "y": 56
+     }
+    ],
+    "type": "data",
+    "widgetContent": ""
+   }
+  ]
+ },
+ "ratio": "4:3",
+ "screenStatus": "butt",
+ "width": 320
+}

@@ -32,7 +32,12 @@ currently has selected on this panel (`store.json` → `currentThemeId 178550677
 theme has no widget for added: **GPU temperature** in its own column next to the CPU
 one, a **gauge arc around each temperature** (30-100 °C, the fill's position *and* its
 colour carrying the value - green at 30 °C, amber at 62, red at 100), the **system clock
-with seconds** along the bottom, and **one fan figure under each temperature**.  The two
+with seconds** along the bottom, and **one fan figure under each temperature**.  That
+selected theme is now identified exactly rather than inferred: the app's 27 `presetTheme`
+entries pair one-to-one with the 27 theme files the installer ships, and entry 26 is the
+vendor's `1757491589871`.  The whole library - layouts, clips, baked overlays, decrypted
+with the app's own constants - is in `themes/alpha/`, and that directory's `README.md`
+writes up the container, the cipher and the layout schema.  The two
 temperature columns are deliberately alike - same label size and weight, one shared size
 for both numbers, chosen from whichever reading is wider, so neither can end up bigger
 than the other.  Each reading sits inside its ring's hole: at 97 px outer radius the two
@@ -304,7 +309,7 @@ touches `recovery` is `reset_panel.py`, which you invoke by hand.
 | If the question is | run | what it answers |
 |---|---|---|
 | is the panel healthy after a boot or a reset? | `tools/state.py`, then `tools/bootcheck.py` | the `conn` snapshot, read-only; then two small and two full uploads. `logo`/`mode` at `2147483647` means it is not healthy |
-| did my edit break the wire format? | `tools/selftest.sh`, then `tools/verify_protocol.py COM3_windows_dumps/*.txt` | fourteen offline sections with no hardware, then every captured Windows frame re-encoded and diffed: **130 frames, 0 mismatches** |
+| did my edit break the wire format? | `tools/selftest.sh`, then `tools/verify_protocol.py COM3_windows_dumps/*.txt` | fifteen offline sections with no hardware, then every captured Windows frame re-encoded and diffed: **130 frames, 0 mismatches** |
 | does this firmware know that topic at all? | `tools/fuzz.py`, `tools/probe.py` | no answer = no topic, `400` = topic exists and the body was wrong, `200` = the JSON parsed — which is not the same as the write landing |
 | will the panel take *my* file? | `tools/send_image.py FILE`; `tools/fileshape.py` if the file's shape is the question | one upload, judged by the panel's own file notice; the second rotates RGBA, indexed, flat and the vendor's own `.osd` files through one session |
 | how fast does the glass tick, and why does the clock only move every 20-40 s? | `tools/frame_lag.py`, `tools/indexprobe.py`, `tools/watchtest.py` | a big frame number and the wall clock painted on the glass, so the answer is a glance rather than a stopwatch. Needs eyes on the unit |
@@ -317,6 +322,7 @@ touches `recovery` is `reset_panel.py`, which you invoke by hand.
 | what did the vendor app itself actually send? | `tools/log_timeline.py LOG`, `tools/capdump.py`, `tools/vendor_capture.py` | ALPHA's 6-17 MB logs folded into a request sequence, the Windows IRP captures parsed without a Windows box, and the `.osd` payloads taken back out of them |
 | the panel is white from the first second | `tools/reset_panel.py --yes` | the vendor's `recovery`, byte-identical to the frame in its own log; the only repair for fields stuck at `2147483647` |
 | what would a frame look like, with no panel in the loop? | `python3 -m xigmalcd --dry-run DIR`, `tools/previews.py` | PNGs on disk from the same render path; previews composite over the shipped clip the way the panel composites |
+| what are ALPHA's theme files, and what do its themes actually contain? | `tools/thm_unlock.py`, `tools/theme_previews.py` | the `.thm` container opened with the app's own constants: 27 layouts, 44 clips, 27 baked overlays in `themes/alpha/`, every byte hashed; and a sheet showing each theme over its own clip |
 
 * `tools/probe.py` — the body-key question: does the panel validate bodies, and
   which key names does it know?  Walks eight display topics (`logo`,
@@ -346,7 +352,10 @@ touches `recovery` is `reset_panel.py`, which you invoke by hand.
   theme, encode/decode round-trips including the panel's malformed-reply case, the encoder
   switches read out of the PNG each dry run writes, what the indexed file gives up next to
   RGBA, the pinned-metrics promise (a pinned frame draws the far end of the ramp and sends no
-  metrics blob at all), `pyproject.toml` read as an installed person would meet it, the
+  metrics blob at all), the vendor theme library re-hashed against its own manifest (all 152
+  files, the dedup rule, the root-vendored clips, the contact sheets, and the
+  `store.json`/`.thm` pairing when the Windows volume is mounted),
+  `pyproject.toml` read as an installed person would meet it, the
   window's saved-state round-trip, the `.desktop` entry and its icon, the GUI built
   offscreen against a port that does not exist (clip sizes and lumas, five themes
   previewed, the scrim rule, the reset gate, the four panel actions against a stubbed
@@ -485,6 +494,21 @@ touches `recovery` is `reset_panel.py`, which you invoke by hand.
 * `tools/asar_extract.py ASAR` — read an Electron `.asar` without node: list, unpack,
   `--cat` one file, or `--find TEXT` to grep file *contents*, which is how the string
   constants in the app's compiled main process (`out/main/index.jsc`) get mined.
+* `tools/thm_unlock.py` — read ALPHA's `.thm` theme files.  The container is a ZIP with
+  one hex-text entry, and the cipher's own literals are in that bytecode constant pool
+  (`aes-256-cbc`, `Byyeetek2368`, `427979656574656b`, `sha256`), so `key =
+  sha256("Byyeetek2368")` and `iv = "ByyeetekByyeetek"` open all 27 without guessing.
+  Writes `themes/alpha/`: layouts as readable JSON (base64 media replaced by `mediaFile`
+  references), the clips and baked overlay PNGs, and a `manifest.json` hashing every
+  byte.  `--write` is idempotent — a re-run reports `kept`, 126 of them, 0 rewrites — and
+  `--verify --to themes/alpha` re-checks the tree against that manifest with no Windows
+  volume mounted (**152/152 hashes match**).  Reads files, writes files, never the panel.
+* `tools/theme_previews.py` — composite every copied theme onto a contact sheet: one
+  frame lifted from the theme's own clip with ffmpeg, the theme's own baked overlay PNG
+  composited over it, so the sheet is a picture of the vendor's theme and not of our
+  drawing.  Prints what ffprobe says about each clip (fps, frames, duration) as it goes,
+  and treats a `PNG` background as the still it is.  Output:
+  `docs/previews/alpha-themes-480X480.png` (23 themes) and `-320X240.png` (4).
 * `tools/colourtest.py` — the same measurement with nothing to decode: flat solid-colour
   frames, 1 584 bytes each, ending on bright magenta. Counting colour changes gives the
   panel's tick, and landing on magenta proves it shows the *newest* frame rather than
@@ -1338,9 +1362,16 @@ metrics schema; `xigmalcd/render.py` is the drawing; `xigmalcd/main.py` is the l
   `currentThemeId 1785506775818` is entry 26 of that file's `presetTheme` list (eight
   widgets: big CPU temperature, CPU and GPU usage with bars, and no GPU-temperature, clock or
   fan widget), and every coordinate and colour in `theme_alpha` is taken from the `property`
-  records in that entry. The background default follows the same rule - reproduce what the
-  vendor app has, rather than a better-looking picture chosen here: `currentThemeBg` names
-  `Theme_25.mp4` for that theme, and it is vendored byte-identical under `media/`. Decoding
+  records in that entry. As of 2026-11-07 that entry can be named exactly: pairing the store's
+  27 `presetTheme` entries with the vendor's 27 shipped `.thm` files by exact widget properties
+  gives **27 of 27 one-to-one**, and entry 26 is theme `1757491589871`
+  (`themes/alpha/layouts/480X480/1757491589871.json`) - the store re-ids the library at install
+  time, which is why the ids looked unrelated. The background default follows the same rule -
+  reproduce what the vendor app has, rather than a better-looking picture chosen here:
+  `currentThemeBg` names `Theme_25.mp4` for that theme, and it is vendored byte-identical under
+  `media/`. (That pairing is the app's own doing, not a mistake here: theme `1757491589871`
+  ships with `theme_50.mp4`, and the app has `changeThemeBgBySn` for replacing a theme's
+  background on its own.) Decoding
   all 40 clips in the vendor's `Program Files/ALPHA/resources/static/media` and measuring
   brightness, black frames and the loop join did show this clip is not the technically best
   choice - `Theme_11.mp4` (3.40 MB, 15.1 s, luma 13.3-24.1, 0 black frames, seam 0.11 vs
@@ -1352,14 +1383,19 @@ metrics schema; `xigmalcd/render.py` is the drawing; `xigmalcd/main.py` is the l
   fixed. The renderer bundles in `Program Files/ALPHA/resources/app.asar` are plain
   JavaScript, so that vocabulary and the widget types (`text-node`, `number-text-node`,
   `doughnut-node`, `process-bar-node`, `chart-node`) are readable without decompiling
-  anything; only `out/main/index.jsc` needs the V8 route in PROTOCOL.md §10. Re-derive it
+  anything; only `out/main/index.jsc` needs the V8 route in PROTOCOL.md §10. And since
+  2026-11-07 the themes themselves are readable too, keys and all - the whole library is in
+  `themes/alpha/`, see that directory's README. Re-derive it
   any time with `python3 tools/theme.py` and `python3 tools/vendor_log.py`.
 * **Version control: local, started 2026-11-06.** `git init` in this directory and
   one baseline commit, whose message lists what is and is not established at it.
   Nothing is upstream, nothing is pushed, and there is no remote. Tracked: the two
   Eltima **.txt** captures (37 MB - `tools/verify_protocol.py` and
   `tools/vendor_capture.py` read them, so a clone can re-derive the protocol
-  rather than trust these notes), the three vendored clips in `media/`, all
+  rather than trust these notes), the three vendored clips in `media/`, the vendor's
+  theme library in `themes/alpha/` (145 MB: 27 `.thm` originals as shipped, 27 decrypted
+  layouts, 44 clips, 27 baked overlay PNGs, and a `manifest.json` hashing all 152 of
+  them), the theme contact sheets in `docs/previews/`, all
   twenty `data/glass/` logs, and the three pinned-number fixtures in
   `tools/metrics/`. Not tracked, and said so in `.gitignore`: the
   `.spm` binaries of the same two sessions, which only the Windows monitoring

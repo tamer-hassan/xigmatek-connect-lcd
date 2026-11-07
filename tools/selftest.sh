@@ -361,6 +361,74 @@ for path, size, md5 in ((DEFAULT_MP4, 214_917, "b818b7d3294b3625e9f143e920ccc9b0
 PY
 
 echo
+echo "== the vendor theme library: every copied byte against its own manifest"
+# Read-only, no hardware, and no Windows volume: manifest.json recorded the sha256 of
+# every file as it was read out of ALPHA, and each theme's `background` entry carries the
+# hash of the bytes that were *embedded in the .thm*.  So re-hashing the clip that entry
+# points at re-proves, offline, that the vendor's loose clip and the theme's own payload
+# are the same file -- which is the claim themes/alpha/README.md rests on.
+python3 tools/thm_unlock.py --verify --to themes/alpha | sed 's/^/  /' || {
+    echo "theme library does not match its manifest"; exit 1; }
+python3 - <<'PY' || { echo "theme copy FAILED"; exit 1; }
+import hashlib, json, os, sys
+from PIL import Image
+man = json.load(open("themes/alpha/manifest.json"))
+# what themes/alpha/README.md's size table claims, re-counted here
+counts = {"thm": (27, 66_300_082), "layout": (27, 127_115),
+          "clip": (44, 84_392_330), "foreground": (27, 407_095)}
+for kind, (files, byte_total) in counts.items():
+    rows = [e for e in man["files"] if e["kind"] == kind]
+    assert len(rows) == files, (kind, len(rows), files)
+    assert sum(e["bytes"] for e in rows) == byte_total, (kind,)
+    print(f"  {kind:<10} {files:>3} files {byte_total:>10} B as documented")
+# the dedup the README states: every theme background lives in clips/, none duplicated
+themes = man["themes"]
+assert len(themes) == 27, len(themes)
+assert all(t["backgroundFile"].startswith("clips/") for t in themes)
+assert not os.path.exists("themes/alpha/background"), "a background/ dir should not exist"
+print(f"  27 themes, all 27 background payloads held by clips/, no background/ dir")
+# the three clips vendored at the repo root are the vendor's, twice over
+for f in ("Theme_11.mp4", "Theme_25.mp4", "theme_48.mp4"):
+    a = hashlib.sha256(open(f"media/{f}", "rb").read()).hexdigest()
+    b = hashlib.sha256(open(f"themes/alpha/clips/{f}", "rb").read()).hexdigest()
+    assert a == b, (f, a[:12], b[:12])
+    print(f"  media/{f} == themes/alpha/clips/{f}  {a[:16]}")
+# the contact sheets the README links, at the size the README says they are
+for name, px in (("alpha-themes-480X480.png", (960, 1548)),
+                 ("alpha-themes-320X240.png", (960, 258))):
+    p = os.path.join("docs", "previews", name)
+    im = Image.open(p)
+    assert im.size == px, (name, im.size, px)
+    print(f"  docs/previews/{name}  {im.size[0]}x{im.size[1]}  "
+          f"{os.path.getsize(p)} B")
+# the identity claim: store.json's 27 presetTheme entries are these 27 layouts.  The
+# store itself stays on the Windows volume; if it is not mounted, say so rather than
+# pretending the check passed.
+win = "/media/windows-c/Users/Tamer/AppData/Roaming/alpha/store.json"
+if not os.path.exists(win):
+    print("  store.json pairing SKIPPED: the Windows volume is not mounted")
+else:
+    def sig(o):
+        return json.dumps(sorted((w["type"], json.dumps(w["property"], sort_keys=True))
+                                 for w in o["osd"]["widget"]), sort_keys=True)
+    lay = {t["id"]: json.load(open(os.path.join("themes/alpha", t["layout"])))
+           for t in themes}
+    pres = json.load(open(win))["presetTheme"]
+    assert len(pres) == 27, len(pres)
+    pair, unpaired = 0, []
+    for p in pres:
+        hits = [i for i, d in lay.items()
+                if sig(d) == sig(p) and [d["width"], d["height"]] == [p["width"], p["height"]]]
+        if len(hits) == 1:
+            pair += 1
+        else:
+            unpaired.append((p["id"], hits))
+    assert not unpaired, unpaired
+    print(f"  store.json: all {pair}/27 presetTheme entries pair one-to-one with a "
+          f"shipped .thm layout, widget properties identical")
+PY
+
+echo
 echo "== decoder round-trip: encode -> decode -> re-encode"
 python3 - <<'PY' || { echo "decoder round-trip FAILED"; exit 1; }
 from xigmalcd import protocol as p

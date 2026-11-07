@@ -948,11 +948,50 @@ V1.0.2). Its `resources/app.asar` → `out/main/index.jsc` is **byte-identical**
 from the installed app (same md5), so the newer build adds nothing to the protocol — the
 topic registry above is current. What that package adds is *content*:
 
-* `resources/static/media/*.mp4` — panel-bound video, 480×480 H.264 `yuv420p` 20 fps (§6);
-* `resources/static/theme/<model>/480X480/*.thm` (23 files plus `default.thm`) — a `.thm`
-  is a ZIP holding one `<epoch-ms>.json`, and that JSON is a single long hex string: the
-  theme definitions are encrypted, so the layouts are not readable without the app's key
-  (and are not needed for the protocol);
+* `resources/static/media/*.mp4` — the panel-bound video, all H.264 `yuv420p`: 40 files
+  at 480×480, 3 at 320×240 (the other panel), plus one 960×720 RGBA PNG that a 320×240
+  theme uses as a still background.  Rates, measured with ffprobe on 2026-11-07:
+  **20 fps or 24 fps, never 30** — every `Theme_NN` clip is 24 fps except
+  `Theme_35.mp4` (20 fps), and every `theme_NN` clip is 20 fps except `theme_38.mp4` and
+  `theme_51.mp4`, which are 24 fps because they are byte-twins of `Theme_27.mp4` and
+  `Theme_29.mp4` under other names.  23 to 817 frames, 0.96 s to 34.0 s per loop; the 27
+  clips the shipped themes actually use run 23 to 480 frames (0.96 s to 23.35 s).  So
+  "the vendor's clips are 20 fps" is half right, and the panel takes both rates (§6,
+  where `Theme_11.mp4` is a 24 fps file);
+* `resources/static/theme/<model>/480X480/*.thm` (23 files plus `default.thm`) and
+  `.../320X240/*.thm` (4) — a `.thm` is a ZIP holding exactly one entry,
+  `<themeId>.json`, and that entry is one long **hex string**.  Those are the theme
+  definitions, and **they are readable: the key is in the app.**  Corrected on
+  2026-11-07, and the whole library is now in this repo under `themes/alpha/`
+  (that directory's `README.md` is the detailed write-up, `tools/thm_unlock.py` is the
+  tool).  The cipher's own literals sit in `out/main/index.jsc`'s V8 constant pool,
+  readable with `strings`:
+
+  ```
+  aes-256-cbc   createCipheriv   createDecipheriv   createHash   sha256   digest
+  Byyeetek2368   427979656574656b
+  "Invalid theme zip file: should contain exactly one JSON file"
+  ```
+
+  so a `.thm` decrypts as AES-256-CBC, PKCS#7, `key = sha256("Byyeetek2368")`,
+  `iv = "ByyeetekByyeetek"` (that 8-byte constant twice — recovered, not guessed, by
+  ECB-decrypting block 0 and XORing against the known `{"id":<digits>` prefix the ZIP
+  entry's own name implies; identical on four files, then verified on all 27).  Each
+  theme is self-contained: `background.pathData` and `osd.pathData` are base64 for its
+  clip and its baked 480×480 overlay PNG, and **all 27 embedded backgrounds are
+  byte-identical to one of the 44 loose clips** in the same `static/` tree, while all 27
+  overlay PNGs are byte-identical to PNGs the running app keeps in
+  `%APPDATA%\alpha\media\foreground`.
+
+  That does not change what goes on the wire.  The layouts are still never uploaded
+  (the paragraph above: only `.osd` and `.mp4` ever appear in the app's logs), so the
+  panel is still not drawing gauges and clocks itself — but a Linux driver no longer has
+  to reverse-engineer the vendor's designs from screenshots.  Read off the 27 layouts:
+  152 widgets (`data` 66, `text` 66, `bar` 15, `line` 4, `arc` 1), all coordinates and
+  font sizes in device pixels, colours as `rgba(...)`, metric sources as literal English
+  strings (`CPU Temperature` 22, `CPU Usage` 16, `Time` 13, `Pump Speed` 9, …), and the
+  formats and anchor conventions that the layouts do *not* state were measured off the
+  vendor's own baked PNGs — see `themes/alpha/README.md`.
 * `adb` DLLs, `ffmpeg.exe` and OpenCV. ADB is a hint that a `"OS":"Linux"` panel may have
   a second, non-serial path — unexplored, and the panel presents no ADB interface over the
   USB we see today.
@@ -1102,7 +1141,10 @@ topic registry above is current. What that package adds is *content*:
   `transported`, `recovery`, `STATE all`). So the panel is not being handed the theme's
   `osd.widget[]` definitions by some route we have missed: ALPHA renders the widgets
   itself into the transparent PNG, and the perfect 1 Hz clock and gauge seen on Windows
-  were that PNG stream. The `.thm` theme files in the installer are encrypted (§10), and
+  were that PNG stream. The `.thm` theme files in the installer are encrypted, but not
+  unreadable — §10 has the container, the key and what the 27 layouts contain, and the
+  library itself is copied into this repo at `themes/alpha/`; that is the reference a
+  Linux driver has to draw from, since the panel is never handed those definitions.
   `realtimeDisplay`/`sysinfoDisplay` in the app's code belong to product paths this unit
   does not implement — which is why they answer `400` here.
 * `GET`/`PUT`/`SET`/`DELETE` topics: registered verbs, never used in the captures.
