@@ -55,6 +55,7 @@ class Clip:
     origin: str                  # "vendored", "vendor library" or "app upload"
     bytes: int = 0
     seconds: float = 0.0
+    px: tuple = (0, 0)             # width, height; (0, 0) until probed
     luma: float = -1.0           # mean of 0-255, -1 until measured
     note: str = ""
     thumbs: dict = field(default_factory=dict, repr=False)
@@ -76,14 +77,29 @@ class Clip:
             else f"{self.bytes / 1024 / 1024:.1f} MiB"
 
 
-def _ffprobe_duration(path: str) -> float:
+def _ffprobe_look(path: str) -> tuple[float, int, int]:
+    """One ffprobe, three numbers: seconds, and the frame's width and height.
+
+    The geometry is not decoration.  Of the 43 clips the themes package installs,
+    40 are 480x480 - the panel's own size - and **3 are 320x240** (measured on the
+    installed tree with the same call, the odd ones being the timestamp-named
+    `2024-05-30_*` and `2024-05-31_*` files the vendor app's own history holds);
+    all three clips this repository vendors are 480x480.  What the panel does with
+    a file that is not its size is not measured and cannot be - there is no
+    readback (§11) - so the picker shows the number and leaves the inference to
+    you rather than making one.
+    """
     try:
-        out = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
-                              "format=duration", "-of", "default=nk=1:nw=1",
-                              path], capture_output=True, text=True, check=True)
-        return float(out.stdout.strip())
-    except (OSError, ValueError, subprocess.CalledProcessError):
-        return 0.0
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=width,height", "-show_entries",
+             "format=duration", "-of", "default=nw=1:nk=1", path],
+            capture_output=True, text=True, check=True)
+        numbers = [ln.strip() for ln in out.stdout.splitlines() if ln.strip()]
+        w, h = (int(numbers[0]), int(numbers[1])) if len(numbers) >= 3 else (0, 0)
+        return float(numbers[-1]), w, h
+    except (OSError, ValueError, IndexError, subprocess.CalledProcessError):
+        return 0.0, 0, 0
 
 
 def frame(path: str, at: float = 0.5) -> Image.Image | None:
@@ -101,7 +117,7 @@ def frame(path: str, at: float = 0.5) -> Image.Image | None:
     hit = _FRAME_CACHE.get(key)
     if hit is not None:
         return hit.copy()
-    dur = _ffprobe_duration(path)
+    dur, _wide, _tall = _ffprobe_look(path)   # the size is for the picker
     seek = dur * at if dur > 0.2 else 0.0
     try:
         out = subprocess.run(
@@ -204,9 +220,10 @@ def list_clips(extra: str = "") -> list[Clip]:
 
 
 def probe(clip: Clip) -> float:
-    """Measure one clip's loop length. Cheap enough to do a row at a time."""
-    if not clip.seconds:
-        clip.seconds = _ffprobe_duration(clip.path)
+    """Measure one clip's loop length and frame size. One row at a time."""
+    if not clip.seconds or not clip.px[0]:
+        clip.seconds, w, h = _ffprobe_look(clip.path)
+        clip.px = (w, h)
     return clip.seconds
 
 

@@ -686,6 +686,7 @@ class Window(QMainWindow):
     def _row(self, c: clipdb.Clip) -> str:
         """One picker row. The loop length appears once it has been probed."""
         return (f"{c.name}   {c.size}   "
+                f"{f'{c.px[0]}x{c.px[1]}' if c.px[0] else 'size ?'}   "
                 f"{f'{c.seconds:.1f} s' if c.seconds else 'loop  ?'}   {c.origin}")
 
     def _populate_clips(self) -> None:
@@ -796,7 +797,20 @@ class Window(QMainWindow):
                        else "mean luma, measured just now from a decoded frame")
                 need = ("needs a scrim plate for white glyphs" if lum > BRIGHT_LUMA
                         else "white glyphs stay readable over it")
+                size_note = ""
+                if c.px[0] and c.px != (render.W, render.H):
+                    # measured here with ffprobe, and the honest half of it stays
+                    # unmeasured: 40 of the 43 clips the themes package installs are
+                    # 480x480 and 3 are 320x240, and what the panel does with a file
+                    # that is not its own size is something no log can show, because
+                    # there is no readback (§11).  So the number is shown and the
+                    # inference is left to the reader, with the preview labelled a guess
+                    size_note = (f"\nthis file is {c.px[0]}x{c.px[1]}, not the "
+                                 f"panel's {render.W}x{render.H}: what it does with "
+                                 f"that is not measured, so the preview above is a "
+                                 f"guess")
                 return (f"\n{how}: {lum:.1f}/255 - {need}"
+                        f"{size_note}"
                         f"\nsending it overwrites what the panel stores, and "
                         f"only a reset clears that again.")
         return ""

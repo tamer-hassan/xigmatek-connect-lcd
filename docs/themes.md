@@ -23,7 +23,10 @@ What the library **is** good for here, both of them used: its 27 layouts are the
 measured geometry the `alpha` preset was redrawn from (`xigmalcd/layout.py`, and the
 paragraph below about rings and text sizes), and its media is uploadable -
 43 clips and 28 images per install, all 43 clips under the socket gate's 8 MB ceiling
-(largest `clips/Theme_22.mp4`, 7 662 077 B). Two of those uploads have been measured on
+(largest `clips/Theme_22.mp4`, 7 662 077 B) - and note what ffprobe says about them: 40
+of the 43 are 480×480 like the panel, **3 are 320×240**, so the vendor's own library
+ships backgrounds the glass is not the size of and nothing here has measured what the
+panel does with one (docs/limits.md). Two uploads from that library have been measured on
 the packaged unit's own path: `themes/alpha/clips/theme_47.mp4` at 1 211 106 B,
 `notice 200 in 1.0 s`, and `themes/alpha/foreground/1757492775624.png` at 3 409 B,
 `notice 200 in 0.3 s`. Whether the panel *displays* a still PNG is the one half of that

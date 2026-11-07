@@ -1408,6 +1408,34 @@ finally:
     win.daemon.present = False
     win._refresh_clip_state()
 
+# every row carries the file's measured frame size, because the vendor's own
+# library is not all the panel's size: measured on the installed tree, 40 of its 43
+# clips are 480x480 and 3 are 320x240, and this checkout's three are 480x480.  The
+# row says so, and a clip that is not the panel's size is called out as a guess
+# rather than drawn as if the preview were the glass.
+for c in win.all_clips[:6]:
+    clipdb.probe(c)
+sized = [c for c in win.all_clips if c.px[0]]
+assert sized, "no clip reported a frame size"
+byname2 = {c.name: c for c in win.all_clips}
+assert byname2["Theme_25.mp4"].px == (render.W, render.H), byname2["Theme_25.mp4"].px
+row = win.clips.item(next(i for i, c in enumerate(win.all_clips)
+                          if c is byname2["Theme_25.mp4"])).text()
+assert f"{render.W}x{render.H}" in row, row
+import copy
+odd = copy.copy(byname2["Theme_25.mp4"])
+odd.px = (320, 240)
+detail = win._clip_detail(odd.path)
+win._load_background(odd.path)
+odd_detail = ""
+for c in win.all_clips:
+    if c.path == odd.path:
+        c.px = (320, 240)
+        odd_detail = win._clip_detail(c.path)
+assert "320x240" in odd_detail and "not measured" in odd_detail, odd_detail
+print(f"  clip rows carry size   {len(sized)}/{len(win.all_clips)} probed, "
+      f"480x480 stated on the row, an odd size called a guess")
+
 # the picker's filter: 69 rows on a bare box, 115 with the Windows partition
 # mounted, and no way to find one short of a scroll wheel
 win.clip_filter.setText("theme_48")

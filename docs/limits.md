@@ -161,6 +161,17 @@ What has been measured on glass, by whom, with how many frames - and what has no
   like is the part no log here can supply, because the panel has no readback (§11) and
   nobody at the desk was asked. So `xigmaui` offers MP4 rows only, and the package's 28
   images stay out of the picker until that observation has been made.
+* **Three of the vendor's own backgrounds are not the panel's size, and what the panel
+  does with them is unmeasured.** ffprobe over the installed library:
+  `/usr/share/xigmalcd/themes/alpha/clips/` holds 43 clips, **40 at 480×480** and **3 at
+  320×240** (`2024-05-30_13-43-24-476.mp4`, `2024-05-30_14-09-30-913.mp4`,
+  `2024-05-31_15-01-03-396.mp4`); the three clips this repository vendors are all
+  480×480. So the vendor's own app ships files that are not the glass's resolution -
+  which means the panel, or that app, scales them somewhere - but there is no readback
+  (§11) and nobody has looked at the glass with one of those three stored, so this
+  project states the numbers instead of the effect: `xigmaui` puts the measured size on
+  every clip row and, for a file that is not 480×480, says under the list that its
+  preview is a guess.
 * **The themes package is media and reference material, not a theme list.**
   `xigmatek-connect-lcd-themes` installs the vendor's own 125 files - 27 `.thm` themes,
   27 layouts, 27 background and 27 foreground images, 43 clips, under
