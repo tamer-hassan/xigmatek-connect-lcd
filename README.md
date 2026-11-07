@@ -35,15 +35,15 @@ and the file says so.
 
 | `alpha` (default) over `Theme_25.mp4` | `gauge` over `3.mp4` |
 |---|---|
-| `PREVIEW ME: upload docs/videos/alpha-Theme_25.mp4 here, then delete this marker` | `PREVIEW ME: upload docs/videos/gauge-3.mp4 here, then delete this marker` |
+| https://github.com/user-attachments/assets/79094fe1-e2e9-4ce0-9f81-3f3f3ee123e0 | https://github.com/user-attachments/assets/da2cbb5a-cb17-4121-b4c4-f1f53c9cc3ce |
 
-| `dual` over `Theme_30.mp4` | `clock` over `Theme_07.mp4` |
+| `dual` over `Theme_30.mp4` | `bars` over `theme_52.mp4` |
 |---|---|
-| `PREVIEW ME: upload docs/videos/dual-Theme_30.mp4 here, then delete this marker` | `PREVIEW ME: upload docs/videos/clock-Theme_07.mp4 here, then delete this marker` |
+| https://github.com/user-attachments/assets/598e1e53-1775-407b-bd25-576b55082bd6 | https://github.com/user-attachments/assets/57e582b7-73c5-42b1-9437-9ede6cf18f18 |
 
-| `bars` over `theme_52.mp4` | |
+| `clock` over `Theme_07.mp4` | |
 |---|---|
-| `PREVIEW ME: upload docs/videos/bars-theme_52.mp4 here, then delete this marker` | |
+| https://github.com/user-attachments/assets/ce8cab80-2125-4011-b44a-9a4e19a08ca3 | |
 
 `clock` runs over a bright clip (mean luma 176 of 255), which is why its lettering
 carries a dark plate behind it — the same rule the window applies, described in
