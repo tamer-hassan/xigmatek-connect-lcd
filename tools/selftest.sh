@@ -1212,9 +1212,20 @@ assert uploads[-1][0] == "Theme_25.mp4", uploads[-1]
 # PROTOCOL.md §8: the metrics blob is twice at the head of a session and never
 # between files. Feeding it per frame makes the panel stop answering uploads,
 # so this is the rule the GUI has to follow, not a nicety.
-assert links[-1].states == [(0, True), (0, True)], links[-1].states
+#
+# Whether the blob carries the tach array is this host's own sensors, not a
+# constant: xigmalcd/sensors.py:collect() leaves the whole `fans` section out when
+# nothing reads, so a board with nothing wired to a tach header - or a cloud VM -
+# legitimately sends the blob without it. The author's bench has a Super-IO with
+# the CPU fan on it and reads (0, True); the first CI runner on 2026-11-07 read
+# (0, False) and failed here. What is under test is the *placement* - twice, both
+# before the first file - so the flag is derived from the same call the worker
+# makes instead of pinning the bench's value.
+host_fans = "fans" in sensors.collect()
+assert links[-1].states == [(0, host_fans), (0, host_fans)], links[-1].states
 print(f"  background upload: one file, all {len(blob)} B, gap 0.02 s, "
-      f"named for the clip, `STATE all 1` twice before it")
+      f"named for the clip, `STATE all 1` twice before it "
+      f"({'with' if host_fans else 'without'} this host's fan readings)")
 
 StubLink.notice = "400"
 assert worker._upload(path=mp4, gap=0.02, chunk=1000) is False
