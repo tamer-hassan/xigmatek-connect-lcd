@@ -1045,7 +1045,13 @@ print(f"  window built: {win.clips.count()} clips, "
 t0 = time.perf_counter()
 win2 = app.Window(bad, 1.0, restore=False)
 build = time.perf_counter() - t0
-assert 0.1 < build < 5.0, build
+# The floors here are one order of magnitude below what both machines measure, and
+# the ceilings one above: they are there to catch a build or a render that stopped
+# doing work, not to grade the machine.  The runner is faster than the bench at this
+# (0.091 s and 0.10 s against 0.21 s here), which is exactly why the old floor of
+# 0.1 s failed CI on 2026-11-07 with `AssertionError: 0.09128455299999416` - a
+# desktop's number written as a limit.
+assert 0.02 < build < 5.0, build
 
 m = sensors.collect()
 render.to_png(render.draw(m, "alpha"))            # warm the font cache
@@ -1059,7 +1065,11 @@ def _draw_once(m):
 
 draws = sorted(_draw_once(m) for _ in range(15))
 mid = draws[len(draws) // 2]
-assert 3.0 < mid < 60.0, mid
+# Same rule as the band above: 11.9 ms here and 22.3 ms on the runner, so a floor of
+# 1 ms and a ceiling of 200 ms catch the thing this is for - a draw that starts
+# encoding a PNG per call, or a frame that stops being drawn at all - without being a
+# bet on how loaded a shared runner happens to be at the moment.
+assert 1.0 < mid < 200.0, mid
 
 t0 = time.perf_counter()
 while getattr(win, "_pending", []):
