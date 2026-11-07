@@ -119,17 +119,41 @@ jobs:
 
       - name: Build-Depends, taken out of debian/control rather than repeated here
         # Repeating them in this file would be a second list to keep honest, and
-        # debian/control is the one dpkg-checkbuilddeps reads.  grep-dctrl (devscripts)
-        # pulls the field out of the source stanza; the sed drops the version
-        # constraints, because apt resolves those itself and `debhelper-compat (= 13)`
-        # has to become `debhelper-compat` to be an apt argument at all.
+        # debian/control is the one dpkg-checkbuilddeps reads.  grep-dctrl (from
+        # dctrl-tools) pulls the field out of the source stanza; the sed drops the
+        # version constraints, because apt resolves those itself and
+        # `debhelper-compat (= 13)` has to become a plain package name before it can be
+        # an apt argument at all (into `debhelper`, by the sed below, for the reason
+        # given at the end of this comment).
+        #
+        # The four packages installed first are not in debian/control and have to be
+        # named here, and the first CI run said why in one line each.  `devscripts`
+        # only *Recommends* dctrl-tools, so with --no-install-recommends grep-dctrl is
+        # simply absent: the step printed "grep-dctrl: command not found", then
+        # "installing:" with an empty list, and then dpkg-checkbuilddeps - correctly -
+        # reported every Build-Depend unmet.  `build-essential` is a Suggests of
+        # devscripts and only a Recommends of dpkg-dev, which debhelper Depends on, and
+        # the ubuntu-26.04 runner image does not carry it: dpkg-checkbuilddeps named
+        # "build-essential:native" among the unmet.  The empty-list guard is there
+        # because a silently empty $deps is what made that run look like it was
+        # installing something.  And `debhelper-compat` is mapped to `debhelper` by the
+        # last sed: debian/control writes the compat level as `debhelper-compat (= 13)`,
+        # a virtual that debhelper Provides with a version, and `apt-cache policy
+        # debhelper-compat` on this bench answers "(none)" - so stripping `(= 13)` would
+        # leave a bare virtual name sitting in an apt command line.  The compat level
+        # itself stays where it is read: dpkg-checkbuilddeps, the last command in the
+        # step, fails the job when debian/control and this box disagree.
         run: |
+          set -eu
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends devscripts lintian
+          sudo apt-get install -y --no-install-recommends \
+            devscripts dctrl-tools lintian build-essential
           deps=$(grep-dctrl -n -s Build-Depends '' < debian/control \
                  | tr ',' '\n' | sed -e 's/([^)]*)//g' \
                                         -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+                                        -e 's/^debhelper-compat$/debhelper/' \
                                         -e '/^$/d' | tr '\n' ' ')
+          test -n "$deps" || { echo "no Build-Depends parsed out of debian/control"; exit 1; }
           echo "installing: $deps"
           sudo apt-get install -y --no-install-recommends $deps
           dpkg-checkbuilddeps            # the check that debian/control and this box agree
