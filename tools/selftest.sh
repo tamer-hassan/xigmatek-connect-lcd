@@ -1360,19 +1360,48 @@ assert worker._status() is True
 assert links[-1].states == [], links[-1].states
 print("  status: no metrics blob (it puts no picture on the glass)")
 
+# `_reset` finishes by waiting for the panel's node to come back - `glob.glob(
+# "/dev/ttyACM*")` in xigmaui/panel.py, for up to 30 s.  That is a sentence about
+# hardware, and this check had been passing on the author's bench by finding his actual
+# panel in that listing: nothing was ever sent (the Link through this whole block is a
+# stub), but the *verdict* came from whatever was on the desk.  Run 42334404814 hit the
+# other half: a runner with no /dev/ttyACM at all waits out the 30 s and `_reset`
+# returns False.  So the listing is pinned here - the pattern the worker asked for is
+# recorded and answered - and what the host genuinely has is printed as a fact about the
+# machine instead of leaned on as a result.
+import glob as _glob
+host_acm = _glob.glob("/dev/ttyACM*")
+asked = []
+
+
+class NodesBack:
+    """panel.py's `glob`, standing in for the re-enumeration the real device does."""
+
+    @staticmethod
+    def glob(pattern):
+        asked.append(pattern)
+        return ["/dev/xigma-stub"]
+
+
+real_glob = panel.glob
+panel.glob = NodesBack
+
 assert worker._reset(confirm="reset") is True
 # `_reset` opens the destructive link and then re-reads status with a normal one,
 # so the check is "exactly one destructive open in the whole session, and it was
 # not the first" - the source inspection above is what pins it to `_reset`
 assert sum(1 for _, d in opened if d) == 1, opened
 assert opened[0][1] is False and opened[-1][1] is False, opened[:2] + opened[-1:]
+assert asked[:1] == ["/dev/ttyACM*"], asked[:2]
 print(f"  reset: one destructive link in {len(opened)} opens, everything else "
-      f"non-destructive")
+      f"non-destructive; it then waited for {asked[0]!r} (answered here - this host"
+      f" has {len(host_acm)} such node(s) of its own)")
 
-# and the rebinding stops with this block: every assert above saw the fixture, and
-# nothing after this line in this process needs the host's own sensors - the next
-# section starts a fresh python3 anyway
+# and both rebindings stop with this block: every assert above saw the fixture and the
+# answered listing, and nothing after this line in this process needs the host's own
+# sensors or its own /dev nodes - the next section starts a fresh python3 anyway
 panel.sensors = real_sensors
+panel.glob = real_glob
 PY
 
 echo
