@@ -988,6 +988,18 @@ from xigmalcd import render, sensors
 from xigmalcd.main import CLIP_LUMA
 
 # the clip library, and the lumas the picker's scrim rule leans on
+# These two figures come out of ffmpeg and ffprobe decoding real frames, so a machine
+# without them cannot measure them: say which tool is missing instead of letting the
+# comparison below fail on a luma of 0.0, which is what `measure` returns when the
+# decode did not work at all.  (The first CI run on 2026-11-07 did exactly that, with
+# `AssertionError: ('Theme_25.mp4', 0.0)`; the job's own comment says why ffmpeg is
+# installed there, and the .deb names it under Suggests for the same reason.)
+import shutil
+missing = [t for t in ("ffmpeg", "ffprobe") if not shutil.which(t)]
+if missing:
+    print(f"  needs {', '.join(missing)}: the luma and loop-length figures are decoded "
+          f"from the clips, and the assertion below compares them to README's numbers")
+    raise SystemExit(1)
 found = clipdb.list_clips()
 assert found, "no clips found at all"
 byname = {c.name: c for c in found}

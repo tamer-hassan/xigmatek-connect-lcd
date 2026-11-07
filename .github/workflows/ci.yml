@@ -64,12 +64,20 @@ jobs:
         # against the ring's stroke, so it is measuring *these* glyphs.
         # requirements.txt and pyproject.toml name the same runtime deps for a pip
         # install; apt is the shorter way to the same three on this distro.
+        #
+        # ffmpeg is here because the GUI section asks xigmaui/clips.py for a clip's
+        # luma and loop length, and those come out of ffmpeg/ffprobe decoding real
+        # frames (`measure` returns 0.0 when the decode fails).  Without it the first
+        # CI run failed exactly there: `AssertionError: ('Theme_25.mp4', 0.0)`,
+        # 2026-11-07.  The .deb has the same thing in `Suggests: ffmpeg`, and the
+        # figures the assertion compares against are the ones README quotes.
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             python3 python3-pil python3-serial python3-pyqt6 python3-setuptools \
-            fonts-dejavu-core fonts-liberation desktop-file-utils
+            fonts-dejavu-core fonts-liberation desktop-file-utils ffmpeg
           python3 -c 'import PIL, serial, PyQt6.QtWidgets, sys; print(" ", sys.version.split()[0], "Pillow", PIL.__version__)'
+          ffmpeg -version | head -1
 
       - name: tools/selftest.sh
         run: tools/selftest.sh
@@ -298,7 +306,9 @@ jobs:
             cat "$RUNNER_TEMP/assets.md"
             echo
             echo '```'
-            cat "$GITHUB_WORKSPACE/../lintian-summary.txt"
+            # the lintian summary came back inside the artifact this job downloaded,
+            # not from the build job's own disk - that machine is gone by now
+            cat debs/lintian-summary.txt
             echo '```'
             echo
             echo "Install both, in one command, from the directory holding them:"
