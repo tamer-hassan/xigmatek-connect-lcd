@@ -80,7 +80,14 @@ selected theme is now identified exactly rather than inferred: the app's 27 `pre
 entries pair one-to-one with the 27 theme files the installer ships, and entry 26 is the
 vendor's `1757491589871`.  The whole library - layouts, clips, baked overlays, decrypted
 with the app's own constants - is in `themes/alpha/`, and that directory's `README.md`
-writes up the container, the cipher and the layout schema.  The two
+writes up the container, the cipher and the layout schema; the `.thm` containers themselves
+are recorded there by size and sha256 and are not carried in the tree (see the bullet
+above).  Two of **our** drawing rules were re-measured while the previews were rebuilt for
+0.3, and both are written out in [limits.md](limits.md): every line of the `clock` theme
+now fits the same 440 px budget the big time line always had - the readings line measured
+494.2 px against a 480 px panel and was simply losing its end glyphs - and the `dual`
+theme's rings sit on a neutral track, because the pale cyan default measured 7.4 of 255
+luma from its own fill, which is not a meter.  The two
 temperature columns are deliberately alike - same label size and weight, one shared size
 for both numbers, chosen from whichever reading is wider, so neither can end up bigger
 than the other.  Each reading sits inside its ring's hole: at 97 px outer radius the two

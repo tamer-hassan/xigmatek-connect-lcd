@@ -171,6 +171,130 @@ print(f"  encoder switches   default over a transparent canvas: {dflt.mode} "
 PY
 
 echo
+echo "== a meter is only a meter if the ring it sits on stays out of its way"
+python3 - <<'PY' || { echo "legibility FAILED"; exit 1; }
+import os, shutil, subprocess, sys, tempfile
+sys.path.insert(0, ".")
+from PIL import Image
+from xigmalcd import render as R
+
+# ---- the dual rings: is the meter legible over a background, or is the track ----
+# Measured on a decoded frame of a clip this repository carries, so the number can be
+# re-counted on any machine: fill vs unfilled, mean luma along the ring's mid-radius,
+# for the neutral track this theme now asks for and the pale cyan default it used to
+# inherit.  `cold=heat, span="sweep"` means the colour itself carries the value, so a
+# track within a few luma of the fill is the whole complaint.
+DARK = "themes/alpha/clips/Theme_30.mp4"      # mean luma 4.0 of 255 (measured)
+PIN = {"cpu": {"temperature": 71.0}, "gpu": {"temperature": 44.0},
+       "memory": {"used": 85332, "total": 126157}}     # dual spans cold 30 hot 90
+
+
+def mid_frame(path, tmp):
+    out = os.path.join(tmp, "f.png")
+    dur = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                          "-show_entries", "format=duration", "-of", "csv=p=0", path],
+                         check=True, capture_output=True).stdout.decode().strip()
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{float(dur) / 2:.3f}",
+                    "-i", path, "-frames:v", "1", out], check=True)
+    return Image.open(out).convert("RGBA").resize((480, 480), Image.LANCZOS)
+
+
+def lum(px):
+    return 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2]
+
+
+def ring(comp, cx, cy, r, frac, start=120, sweep=300, n=240):
+    """mean luma of the filled part and the unfilled part of one ring"""
+    import math
+    fill, track = [], []
+    for i in range(n):
+        a = math.radians(start + sweep * i / (n - 1))
+        px = comp.getpixel((int(round(cx + r * math.cos(a))),
+                            int(round(cy + r * math.sin(a)))))
+        (fill if i < n * frac else track).append(lum(px))
+    return sum(fill) / len(fill), sum(track) / len(track)
+
+
+def dual_over(bg, track):
+    real = R.gauge
+
+    def patched(img, *a, **kw):
+        kw["track"] = track        # force it: theme_dual now passes one explicitly,
+        return real(img, *a, **kw)  # and setdefault would leave the new value in place
+    R.gauge = patched
+    try:
+        return Image.alpha_composite(bg, R.draw(PIN, "dual", bg=R.OVERLAY))
+    finally:
+        R.gauge = real
+
+
+if shutil.which("ffmpeg") and os.path.exists(DARK):
+    with tempfile.TemporaryDirectory() as tmp:
+        bg = mid_frame(DARK, tmp)
+        spans = (30.0, 90.0)
+        rows = {}
+        for what, tr in (("track=ARC_TRACK (now)", R.ARC_TRACK),
+                         ("gauge default TRACK (before)", R.TRACK)):
+            comp = dual_over(bg, tr)
+            f1, t1 = ring(comp, 128, 228, 86, (71.0 - spans[0]) / (spans[1] - spans[0]))
+            f2, t2 = ring(comp, 352, 228, 86, (44.0 - spans[0]) / (spans[1] - spans[0]))
+            rows[what] = (f1, t1, f2, t2)
+            print(f"  dual ring on {os.path.basename(DARK)}  {what:<30} "
+                  f"CPU ring fill {f1:6.1f} track {t1:6.1f} gap {abs(f1 - t1):5.1f}  |  "
+                  f"GPU ring fill {f2:6.1f} track {t2:6.1f} gap {abs(f2 - t2):5.1f}")
+        now, was = rows["track=ARC_TRACK (now)"], rows["gauge default TRACK (before)"]
+        gap_now = min(abs(now[0] - now[1]), abs(now[2] - now[3]))
+        gap_was = max(abs(was[0] - was[1]), abs(was[2] - was[3]))
+        assert gap_now >= 4 * gap_was, (gap_now, gap_was)
+        print(f"  the neutral track separates the meter from its own ring by "
+              f"{gap_now:.1f} luma where the pale default managed {gap_was:.1f} "
+              f"({gap_now / gap_was:.1f}x); the ring is still drawn, it just no "
+              f"longer out-shouts the fill")
+        assert R.ARC_TRACK[0] < 150 and R.ARC_TRACK[3] < 255, R.ARC_TRACK
+else:
+    print(f"  dual ring legibility SKIPPED: {DARK} or ffmpeg missing here")
+
+# ---- every line this theme draws has to land inside the panel ------------------
+# The clock theme fitted only its big time line; the other two could run off the
+# glass.  Counted by drawing the string and reading the alpha bbox, which is what
+# the panel would show: a clipped glyph is a clipped glyph.
+WORST = {"cpu": {"temperature": 100.0}, "gpu": {"temperature": 100.0},
+         "fans": [{"name": "Fan CPU", "type": "Fan", "onBoard": True,
+                   "value": 12345}]}
+PINNED = {"cpu": {"temperature": 57.0}, "gpu": {"temperature": 47.0},
+          "fans": [{"name": "Fan CPU", "type": "Fan", "onBoard": True,
+                    "value": 1957}]}
+BANDS = {"time": (150, 240), "date": (270, 310), "readings": (335, 380)}
+
+
+def band_box(lay, y0, y1):
+    """ink bbox of one line, measured on the 480 px result: the crop is what makes
+    it a per-line check rather than a whole-picture one"""
+    a = lay.getchannel("A").crop((0, y0, lay.width, y1))
+    return a.getbbox()
+
+
+for label, m in (("pinned readings", PINNED), ("worst realistic", WORST)):
+    lay = R.draw(m, "clock", bg=R.OVERLAY).convert("RGBA")
+    for band, (y0, y1) in BANDS.items():
+        box = band_box(lay, y0, y1)
+        assert box, (label, band, "a line this theme should draw drew nothing")
+        assert box[0] > 0 and box[2] < 480, \
+            (label, band, box, "ink touches or crosses a panel edge")
+        print(f"  clock {label:<16} {band:<9} ink x {box[0]:4d}..{box[2]:4d} "
+              f"({box[2] - box[0]:4d} px) inside 480, y band {y0}-{y1}")
+# and the same line at the size it used to be fixed at, so the before figure stays
+# in the open rather than remembered
+line = "CPU 100°C    GPU 100°C    12345 RPM"
+one = Image.new("RGBA", (R.W * R.SS, R.H * R.SS), (0, 0, 0, 0))
+R._text(one, (240, 358), line, R.font(26, True), R.CYAN)
+b = one.getchannel("A").getbbox()
+print(f"  that line at the old fixed font 26 reaches x {b[0] / R.SS:.1f}..{b[2] / R.SS:.1f}, "
+      f"i.e. both canvas edges: drawn centred, it was clipped at each end")
+assert b[0] == 0 and b[2] == R.W * R.SS, (b, "the old overflow is what this pins")
+PY
+
+echo
 echo "== the alpha gauges: text fitted inside the ring, colour graded by degree"
 python3 - <<'PY' || { echo "alpha gauge geometry FAILED"; exit 1; }
 import math, sys
@@ -494,7 +618,7 @@ python3 - <<'PY' || { echo "preview gifs FAILED"; exit 1; }
 import os, re, subprocess, sys, tempfile, time
 sys.path.insert(0, ".")
 sys.path.insert(0, "tools")
-from PIL import Image, ImageChops, ImageStat
+from PIL import Image, ImageChops, ImageFilter, ImageStat
 
 from xigmalcd import render
 import preview_gif
@@ -548,6 +672,85 @@ def step(a, b):
     return ImageStat.Stat(diff).mean[0]
 
 
+# which background each README preview is drawn over, and that it is a file this
+# repository carries: the gauge/dual/clock/bars clips live in the vendored theme
+# library, so a reader who clones this tree can regenerate all five without a Windows
+# volume.  README names these next to the pictures; if the two ever part company, the
+# luma cross-check below and the caption check further down both say so.
+CLIP_OF = {"alpha": "media/Theme_25.mp4",
+           "gauge": "themes/alpha/clips/3.mp4",
+           "dual": "themes/alpha/clips/Theme_30.mp4",
+           "clock": "themes/alpha/clips/Theme_07.mp4",
+           "bars": "themes/alpha/clips/theme_52.mp4"}
+
+#: the clock every README preview was written with (`--clock`), so the mask the
+#: legibility check builds is the picture the check is reading
+README_CLOCK = "11:07:42"
+
+
+def src_steps(path, n, fps):
+    """the same seam metric on the clip on its own, sampled at the GIF's rate, plus
+    its mean luma - which is how the composite is checked to be over the background
+    its caption claims"""
+    with tempfile.TemporaryDirectory() as t:
+        # `-stream_loop -1` because this is the same thing the GIF was built from: some
+        # of these clips are shorter than the GIF's 2.04 s window (`Theme_25.mp4` is a
+        # 0.958 s loop, so an unlooped sample hands back 6 frames, not 12, and the seam
+        # being measured would then be between two different moments than the GIF's).
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-stream_loop", "-1",
+                        "-i", path, "-vf", f"fps={fps}", "-frames:v", str(n),
+                        os.path.join(t, "f%03d.png")], check=True)
+        made = [Image.open(os.path.join(t, p)).convert("RGB")
+                for p in sorted(os.listdir(t))]
+    assert len(made) == n, (path, len(made))
+    ins = sorted(step(a, b) for a, b in zip(made, made[1:]))
+    return {"seam": step(made[-1], made[0]), "typical": ins[len(ins) // 2],
+            "luma": sum(ImageStat.Stat(f.convert("L")).mean[0] for f in made) / len(made)}
+
+
+def legibility(gif, theme):
+    """The drawn glyphs against their own immediate surround, read out of the encoded
+    file.  `render._scrim` hugs what was drawn (a MaxFilter over the frame's alpha,
+    grown by 3 device px) instead of washing the canvas, so the contrast a reader
+    actually gets is glyph core vs that grown halo - which is also why a scrim plate
+    helps on a bright clip without darkening the picture as a whole.
+
+    The mask is built with the same pinned clock `preview_gif.frames()` writes the files
+    with, for the obvious reason: the digits in the mask have to be the digits in the
+    file, and unpinned the theme draws whatever time the suite happens to run at (that
+    alone moved the clock theme's figure by ten points between two runs of this file).
+    The one thing still live is the `clock` theme's date line, which shows the day the
+    file was made; that is why this check holds a floor and prints a number rather than
+    matching one.
+    """
+    real = render.clock_str
+    render.clock_str = lambda *a, **k: README_CLOCK
+    try:
+        lay = render.draw(preview_gif.PINNED, theme, bg=render.OVERLAY)
+    finally:
+        render.clock_str = real
+    a = lay.getchannel("A").resize((EDGE, EDGE), Image.LANCZOS)
+    ink = a.point(lambda v: 255 if v == 255 else 0)
+    grown = a.filter(ImageFilter.MaxFilter(9)).point(lambda v: 255 if v else 0)
+    ring = ImageChops.subtract(grown, ink)
+    field = a.point(lambda v: 255 if v == 0 else 0)
+    im = Image.open(gif).convert("RGB")
+    lum = lambda m: ImageStat.Stat(im, m).mean if m.getbbox() else (0, 0, 0)
+
+    def luma(px):
+        return 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2]
+    gi, gr, gf = luma(lum(ink)), luma(lum(ring)), luma(lum(field))
+    assert ink.getbbox(), (gif, "the theme drew nothing opaque at all")
+    return gi, gr, gf
+
+
+# The floor is not tuned to the answer: the widest case here is `alpha` at 153 and the
+# narrowest is the clock over the bright clip at 62, and the floor sits at 30 - half the
+# worst case, so a plate that stopped firing, or an ink that stopped contrasting, fails
+# while a merely different picture does not.
+LEGIBILITY_FLOOR = 30
+
+
 total = 0
 for theme, path in THEME_FILES.items():
     fr, dur = decoded(path)
@@ -562,19 +765,59 @@ for theme, path in THEME_FILES.items():
     size = os.path.getsize(path)
     assert size < CEILING, (path, size)
     total += size
-    # the loop seam: 12 frames at a 170 ms delay is 2.04 s, and the vendored clip's
-    # own loop is 0.958 s, so the GIF restarts 0.12 s into a fresh pass.  That is
-    # only a problem if it reads as a jump, so it is measured: the seam has to be no
-    # bigger than an ordinary step between neighbouring frames.
+    # the loop seam: 12 frames at a 170 ms delay is 2.04 s of a clip that may loop in
+    # 0.96 s or in 17.6 s, and what that restart looks like depends on which.  Measured
+    # with PROTOCOL.md §9's own metric - mean absolute difference of the gray plane, the
+    # same shape as the table that measures the vendor's clips there.
     inside = sorted(step(a, b) for a, b in zip(fr, fr[1:]))
     typical = inside[len(inside) // 2]        # §9 compares a join with the median step
     seam = step(fr[-1], fr[0])
-    assert seam <= typical * 1.25, (path, seam, typical)
+    # The rule cannot be "the join is no bigger than a typical step of this file", and
+    # the per-theme backgrounds are what showed it.  Two different things make a restart
+    # visible, and neither of them is the compositing:
+    #   * the GIF covers nearly the whole loop - `Theme_25.mp4` at 0.96 s, `3.mp4` at
+    #     2.10 s against the GIF's 2.04 s - so the restart is the *clip's own join*, and
+    #     `3.mp4`'s is a hard cut (12.34 against 9.25 sampled at 6 fps here, 12.45 against
+    #     4.55 at its native 20 fps in docs/limits.md);
+    #   * the GIF covers a fraction of the loop - `theme_52.mp4` runs 10.10 s, and a
+    #     2.04 s GIF restarts 1.9 s into it - so the restart is a cut back to the
+    #     beginning, and 13.52 simply says how much that clip moves in two seconds.  Its
+    #     own join is mild: 2.49 against 1.29 typical.
+    # A ratio test against the GIF's own median step would fail a *nearly still* clip for
+    # any join at all: `Theme_30.mp4` steps 0.92, so even 2.83 - less than the ordinary
+    # motion inside `Theme_25.mp4` - is three times its median.
+    # So the gate asserts the only thing a preview can honestly be blamed for: it must not
+    # add a jump the video underneath does not have.  Same span, same rate, the clip on
+    # its own (printed every run, and README carries the table):
+    #   Theme_25.mp4    clip  2.60 /  2.68   GIF  2.32 /  2.35
+    #   3.mp4           clip 12.34 /  9.25   GIF 11.19 /  7.24
+    #   Theme_30.mp4    clip  2.83 /  0.92   GIF  2.30 /  0.77
+    #   Theme_07.mp4    clip  0.61 /  0.44   GIF  0.54 /  0.41
+    #   theme_52.mp4    clip 13.52 /  2.90   GIF 10.78 /  1.87
+    src = src_steps(CLIP_OF[theme], FRAMES, 6.0)
+    assert os.path.exists(CLIP_OF[theme]), (path, CLIP_OF[theme])
+    gi, gr, gf = legibility(path, theme)
+    # Is this picture over the background its caption names?  The comparison that means
+    # anything is the clip's own mean luma against the GIF's mean over the pixels this
+    # theme never touches - the field showing through.  Comparing whole frames instead
+    # would call the layer's own drawing a mismatch: the `alpha` theme's translucent
+    # gauge track alone lifts the frame mean from the clip's 17.8 to 36.0.
+    assert abs(gf - src["luma"]) < 20, (path, CLIP_OF[theme], gf, src["luma"])
+    assert seam <= typical * 1.25 or seam <= src["seam"], \
+        (path, seam, typical, src)
+    assert seam <= src["seam"] * 1.15, \
+        (path, seam, src["seam"], "the layer added a jump the clip does not have")
+    assert gi - gr >= LEGIBILITY_FLOOR, (path, gi, gr, gf, "glyphs washing out")
     # and the glyphs are still the theme's own colour, not lost in the palette
     near, dist = nearest(path, (255, 255, 255))
     print(f"  {path:34} {im.size[0]}x{im.size[1]} {len(fr)} fr @ {dur} ms "
           f"= {len(fr) * dur / 1000:.2f} s  {size:>7,} B  seam {seam:5.2f} vs "
-          f"typical {typical:5.2f}  nearest to white {near} off {dist}")
+          f"typical {typical:5.2f} (the clip alone: {src['seam']:5.2f} vs "
+          f"{src['typical']:5.2f})  nearest to white {near} off {dist}")
+    print(f"  {'':34} over {os.path.basename(CLIP_OF[theme]):<18} "
+          f"clip luma {src['luma']:5.1f}  field {gf:5.1f} (gap {abs(gf - src['luma']):4.1f})  "
+          f"glyph {gi:6.1f} vs its own halo {gr:6.1f} = {gi - gr:6.1f} "
+          f"(floor {LEGIBILITY_FLOOR})")
 
 fr, dur = decoded(INK_FILE)
 assert Image.open(INK_FILE).size == (EDGE, EDGE) and len(fr) == FRAMES
@@ -588,6 +831,10 @@ print(f"  {INK_FILE:34} the ink in the file is {near}, {dist}/255 from "
 readme = open("README.md", encoding="utf-8").read()
 for theme, path in THEME_FILES.items():
     assert f"]({path})" in readme, (theme, path)
+    # the caption by each picture has to name the background it is drawn over, and that
+    # background has to be a file this tree carries: a reader regenerating the previews
+    # from a clone should get the picture README shows
+    assert os.path.basename(CLIP_OF[theme]) in readme, (theme, CLIP_OF[theme])
     assert f"docs/preview-{theme}.png" not in readme, theme
     # and not tracked either.  `tools/previews.py` still writes those PNGs, so a
     # developer's own run can leave them in the working tree; what must not happen is

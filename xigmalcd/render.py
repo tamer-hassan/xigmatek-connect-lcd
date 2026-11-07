@@ -28,6 +28,15 @@ RED = (255, 64, 64, 255)
 DIM = (150, 170, 180, 255)
 TRACK = (120, 200, 220, 255)
 
+# the unfilled part of an arc, for the rings where a pale track would swamp the fill.
+# Chosen here, not taken from the vendor: ALPHA's own layouts give `bgColor` to their
+# bar widgets (rgba(196,162,255,1), kept below as `A26_TRACK`) and declare no track for
+# an arc at all, so the honest claim is only "neutral, so the value's own ramp is the
+# colour that moves on the ring".  What *is* measured is the effect on legibility, and
+# it is counted where it has to be - over decoded frames of the clips the library ships
+# (see `theme_dual`, and docs/limits.md).
+ARC_TRACK = (104, 118, 130, 150)
+
 # ---- ink: the colour of the glyphs we draw ----------------------------------
 #
 # Each theme used to paint its text with a constant chosen at import time.  It
@@ -436,7 +445,29 @@ def theme_dual(m, title="CPU  /  GPU", clock=True, cold=30.0, hot=90.0,
     for cx, dev, name in ((128, cpu, "CPU TEMP"), (352, gpu, "GPU TEMP")):
         t = dev.get("temperature")
         frac = 0.0 if t is None else (t - cold) / (hot - cold)
-        gauge(img, cx, 228, 96, frac, width=20, cold=heat, span="sweep")
+        # `track=ARC_TRACK`, the neutral ring this module already uses for alpha's
+        # arcs, and not the module default `TRACK` (120,200,220,255) - a pale cyan
+        # picked at import time with nothing measured behind it.  Measured, not
+        # guessed: one mid-loop frame of four clips the vendor ships, composited
+        # under this theme's layer, sampling the ring at its mid-radius over 240
+        # points and averaging the luma of the filled part against the unfilled one
+        # (2026-11-07, off screen - this is a picture measurement, not a glass one):
+        #
+        #   background (mean luma)      today's TRACK      neutral track
+        #   Theme_30.mp4   (4.0)         7.4 / 6.1          100.4 / 109.0
+        #   theme_52.mp4   (11.5)        7.4 / 6.1          101.9 / 105.0
+        #   3.mp4          (56.3)        7.3 / 5.5           67.1 / 81.3
+        #   Theme_07.mp4   (180.7)       7.0 / 4.8           27.3 / 20.1
+        #
+        # (two figures per row: the CPU ring at 68 % of the sweep and the GPU ring at
+        # 23 %.)  Seven luma out of 255 is the whole complaint: a green-yellow tip on a
+        # near-white ring is not a meter, and on the bright clip the fill is *dimmer*
+        # than its own track.  The neutral carries 20-109 depending on how bright the
+        # background is, and that last row is the honest limit of a half-transparent
+        # track over a bright clip - which is what the scrim is for (docs/gui.md), not
+        # a colour choice.
+        gauge(img, cx, 228, 96, frac, width=20, cold=heat, span="sweep",
+              track=ARC_TRACK)
         if t is not None:
             s = f"{round(t)}"
             _text(img, (cx, 222), s, _fit(img, s, 120, 52), fg)
@@ -462,9 +493,16 @@ def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY, ink=None):
     img = Image.new("RGBA", (W * SS, H * SS), bg)
     fg, mid, acc = _skin(ink, WHITE, DIM, CYAN)
     t = clock_str()
+    # One budget for every line in this theme: 440 panel px, which is what the big
+    # time line already used and what the other two did not.
     _text(img, (240, 190), t, _fit(img, t, 440, big), fg)
     if date:
-        _text(img, (240, 286), time.strftime("%A %d %B %Y"), font(22), mid)
+        date_s = time.strftime("%A %d %B %Y")
+        # `Wednesday 31 December 2099` measures 382.5 panel px at 22, so the date
+        # fits today and the budget is insurance for the day it does not - a locale
+        # with a longer month name, which is the `Week_en`/`Time_hh:mm` format gap
+        # docs/limits.md still writes down as unfilled.
+        _text(img, (240, 286), date_s, _fit(img, date_s, 440, 22), mid)
     cpu = (m.get("cpu") or {}).get("temperature")
     gpu = (m.get("gpu") or {}).get("temperature")
     parts = []
@@ -476,7 +514,20 @@ def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY, ink=None):
     if fans:
         parts.append(f"{round(sum(fans) / len(fans))} RPM")
     if parts:
-        _text(img, (240, 358), "    ".join(parts), font(26), acc)
+        # The line that used to run off the glass.  At font 26, `CPU 57°C  GPU 47°C
+        # 1957 RPM` - the pinned readings every documented preview uses - measures
+        # 494.2 panel px against a 480 px panel: 14.2 px over, 7.1 at each end.  The
+        # worst realistic line, `CPU 100°C  GPU 100°C  12345 RPM`, measures 548.5:
+        # 68.5 px over.  Drawn at that size it reaches both canvas edges (ink bbox x
+        # 0.0..480.0, i.e. clipped at both ends: the "C" of "CPU" and the last "M" of
+        # "RPM" are not on the picture).  Fitted to the same 440 px budget the time
+        # line has always had, it lands at x 29..450 (font 22) for the pinned set and
+        # 27..452 (font 20) for the worst one - 421 and 425 px of ink in a 480 px
+        # panel.  Counted by drawing the string and reading the alpha channel's bbox,
+        # 2026-11-07; the suite crops each of the theme's three lines to its own y
+        # band and fails if any of them touches a panel edge.
+        line = "    ".join(parts)
+        _text(img, (240, 358), line, _fit(img, line, 440, 26), acc)
     return img.resize((W, H), Image.LANCZOS)
 
 
@@ -677,9 +728,10 @@ A26_ARC_START, A26_ARC_SWEEP = 140.0, 260.0
 # amber: below that it climbs green to amber, above it amber to red, and a
 # reading past 100 can push the tip no further, so the colour clamps with it
 A26_ARC_LO, A26_ARC_MID, A26_ARC_HI = 30.0, 62.0, 100.0
-A26_ARC_TRACK = (104, 118, 130, 150)  # the unfilled part: neutral, so the
+A26_ARC_TRACK = ARC_TRACK             # the unfilled part: neutral, so the
                                       # green-to-red fill is the only colour
-                                      # moving on the ring
+                                      # moving on the ring (the constant and its
+                                      # note live up with the other inks)
 A26_FAN_X = A26_TCOL_X               # one fan figure per column, each under its
                                     # own temperature, not one line between them
 A26_FAN_Y = 246

@@ -150,7 +150,8 @@ override_dh_auto_install:
 	# The pictures stay out: the six docs/preview-*.gif (animated: the README's
 	# previews play since 0.3, see tools/preview_gif.py), docs/logo.png,
 	# docs/screenshot-xigmaui.png and the two theme contact sheets are the
-	# repository's showcase - 5 845 093 B of them, some of it derived from
+	# repository's showcase - 4 944 047 B of them, 2 269 716 B of that the six GIFs,
+	# some of it derived from
 	# XIGMATEK's own theme library, which is the other package's business and its own
 	# licence. An installed system therefore gets the prose, and the README it can
 	# read says what it shows. debian/README.source keeps this difference in mind for

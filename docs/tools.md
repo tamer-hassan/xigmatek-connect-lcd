@@ -13,7 +13,7 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
 | If the question is | run | what it answers |
 |---|---|---|
 | is the panel healthy after a boot or a reset? | `tools/state.py`, then `tools/bootcheck.py` | the `conn` snapshot, read-only; then two small and two full uploads. `logo`/`mode` at `2147483647` means it is not healthy |
-| did my edit break the wire format? | `tools/selftest.sh`, then `tools/verify_protocol.py data/captures/*.txt` | nineteen offline sections with no hardware, then every captured Windows frame re-encoded and diffed: **181 frames, 0 mismatches** (130 in one session, 51 in the other). The captures are bench files, so in a fresh clone the first section prints those figures and says it did not re-derive them |
+| did my edit break the wire format? | `tools/selftest.sh`, then `tools/verify_protocol.py data/captures/*.txt` | twenty offline sections with no hardware, then every captured Windows frame re-encoded and diffed: **181 frames, 0 mismatches** (130 in one session, 51 in the other). The captures are bench files, so in a fresh clone the first section prints those figures and says it did not re-derive them |
 | does this firmware know that topic at all? | `tools/fuzz.py`, `tools/probe.py` | no answer = no topic, `400` = topic exists and the body was wrong, `200` = the JSON parsed — which is not the same as the write landing |
 | will the panel take *my* file? | `tools/send_image.py FILE`; `tools/fileshape.py` if the file's shape is the question | one upload, judged by the panel's own file notice; the second rotates RGBA, indexed, flat and the vendor's own `.osd` files through one session |
 | how fast does the glass tick, and why does the clock only move every 20-40 s? | `tools/frame_lag.py`, `tools/indexprobe.py`, `tools/watchtest.py` | a big frame number and the wall clock painted on the glass, so the answer is a glance rather than a stopwatch. Needs eyes on the unit |
@@ -26,7 +26,7 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
 | what did the vendor app itself actually send? | `tools/log_timeline.py LOG`, `tools/capdump.py`, `tools/vendor_capture.py` | ALPHA's 6-17 MB logs folded into a request sequence, the Windows IRP captures parsed without a Windows box, and the `.osd` payloads taken back out of them |
 | the panel is white from the first second | `xigmalcd-reset --yes` (installed) / `tools/reset_panel.py --yes` (checkout) | the vendor's `recovery`, byte-identical to the frame in its own log; the only repair for fields stuck at `2147483647` |
 | what would a frame look like, with no panel in the loop? | `python3 -m xigmalcd --dry-run DIR`, `tools/previews.py`, `tools/preview_gif.py` |
-| the README's previews move, and how would I make another? | `tools/preview_gif.py --theme alpha --ink amber` | the preview pane's composite as an animated GIF, the only thing GitHub plays inline; it prints the file's size, its real per-frame delay and how far its palette moved the text colour | PNGs on disk from the same render path; previews composite over the shipped clip the way the panel composites |
+| the README's previews move, and how would I make another? | `tools/preview_gif.py --clip CLIP --theme T --ink amber` (README's set: `--scale 320 --colors 128 --frames 12 --gif-fps 6`) | the preview pane's composite as an animated GIF, the only thing GitHub plays inline; it prints the file's size, its real per-frame delay, how far its palette moved the text colour, the background's own join against the composited one, and the glyph-vs-halo legibility figure; the readings come from `tools/preview_pin.py`, one fixture for both preview tools | PNGs on disk from the same render path; previews composite over the shipped clip the way the panel composites |
 | what does the window look like, and does the README's picture match the code? | `tools/screenshot.py` | `docs/screenshot-xigmaui.png`: the real Qt window, offscreen, with a port path that does not exist so nothing on the glass is touched |
 | what are ALPHA's theme files, and what do its themes actually contain? | `tools/thm_unlock.py`, `tools/theme_previews.py` | the `.thm` container opened with the app's own constants: 27 layouts, 44 clips, 27 baked overlays in `themes/alpha/`, every byte hashed; and a sheet showing each theme over its own clip |
 
@@ -64,9 +64,10 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   switches read out of the PNG each dry run writes, what the indexed file gives up next to
   RGBA, the pinned-metrics promise (a pinned frame draws the far end of the ramp and sends no
   metrics blob at all), the vendor theme library re-hashed against its own manifest (125
-  entries over 125 distinct files, the dedup rule, the root-vendored clips, the contact
-  sheets, and the
-  `store.json`/`.thm` pairing when the Windows volume is mounted), where the shipped clips
+  entries over 98 distinct files, plus the 27 `.thm` containers it records by hash and
+  deliberately does not carry - and with the vendor's install mounted, exactly those 27 get
+  re-hashed where they live, which is 152/152), the clip-list dedup rule, the root-vendored
+  clips, the contact sheets, and the `store.json`/`.thm` pairing), where the shipped clips
   are looked up (checkout, `$XIGMA_MEDIA`, `/usr/share/xigmalcd/media`, and the Windows
   partition's copies, in that order, checked against fake roots), the packaged copies of
   the login unit and the menu entry compared key for key against the checkout's
@@ -78,7 +79,11 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   window's saved-state round-trip, the `.desktop` entry and its icon, the GUI built
   offscreen against a port that does not exist (clip sizes and lumas, five themes
   previewed, the scrim rule, the reset gate, the four panel actions against a stubbed
-  `Link`), the wall-clock cost of the window re-measured rather than remembered, and the
+  `Link`), the two picture-level rules added at 0.3 - the `dual` ring's filled part against
+  its own unfilled part over a decoded clip of the vendor's (100.4 luma where the pale
+  default managed 7.4, re-counted every run) and every line of the `clock` theme cropped to
+  its own y band with ink required to stay inside the 480 px panel - the wall-clock cost of
+  the window re-measured rather than remembered, and the
   GUI ledger's own numbers re-read out of `data/glass/` so the table in [the GUI doc](gui.md) cannot
   quietly become folklore. Needs no hardware, so it is what to run after editing
   `protocol.py`, `render.py` or `xigmaui/`.
@@ -222,12 +227,33 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   OSD over one frame lifted out of the vendor's background MP4. Since 0.3 the README does not
   embed these; it embeds the animated GIFs from `tools/preview_gif.py`. The PNGs are not
   tracked (`.gitignore` says so), because they are what you run this tool to *look at* after a
-  change to the skin, not an artefact the tree has to carry in two shapes. It pins its own
-  readings - 57 °C/47 °C, the pair ALPHA's own captured frame reads, the fan figure inside the
-  tachometer span PROTOCOL §8 measured - which are deliberately not the readings
-  `tools/preview_gif.py` pins: a figure quoted from a picture has to name the picture it came
-  from.
+  change to the skin, not an artefact the tree has to carry in two shapes. Its background
+  defaults to `media/Theme_25.mp4` and takes any clip you point it at.
+  * `tools/preview_pin.py` — the readings **both** preview tools draw, in one place, so a
+  caption cannot disagree with the file beside it. Two kinds of number, labelled: the
+  temperatures and loads and the two fan figures are a *fixture* — 57 °C CPU and 47 °C GPU,
+  the pair ALPHA's own captured frame reads, and 1 957 RPM, inside the tachometer span
+  PROTOCOL §8 measured without being this box's live number — because those decide where the
+  arcs land, and 57 °C on the `gauge` theme's measured 30..75 °C scale is 60 % of the sweep,
+  in the part of the ramp where the colour changes too. The memory, board, disk and CPU-power
+  fields are a dated `sensors.collect()` from the author's bench. The file also records what
+  this box *actually* read - 73 °C at 89.8 % under eight parallel decodes, and 70 °C at 8.8 %
+  with a GPU-using process running - and why the picture uses neither: at 73 °C that arc sits
+  at 95.6 % of the sweep, which reads as pegged rather than as a measurement. `--live` draws
+  those instead.
   * `tools/preview_gif.py` — the same composite **playing**, as an animated GIF: `ClipPlayer`
+  decoding the background in sequence and `render.draw` drawing our layer over each frame,
+  which is what the window's `playing` preview pane shows. README runs one background per
+  theme - `Theme_25.mp4`, `3.mp4`, `Theme_30.mp4`, `Theme_07.mp4`, `theme_52.mp4` - all five of
+  them files this tree carries, so the set regenerates from a clone. With no `--scrim` it
+  applies the **window's** auto rule rather than the daemon's (the daemon only knows the
+  handful of clips `CLIP_LUMA` measured; the tool measures the clip's luma the way the pane
+  does and puts 150/255 of plate over anything brighter than mid-grey), which is why the
+  `clock` preview over the bright `Theme_07.mp4` carries a plate and the four dark ones do
+  not. It opens no device and needs no Qt. The
+  switches are `--clip --theme --ink --frames --gif-fps --scale --colors --clock --scrim --out
+  --mp4 --live`, and the tool prints its own measurements, because these knobs interact in ways
+  no one guesses right:
   decoding the background in sequence and `render.draw` drawing our layer over each frame, which
   is what the window's `playing` preview pane shows. It opens no device and needs no Qt. The
   switches are `--clip --theme --ink --frames --gif-fps --scale --colors --clock --scrim --out
@@ -249,20 +275,24 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   smaller and bands the gradients; `stats_mode=diff` measured 2-3 % *bigger* here.
   * **what the file cost in colour, measured off the file.** The tool decodes what it wrote and
   reports the nearest drawn colour to the ink asked for: the amber file in docs/gui.md reads
-  **(253, 195, 0), 2/255 from** `#ffc400`. That is ffmpeg's animation palette, not the
+  **(253, 195, 1), 2/255 from** `#ffc400`. That is ffmpeg's animation palette, not the
   256-colour PNG the upload path uses - the suite measures that drift separately at 1/255 - and
   README says so next to the pictures instead of leaving a reader to assume it.
   * **delays are quantised.** A 6 fps GIF is 12 frames at a **170 ms** delay, not 167: GIF stores
   delays in 10 ms units, so the file runs 2.04 s at 5.9 fps. The tool reports what the file holds.
 
-  The set README carries (320 px, 128 colours, 12 frames, pinned readings): alpha 528 606 B,
-  gauge 576 843 B, dual 500 316 B, clock 585 559 B, bars 471 305 B, and docs/gui.md's ink figure
-  551 641 B — **3 214 270 B** for six files. The same settings at 480 px run 1.05-1.18 MB each,
+  The set README carries (320 px, 128 colours, 12 frames, one background per theme, the same
+  pinned readings): `alpha` 556 558 B, `gauge` 621 464 B, `dual` 59 231 B, `clock` 125 789 B,
+  `bars` 351 015 B, and docs/gui.md's ink figure 555 659 B — **2 269 716 B** for six files. The
+  spread is the backgrounds and not the layers: `Theme_30.mp4` moves 0.92 between the sampled
+  frames, so its composite encodes to 59 KB, while `3.mp4` moves 9.25 and costs ten times that. The same settings at 480 px run 1.05-1.18 MB each,
   which is the argument for 320 measured rather than assumed: GitHub renders this README's body
   **624 px** wide in a narrow window, and it displayed the old 480 px PNGs at **281-289 px** in
   the two-column table, so the extra half-megabyte per file buys nothing at that size. The suite
-  checks these files as documents - 320×320, 12 frames, 170 ms, under 700 KB, seam no bigger than
-  a normal frame step, ink within 3/255 - and pointedly not by byte hash, because GIF output is
+  checks these files as documents - 320×320, 12 frames, 170 ms, under 700 KB, a join no worse
+  than the same span of the clip underneath, glyph-vs-halo legibility over a floor of 30, the
+  untouched field matching the clip the caption names, ink within 3/255 - and pointedly not by
+  byte hash, because GIF output is
   ffmpeg's version's business.
 * `tools/screenshot.py` — regenerates `docs/screenshot-xigmaui.png`, the README's picture of
   the **window** rather than of the glass: a real `xigmaui` built the way the suite builds it

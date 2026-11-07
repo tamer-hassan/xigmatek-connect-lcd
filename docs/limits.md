@@ -419,7 +419,8 @@ What has been measured on glass, by whom, with how many frames - and what has no
   out of a measurement rather than out of taste:
   * **GitHub renders this README's body 624 px wide** in a 1 000 px window, and displayed the
     old 480 px PNGs at **281-289 px** inside the two-column table. So the GIFs are 320 px
-    (**471 305-585 559 B** each) and not 480 px (**1.05-1.18 MB** each): at the size they are
+    (**59 231-621 464 B** each, the spread coming from the backgrounds rather than the layers)
+    and not 480 px (**1.05-1.18 MB** each): at the size they are
     drawn, the extra half-megabyte a file is invisible.
   * **128 colours for the whole animation** (`palettegen`), measured **23 % smaller** than 256
     with the drawn colour still within 1/255 at 480 px either way. 64 colours at 320 px is
@@ -434,28 +435,99 @@ What has been measured on glass, by whom, with how many frames - and what has no
     `loop == 0` on all six - a GIF that stops after one pass was encoded that way.
   * **A frame delay is 170 ms, not 167.** GIF stores delays in 10 ms units, so the "6 fps"
     request lands at 5.9 fps and the 12-frame file runs **2.04 s**.
-  * **The GIF's join is smaller than the clip's own join.** `Theme_25.mp4` loops in 0.958 s, so
-    12 frames at 170 ms restarts 0.12 s into a fresh pass - which is only a problem if it reads
-    as a jump. Measured with §9's own metric (mean absolute difference of the gray plane, against
-    the median step inside the loop), the five README files land at **seam 2.05-2.36 against a
-    typical step of 2.15-2.52** - the join is never larger than an ordinary frame step, and on
-    `alpha` it is 2.30 against 2.33. Against the same clip with nothing drawn on it, §9 measured
-    **2.50 against 1.51**: the raw clip does jump once per second, and it is *our layer* that
-    raises the ordinary step (a redrawn OSD is a constant difference between frames) so the join
-    stops standing out. That is §9's seam seen from the host side instead of the glass side, and
-    the suite asserts it on the shipped files.
+  * **What a GIF restart looks like depends on how much of the loop it covers, and the
+    preview is only ever blamed for what it adds.** Measured with §9's own metric - mean
+    absolute difference of the gray plane, join against the median step across the same span -
+    on each README file and on the same span of the same clip with nothing drawn on it:
+
+    | the GIF over | its join / typical step | the clip alone |
+    |---|---|---|
+    | `Theme_25.mp4` (0.96 s loop) | 2.32 / 2.35 | 2.60 / 2.68 |
+    | `3.mp4` (2.10 s loop) | **11.19** / 7.24 | **12.34** / 9.25 |
+    | `Theme_30.mp4` (5.42 s) | 2.30 / 0.77 | 2.83 / 0.92 |
+    | `Theme_07.mp4` (17.62 s) | 0.54 / 0.41 | 0.61 / 0.44 |
+    | `theme_52.mp4` (10.10 s) | **10.78** / 1.87 | **13.52** / 2.90 |
+
+    Two of those restarts are obvious, for two different reasons, and README says which one
+    beside the picture. `3.mp4`'s loop (2.10 s) is almost exactly the GIF's length (2.04 s), so
+    its restart *is* the clip's own join, and that is a hard cut: 12.45 against 4.55 measured
+    at the clip's native 20 fps, the same basis as the table the vendor's library is in.
+    `theme_52.mp4` loops in 10.10 s, so a 2.04 s GIF restarts 1.9 s into it - the 13.52 says
+    how much that clip moves in two seconds, not that its loop is bad (its own join is a mild
+    2.49 against 1.29 typical). The step is also a coarser measure at 6 fps than at 20-24, which
+    is why the sampled and native columns differ in detail while agreeing about which clips jump.
+    What the suite asserts is the one thing a preview can be blamed for: the composited join is
+    no worse than the same span of the clip underneath, and never more than 15 % above it. The
+    rule before it - join within 1.25x the file's own median step - failed the honest pictures:
+    on a nearly still clip like `Theme_30.mp4` (0.92 a step) even 2.83, less than ordinary
+    motion inside `Theme_25.mp4`, is three times that median.
+  * **Legibility of the previews, counted out of the encoded files.** Glyph luma against the
+    halo `render._scrim` hugs around it - separation on 0-255, with the mask built from the
+    renderer's own alpha *and the same pinned clock the file was written with*, which matters:
+    with the mask drawn at whatever time the suite runs, this figure moved ten points between
+    two runs of the same file, and a number that jitters because it is measuring a different
+    picture than the one it is scored against is not a measurement. `alpha` 154.3, `dual`
+    127.4, `gauge` 113.1, `clock` 110.3, `bars` 92.6. Floor 30, asserted and printed every run.
+    The `clock` case is the interesting one because its background, `Theme_07.mp4`, measures a
+    mean luma of 176.3 of 255 - white glyphs on a bright clip: with no plate the separation is
+    47.1 (glyph 241.6, halo 194.5), and with the 150/255 plate the window's auto rule puts
+    there it is 110.3 (glyph 241.8, halo 131.6). The plate does not brighten the text; it
+    darkens the ring around it, which is the whole mechanism, and it is why `_scrim` hugs the
+    drawn pixels instead of washing the canvas.
+  * **A preview's background is checked, not assumed.** Each README file's untouched field (the
+    pixels its theme never draws) is compared against the mean luma of the same span of the
+    clip its caption names: 1.8 (`Theme_25.mp4`), 0.4 (`Theme_30.mp4`), 10.4 (`Theme_07.mp4`,
+    the plate's edge bleeding into what the mask counts as field), 7.3 (`3.mp4`) and 0.8
+    (`theme_52.mp4`). Bound 20; the nearest *wrong* pairing here is 60 away.
+  * **The `clock` theme fitted its big line and not the other two**, which is how a reading
+    line ran off the glass: at font 26, `CPU 57°C  GPU 47°C  1957 RPM` measures 494.2 panel px
+    against a 480 px panel (14.2 over, 7.1 at each side), and `CPU 100°C  GPU 100°C  12345 RPM`
+    measures 548.5; drawn at that size the ink reaches both canvas edges, so the glyph at each
+    end is not on the picture at all. All three lines now take the 440 px budget the time line
+    always had, and the ink lands at x 29..450 (font 22) for the pinned set and 27..452 (font
+    20) for the worst realistic one. Counted by drawing the string and reading the alpha
+    channel's bbox, 2026-11-07; the suite crops each of the theme's three lines to its own y
+    band and fails if any of them touches a panel edge.
+  * **A meter needs a ring that stays out of its way.** `dual` drew its unfilled arc in
+    `TRACK` (120,200,220,255), a pale cyan picked at import time with nothing measured behind
+    it; it now asks for `ARC_TRACK` (104,118,130,150), the neutral this module already used for
+    the alpha arcs. Counted on one decoded frame of each of four clips the vendor ships, mean
+    luma along the ring's mid-radius, filled part against unfilled part (CPU ring first, GPU
+    ring second):
+
+    | background | `TRACK`, the pale default | `ARC_TRACK`, now |
+    |---|---|---|
+    | `Theme_30.mp4` (luma 4.0) | 7.4 / 6.1 | 100.4 / 109.0 |
+    | `theme_52.mp4` (11.5) | 7.4 / 6.1 | 101.9 / 105.0 |
+    | `3.mp4` (56.3) | 7.3 / 5.5 | 67.1 / 81.3 |
+    | `Theme_07.mp4` (180.7) | 7.0 / 4.8 | 27.3 / 20.1 |
+
+    Seven luma out of 255 is the complaint stated numerically - the fill used to be *dimmer*
+    than its own track - and the suite re-counts the dark-clip case (100.4 against 7.4) every
+    run. That last row is the honest limit of a half-transparent track over a bright field, and
+    the reason the scrim plate exists rather than a reason to go hunting for a third colour.
+    Off screen, both times: these are picture measurements, and the panel still cannot be asked
+    what it shows (§11).
   * **Repeating frames is not a saving.** Decoding at the clip's own 24 fps and letting ffmpeg
     drop to 8 costs **7 205 675 B** for the animation that sampling at the target rate writes
     in **1 510 157 B** - GIF's whole size model is inter-frame difference, so a frame shown
     three times pays for the deltas twice.
-  And what those pictures are not: the digits are one dated pinned sample (CPU 73 °C at 89.8 %
-  load, CPU fan 2 238 RPM, the set `tools/preview_gif.py` carries, taken under a stated ffmpeg
-  load and re-derivable there), the palette is ffmpeg's animation palette and not the
-  256-colour PNG the upload path uses (§10 measures that drift at 1/255 per channel), and §11
-  still means none of it is a photograph of the glass. Re-derive any figure above with
-  `tools/preview_gif.py --scale … --colors … --frames … --gif-fps … --ink … [--live]`: it
-  prints the byte size, the delay the written file actually holds, and the nearest drawn colour
-  to the ink asked for, every single time.
+  And what those pictures are not: the digits are one pinned set - CPU 57 °C at 42 % load, GPU
+  47 °C at 38 %, fans 1 957 and 1 554 RPM, memory 85 332 of 126 157 MB - held in
+  `tools/preview_pin.py` and shared by both preview tools, which says there, field by field,
+  whether a number is a **fixture** (the temperatures and the fans: 57 °C is what ALPHA's own
+  captured frame reads, and on the `gauge` theme's measured 30..75 °C span that is 60 % of the
+  sweep, the part of the ramp where the colour moves too) or a **dated collect** from the
+  author's bench, and it names the live readings the fixture deliberately does not use - 73 °C
+  at 89.8 % under eight parallel decodes, 70 °C at 8.8 % with a GPU-using process running -
+  rather than burying them, because at 73 °C that arc sits at 95.6 % of the sweep and the
+  picture would read as pegged instead of as measured; the palette is ffmpeg's animation
+  palette and not the 256-colour PNG the upload path uses (§10 measures that drift at 1/255
+  per channel), and §11 still means none of it is a photograph of the glass. Re-derive any
+  figure above with `tools/preview_gif.py --clip CLIP --theme T --scale … --colors … --frames
+  … --gif-fps … --ink … [--scrim N] [--live]`: it prints the byte size, the delay the written
+  file actually holds, the nearest drawn colour to the ink asked for, the clip's own join
+  against the composited one, and the glyph-vs-halo legibility figure, every single time.
 * **`pip install .` carries no clips, and that is a hole rather than a design.** The three
   MP4s this repo vendors live in `media/`, which is not a Python package, and
   `pyproject.toml` declares no package data for them — so an installed `xigmalcd` finds them

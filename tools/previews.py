@@ -14,11 +14,11 @@ lifted out of ALPHA's own theme MP4 with ffmpeg, so a preview is what the glass 
 rather than a drawing on a flat field.
 
 Numbers are pinned rather than read from this box, so re-running does not churn the
-images every time the CPU happens to be warm.  The set below is not the set
-`tools/preview_gif.py` pins (that one is a dated load-state sample, because a moving
-picture reads better with the meters somewhere other than empty); each tool's own
-provenance is written next to its `PINNED`, and a figure quoted from a picture has to
-say which picture it is.
+images every time the CPU happens to be warm.  Both preview tools - this one and
+`tools/preview_gif.py` - take the same set from one place, `tools/preview_pin.py`, which
+is also where each number's provenance is written: which of them is a fixture chosen so
+the arcs land in the same spot on every machine, and which is a dated snapshot of the
+author's bench.  A figure quoted from a picture still has to say which picture it is.
 """
 import os
 import subprocess
@@ -27,21 +27,12 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from PIL import Image                                           # noqa: E402
-from xigmalcd import render, sensors                            # noqa: E402
+from xigmalcd import render                                     # noqa: E402
 from xigmalcd.main import CLIP_LUMA, DEFAULT_MP4, _scrim_for   # noqa: E402
 
+import preview_pin                                              # noqa: E402
+
 THEMES = ("alpha", "gauge", "dual", "clock", "bars")
-# pinned so re-running does not churn the images every time the CPU is warm;
-# the CPU pair is what ALPHA's own captured frame reads
-PINNED = {"cpu": {"temperature": 57.0, "load": 42.0},
-          "gpu": {"temperature": 47.0, "load": 38.0, "fan": 45}}
-# the fan figures come from `fans`, which is a list and not a mapping, so it is
-# pinned separately: 1957 RPM sits inside the span measured on this board's CPU
-# tachometer (fan1 1360-2371 RPM tracking pwm1, PROTOCOL §8) but is not this
-# box's live number, which is the point - re-running must not churn the gallery
-# every time the CPU happens to be warm
-PINNED_FANS = [{"onBoard": True, "type": "Fan", "name": "Fan CPU",
-                "value": 1957}]
 
 
 def background(path=None, frame=None):
@@ -87,10 +78,8 @@ def main():
           "none (MP4 not mounted or no ffmpeg): drawing over a dark field")
     if bg is None:
         bg = Image.new("RGBA", (render.W, render.H), (9, 26, 36, 255))
-    m = sensors.collect()
-    for section, vals in PINNED.items():
-        m.setdefault(section, {}).update(vals)
-    m["fans"] = PINNED_FANS               # pinned, and labelled as pinned above
+    m = preview_pin.readings()           # the whole fixture: a still is meant to be
+                                         # reproducible, not a snapshot of this minute
     # same rule the daemon uses, so the gallery cannot drift from the panel
     from types import SimpleNamespace
     scrim = _scrim_for(SimpleNamespace(scrim=None, mp4=DEFAULT_MP4, bg="clear"))

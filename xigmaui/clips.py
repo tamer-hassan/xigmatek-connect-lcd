@@ -25,6 +25,16 @@ the row that stays, because that is the file `find_media()` would have picked:
   ALPHA's uploads          `%APPDATA%/alpha/media/...`, the clips the Windows app
                            actually pushed to this panel at some point.
 
+  Not a root: this checkout's own `themes/alpha/clips`.  A clone reaches the vendor's
+  library by installing `xigmatek-connect-lcd-themes`, which is what puts it at
+  `/usr/share/xigmalcd/themes/alpha/clips` above; the copy in the working tree is that
+  package's source, hashed by its manifest, and what reads it today is
+  `tools/preview_gif.py --clip themes/alpha/clips/<name>.mp4` - which is how all five of
+  README's previews are made.  Said here because "in the repository" and "in the roots
+  this walks" are different claims, and a bare checkout offering three clips while README
+  shows pictures over five backgrounds reads, correctly, like a bug until it is written
+  down.
+
 Frames come out of ffmpeg, one frame per call, because decoding a whole clip to
 pick a mid-loop frame (what tools/previews.py does once per run) is far too slow
 for a browser that repaints while you click. ffmpeg's `select` filter is avoided

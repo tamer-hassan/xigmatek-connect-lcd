@@ -72,7 +72,7 @@ one of them (see "How the three columns get their sizes", after the table):
 | the running display | controls | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. It also spells out the settings that display is running with - canvas, clock size, scrim, fans, and **the text colour it holds, as the hex it will answer again** (`text #ffc400`), which is the only place in the window you can see a colour you did not pick yourself. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Measured 1 ms for the commands Apply sends - six on the 0.2 bench ledgers below, seven in the tree, and the suite re-measures the line every run |
 | preview | preview | the background with `render.draw`'s OSD layer composited on top - playing, via one streaming ffmpeg, or as one mid-loop frame (`playing` box, see "The preview plays" below), refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How the three columns get their sizes" below | nothing |
 | theme | controls | the five themes, clock size, **the colour of the text it draws**, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
-| clips | library | every MP4 the roots hold, listed once per **distinct file** - **40 rows here out of 161 files**: 3 vendored here and 37 from the vendor's library; the other 121 are copies (69 in the Windows app's upload history, 43 in its static media, 9 left by the installed packages), 35 of them under a different name; the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
+| clips | library | every MP4 the roots hold, listed once per **distinct file** - **40 rows here out of 161 files**: 3 vendored here and 37 from the vendor's library; the other 121 are copies (69 in the Windows app's upload history, 43 in its static media, 9 left by the installed packages), 35 of them under a different name; the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. One thing that is **not** a root: this checkout's own `themes/alpha/clips` - a clone reaches the vendor's library by installing the themes package, which is why a bare checkout lists 3 clips and an installed box lists 40, while `tools/preview_gif.py --clip themes/alpha/clips/Theme_30.mp4` reaches the tree's copy directly (that is how all five README previews are made). Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
 | background state | library | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the gate refuses says so, in the gate's words, before the button is pressed | nothing: it is a readout |
 | `One frame now` | library | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
 | `Send frames for 30 s` | library, advanced | the picture loop, so you can watch the real glass | `STATE all 1` twice, then 60 uploads at 2 fps |
@@ -208,15 +208,19 @@ clip, and a `black` canvas never opens one, because on black the background show
 nowhere. Measured by watching the counters: 200 event spins with the window hidden
 advance no frames.
 
-The seam is visible in the pane, and it is the file's — and it is a step no larger than
-ordinary motion once our layer is on top (2.30 seam against a 2.33 typical step by PROTOCOL.md
-§9's metric for the README's `alpha` file, against 2.50/1.51 for the bare clip there). The
-number the suite asserts. The seam is visible in the pane, and it is the file's: `Theme_25.mp4` is 0.9583 s, which
+The seam the viewer sees is the file's, not the pane's: the player never seeks, it reads the
+same bytes in order and lets the file loop, and `Theme_25.mp4` is 0.9583 s, which
 at 24 fps is 23-24 frames a pass (measured 24, then 23, then 23 - the last pass is short
 by the fraction of a frame the resampler drops), and the **first frame of successive
 passes is byte-identical** (`f7e5ded0b703` three times), so the restart never splices a
 half frame together. That is the same loop the panel plays, and it is why the README's
-GIFs can claim a measured seam rather than a hope (docs/limits.md).
+GIFs can claim a measured seam rather than a hope: over this clip the README's `alpha` file
+joins at 2.32 against 2.35 for an ordinary neighbouring step, by PROTOCOL.md §9's metric,
+and the same span of the same clip with nothing drawn on it joins at 2.60 against 2.68 -
+so the restart is no bigger than the motion the file already makes, and the layer adds
+nothing (docs/limits.md has that table for all five backgrounds, including the two whose
+restarts *are* obvious and why: `3.mp4`'s loop is a hard cut, and a 2.04 s GIF of a 10.10 s
+clip cuts back through two seconds of motion).
 
 ### The advanced switch
 
@@ -343,7 +347,7 @@ same composite the `playing` pane shows: `ClipPlayer` in sequence, `render.draw`
 and the pinned readings rather than live ones (so the digits say the same thing on
 every machine). The GIF's own loss is measured off the encoded file rather than assumed:
 the nearest colour that file actually holds to the amber `render.py` asked for is
-**(253, 195, 0), 2/255 away**. That is the GIF's palette - ffmpeg's `palettegen`, 128
+**(253, 195, 1), 2/255 away**. That is the GIF's palette - ffmpeg's `palettegen`, 128
 colours for the whole animation - and not the 256-colour PNG the upload path sends,
 whose drift the suite measures separately at 1/255 per channel (§10). Nothing here was
 put on glass to be photographed: the panel cannot be asked what it shows (§11), so this
@@ -853,15 +857,22 @@ names sort *before* `Theme_*` (digits before letters) - a test of the dedupe fou
 now plants a renamed copy, a same-name copy, and a same-length **different-content** pair
 in a temp root and asserts all three outcomes.
 
-The window builds in **0.21-0.64 s** with those 69 rows up (the spread is the machine
-being busy, not the window: the same code prints 0.21 s in a quiet suite run and 0.64 s
+The window builds in **0.21-0.64 s** with those 40 rows up (the spread is the machine
+being busy, not the window: the same code prints 0.21 s in a quiet suite run and 0.47-0.53 s
 when something else is running); the thumbnails and loop lengths of the first ten rows -
-about what one page shows - land in **0.80 s**, and the rest trickle in behind them: an
-ffmpeg seek per clip, **7.2-9.7 s for all 69** (12.7 s for the 115 rows this box listed
-before the dedup), with the window interactive throughout. One frame render measures
-**12.4-14.1 ms** median (11.7-22.7 ms over 15 draws, transparent canvas, `alpha` theme);
-the selftest, which times the same call while the thumbnail pass is decoding around it,
-prints its own median in the same line. Either way a 2 fps preview is a few percent of
+about what one page shows - land in **0.8-1.4 s**, and the rest trickle in behind them: an
+ffmpeg seek per clip, **9.9-11.0 s for all 40** in the two runs of 2026-11-07 that printed
+it (against 7.2-9.7 s for the 69 rows the pre-dedupe list carried, and 12.7 s for the 115
+rows before that - fewer clips, on a busier box, at a cost that did not fall), with the
+window interactive throughout. One frame render measures **12.4-14.1 ms** median for
+`alpha` on a quiet machine, and the suite, which times the same call while the thumbnail
+pass is decoding around it, printed **18.6-24.0 ms** in those two runs. Measured per theme
+on a quiet box, `render.draw` with the pinned fixture: `alpha` 12.7 ms, `dual` 9.5,
+`gauge` 9.0, `bars` 8.1, `clock` 8.0 (60 draws each, median; the spread is 0.2-0.3 ms
+inside that). The `clock` theme's two newly-fitted lines cost nothing measurable: the
+same draw with `_fit` swapped for fixed sizes is 8.23 ms off and 8.00 ms on, and fitting
+moves the other four themes by 0.02 ms or less - a `textlength` loop over a handful of
+sizes is not where a frame's time goes. Either way a 2 fps preview is a few percent of
 one core. That is `render.draw` alone; adding the PNG encode the upload needs costs
 **10.7 ms** median (10.7-15.0 ms) - about 23 ms for a frame that actually goes up - which
 is why the preview does not encode. The gauge rings are most of that growth: the same

@@ -44,51 +44,20 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from PIL import Image                                    # noqa: E402
 
-from xigmalcd import render, sensors                     # noqa: E402
+from xigmalcd import render, sensors
+from xigmalcd.main import BRIGHT_LUMA, SCRIM_ON_BRIGHT                     # noqa: E402
 from xigmaui import clips as clipdb                      # noqa: E402
 
-#: the readings pinned for the documented previews, so one commit draws the same
-#: numbers on every machine.  They are not invented and they are not this box's
-#: idle: the dict below is verbatim `sensors.collect()` on the author's bench at
-#: 2026-11-07 11:0x, twelve seconds into a stated load condition - eight
-#:
-#:   ffmpeg -stream_loop -1 -i media/Theme_25.mp4 -vf scale=1280:1280 -f null -
-#:
-#: running at once, which is the same work these previews are made of.  Reproduce
-#: it and the numbers land in the same places: CPU 73 C at 89.8 % load and 5 378 MHz
-#: (the package temperature and the fan both sit inside the spans docs/limits.md
-#: measured for this board: Tctl 48-79 C, `fan1` 1360-2371 RPM against `pwm1`), CPU
-#: fan 2 238 RPM, chassis fan 1 554, GPU 34 C idle, 84 187 of 126 157 MB of memory
-#: in use, board 51 C, disk 29 C.  A hot CPU next to an idle GPU is the point: it is
-#: what makes the README's caption true, that position *and* colour carry the value -
-#: one arc sits at 61 % of the sweep in the hot part of the ramp, the other at 6 % in
-#: the cold part, and the two load bars are at 90 % and 0 %.
-#:
-#: Two things worth knowing about the shape, because getting them wrong draws
-#: nonsense rather than an error:
-#:
-#: * memory and disk are in **megabytes**, the vendor's units (`clock` and `bars`
-#:   print `used // 1024` and call the result GB).  The first version of this dict
-#:   had bytes, from a guess, and `bars` drew "RAM 8 089 595 GB".  Nothing warned.
-#: * every key is optional - `sensors.collect()` omits whole sections on a box that
-#:   has no such thing - so the pinned set carries what this box really reports and
-#:   no more.
-#:
-#: `--live` replaces all of it with what the machine is doing right now.
-PINNED = {
-    "cpu": {"load": 89.8, "power": 169, "speedAverage": 5378, "temperature": 73,
-            "usage": 89.8, "voltage": 1.324},
-    "disk": {"activity": 0.0, "load": 0.0, "readSpeed": 0.0, "temperature": 29,
-             "total": 786, "used": 68, "writeSpeed": 0.0},
-    "fans": [{"name": "Fan CPU", "onBoard": True, "type": "Fan", "value": 2238.0},
-             {"name": "Fan System 5", "onBoard": True, "type": "Chassis",
-              "value": 1554.0}],
-    "gpu": {"dedicated": 14654, "dedicatedTotal": 16376, "fan": 34, "load": 0,
-            "memoryUsage": 14654, "power": 16.66, "speed": 210, "temperature": 34},
-    "memory": {"load": 66.7, "temperature": 44, "total": 126157, "used": 84187},
-    "motherboard": {"temperature": 51},
-    "network": {"download": 0.0, "upload": 0.0},
-}
+#: the readings the documented previews draw.  One shared fixture for both preview
+#: tools, in tools/preview_pin.py - which also says, field by field, which numbers are a
+#: fixture chosen so the arcs land in the same place on every machine (57 C, which is
+#: 60 % of the gauge theme's measured 30..75 C span: the middle of the ramp, where both
+#: position and colour carry the value) and which are a dated snapshot of the author's
+#: bench.  It names the live readings too - this bench read 73 C at 89.8 % under eight
+#: parallel ffmpeg decodes, and 70 C at 8.8 % with a GPU-using process running, and at
+#: 73 C that arc would sit at 95.6 % of the sweep, which reads as pegged rather than as
+#: a measurement.  `--live` draws those instead.
+from preview_pin import PINNED                                      # noqa: E402
 
 
 def frames(path: str, theme: str, ink: tuple | None, clock: str, kw: dict,
@@ -252,7 +221,21 @@ def main() -> int:
     params = inspect.signature(render.THEMES[a.theme]).parameters
     kw = {k: v for k, v in kw.items() if k in params and v is not None}
     if a.scrim is not None:
-        kw["scrim"] = a.scrim        # `draw` takes this, the theme does not
+        kw["scrim"] = a.scrim        # `draw` takes this, the window's `--scrim N` rule
+    else:
+        # ...and when it is not given, the *window's* auto rule, not the daemon's.
+        # `main._scrim_for` only knows the handful of clips `CLIP_LUMA` measured, and
+        # this tool can be pointed at any file in the library; `xigmaui/_render_kw`
+        # measures the luma and applies the same two constants (BRIGHT_LUMA where
+        # white-on-white starts, SCRIM_ON_BRIGHT how much plate fixes it).  The pane
+        # draws the plate, so a preview that claims to be "the same composite the pane
+        # shows" has to include it.  Counted out of the encoded GIFs for the clock over
+        # `Theme_07.mp4` (measured luma 176.3 of 255): glyph against its own grown halo,
+        # 47.1 with `--scrim 0` and 110.3 with the plate the rule gives, the mechanism
+        # being that `_scrim` hugs what was drawn instead of washing the canvas - the
+        # glyph itself stays at 241.7 either way.  The suite prints that figure for all
+        # five README files, and holds it at a floor of 30.
+        kw["scrim"] = SCRIM_ON_BRIGHT if lum > BRIGHT_LUMA else 0
     global PINNED
     if a.live:
         PINNED = sensors.collect()
