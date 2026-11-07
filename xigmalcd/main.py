@@ -107,6 +107,10 @@ def _repo(*parts):
 WIN_STATIC = "/media/windows-c/Program Files/ALPHA/resources/static/media"
 WIN_UPLOADS = ("/media/windows-c/Users/Tamer/AppData/Roaming/alpha/media"
                "/background")
+# the vendor app's own state file: the store whose `currentThemeId` picks which
+# theme is selected, and whose `textColor` values are counted by the suite (it is
+# on the mounted Windows volume, so the check says when it cannot read it)
+WIN_STORE = "/media/windows-c/Users/Tamer/AppData/Roaming/alpha/store.json"
 
 # Where this program's own clips are, in the order the spellings win over each
 # other.  A package install has to be able to answer this: `pip install .` and

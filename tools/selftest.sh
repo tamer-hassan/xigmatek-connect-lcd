@@ -599,6 +599,73 @@ assert len(themes) == 27, len(themes)
 assert all(t["backgroundFile"].startswith("clips/") for t in themes)
 assert not os.path.exists("themes/alpha/background"), "a background/ dir should not exist"
 print(f"  27 themes, all 27 background payloads held by clips/, no background/ dir")
+
+# The colour of the vendor's own lettering, counted out of the layout files this
+# repo tracks - byte-identical to what the themes package installs - because
+# PROTOCOL.md §10, docs/themes.md and docs/usage.md all quote the figures now and
+# one of them used to claim "every glyph is white".  It is not: white is the rule
+# across the library and the exception-free case only for the theme in use.
+import collections as _col, glob as _glob, json as _json
+
+
+def _text_colours(path):
+    """every `*text*color*` property value in one layout, spaces normalised"""
+    got = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if isinstance(v, str) and "text" in k.lower() and "color" in k.lower():
+                    got.append(v.replace(" ", ""))
+                elif isinstance(v, (dict, list)):
+                    walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+    walk(_json.load(open(path)))
+    return got
+
+
+WHITE = "rgba(255,255,255,1)"
+lays = sorted(_glob.glob("themes/alpha/layouts/480X480/*.json"))
+vals = _col.Counter()
+exclusive = 0
+for f in lays:
+    got = _text_colours(f)
+    assert got, (f, "a layout with no text colour at all")
+    vals.update(got)
+    if set(got) == {WHITE}:
+        exclusive += 1
+assert len(lays) == 23, len(lays)
+assert sum(vals.values()) == 106, sum(vals.values())
+assert len(vals) == 9, sorted(vals)
+assert vals[WHITE] == 88, vals[WHITE]
+assert exclusive == 18, exclusive
+assert sum(v for k, v in vals.items() if k != WHITE) == 18, dict(vals)
+# ...and the theme ALPHA has actually selected is one of the exclusively-white ones
+sel = "themes/alpha/layouts/480X480/1757491589871.json"
+assert set(_text_colours(sel)) == {WHITE}, _text_colours(sel)
+print(f"  vendor text colours     {sum(vals.values())} textColor values across "
+      f"{len(lays)} 480x480 layouts, {vals[WHITE]} white in {len(vals)} distinct "
+      f"spellings, {exclusive} layouts exclusively white and {len(lays) - exclusive} "
+      f"mixing in greys/near-blacks; the selected theme 6 of 6 white")
+# store.json is the Windows app's own state, so only this bench can count it; the
+# claim in docs/themes.md's table (125 white of 160) is re-derived when the volume
+# is mounted and named as not-re-derived here when it is not.
+from xigmalcd.main import WIN_STORE
+if WIN_STORE and os.path.isfile(WIN_STORE):
+    import re as _re
+    raw = open(WIN_STORE, encoding="utf-8", errors="replace").read()
+    sj = _col.Counter(m.replace(" ", "")
+                      for m in _re.findall(r'"textColor"\s*:\s*"([^"]*)"', raw))
+    assert sum(sj.values()) == 160 and sj[WHITE] == 125 and len(sj) == 13, \
+        (sum(sj.values()), sj[WHITE], len(sj))
+    print(f"  store.json            {sum(sj.values())} textColor values, "
+          f"{sj[WHITE]} white, {len(sj)} distinct")
+else:
+    print("  store.json            SKIPPED: not on this machine (the Windows "
+          "volume is not mounted), so its 125-of-160 figure is quoted from the "
+          "bench run, not re-derived here")
 # the three clips vendored at the repo root are the vendor's, twice over
 for f in ("Theme_11.mp4", "Theme_25.mp4", "theme_48.mp4"):
     a = hashlib.sha256(open(f"media/{f}", "rb").read()).hexdigest()
@@ -2089,8 +2156,14 @@ def _status_like_02() -> dict:
 
 ctl.status = _status_like_02
 args.text_color = None
-for _ in range(30):
-    qapp.processEvents()                       # the window's own status poll
+# asked for directly, not waited for: `processEvents` does not advance the wall
+# clock, so a 2 s timer may not fire at all in a tight loop and the daemon's
+# cached status would still be the pre-patch dict.  That is exactly how this
+# check passed on the bench and failed on the runner (run 42355629537): the race
+# was in the test, not in the window.
+win.daemon.poll(report=True)
+for _ in range(6):
+    qapp.processEvents()
 assert "text_color" not in win.daemon.status, sorted(win.daemon.status)
 assert win.daemon.knows("text_color") is False
 assert win.daemon.knows("theme") is True       # the rest is not optional
@@ -2114,7 +2187,8 @@ print(f"  an older display        the colour row goes inactive with the reason "
       f"display knows: theme {args.theme}, clock {args.clock_size}, and the log "
       f"says so)")
 ctl.status = _real_status
-for _ in range(30):
+win.daemon.poll(report=True)
+for _ in range(6):
     qapp.processEvents()
 assert win.daemon.knows("text_color") is True and win.ink_choice.isEnabled(), \
     "the row stayed dead after the display came back with the field"
