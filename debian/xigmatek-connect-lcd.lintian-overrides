@@ -1,0 +1,33 @@
+# -*- mode: conf -*-
+# Overrides for tags this build actually produced (lintian 2.129.0ubuntu2.1 against
+# xigmatek-connect-lcd_0.1_amd64.changes, 2026-11-07: 0 errors, 23 warnings, and
+# these are two of the three kinds those warnings were).  Everything else lintian
+# said has been fixed in the packaging rather than silenced here; the third kind was
+# description and changelog lines over 80 columns, which are wrapped.
+
+# The three commands here document themselves: `xigmalcd --help`, `xigmaui --help`
+# and `xigmalcd-reset --help` each print every flag with a sentence saying what it
+# does, and README.md is installed with the package
+# (/usr/share/doc/xigmatek-connect-lcd/README.md.gz, via
+# debian/xigmatek-connect-lcd.docs) with the same flag tables plus what each flag
+# puts on the wire and what it refuses to.  A roff copy would be a second place to
+# keep the flag list honest, and this project keeps one source for each list.  What
+# the packaging does guarantee is checked instead, in debian/tests/smoke: that all
+# three commands are on PATH, that two of them answer --help, and that the third
+# sends nothing without --yes.
+xigmatek-connect-lcd: no-manual-page [usr/bin/xigmalcd]
+xigmatek-connect-lcd: no-manual-page [usr/bin/xigmaui]
+xigmatek-connect-lcd: no-manual-page [usr/bin/xigmalcd-reset]
+
+# This one deserves the explanation, because the tag is right in general: a package
+# that ships a udev rule is usually expected to name the device's modalias in an
+# AppStream component, so the right software is suggested when the hardware shows
+# up.  The tag cannot be satisfied honestly here.  The panel reports vendor:product
+# 1d6b:0109, which is the USB Implementers Forum's reserved test id - every CDC-ACM
+# device that does not bother to register an id reports those numbers, the same ones
+# the Linux Foundation's own test devices use.  Advertising that modalias would tell
+# whoever reads it that this package is the software for unrelated hardware too.
+# So the rule matches the USB product string as well, "Xigmatek USB Device"
+# (install/99-xigmatek-lcd.rules, installed as /usr/lib/udev/rules.d/99-xigmatek-
+# lcd.rules), and no modalias is claimed anywhere in this package.
+xigmatek-connect-lcd: appstream-metadata-missing-modalias-provide usr/lib/udev/rules.d/99-xigmatek-lcd.rules

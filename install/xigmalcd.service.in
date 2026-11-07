@@ -13,7 +13,11 @@ ExecStartPre=/bin/sleep 5
 # --status` reach the glass without stopping this unit - see xigmalcd/control.py.
 # Add --allow-reset to ExecStart only if you want the socket to be able to send
 # the vendor's `recovery` (it re-enumerates the USB device and drops the stored
-# background); tools/reset_panel.py --yes is the deliberate way.
+# background); the deliberate way is the reset command run by hand -
+# `xigmalcd-reset --yes` on a system that installed the package,
+# `tools/reset_panel.py --yes` in a checkout, one module behind both
+# (xigmalcd/reset.py).  A package install has no tools/ directory, which is why
+# that command exists.
 ExecStart=@PYTHON@ -m xigmalcd --theme @THEME@ --fps @FPS@
 Restart=on-failure
 RestartSec=10

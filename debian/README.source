@@ -1,0 +1,82 @@
+Notes for whoever packages this tree, written from the build on the author's bench
+(Ubuntu 26.04 LTS "resolute", debhelper 13.31ubuntu1, dh-python 7.20260309,
+python3-all 3.14.3-0ubuntu2, python3-setuptools 78.1.1-0.1build1, lintian
+2.129.0ubuntu2.1, devscripts 2.26.7 - versions as reported by dpkg -l on 2026-11-07).
+
+Format: 3.0 (native), and why
+--------------------------------
+This repository *is* the upstream: the protocol notes, the render code, the tools
+and the vendor files kept as evidence all live in one tree, developed together, and
+`debian/` sits in it as another part of that same work.  There is no separate
+upstream release to diff an upstream tarball against, so a native source format is
+the honest one; that also means no debian/watch file (there is no upstream tarball
+url to point at) and no dfsg mechanism - which matters, because the vendor's files
+are the part someone might want filtered out (next section), and with a native
+format that decision has to be made by building the second binary package or not,
+rather than by a repack rule.  If this is ever uploaded to a Debian-family archive,
+expect to move it to 3.0 (quilt) with a repacked tarball, and expect the FTP masters
+to ask about themes/alpha/ - debian/copyright answers the question rather than
+leaving it to be found.
+
+Version: debian/changelog's `0.1` is pyproject.toml's `0.1`, which is also the
+version in the wheel's METADATA.  Three places, one number; keep them equal and
+say so in the changelog when one moves.
+
+Which bytes go in which package
+-------------------------------
+`xigmatek-connect-lcd` is the code plus what the code needs to look like the vendor
+app out of the box: the two Python packages, the two console scripts, the three
+background clips this project vendors (4.8 MB), the udev rule, the user unit, the
+menu entry and the icon.
+
+`xigmatek-connect-lcd-themes` is ALPHA's own library - the 27 `.thm` files as
+shipped, their decrypted layouts, the clips, the baked overlay PNGs and the
+manifest that hashes every one of them (145 MB).  Those bytes are XIGMATEK's and
+nobody licensed them for redistribution here; debian/copyright's `OTHER` paragraph
+says what was actually done to obtain them and why they are carried.  They are a
+separate package so that the act of redistributing them is one deliberate choice at
+install time, and so that removing them is one command: `xigmalcd/layout.py`, the
+only code that reads the copied layouts, is used by tools/theme_check.py, which no
+package installs, and the clips are scanned as one optional root by
+xigmaui/clips.py.  Nothing reads them at startup, so the display loop keeps working
+with the package absent.
+
+tools/ is not installed by either package.  See debian/rules for the reason, and
+README.md "If the panel goes white" for what a packaged system therefore does and
+does not offer.
+
+Building
+--------
+    dpkg-buildpackage -us -uc -b        # -us -uc: unsigned, see below
+    lintian ../xigmatek-connect-lcd_*.changes
+
+`--fail-missing` is on (override_dh_missing), so a file pybuild installs that no
+.install file names is a build failure rather than something quietly dropped from
+the package.
+
+Signing: `-us -uc` means no .deb.signing/debsign signature on the .changes or the
+.upload, and no Maintainers signature on the .buildinfo's signature block.  A GitHub
+Release attachment carries no OpenPGP signature at all: authenticity there is HTTPS
+plus the checksums the release body lists.  That is a real difference from an
+archive upload and README says so where the .deb is offered.
+
+Testing
+-------
+    sudo apt install ./../xigmatek-connect-lcd_0.1_all.deb
+    debian/tests/smoke
+
+debian/tests/smoke runs the checks that only make sense after an install: both
+console scripts answering --help, the clip that pyproject.toml does not describe
+being found under /usr/share/xigmalcd/media by the same root rules a checkout uses,
+one frame rendered with no panel in the loop, the menu entry passing
+desktop-file-validate, the udev rule and unit present with the unit holding no
+--allow-reset, and (if the themes package is installed) every file in it hashing to
+what manifest.json recorded.  It works under autopkgtest (`Tests: smoke` in
+debian/tests/control, `Restrictions: superficial`) and by hand as above.
+
+The offline suite, tools/selftest.sh, runs before packaging in CI and is the thing
+to run after editing protocol.py, render.py or xigmaui/.  It is not run from
+debian/rules' override_dh_auto_test: two of its sections read the author's bench
+files under data/ (the Windows captures, the glass logs) and several measure wall
+clock timings, so a build that failed because a runner was slow would be a build
+failure that means nothing.

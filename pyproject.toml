@@ -21,9 +21,16 @@ license-files = ["LICENSE"]
 [project.optional-dependencies]
 gui = ["PyQt6>=6.4"]
 
+# One more entry point than there are programs: `xigmalcd-reset` is the vendor's
+# `recovery`, the request that re-enumerates the USB device and drops the panel's
+# stored background.  It is here because a person with an installed system and a
+# white panel otherwise has no way back (`logo`/`mode` cannot be set from the wire),
+# and it sends nothing without --yes.  xigmalcd/reset.py is the implementation and
+# the provenance; tools/reset_panel.py is the checkout spelling of the same command.
 [project.scripts]
 xigmalcd = "xigmalcd.main:main"
 xigmaui = "xigmaui.__main__:run"
+xigmalcd-reset = "xigmalcd.reset:main"
 
 [build-system]
 requires = ["setuptools>=77"]

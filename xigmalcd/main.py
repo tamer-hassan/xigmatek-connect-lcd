@@ -107,7 +107,75 @@ def _repo(*parts):
 WIN_STATIC = "/media/windows-c/Program Files/ALPHA/resources/static/media"
 WIN_UPLOADS = ("/media/windows-c/Users/Tamer/AppData/Roaming/alpha/media"
                "/background")
-DEFAULT_MP4_CANDIDATES = (
+
+# Where this program's own clips are, in the order the spellings win over each
+# other.  A package install has to be able to answer this: `pip install .` and
+# `apt install xigmatek-connect-lcd` put the code where the checkout is not, and
+# `xigmalcd/../media/Theme_25.mp4` then names a file that was never installed.
+#
+#   $XIGMA_MEDIA                 the one spelling for "use this clip set": the
+#                                tests use it, and so can anyone keeping their own
+#   <checkout>/media             the repository copy - what runs from a clone, and
+#                                what every clip figure in README was read from
+#   /usr/share/xigmalcd/media    the Debian/Ubuntu layout: where the .deb puts the
+#                                three clips it ships
+#
+# `media_dir()` is the first that exists, so a clone on a box that also has the
+# .deb installed still draws from the clone: otherwise the numbers README quotes
+# would depend on what happened to be packaged last.  The clip *library* lists
+# every root that exists (xigmaui/clips.py), so an installed themes package is
+# not hidden from a display running out of a checkout.
+MEDIA_ENV = "XIGMA_MEDIA"
+SYSTEM_MEDIA = "/usr/share/xigmalcd/media"
+REPO_MEDIA = _repo("media")
+
+# The rest of ALPHA's theme library, as the `xigmatek-connect-lcd-themes` package
+# installs it.  It is a root of the clip *library* and nothing else: the display
+# loop never reads themes/alpha at all (its own five themes are drawn from
+# render.py; `xigmalcd/layout.py`, which does read the copied layouts, is used by
+# tools/theme_check.py, which these packages do not ship).  The package owns its
+# own directory instead of symlinking clips into media/, so removing either
+# package leaves the other's files intact.
+SYSTEM_THEMES = "/usr/share/xigmalcd/themes/alpha"
+
+
+def media_roots() -> tuple:
+    """Every clip root that exists, first-winning order, no repeats."""
+    roots = []
+    env = os.environ.get(MEDIA_ENV)
+    if env:
+        roots.append(os.path.abspath(env))
+    for root in (REPO_MEDIA, SYSTEM_MEDIA):
+        if os.path.isdir(root):
+            roots.append(os.path.abspath(root))
+    return tuple(dict.fromkeys(roots))
+
+
+def media_dir() -> str:
+    """Where a clip name is looked up: the first root that exists, else the
+    checkout's, so a missing file is reported as the path this repo says it is."""
+    roots = media_roots()
+    return roots[0] if roots else REPO_MEDIA
+
+
+def find_media(name: str, *fallbacks: str) -> str:
+    """The first existing file for `name`: the clip roots in order, then the
+    Windows volume's copies, then the name under the first root so that a missing
+    clip is reported as the file we asked for.  The fallbacks are not decoration:
+    the same clip sits on the Windows partition under two different names, and
+    which one a frame came from is a fact worth having in the log."""
+    for root in (media_roots() or (REPO_MEDIA,)):
+        p = os.path.join(root, name)
+        if os.path.exists(p):
+            return p
+    for p in fallbacks:
+        if os.path.exists(p):
+            return p
+    return os.path.join(media_dir(), name)
+
+
+DEFAULT_MP4 = find_media(
+    "Theme_25.mp4",
     # The other half of the theme/background pair ALPHA itself has selected on
     # this machine, so the shipped default reproduces what the vendor app shows
     # rather than a better-looking picture chosen here: store.json says
@@ -121,27 +189,23 @@ DEFAULT_MP4_CANDIDATES = (
     # imperfection, and the one respect in which this clip is not the best
     # choice.  Accepted because matching the vendor is the point; the two
     # measured-quieter clips are below and `--mp4` reaches them in one flag.
-    _repo("media", "Theme_25.mp4"),
     os.path.join(WIN_UPLOADS, "Theme_25.mp4"),
     os.path.join(WIN_UPLOADS, "1757491589240.mp4"),
     os.path.join(WIN_STATIC, "Theme_25.mp4"),
 )
-DEFAULT_MP4 = next((p for p in DEFAULT_MP4_CANDIDATES if os.path.exists(p)),
-                   DEFAULT_MP4_CANDIDATES[0])
-QUIET_MP4_CANDIDATES = (
+QUIET_MP4 = find_media(
+    "Theme_11.mp4",
     # The least obtrusive clip in the same library: 3 402 098 B, 363 frames at
     # 24 fps = a 15.1 s loop, mean luma 13.3-24.1 (dark), 0 black frames, loop
     # seam 0.11 against 2.54 typical motion - the join is smoother than the
     # clip's own motion, i.e. the least visible loop in the library.  Its only
     # cost is size: it uploads in 2.4 s instead of 0.25-0.4 s (PROTOCOL §11).
     # Opt-in: --mp4 media/Theme_11.mp4
-    _repo("media", "Theme_11.mp4"),
     os.path.join(WIN_STATIC, "Theme_11.mp4"),
     os.path.join(WIN_UPLOADS, "Theme_11.mp4"),
 )
-QUIET_MP4 = next((p for p in QUIET_MP4_CANDIDATES if os.path.exists(p)),
-                 QUIET_MP4_CANDIDATES[0])
-BRIGHT_MP4_CANDIDATES = (
+BRIGHT_MP4 = find_media(
+    "theme_48.mp4",
     # The brightest clip in the library and the one ALPHA never pairs with a
     # white-on-transparent theme: 1 333 649 B, 217 frames at 20 fps = a 10.85 s
     # loop, 0 black frames, mean luma 227.3 of 255 - a near-white field under
@@ -149,12 +213,9 @@ BRIGHT_MP4_CANDIDATES = (
     # join is a hard cut.  Vendored so `--mp4 media/theme_48.mp4` is one flag
     # away, and measurable by the fact that the drawing puts a dark plate behind
     # everything it paints for this file (render._scrim, --scrim N).
-    _repo("media", "theme_48.mp4"),
     os.path.join(WIN_STATIC, "theme_48.mp4"),
     os.path.join(WIN_UPLOADS, "theme_48.mp4"),
 )
-BRIGHT_MP4 = next((p for p in BRIGHT_MP4_CANDIDATES if os.path.exists(p)),
-                  BRIGHT_MP4_CANDIDATES[0])
 
 # Mean luma of each clip on 255, measured by decoding it whole (PROTOCOL.md §9).
 # Held here, rather than decoded at startup, because the only thing it decides is
@@ -547,7 +608,11 @@ def build_parser() -> argparse.ArgumentParser:
                          "background. On by default with media/Theme_25.mp4: the "
                          "clip ALPHA itself pairs with the theme this program "
                          "redraws (215 KB, 23 frames, a 0.96 s loop, mean luma "
-                         "18.7 of 255, no black frames). Its measured weakness is "
+                         "18.7 of 255, no black frames). Where that file is "
+                         "looked up, in order: $XIGMA_MEDIA, this checkout's "
+                         "media/, and /usr/share/xigmalcd/media/ (what the .deb "
+                         "installs) - the first that exists. Its measured "
+                         "weakness is "
                          "the loop join, 2.50 against 1.51 typical motion, i.e. "
                          "a small jump once per second. Vendored alternatives, "
                          "one flag away: media/Theme_11.mp4 (3.4 MB, 15.1 s, "
@@ -601,7 +666,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="let the control socket send `recovery`.  It "
                          "re-enumerates the USB device and drops the stored "
                          "background, so it is off by default and "
-                         "tools/reset_panel.py --yes is the deliberate way")
+                         "xigmalcd-reset --yes (tools/reset_panel.py --yes in "
+                         "a checkout) is the deliberate way")
     ap.add_argument("--list", action="store_true",
                     help="list candidate serial ports and exit")
     return ap

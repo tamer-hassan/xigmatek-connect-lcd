@@ -1,0 +1,88 @@
+#!/usr/bin/make -f
+# debhelper 13 (declared as debhelper-compat in debian/control, so there is no
+# debian/compat file) plus dh-python: `--with python3 --buildsystem=pybuild`.
+#
+# Why pybuild rather than copying the modules by hand: this tree's metadata lives
+# in pyproject.toml - it is what `pip wheel .` reads, what the licence hash check in
+# tools/selftest.sh reads back, and what declares the three console scripts
+# (`xigmalcd = xigmalcd.main:main`, `xigmaui = xigmaui.__main__:run`,
+# `xigmalcd-reset = xigmalcd.reset:main`).  dh-python 7 has a PEP 517 build plugin
+# (`plugin_pyproject.py`), so the deb is built from that one declaration instead of
+# a second copy of it, and the commands in /usr/bin come from the same entry points
+# a pip install writes - one spelling of "what is this program called", checked in
+# this package's autopkgtest (debian/tests/smoke) by running them after an install.
+#
+# What pybuild does on this distro was measured, not assumed (debhelper
+# 13.31ubuntu1, dh-python 7.20260309, python3-all 3.14.3-0ubuntu2, built on Ubuntu
+# 26.04): its default module directory is the versioned one, which this interpreter
+# does not look in, so it is overridden below to the distro directory - the layout
+# every Python package on this machine uses.  That is deliberately not what
+# `pip install .` does on the same machine (pip writes its own scheme), and both are
+# right for their own audience: this file is the deb's.
+#
+# The three commands come from pyproject.toml's entry points: `xigmalcd` (the display
+# loop), `xigmaui` (the window) and `xigmalcd-reset` (the vendor's `recovery`, which
+# re-enumerates the USB device and drops the panel's stored background).  The last one
+# is in the package because a person with an installed system and a panel whose `logo`
+# and `mode` read 2147483647 has no other way back - those fields cannot be set from
+# the wire, only reset - and it sends nothing without --yes (xigmalcd/reset.py, and
+# debian/tests/smoke runs its dry-run path and fails if the installed unit ever grows
+# --allow-reset).
+#
+# The rest of tools/ is deliberately not installed: the discovery and probe scripts
+# (probe.py, fuzz.py, keyprobe.py, session_limit.py, fileshape.py and the rest) put
+# unmeasured or deliberately wrong bodies on the wire to learn what the firmware
+# accepts.  That is what a bench is for, not a package.
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+# pybuild's default module directory is the versioned one,
+# /usr/lib/python{version}/dist-packages (dh-python's build/options.py:30).  It
+# expects dh_python3 to move those files afterwards - dhpython/fs.py:fix_locations
+# walks interpreter.old_sitedirs(), whose OLD_SITE_DIRS list (dhpython/__init__.py)
+# includes /usr/lib/python{version}/dist-packages, and relocates them into /usr/lib/python3/dist-packages.  That works for a one-package
+# python3-foo source, where pybuild installs straight into debian/<package>.  It
+# does not work here: this source builds two binary packages, so files are staged in
+# debian/tmp and split by .install files at dh_install time, which is *before* that
+# move.  Measured on the first two builds: with the default, dh_install matched
+# nothing - "Cannot find (any matches for) usr/lib/python3/dist-packages/xigmalcd/" -
+# and stopped, and the interpreter would not have seen the files either, since
+# `python3 -m site` on this box lists /usr/lib/python3/dist-packages and
+# /usr/local/lib/python3.14/dist-packages and no versioned dist-packages at all.  So
+# the directory is pinned to the one every Python package here uses (dpkg -L
+# python3-pil, python3-serial, python3-pyqt6).  dh_python3 still runs after this and
+# does the byte-compiling and ${python3:Depends} generation.
+export PYBUILD_INSTALL_DIR = /usr/lib/python3/dist-packages
+
+TMP := debian/tmp
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_auto_install:
+	# pybuild first (it fills debian/tmp: modules, entry points, METADATA), then
+	# the data files pyproject.toml does not describe - the three clips this
+	# project vendors, the udev rule, the unit, the menu entry and the icon.
+	# The rest of the vendor's theme library is the second binary package's own
+	# tree, kept out of media/ rather than symlinked into it: xigmaui/clips.py
+	# scans it as a clip root (xigmalcd/main.py:SYSTEM_THEMES is that root), and
+	# the display loop never reads it.
+	dh_auto_install
+	install -d $(TMP)/usr/share/xigmalcd/media
+	install -m 644 media/Theme_25.mp4 media/Theme_11.mp4 media/theme_48.mp4 \
+		$(TMP)/usr/share/xigmalcd/media/
+	install -d $(TMP)/usr/lib/udev/rules.d
+	install -m 644 install/99-xigmatek-lcd.rules $(TMP)/usr/lib/udev/rules.d/
+	install -d $(TMP)/usr/lib/systemd/user
+	install -m 644 debian/xigmalcd.service $(TMP)/usr/lib/systemd/user/
+	install -d $(TMP)/usr/share/applications
+	install -m 644 debian/xigmaui.desktop $(TMP)/usr/share/applications/
+	# the launcher picture as a themed icon, so `Icon=xigmaui` in the menu entry and
+	# `QIcon.fromTheme("xigmaui")` in the window both find it without a configured
+	# icon theme path (dh_icons updates the cache and adds what it needs)
+	install -d $(TMP)/usr/share/icons/hicolor/256x256/apps
+	install -m 644 install/xigmaui.png \
+		$(TMP)/usr/share/icons/hicolor/256x256/apps/xigmaui.png
+
+override_dh_missing:
+	dh_missing --fail-missing

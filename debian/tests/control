@@ -1,0 +1,16 @@
+Tests: smoke
+Depends: @, python3, python3-pil, python3-serial, desktop-file-utils
+Restrictions: superficial
+
+# What this test is for: the things that can only be measured after an install, in
+# the layout an install produces.  The offline suite (tools/selftest.sh) covers the
+# protocol, the renders and the window from a checkout; none of it can see whether
+# pybuild put the modules where the interpreter looks, whether the clips the
+# packaging installs are the ones the code then finds by its own root rules, or
+# whether the menu entry and the unit survive a trip through debhelper.
+#
+# `Restrictions: superficial` because it reboots nothing and touches no hardware: it
+# renders to a file and never opens a serial port.  PyQt6 and the themes package are
+# not in Depends on purpose - the test says what it skipped rather than pulling 100+
+# MB of Qt into a run that is checking packaging.  Run it by hand on an installed
+# system too (debian/README.source, "Testing").

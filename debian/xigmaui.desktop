@@ -1,0 +1,50 @@
+# The menu entry, as installed by the .deb: /usr/share/applications/xigmaui.desktop.
+# install/xigmaui.desktop.in is the same entry for a git checkout, with @DIR@ and
+# @PYTHON@ filled in by install/install.sh.  tools/selftest.sh compares the two so
+# they cannot drift apart on the things that matter (Name, Exec's program and flags,
+# StartupWMClass, Categories, the tray action).
+#
+# The installed form needs no `Path` key: `xigmaui` is a real command in /usr/bin from
+# pyproject.toml's entry points, and the modules are on the system Python's path, so
+# the entry does not depend on any working directory.  `Icon` is a theme name rather
+# than a full path because the package installs install/xigmaui.png into
+# /usr/share/icons/hicolor/256x256/apps/, where a shell finds it without being told
+# where it is - which is also what lets the window's own QIcon.fromTheme("xigmaui")
+# work after an install (xigmaui/app.py:ICON).
+#
+# One entry, because there is one program and it decides its own role: if a `xigmalcd`
+# display is running (its control socket answers) the window drives it and never opens
+# /dev/ttyACM0; if none is, it uses the port itself, one action at a time.  The box at
+# the top of the window says which of the two it is.  The tray-only action below is the
+# same program with `--hidden`, and it needs a desktop with a tray to be of any use:
+# without one the window prints why and shows itself anyway.
+#
+# The name is the family, not the author's model - see install/xigmaui.desktop.in for
+# the paragraph, which says what has and has not been measured on which Connect.  The
+# two files must agree on Name, Comment and Keywords: tools/selftest.sh checks that.
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Xigmatek Connect LCD
+GenericName=AIO LCD panel
+GenericName[en_US]=AIO LCD panel
+Comment=Preview, theme and background picker for the Xigmatek Connect series AIO coolers LCD
+Comment[en_US]=Preview, theme and background picker for the Xigmatek Connect series AIO coolers LCD
+Exec=xigmaui
+Icon=xigmaui
+Terminal=false
+Categories=System;Monitor;Qt;
+Keywords=xigmatek;connect;connect 360;xigma;xigmaui;aio;lcd;panel;cooling;monitor;
+# StartupNotify=true is worth it for the window: the launcher marks it starting for
+# the ~0.2 s the build takes.  It is why the tray-only action is an action and not a
+# second visible entry: a shell that waits for a window with the right WM_CLASS waits
+# in vain for `--hidden`, so on some desktops that entry would spin until it gave up.
+StartupNotify=true
+StartupWMClass=xigmaui
+NoDisplay=false
+Actions=tray;
+
+[Desktop Action tray]
+Name=Start in the tray only
+Name[en_US]=Start in the tray only
+Exec=xigmaui --hidden

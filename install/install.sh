@@ -142,7 +142,7 @@ logs:   journalctl --user -u xigmalcd -f
 stop:   systemctl --user disable --now xigmalcd
 manual: cd $DIR && $PY -m xigmalcd --theme $THEME --fps $FPS -v
 
-gui:    "Xigma" in the application menu, or
+gui:    "Xigmatek Connect LCD" in the application menu, or
         cd $DIR && $PY -m xigmaui            (window, and tray icon if the
         desktop has one)  or  $PY -m xigmaui --hidden   (tray only)
         it talks to the running display over the control socket; with no display

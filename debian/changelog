@@ -1,0 +1,33 @@
+xigmatek-connect-lcd (0.1) resolute; urgency=medium
+
+  * First packaged form of the project, and the first form that is not a git
+    checkout: the display loop (`xigmalcd`), the Qt window (`xigmaui`), the
+    three background clips this project vendors, the udev rule, the systemd
+    user unit and the menu entry all land in the normal places.
+  * The vendor's panel reset ships as its own command, `xigmalcd-reset`,
+    because an installed system has no other way back once the panel's
+    `logo`/`mode` read 2147483647 - those fields cannot be set over the wire,
+    only reset.  It sends nothing without --yes, the shipped unit does not
+    arm --allow-reset, and debian/tests/smoke fails if either ever changes.
+    tools/reset_panel.py is now the checkout spelling of that same code
+    (`xigmalcd/reset.py`) rather than a second copy of it.
+  * Data discovery had to become installation-aware first: a path next to the
+    checkout is not a thing after `apt install`, so the clip roots are now
+    `$XIGMA_MEDIA`, the checkout's `media/` and /usr/share/xigmalcd/media,
+    first that exists, with the Windows partition's copies behind them
+    (`xigmalcd/main.py:media_roots`).  The window finds its icon the same way:
+    the checkout file, then the hicolor copy this package installs.
+    tools/selftest.sh checks those rules against fake roots.
+  * `xigmatek-connect-lcd-themes` carries ALPHA's own theme library - 27
+    `.thm` files as shipped, their decrypted layouts, 44 background clips, 27
+    baked overlay PNGs, and the manifest that hashes all 152 entries of the
+    125 distinct files they name - copied byte for byte out of the vendor
+    installation on the author's bench.  Those bytes are XIGMATEK's, not
+    ours, and `debian/copyright` says so instead of pretending to license
+    them; the package exists so a user can take them down again in one
+    command.
+  * Everything measured about the protocol is in `PROTOCOL.md`, and the
+    offline suite (`tools/selftest.sh`, seventeen offline sections) is what
+    CI runs before it builds a package.
+
+ -- Tamer Hassan <thameruddin@gmail.com>  Sat, 07 Nov 2026 04:40:00 +0000

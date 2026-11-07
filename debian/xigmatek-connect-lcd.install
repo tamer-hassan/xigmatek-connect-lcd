@@ -1,0 +1,18 @@
+# Paths here are relative to debian/tmp, where dh_auto_install staged everything -
+# pybuild's wheel modules in usr/lib/python3/dist-packages (the directory is pinned
+# in debian/rules; at this point in the sequence it is not the versioned one pybuild
+# would have used) and the rest of it from override_dh_auto_install.  Anything in
+# debian/tmp that no .install file names is a build failure, not a silent omission:
+# override_dh_missing calls `dh_missing --fail-missing`.
+
+usr/bin/xigmalcd
+usr/bin/xigmaui
+usr/bin/xigmalcd-reset
+usr/lib/python3/dist-packages/xigmalcd/
+usr/lib/python3/dist-packages/xigmaui/
+usr/lib/python3/dist-packages/xigmalcd-*/
+usr/share/xigmalcd/media/
+usr/lib/udev/rules.d/99-xigmatek-lcd.rules
+usr/lib/systemd/user/xigmalcd.service
+usr/share/applications/xigmaui.desktop
+usr/share/icons/hicolor/256x256/apps/xigmaui.png

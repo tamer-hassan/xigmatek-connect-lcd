@@ -1,0 +1,7 @@
+# ALPHA's own theme library, as copied out of the vendor installation.  Everything
+# under themes/alpha/ goes in as its own tree, and nothing from it is placed inside
+# the other package's directories: `apt remove xigmatek-connect-lcd-themes` then
+# takes 146 MB of somebody else's files away and leaves this program's own layout
+# untouched.  The tree is a clip library and nothing more: xigmalcd/main.py names it
+# (SYSTEM_THEMES) and xigmaui/clips.py scans it; the display loop never reads it.
+themes/alpha/ usr/share/xigmalcd/themes/

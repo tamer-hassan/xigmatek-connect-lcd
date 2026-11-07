@@ -1,0 +1,245 @@
+#!/bin/bash
+# Post-install checks for xigmatek-connect-lcd: the things only measurable once the
+# package has been unpacked into the layout an install produces.  Runs under
+# autopkgtest (debian/tests/control) and by hand on any installed system:
+#
+#     sudo apt install ./../xigmatek-connect-lcd_0.1_all.deb
+#     debian/tests/smoke
+#
+# Deliberately never opens a serial port: the render goes to a PNG in a temporary
+# directory, so this is safe on a box where the panel is absent, busy, or unhealthy.
+set -euo pipefail
+
+# Not the source tree: if the current directory held xigmalcd/, `import xigmalcd`
+# would import the copy sitting next to us and prove nothing about the install.
+here=$(cd "$(dirname "$0")" && pwd)
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+cd /
+
+say() { printf '  %-21s %s\n' "$1" "$2"; }
+
+echo "== the modules are where the interpreter looks"
+where=$(python3 - <<'PY'
+import os, xigmalcd.protocol, xigmaui.clips
+print(os.path.dirname(os.path.abspath(xigmalcd.protocol.__file__)))
+PY
+)
+case "$where" in
+    /usr/lib/python3/dist-packages/xigmalcd) ;;
+    *) echo "  imported from $where, not dist-packages: FAILED"; exit 1 ;;
+esac
+say "imports" "$where (+ xigmaui)"
+
+echo
+echo "== the two commands pyproject.toml declares"
+for cmd in xigmalcd xigmaui; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        echo "  $cmd not on PATH: FAILED"; exit 1
+    fi
+done
+xigmalcd --help >"$work/help.txt"
+grep -q -- '--fps' "$work/help.txt" || { echo "  xigmalcd --help: FAILED"; exit 1; }
+say "xigmalcd" "$(command -v xigmalcd), --help $(wc -c <"$work/help.txt") B"
+if python3 -c "import PyQt6" >/dev/null 2>&1; then
+    xigmaui --help >"$work/ghelp.txt"
+    grep -q -- '--tray' "$work/ghelp.txt" || { echo "  xigmaui --help: FAILED"; exit 1; }
+    say "xigmaui" "$(command -v xigmaui), --help $(wc -c <"$work/ghelp.txt") B"
+else
+    # PyQt6 is a Suggest, not a Depends: the display loop needs no Qt.  The command
+    # is still there (it comes from pyproject.toml's entry points), so say which of
+    # the two reasons it could not run is the one we are in.
+    say "xigmaui" "$(command -v xigmaui) present; SKIPPED --help, no PyQt6 (Suggest)"
+fi
+
+echo
+echo "== the clips the package installed are the ones the code finds"
+# $XIGMA_MEDIA unset and no checkout in the picture: /usr/share/xigmalcd/media has to
+# answer on its own, which is exactly the case that was broken before the roots were
+# made installation-aware (xigmalcd/main.py:media_roots).  md5 is the vendor's own
+# clip, the same value tools/selftest.sh pins from a checkout.
+test -z "${XIGMA_MEDIA:-}" || { echo "  XIGMA_MEDIA is set; unset it for this test"; exit 1; }
+python3 - <<'PY'
+import hashlib, os
+from xigmalcd import main as m
+
+assert m.SYSTEM_MEDIA == "/usr/share/xigmalcd/media", m.SYSTEM_MEDIA
+assert m.media_roots() == ("/usr/share/xigmalcd/media",), m.media_roots()
+want = {"Theme_25.mp4": (214_917, "b818b7d3294b3625e9f143e920ccc9b0"),
+        "Theme_11.mp4": (3_402_098, "4a515a8a17204ffb5a23d2ac34dd37ee"),
+        "theme_48.mp4": (1_333_649, "51701687804f60875da872c7f27ad673")}
+got = sorted(os.listdir(m.SYSTEM_MEDIA))
+assert got == sorted(want), got
+for name, (size, md5) in want.items():
+    blob = open(os.path.join(m.SYSTEM_MEDIA, name), "rb").read()
+    assert len(blob) == size, (name, len(blob), size)
+    assert hashlib.md5(blob).hexdigest() == md5, name
+    assert blob[4:8] == b"ftyp", blob[:12]
+for const, name in (("DEFAULT_MP4", "Theme_25.mp4"), ("QUIET_MP4", "Theme_11.mp4"),
+                    ("BRIGHT_MP4", "theme_48.mp4")):
+    path = getattr(m, const)
+    assert path == os.path.join(m.SYSTEM_MEDIA, name), (const, path)
+    print(f"  {const:11s} {path}")
+print(f"  roots         {m.media_roots()}")
+PY
+say "vendored clips" "3 clips, sizes and md5 as pinned in tools/selftest.sh"
+
+echo
+echo "== one frame, drawn with no panel in the loop"
+# --dry-run is the same render path the loop uses; --once keeps it to one PNG and one
+# exit code.  A missing font or a missing clip shows up here as a failed exit or a
+# short file rather than as a blank panel in someone's kitchen.
+xigmalcd --dry-run "$work/frames" --once >"$work/dry.log" 2>&1 || {
+    cat "$work/dry.log"; echo "  xigmalcd --dry-run: FAILED"; exit 1; }
+python3 - "$work/frames" <<'PY'
+import glob, sys
+from PIL import Image
+files = sorted(glob.glob(sys.argv[1] + "/*.png"))
+assert len(files) == 1, files
+im = Image.open(files[0])
+assert im.size == (480, 480), im.size
+print(f"  frame           {files[-1]} {im.size[0]}x{im.size[1]} {im.mode} "
+      f"{__import__('os').path.getsize(files[-1])} B")
+PY
+say "dry-run" "480x480 PNG written, exit 0"
+
+echo
+echo "== what debhelper installed around it"
+rule=/usr/lib/udev/rules.d/99-xigmatek-lcd.rules
+test -f "$rule" || { echo "  missing $rule: FAILED"; exit 1; }
+grep -q 'idVendor}=="1d6b"' "$rule" && grep -q 'Xigmatek USB Device' "$rule" \
+    || { echo "  $rule does not name the panel: FAILED"; exit 1; }
+say "udev rule" "$rule (symlink xigmatek-lcd, TAG+=uaccess)"
+
+unit=/usr/lib/systemd/user/xigmalcd.service
+test -f "$unit" || { echo "  missing $unit: FAILED"; exit 1; }
+exec_line=$(sed -n 's/^ExecStart=//p' "$unit")
+[ -n "$exec_line" ] || { echo "  no ExecStart in $unit: FAILED"; exit 1; }
+prog=${exec_line%% *}
+[ -x "$prog" ] || { echo "  ExecStart names $prog, not executable: FAILED"; exit 1; }
+# The gate is on ExecStart, not on the file: this unit's prose names --allow-reset to
+# explain why it is not used, so a whole-file grep is the wrong test (the first
+# version of this check failed on a unit that ships the flag nowhere).  What matters
+# is that the command systemd runs cannot reach the vendor's `recovery`, which
+# re-enumerates the USB device and drops the panel's stored background; nothing that
+# starts at login may be one socket write away from that.  debian/xigmalcd.service
+# explains the gate.
+case "$exec_line" in
+    *--allow-reset*)
+        echo "  $unit ExecStart arms --allow-reset: FAILED"
+        exit 1 ;;
+esac
+say "user unit" "$unit -> $exec_line (no --allow-reset)"
+
+desk=/usr/share/applications/xigmaui.desktop
+if command -v desktop-file-validate >/dev/null 2>&1; then
+    desktop-file-validate "$desk" || { echo "  $desk: FAILED"; exit 1; }
+    say "menu entry" "$desk, desktop-file-validate clean"
+else
+    say "menu entry" "$desk present; desktop-file-validate not installed (SKIPPED)"
+fi
+
+icon=/usr/share/icons/hicolor/256x256/apps/xigmaui.png
+test -f "$icon" || { echo "  missing $icon: FAILED"; exit 1; }
+python3 - "$icon" <<'PY'
+import os, sys
+from PIL import Image
+im = Image.open(sys.argv[1])
+assert im.size == (256, 256) and im.mode == "RGBA", (im.size, im.mode)
+assert all(im.getpixel(xy)[3] == 0 for xy in ((0, 0), (255, 0), (0, 255), (255, 255)))
+print(f"  icon            {sys.argv[1]} {im.size[0]}x{im.size[1]} "
+      f"{im.mode} {os.path.getsize(sys.argv[1])} B, corners transparent")
+PY
+# Whether the theme name resolves is a property of the desktop session's icon cache
+# (dh_icons installs the file and asks for the cache to be updated; a headless box
+# may never run that), so it is reported, not asserted.
+if python3 -c "import PyQt6" >/dev/null 2>&1; then
+    resolves=$(QT_QPA_PLATFORM=offscreen python3 - <<'PY' 2>/dev/null || echo unknown
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QApplication
+app = QApplication([])
+print("yes" if QIcon.fromTheme("xigmaui").isNull() is False else "no")
+PY
+)
+    say "Icon=xigmaui" "resolves by theme name: ${resolves:-unknown} (informational)"
+fi
+
+echo
+echo "== the reset command, and the gate on it"
+# `recovery` re-enumerates the USB device and drops the panel's stored background, so
+# the command that sends it is in the package only as a thing a person types, and only
+# with --yes (xigmalcd/reset.py).  Run here without --yes, against a port that is not
+# there: it must print the frame and send nothing, exit 0, and leave no device open.
+reset=/usr/bin/xigmalcd-reset
+test -x "$reset" || { echo "  missing $reset: FAILED"; exit 1; }
+rc=0
+"$reset" --device /nonexistent-port >"$work/reset.txt" 2>&1 || rc=$?
+[ "$rc" -eq 0 ] || { echo "  dry run exited $rc: FAILED"; cat "$work/reset.txt"; exit 1; }
+grep -q 'dry run: nothing sent' "$work/reset.txt" \
+    || { echo "  dry run did not say it sent nothing: FAILED"; cat "$work/reset.txt"; exit 1; }
+grep -q 'frame to send (109 bytes)' "$work/reset.txt" \
+    || { echo "  the frame printed is not the 109-byte one PROTOCOL.md quotes: FAILED"; exit 1; }
+if grep -q -- '--yes' <<<"$(sed -n 's/^ExecStart=//p' "$unit")"; then
+    echo "  $unit passes --yes: FAILED"; exit 1
+fi
+say "xigmalcd-reset" "$reset; no --yes -> $(wc -c <"$work/reset.txt") B printed, nothing sent"
+
+echo
+echo "== what the package does NOT ship"
+# The discovery and probe scripts in tools/ put deliberately wrong or unmeasured
+# bodies on the wire to see what the firmware accepts.  Those stay on the bench.
+for path in /usr/bin/reset_panel /usr/bin/reset_panel.py /usr/bin/probe \
+            /usr/bin/fuzz /usr/bin/keyprobe /usr/bin/send_image \
+            /usr/share/xigmalcd/tools; do
+    if [ -e "$path" ]; then echo "  $path exists in the install: FAILED"; exit 1; fi
+done
+say "tools/" "not installed; only the three entry points are on PATH"
+
+echo
+echo "== the vendor library, if it is installed"
+lib=/usr/share/xigmalcd/themes/alpha
+if ! dpkg -s xigmatek-connect-lcd-themes >/dev/null 2>&1; then
+    say "themes package" "not installed (Suggest-equivalent; SKIPPED)"
+else
+    test -f "$lib/manifest.json" || { echo "  missing $lib/manifest.json: FAILED"; exit 1; }
+    # Every file the manifest recorded, hashed in the layout the package installed it
+    # into: the same check tools/selftest.sh runs in a checkout, run here against the
+    # bytes that actually got packaged.
+    python3 - "$lib" <<'PY'
+import hashlib, json, os, sys
+lib = sys.argv[1]
+man = json.load(open(os.path.join(lib, "manifest.json")))
+bad, done, total = [], 0, 0
+for ent in man["files"]:
+    total += 1
+    path = os.path.join(lib, ent["path"])
+    if not os.path.exists(path):
+        bad.append((ent["path"], "missing"))
+        continue
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    if h.hexdigest() != ent["sha256"]:
+        bad.append((ent["path"], h.hexdigest()[:16]))
+    done += 1
+extra = []
+for root, _dirs, files in os.walk(lib):
+    for name in files:
+        rel = os.path.relpath(os.path.join(root, name), lib)
+        if rel not in {e["path"] for e in man["files"]} and rel not in (
+                "manifest.json", "README.md"):
+            extra.append(rel)
+assert not bad, bad[:6]
+assert not extra, extra[:6]
+print(f"  manifest          {done}/{total} files hashed clean under {lib}")
+kinds = {}
+for ent in man["files"]:
+    kinds[ent["kind"]] = kinds.get(ent["kind"], 0) + 1
+print(f"  kinds             {kinds}")
+PY
+    say "themes" "$lib, every manifest entry re-hashed"
+fi
+
+echo
+echo "all installed checks passed"

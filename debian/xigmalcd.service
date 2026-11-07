@@ -1,0 +1,50 @@
+# The systemd user unit, as installed by the .deb: /usr/lib/systemd/user/xigmalcd.service.
+# install/xigmalcd.service.in is the same unit for a git checkout, with @DIR@ and
+# @PYTHON@ filled in by install/install.sh.  tools/selftest.sh compares the two so
+# they cannot drift apart on the things that matter (ExecStart's flags, the
+# PartOf/After pairing, WantedBy, Restart, Nice).
+#
+# Start it with `systemctl --user enable --now xigmalcd` and, if you want it drawing
+# before you log in, `loginctl enable-linger $USER`.
+
+[Unit]
+Description=Xigmatek Connect LCD - show system stats on the AIO's front panel
+Documentation=file:/usr/share/doc/xigmatek-connect-lcd/README.md.gz
+Documentation=https://github.com/tamer-hassan/xigmatek-connect-lcd
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+# No WorkingDirectory, unlike the checkout unit: the modules are in
+# /usr/lib/python3/dist-packages, so the interpreter finds them from anywhere, and
+# the clips it draws are found by the roots xigmalcd/main.py:media_roots lists
+# ($XIGMA_MEDIA, a checkout's media/, /usr/share/xigmalcd/media).
+#
+# This one process is the only opener of the serial port, and it listens on a
+# control socket while it draws: $XDG_RUNTIME_DIR/xigmalcd.sock, which systemd sets
+# for a user unit.  That is how the desktop window and `xigmalcd --status` reach the
+# glass without stopping this unit - see xigmalcd/control.py.
+#
+# Add --allow-reset to ExecStart only if you want the socket to be able to send the
+# vendor's `recovery` (it re-enumerates the USB device and drops the stored
+# background).  It is not in the unit shipped here on purpose: nothing that starts
+# at login should be one socket write away from that.
+#
+# What that leaves a system with is the reset command one deliberate step away, which
+# is worth knowing before a panel goes white from the first second (its `logo`/`mode`
+# fields reading 2147483647).  The repair is the vendor's `recovery`: run
+# `xigmalcd-reset` on its own to see the frame it would send, or `xigmalcd-reset --yes`
+# to send it.  Nothing in this package sends it by itself - not a maintainer script,
+# not this unit, and not the control socket unless a loop was started with
+# --allow-reset - and debian/tests/smoke fails the install if this unit ever grows
+# --allow-reset.  README.md, "If the panel goes white", is the prose version of this.
+ExecStartPre=/bin/sleep 5
+ExecStart=/usr/bin/xigmalcd --theme alpha --fps 2
+Restart=on-failure
+RestartSec=10
+# the panel is a nicety, not a service: keep it off the way of real work
+Nice=10
+
+[Install]
+WantedBy=default.target

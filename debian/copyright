@@ -1,0 +1,82 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: xigmalcd
+Upstream-Contact: Tamer Hassan <thameruddin@gmail.com>
+Source: https://github.com/tamer-hassan/xigmatek-connect-lcd
+
+# Two kinds of bytes in this tree, and this file keeps them apart rather than
+# putting one licence over the whole thing.  The code, the documents and the
+# drawings made here are GPL-3.0-or-later.  The vendor's own files are in the
+# tree because every claim this project makes about ALPHA's themes is a claim
+# about those exact bytes - a reader should be able to hash them - and they are
+# not licensed by anyone who has a right to license them.  The last paragraph
+# says what was actually done to get them.
+
+Files: *
+Copyright: 2026 Tamer Hassan <thameruddin@gmail.com>
+License: GPL-3.0-or-later
+
+Files: debian/*
+Copyright: 2026 Tamer Hassan <thameruddin@gmail.com>
+License: GPL-3.0-or-later
+
+# The project's mark, and the icon and logo generated from it by tools/makeicon.py.
+Files: install/artwork/*
+       install/xigmaui.png
+       install/xigmaui.ico
+       docs/logo.png
+Copyright: 2026 Tamer Hassan <thameruddin@gmail.com>
+License: GPL-3.0-or-later
+
+# Previews and contact sheets.  Each one is this project's drawing composited
+# over one frame lifted out of a XIGMATEK background clip, the way the panel
+# composites its two layers, so they are derivative works of the vendor's media
+# as much as they are ours.  None of them is installed by these packages.
+Files: docs/previews/*
+Copyright: 2026 Tamer Hassan <thameruddin@gmail.com>
+           XIGMATEK (derivative: one frame of a vendor clip underneath)
+License: GPL-3.0-or-later+OTHER
+
+Files: themes/alpha/*
+       media/Theme_11.mp4
+       media/Theme_25.mp4
+       media/theme_48.mp4
+Copyright: XIGMATEK (the panel's vendor); these files are the vendor's own, and
+ the copyright holder has not granted a licence for them - see the paragraph
+ below, and themes/alpha/README.md for the path they were read out of
+License: OTHER
+
+License: GPL-3.0-or-later
+ This package is free software: you can redistribute it and/or modify it under
+ the terms of the GNU General Public License as published by the Free Software
+ Foundation, either version 3 of the License, or (at your option) any later
+ version.
+ .
+ This package is distributed in the hope that it will be useful, but WITHOUT ANY
+ WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+ PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+ .
+ On a Debian system the full text of GPL version 3 is in
+ /usr/share/common-licenses/GPL-3; it is also reproduced verbatim as LICENSE at
+ the top level of the upstream source, and included below.
+
+License: OTHER
+ What was done, plainly: the files under themes/alpha/ and the three clips in
+ media/ were copied, byte for byte, out of a vendor installation on the author's
+ bench machine (`C:\Program Files\ALPHA\`, reached from Linux as a mounted
+ Windows volume; themes/alpha/README.md names the paths and the tool,
+ tools/thm_unlock.py, that took them out).  The `.thm` theme files were decrypted
+ with constants read out of the vendor application's own compiled code, in order
+ to learn what the panel is being told to draw.
+ .
+ No permission to copy them was asked for and none was given, so no licence for
+ them is claimed here: they are redistributed as an act of interoperability and
+ record-keeping, on the assessment that documenting an undocumented, unlicensed
+ USB protocol and reproducing the assets it consumes is within fair use for that
+ purpose.  They are separated into their own binary package
+ (xigmatek-connect-lcd-themes), and nothing in this project needs them to run:
+ removing that package takes them away and leaves the display working.
+ .
+ If the rights holder considers this wrong, say so to the address in
+ Upstream-Contact and the files come down; that offer is in README.md as well.
+ Xigmatek, Connect and ALPHA are the rights holder's names, and nothing here is
+ affiliated with, endorsed by or approved by XIGMATEK.

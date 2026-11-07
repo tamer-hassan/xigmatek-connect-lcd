@@ -376,6 +376,86 @@ for path, size, md5 in ((DEFAULT_MP4, 214_917, "b818b7d3294b3625e9f143e920ccc9b0
 PY
 
 echo
+echo "== where clips are looked up: the roots a package install has to get right"
+# A checkout is not the only place this code runs.  `pip install .` and the .deb
+# built from debian/ put the modules where the repository tree is not, so the
+# three roots of xigmalcd.main (env, checkout, /usr/share/xigmalcd/media) are what
+# decides whether a user gets the shipped background or a missing-file message.
+# Checked against fake roots: no root, no installed package, nothing written
+# outside a temp directory.
+python3 - <<'PY' || { echo "clip roots FAILED"; exit 1; }
+import os, shutil, sys, tempfile
+sys.path.insert(0, ".")
+from xigmalcd import main as m
+
+# 1. in a checkout: the repository's own media/ is the root, and all three shipped
+#    clips resolve inside it - which is what every clip number in README reads
+repo = os.path.abspath(m.REPO_MEDIA)
+assert m.media_roots() == (repo,), m.media_roots()
+for p in (m.DEFAULT_MP4, m.QUIET_MP4, m.BRIGHT_MP4):
+    assert os.path.dirname(p) == repo, p
+    assert os.path.exists(p), p
+print(f"  checkout           default, quiet and bright all resolve inside {repo}")
+
+with tempfile.TemporaryDirectory() as tmp:
+    sysroot = os.path.join(tmp, "usr-share-xigmalcd-media")
+    os.makedirs(sysroot)
+    for n in ("Theme_25.mp4", "Theme_11.mp4", "theme_48.mp4"):
+        open(os.path.join(sysroot, n), "wb").write(b"stand-in")
+
+    # 2. a box with both: the checkout still answers, so the README figures do not
+    #    depend on what happens to be installed on the machine reading them
+    real = m.SYSTEM_MEDIA
+    m.SYSTEM_MEDIA = sysroot
+    try:
+        assert m.media_roots() == (repo, os.path.abspath(sysroot)), m.media_roots()
+        assert m.media_dir() == repo
+        assert m.find_media("Theme_25.mp4") == os.path.join(repo, "Theme_25.mp4")
+
+        # 3. the same question with no checkout in the picture: the installed root
+        #    is what answers it, which is the whole point of installing to /usr/share
+        saved = m.REPO_MEDIA
+        m.REPO_MEDIA = os.path.join(tmp, "no-such-checkout")
+        try:
+            assert m.media_roots() == (os.path.abspath(sysroot),), m.media_roots()
+            got = m.find_media("Theme_25.mp4")
+            assert got == os.path.join(sysroot, "Theme_25.mp4"), got
+        finally:
+            m.REPO_MEDIA = saved
+
+        # 4. a clip in no root at all falls back to the Windows partition's copy,
+        #    and if it is nowhere it is still named as the file we asked for
+        win = os.path.join(tmp, "win", "Theme_99.mp4")
+        os.makedirs(os.path.dirname(win))
+        open(win, "wb").write(b"windows copy")
+        assert m.find_media("Theme_99.mp4", win) == win
+        nowhere = m.find_media("Theme_99.mp4")
+        assert nowhere.endswith("Theme_99.mp4") and not os.path.exists(nowhere), nowhere
+    finally:
+        m.SYSTEM_MEDIA = real
+print("  installed root     behind the checkout when both exist, first when only it does;")
+print("                     the Windows copies still answer, and a clip that is nowhere")
+print("                     local is reported as the file that was asked for")
+
+# 5. $XIGMA_MEDIA replaces the checkout root, and the window's clip library scans
+#    every root that exists rather than only the first: an installed themes set is
+#    not hidden from a display running out of a clone
+with tempfile.TemporaryDirectory() as envdir:
+    shutil.copy(os.path.join(repo, "Theme_25.mp4"), envdir)
+    os.environ[m.MEDIA_ENV] = envdir
+    try:
+        assert m.media_dir() == os.path.abspath(envdir), m.media_dir()
+        assert m.media_roots()[:2] == (os.path.abspath(envdir), repo), m.media_roots()
+        from xigmaui import clips
+        dirs = {os.path.dirname(c.path) for c in clips.list_clips()}
+        assert os.path.abspath(envdir) in dirs, sorted(dirs)[:4]
+        assert repo in dirs, sorted(dirs)[:4]
+    finally:
+        del os.environ[m.MEDIA_ENV]
+print("  $XIGMA_MEDIA       first root, and the clip library lists it alongside the rest")
+PY
+
+echo
 echo "== the vendor theme library: every copied byte against its own manifest"
 # Read-only, no hardware, and no Windows volume: manifest.json recorded the sha256 of
 # every file as it was read out of ALPHA, and each theme's `background` entry carries the
@@ -551,10 +631,26 @@ assert any("PyQt6" in d for d in gui), gui
 assert not any("PyQt6" in d for d in cfg["project"]["dependencies"]), \
     "Qt belongs in the [gui] extra: the display loop runs without it"
 scripts = cfg["project"]["scripts"]
-assert set(scripts) == {"xigmalcd", "xigmaui"}, scripts
+assert set(scripts) == {"xigmalcd", "xigmaui", "xigmalcd-reset"}, scripts
 for name, target in sorted(scripts.items()):
     mod, _, attr = target.partition(":")
     assert callable(getattr(importlib.import_module(mod), attr)), (name, target)
+
+# `xigmalcd-reset` is the one entry point that can put a destructive frame on the
+# wire, so the gate is checked here rather than trusted: called with no arguments,
+# against whatever ports happen to exist, it must build the frame, print it, and
+# send nothing.  Nothing in this suite ever opens /dev/ttyACM0, and this is the
+# check that keeps it that way.
+import contextlib, io
+from xigmalcd import reset as resetmod
+out = io.StringIO()
+with contextlib.redirect_stdout(out):
+    rc = resetmod.main([])
+text = out.getvalue()
+assert rc == 0 and "dry run: nothing sent" in text, text
+assert "frame to send (109 bytes)" in text, text     # the vendor's own frame length
+print(f"  reset gate           {scripts['xigmalcd-reset']} with no --yes sends "
+      f"nothing ({len(text)} B printed, 109-byte frame shown)")
 
 # the licence the README states and the licence the package declares have to be
 # the same thing, and the file it points at has to be the licence itself rather
@@ -715,6 +811,162 @@ assert ns.theme in render.THEMES, ns.theme
 assert 0.1 <= ns.fps <= 5.0, ns.fps                 # control.py's accepted range
 assert "--no-control" not in args, "the unit must leave the window a socket"
 print(f"  unit                   ExecStart: {' '.join(args)}")
+PY
+
+echo
+echo "== the .deb's unit and menu entry against the checkout's"
+# debian/xigmalcd.service and debian/xigmaui.desktop are the installed-layout twins
+# of install/xigmalcd.service.in and install/xigmaui.desktop.in, and they are written
+# by hand rather than generated: the checkout forms need @DIR@, @PYTHON@ and a `Path`
+# key, none of which mean anything once the modules sit in
+# /usr/lib/python3/dist-packages and `xigmalcd` is a command in /usr/bin.  Two
+# hand-written files that describe the same panel drift, so this compares them on
+# every key that is about the run, and states out loud the ones that differ because
+# of the layout.
+python3 - <<'PY' || { echo "packaging parity FAILED"; exit 1; }
+import os
+import re
+import shutil
+import subprocess
+
+from xigmalcd import main as cli
+from xigmalcd import render
+
+
+def groups(path):
+    """key=value by [group], comments skipped: enough for a unit file and a .desktop
+    entry, and it keeps Exec of the main entry apart from Exec of the tray action."""
+    g, cur = {}, None
+    for line in open(path, encoding="utf-8"):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            cur = line[1:-1]
+            g[cur] = {}
+        elif "=" in line:
+            k, _, v = line.partition("=")
+            g[cur][k] = v.strip()
+    return g
+
+
+deb, chk = groups("debian/xigmalcd.service"), groups("install/xigmalcd.service.in")
+
+# what the run is: same description, same pairing with the session, same restart
+# behaviour.  Nothing here is compared to a copy of the list - both sides are read.
+for k in ("Description", "After", "PartOf"):
+    assert deb["Unit"][k] == chk["Unit"][k], (k, deb["Unit"][k], chk["Unit"][k])
+for k in ("Type", "ExecStartPre", "Restart", "RestartSec", "Nice"):
+    assert deb["Service"][k] == chk["Service"][k], (k, deb["Service"][k],
+                                                    chk["Service"][k])
+assert deb["Install"]["WantedBy"] == chk["Install"]["WantedBy"], deb["Install"]
+
+# ExecStart: two spellings of one command.  The checkout's theme and fps come from
+# install.sh's own defaults, the same reading the section above uses.
+install = open("install/install.sh", encoding="utf-8").read()
+defaults = dict(re.findall(r'^(\w+)="\$\{XIGMALCD_\w+:-([^"]*)\}"', install, re.M))
+co = chk["Service"]["ExecStart"].replace("@THEME@", defaults["THEME"]) \
+                                .replace("@FPS@", defaults["FPS"]).split()
+assert co[:2] == [os.path.basename(co[0]), "-m"] and co[2] == "xigmalcd", co[:3]
+co = co[3:]
+db = deb["Service"]["ExecStart"].split()
+prog, db = db[0], db[1:]
+assert prog == "/usr/bin/xigmalcd", prog      # the entry point, not `python3 -m`
+assert co == db, (co, db)
+for a in (co, db):
+    assert "--allow-reset" not in a and "--no-control" not in a, a
+    ns = cli.build_parser().parse_args(a)     # the real parser takes this unit line
+    assert ns.theme in render.THEMES and 0.1 <= ns.fps <= 5.0, ns
+print(f"  unit                   both ExecStart agree: {' '.join(db)} "
+      f"(parser: theme {ns.theme}, fps {ns.fps}); no --allow-reset in either")
+
+# ...and the two differences are the layout, not the panel: a checkout needs a
+# working directory because it runs `-m xigmalcd`, an installed system does not; and
+# only the installed form can point a reader at a compressed README in /usr/share/doc.
+assert "WorkingDirectory" in chk["Service"], "the checkout unit needs one"
+assert "WorkingDirectory" not in deb["Service"], "an install has no checkout to cd to"
+# Documentation is a repeated key, and groups() keeps one value per key, so the
+# two lines this checks are read from the file itself.
+docs = [ln.split("=", 1)[1].strip() for ln in open("debian/xigmalcd.service",
+                                                   encoding="utf-8")
+        if ln.startswith("Documentation=")]
+assert any(d.startswith("file:/usr/share/doc/xigmatek-connect-lcd/") for d in docs), docs
+assert any(d.startswith("https://") for d in docs), docs
+print("  unit                   differs only in WorkingDirectory (checkout only) "
+      "and Documentation (installed only)")
+
+de = groups("debian/xigmaui.desktop")
+ce = groups("install/xigmaui.desktop.in")
+shared = ("Type", "Version", "Name", "GenericName", "GenericName[en_US]",
+          "Comment", "Comment[en_US]", "Terminal", "Categories", "Keywords",
+          "StartupNotify", "StartupWMClass", "NoDisplay", "Actions")
+for k in shared:
+    assert de["Desktop Entry"][k] == ce["Desktop Entry"][k], k
+assert ce["Desktop Entry"]["Exec"].endswith("-m xigmaui"), ce["Desktop Entry"]["Exec"]
+assert de["Desktop Entry"]["Exec"] == "xigmaui", de["Desktop Entry"]["Exec"]
+assert "Path" in ce["Desktop Entry"] and "Path" not in de["Desktop Entry"]
+assert de["Desktop Action tray"]["Exec"] == "xigmaui --hidden", \
+    de["Desktop Action tray"]["Exec"]
+print(f"  menu entry             same {len(shared)} keys; Exec xigmaui "
+      f"(installed) vs `-m xigmaui` + Path (checkout)")
+
+# The program's own name sits in four places a reader actually sees - the window's
+# title bar, its tray tooltip, and the `Name=` of both menu entries - so the constant
+# in app.py is compared to both files instead of trusting that they were edited
+# together.  Nothing claims README's prose matches: that is a sentence, not a key, and
+# the entry's `Comment` is deliberately a different sentence from the title bar.
+src = open("xigmaui/app.py", encoding="utf-8").read()
+title = re.search(r'^TITLE = "(.*)"$', src, re.M)
+assert title, "xigmaui/app.py declares no TITLE constant"
+name = de["Desktop Entry"]["Name"]
+assert name == ce["Desktop Entry"]["Name"] == title.group(1), \
+    (name, ce["Desktop Entry"]["Name"], title.group(1))
+assert "setWindowTitle(TITLE)" in src and "setToolTip(TITLE" in src, \
+    "the window does not take its own name from TITLE"
+print(f"  name                   {name!r}: app.py's TITLE, its title bar and tray "
+      f"tooltip, and both entries' Name")
+# The name says `Connect`, not `Connect 360`: the protocol work was measured on a
+# Connect 360 (README, PROTOCOL.md) and no other model has been tested, so the entry
+# names the family the program is written for rather than the author's unit, and
+# keeps `connect 360` only as a search keyword.
+assert "connect 360" in de["Desktop Entry"]["Keywords"], de["Desktop Entry"]["Keywords"]
+assert "360" not in name and "360" not in de["Desktop Entry"]["Comment"], (name,)
+print(f"  name                   Comment: {de['Desktop Entry']['Comment']}")
+
+# The icon is the one claim all three files make, so all three are read: the name in
+# the menu entry, the hicolor path the package installs it to, and the path the
+# window falls back to when no icon theme resolves the name.
+ins = open("debian/xigmatek-connect-lcd.install", encoding="utf-8").read()
+rel = "usr/share/icons/hicolor/256x256/apps/xigmaui.png"
+assert rel in ins, "the package does not install the icon the entry names"
+assert de["Desktop Entry"]["Icon"] == "xigmaui", de["Desktop Entry"]["Icon"]
+assert "/" + rel in open("xigmaui/app.py", encoding="utf-8").read(), \
+    "xigmaui/app.py does not look where the package puts the picture"
+assert os.path.exists("install/" + os.path.basename(rel)), "the source picture"
+print(f"  icon                   Icon=xigmaui, installed at /{rel}, and app.py's "
+      f"ICONS names that path")
+
+# one copy of the udev rule, one installed destination.  Tracked files, not a walk:
+# a build tree has a copy of the same rule under debian/tmp, and that is a build
+# artifact rather than a second file someone has to keep in step.
+rules = subprocess.run(["git", "ls-files", "*.rules"], capture_output=True,
+                       text=True)
+if rules.returncode != 0:
+    print("  udev rule              git not available here: SKIPPED the one-file "
+          "check")
+else:
+    want = ["install/99-xigmatek-lcd.rules"]
+    assert rules.stdout.split() == want, rules.stdout.split()
+    assert "install/99-xigmatek-lcd.rules" in open("debian/rules",
+                                                   encoding="utf-8").read()
+    print("  udev rule              one tracked file, installed by debian/rules")
+
+if shutil.which("desktop-file-validate"):
+    subprocess.run(["desktop-file-validate", "debian/xigmaui.desktop"], check=True)
+    print("  desktop-file-validate  clean on the installed form too")
+else:
+    print("  desktop-file-validate  not installed here: SKIPPED on the installed "
+          "form (CI installs it as a Build-Depend)")
 PY
 
 echo

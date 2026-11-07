@@ -183,7 +183,8 @@ class Control:
                                  "USB device and returns the panel to its "
                                  "default state. Start xigmalcd with "
                                  "--allow-reset if you mean to allow it over "
-                                 "the socket; tools/reset_panel.py --yes is "
+                                 "the socket; xigmalcd-reset --yes (in a "
+                                 "checkout, tools/reset_panel.py --yes) is "
                                  "the deliberate way."}
             return self._queue("reset", None)
         if cmd in ("quit", "stop", "exit"):

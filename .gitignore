@@ -29,3 +29,20 @@ venv/
 .idea/
 .vscode/
 .DS_Store
+
+# debhelper's working state, and the binary package trees it assembles from
+# debian/tmp before dpkg-deb packs them.  The .deb/.changes/.buildinfo themselves
+# are written one directory up, outside the tree, by dpkg-buildpackage.  Listed by
+# name rather than by `debian/*/` because debian/source/ and debian/tests/ are
+# source files like the rest of debian/.
+.pybuild/
+debhelper-build-stamp
+debian/tmp/
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/files
+debian/*.substvars
+debian/*.debhelper.log
+debian/*.debhelper
+debian/xigmatek-connect-lcd/
+debian/xigmatek-connect-lcd-themes/

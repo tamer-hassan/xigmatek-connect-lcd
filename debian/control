@@ -1,0 +1,100 @@
+Source: xigmatek-connect-lcd
+Section: utils
+Priority: optional
+Maintainer: Tamer Hassan <thameruddin@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               pybuild-plugin-pyproject,
+               desktop-file-utils,
+               python3-all,
+               python3-setuptools,
+               python3-wheel
+# pybuild-plugin-pyproject is not decoration: dh-python's pybuild picks its PEP 517
+# plugin from that package, and without it the build stops where this one measured it
+# - "PEP517 plugin dependencies are not available" on 2026-11-07, with debhelper
+# 13.31ubuntu1 and dh-python 7.20260309.
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+# This repository *is* the upstream: the protocol notes, the render code, the
+# tools and the vendor files kept as evidence all live in one tree, and the
+# version in debian/changelog is the version of that tree.  There is no upstream
+# tarball to diff against, hence 3.0 (native) - see debian/README.source.
+
+Package: xigmatek-connect-lcd
+Architecture: all
+Multi-Arch: foreign
+Depends: ${misc:Depends},
+         ${python3:Depends},
+         python3 (>= 3.9),
+         python3-pil,
+         python3-serial,
+         fonts-dejavu-core
+Recommends: fonts-liberation,
+            xigmatek-connect-lcd-themes (= ${binary:Version})
+Suggests: python3-pyqt6, ffmpeg
+Description: system stats on the LCD built into Xigmatek Connect AIO coolers
+ Unofficial: not affiliated with, endorsed by or approved by XIGMATEK, and
+ the program says so on the panel it draws.
+ .
+ Xigmatek's Connect series all-in-one coolers have a 480x480 LCD in a USB
+ port header on the water block, and on Windows the vendor's ALPHA app draws
+ CPU and GPU temperatures, clocks and fan speeds on it.  On Linux the panel
+ appears as a plain CDC-ACM serial port and nothing talks its protocol; this
+ package talks it.
+ .
+ The `xigmalcd` command is the display loop: it opens /dev/ttyACM0 (or the
+ `xigmatek-lcd` symlink this package's udev rule creates), handshakes,
+ uploads a PNG frame from Linux sensors at 1-5 fps, optionally uploads an
+ MP4 as the panel's background layer, and answers on a control socket so the
+ window and `xigmalcd --status` can change what it draws without taking the
+ port.  Only one process can hold the port, so that unit is meant to be the
+ only opener.
+ .
+ The window, `xigmaui`, is a client of that socket: theme, clock, canvas,
+ scrim, fans, fps, pause, one frame and one background upload, live.  It
+ needs PyQt6, which is why PyQt6 is a Suggest rather than a Depends: the
+ display loop does not need Qt at all.
+ .
+ The protocol itself is documented in
+ /usr/share/doc/xigmatek-connect-lcd/PROTOCOL.md.gz - measured against the
+ panel from Linux, byte by byte, with no vendor documentation of any kind.
+ .
+ This is an unofficial project, and it ships no automatic repair.  If the
+ panel is unhealthy after a boot - fields reading 2147483647, a screen white
+ from the first second - the fix is the vendor's own `recovery` request, and
+ the only way this package sends it is the command `xigmalcd-reset --yes`,
+ run by hand: without --yes it prints the frame and sends nothing.  Nothing
+ in this package runs it automatically - not a maintainer script, not the
+ unit, and not the control socket unless a loop was deliberately started
+ with --allow-reset.
+
+Package: xigmatek-connect-lcd-themes
+Section: utils
+Priority: optional
+Architecture: all
+Multi-Arch: foreign
+Depends: ${misc:Depends}
+Recommends: xigmatek-connect-lcd (= ${binary:Version})
+Description: ALPHA's own theme library, as shipped, for Xigmatek Connect panels
+ Unofficial, and the part of this package that is least ours: these are
+ XIGMATEK's files, copied byte for byte out of the vendor's Windows
+ installation on the author's bench, and they are redistributed here for the
+ record rather than under any licence granted by the rights holder.
+ debian/copyright says which files those are and what was actually done to
+ obtain them.
+ .
+ What is in here: the 27 `.thm` theme files as shipped, their decrypted
+ layouts as readable JSON, the 44 background clips (43 MP4s and one PNG), the
+ 27 baked overlay PNGs, and `manifest.json`, whose 152 entries hash those 125
+ distinct files - the 27 `background` entries name the same bytes as 27 of
+ the clips - so the copy can be checked rather than trusted.  The layouts are
+ what xigmalcd/layout.py reads; the clips sit in their own tree, which
+ xigmaui/clips.py scans as one optional clip root (the root constant is
+ xigmalcd/main.py:SYSTEM_THEMES), so the window's background picker offers all
+ 44 of them instead of only the three this project vendors itself, and removing
+ this package takes them away without touching anything else.
+ .
+ Install it to get the vendor's backgrounds and the evidence for every claim
+ this project makes about its themes.  Remove it to take them away again:
+ nothing else in this package reads them, and the display loop keeps drawing
+ its five own themes with it absent.

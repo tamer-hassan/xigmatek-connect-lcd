@@ -14,20 +14,28 @@
 # tray-only action below is the same program with `--hidden`, and it needs a
 # desktop with a tray to be of any use: without one the window prints why and
 # shows itself anyway.
+#
+# The name is the family, not the author's model.  Every measurement in this repo
+# was taken on a Connect 360 (README, PROTOCOL.md), and the frame is drawn at
+# 480x480 because that is what this panel reports - no other Connect has been
+# tested - but a menu entry called "Connect 360" would tell an owner of a
+# different Connect that this is not for their port, which is a claim nothing here
+# has measured either.  `connect 360` stays in Keywords so that someone who does
+# own one still finds it by typing their model.
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Xigma - Xigmatek Connect 360
+Name=Xigmatek Connect LCD
 GenericName=AIO LCD panel
 GenericName[en_US]=AIO LCD panel
-Comment=Preview, theme and background picker for the Xigmatek Connect 360 LCD
-Comment[en_US]=Preview, theme and background picker for the Xigmatek Connect 360 LCD
+Comment=Preview, theme and background picker for the Xigmatek Connect series AIO coolers LCD
+Comment[en_US]=Preview, theme and background picker for the Xigmatek Connect series AIO coolers LCD
 Exec=@PYTHON@ -m xigmaui
 Path=@DIR@
 Icon=@DIR@/install/xigmaui.png
 Terminal=false
 Categories=System;Monitor;Qt;
-Keywords=xigmatek;connect 360;aio;lcd;panel;cooling;monitor;
+Keywords=xigmatek;connect;connect 360;xigma;xigmaui;aio;lcd;panel;cooling;monitor;
 # StartupNotify=true is worth it for the window: the launcher marks it starting
 # for the ~0.2 s the build takes.  It is why the tray-only action is an action and
 # not a second visible entry: a shell that waits for a window with the right

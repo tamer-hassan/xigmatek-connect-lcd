@@ -59,8 +59,37 @@ from . import settings
 from .daemon import Daemon
 from .panel import Panel, describe, flatten, port_busy
 
-ICON = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                    "install", "xigmaui.png")
+# Where the launcher picture is, in the order the spellings win over each other -
+# the same installation-aware rule the clips follow (xigmalcd/main.py:media_roots):
+# after `apt install` the checkout path does not exist, and a window with no icon is
+# a window the taskbar draws as a generic gear and the shell matches by name only.
+ICONS = (os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                      "install", "xigmaui.png"),
+         "/usr/share/icons/hicolor/256x256/apps/xigmaui.png")
+ICON = next((p for p in ICONS if os.path.exists(p)), ICONS[0])
+
+# What this window calls itself - in the title bar, in the tray tooltip, and as the
+# `Name=` of both menu entries (install/xigmaui.desktop.in and
+# debian/xigmaui.desktop).  One string, four places that show it; the suite's
+# packaging-parity section reads this constant back against both files, so the entry a
+# shell lists and the window it launches cannot end up named differently.  It is the
+# vendor's family, not the author's model - the paragraph in
+# install/xigmaui.desktop.in says what has actually been measured on which Connect.
+TITLE = "Xigmatek Connect LCD"
+
+
+def app_icon() -> QIcon:
+    """The project mark, however this machine knows about it.
+
+    By theme name first: the .deb installs the picture into
+    /usr/share/icons/hicolor/256x256/apps/xigmaui.png, which is what makes
+    `Icon=xigmaui` in the installed menu entry resolve.  On a box running from a
+    checkout there is no icon theme holding it (this machine has none configured),
+    so the fallback is the file itself - and the picture is a rendering of the
+    glass, which is the one thing worth showing in the taskbar and in the tray,
+    where it is the only way to find us."""
+    return QIcon.fromTheme("xigmaui",
+                           QIcon(ICON) if os.path.exists(ICON) else QIcon())
 
 
 def _scroll(widget: QWidget) -> QScrollArea:
@@ -93,7 +122,7 @@ class Window(QMainWindow):
         window hides it instead of quitting (`--tray` / `--no-tray`)."""
         super().__init__()
         self.cfg = settings.load() if restore else settings._clean({})
-        self.setWindowTitle("Xigma - Xigmatek Connect 360")
+        self.setWindowTitle(TITLE)
         self.port = port or self.cfg["device"]
         self.preview_fps = preview_fps or self.cfg["preview_fps"]
         self.mp4 = self.cfg["clip"]
@@ -777,8 +806,7 @@ class Window(QMainWindow):
                       "Either way the glass keeps updating while a display is "
                       "running: those frames belong to xigmalcd")
             return
-        self.tray = QSystemTrayIcon(QIcon(ICON) if os.path.exists(ICON)
-                                    else QIcon(), self)
+        self.tray = QSystemTrayIcon(app_icon(), self)
         menu = QMenu(self)
         self.tray_line = QAction("no display running", self)
         self.tray_line.setEnabled(False)      # the status line, not a button
@@ -806,7 +834,7 @@ class Window(QMainWindow):
         menu.addAction(bye)
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(self._tray_click)
-        self.tray.setToolTip("Xigma")
+        self.tray.setToolTip(TITLE)
         self.tray.show()
 
     def _tray_pause(self) -> None:
@@ -854,8 +882,8 @@ class Window(QMainWindow):
         if getattr(self, "tray", None) is None:
             return
         st = self.daemon.status
-        self.tray.setToolTip("Xigma - " + (wire.describe(st) if st
-                                           else "no display running"))
+        self.tray.setToolTip(TITLE + " - " + (wire.describe(st) if st
+                                              else "no display running"))
         self.tray_line.setText(
             f"{st.get('theme')} at {st.get('fps')} fps, "
             f"{st.get('ok')}/{st.get('frames')} confirmed"
@@ -943,12 +971,13 @@ def main(argv=None) -> int:
     # StartupWMClass=xigmaui, and on Wayland the app_id comes from this)
     app.setApplicationName(settings.APP)
     app.setDesktopFileName(settings.APP)      # icon + app_id for the shell
-    if os.path.exists(ICON):
-        # set directly rather than by theme name: on a box with no icon theme
-        # configured (this one) `fromTheme` finds nothing, and the picture is a
-        # rendering of the glass, which is the one thing worth showing there -
-        # in the taskbar and in the tray, where it is the only way to find us
-        app.setWindowIcon(QIcon(ICON))
+    icon = app_icon()
+    if not icon.isNull():
+        # theme name when the box has one (the .deb's hicolor copy), the file when
+        # it does not; see app_icon().  The picture is a rendering of the glass,
+        # which is the one thing worth showing in the taskbar and in the tray, where
+        # it is the only way to find us
+        app.setWindowIcon(icon)
     win = Window(a.device, a.preview_fps, restore=not a.fresh,
                  socket=a.socket, tray=a.tray)
     if a.hidden and win.tray is not None:

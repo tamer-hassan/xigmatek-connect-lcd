@@ -1,16 +1,26 @@
 """clips.py - the background clips this box can offer, and frames out of them.
 
-Three sources, in the order the app lists them:
+Clip roots, in the order the app lists them.  The first three are this project's
+own clips (`xigmalcd.main.media_roots()` says which of them exist); the last two
+are the vendor's copies, reachable only from a box that has the Windows volume
+mounted or the themes package installed.  Every root that exists is scanned, and
+a clip found twice - the same file under two spellings - is listed once:
 
-  media/                 the clips vendored into this repository. `Theme_25.mp4`
-                         is the one ALPHA pairs with the theme it has selected
-                         (214 917 bytes, 23 frames at 24 fps, mean luma 18.7),
-                         and it is the daemon's default background.
-  ALPHA's static media   the vendor's own library, read straight off the mounted
-                         Windows partition when there is one (`WIN_STATIC`), so
-                         picking one here is the same file the vendor app ships.
-  ALPHA's uploads        `%APPDATA%/alpha/media/...`, the clips the Windows app
-                         actually pushed to this panel at some point.
+  the checkout's media/    the clips vendored into this repository. `Theme_25.mp4`
+                           is the one ALPHA pairs with the theme it has selected
+                           (214 917 bytes, 23 frames at 24 fps, mean luma 18.7),
+                           and it is the daemon's default background.  `$XIGMA_MEDIA`
+                           replaces this root with a clip set of your own.
+  /usr/share/xigmalcd/media where the .deb installs those three clips.
+  ALPHA's installed library `/usr/share/xigmalcd/themes/alpha/clips`, which the
+                           `xigmatek-connect-lcd-themes` package puts there: all
+                           43 clips of the 27 themes, not just the three this
+                           project vendors.
+  ALPHA's static media     the vendor's own library, read straight off the mounted
+                           Windows partition when there is one (`WIN_STATIC`), so
+                           picking one here is the same file the vendor app ships.
+  ALPHA's uploads          `%APPDATA%/alpha/media/...`, the clips the Windows app
+                           actually pushed to this panel at some point.
 
 Frames come out of ffmpeg, one frame per call, because decoding a whole clip to
 pick a mid-loop frame (what tools/previews.py does once per run) is far too slow
@@ -46,10 +56,10 @@ class Clip:
     thumbs: dict = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
-        # the globs are rooted at DEFAULT_MP4, which is built relative to the
-        # module, so paths arrive as `.../xigmalcd/../media/Theme_25.mp4`.  One
-        # clean spelling per clip is what lets the picker recognise a path that
-        # came back from the settings file instead of falling back to row 0.
+        # the roots come out of media_roots() already abspath'd, but a clip can
+        # also arrive from the settings file or from `--mp4` with a `..` or a
+        # relative path in it, and one clean spelling per clip is what lets the
+        # picker recognise that path instead of falling back to row 0.
         self.path = os.path.normpath(self.path)
 
     @property
@@ -113,7 +123,8 @@ def luma(img: Image.Image) -> float:
 
 def list_clips(extra: str = "") -> list[Clip]:
     """Every clip the app can offer, best-guess order first."""
-    from xigmalcd.main import DEFAULT_MP4, WIN_STATIC, WIN_UPLOADS
+    from xigmalcd.main import (MEDIA_ENV, SYSTEM_MEDIA, SYSTEM_THEMES,
+                               WIN_STATIC, WIN_UPLOADS, media_roots)
 
     found: list[Clip] = []
     seen = set()
@@ -130,18 +141,22 @@ def list_clips(extra: str = "") -> list[Clip]:
     # pattern's own dirname: for a recursive pattern that dirname is the `**`
     # component, which never exists, and that silently hid every clip the
     # Windows app had ever pushed - 69 of them on this machine
-    sources = ((os.path.dirname(DEFAULT_MP4), "*.mp4", "vendored"),
-               (WIN_STATIC, "*.mp4", "vendor library"),
-               (WIN_UPLOADS, "**/*.mp4", "app upload"))
-    for root, pat, origin in sources:
+    sources = [(_root, "*.mp4", "vendored",
+                "installed with the package" if _root == SYSTEM_MEDIA else
+                ("chosen with $XIGMA_MEDIA" if _root == os.path.abspath(
+                    os.environ.get(MEDIA_ENV, "-")) else ""))
+               for _root in media_roots()]
+    sources += [(os.path.join(SYSTEM_THEMES, "clips"), "*.mp4", "vendor library",
+                 "installed with xigmatek-connect-lcd-themes"),
+                (WIN_STATIC, "*.mp4", "vendor library",
+                 "mounted from the Windows partition"),
+                (WIN_UPLOADS, "**/*.mp4", "app upload",
+                 "pushed to this panel by the Windows app, on the Windows partition")]
+    for root, pat, origin, note in sources:
         if not os.path.isdir(root):
             continue
         for path in sorted(glob.glob(os.path.join(root, pat), recursive=True)):
-            add(path, origin,
-                "pushed to this panel by the Windows app, on the Windows partition"
-                if origin == "app upload" else
-                ("mounted from the Windows partition" if origin == "vendor library"
-                 else ""))
+            add(path, origin, note)
     if extra:
         add(extra, "chosen by you")
 

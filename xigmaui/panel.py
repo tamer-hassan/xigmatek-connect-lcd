@@ -374,7 +374,8 @@ class Panel(QThread):
             self._close(link)
 
     def _reset(self, confirm: str, **_) -> bool:
-        """The vendor's `recovery` - the same frame tools/reset_panel.py sends.
+        """The vendor's `recovery` - the same frame `xigmalcd-reset` /
+        tools/reset_panel.py sends (xigmalcd/reset.py).
 
         Destructive: the panel goes back to its default state, the USB device
         re-enumerates, and a `recovery` frame is *not* an acked `conn` close, so
