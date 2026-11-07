@@ -979,6 +979,7 @@ QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME=$cfgtmp XIGMA_SOCKET=$cfgtmp/no-displa
 import inspect
 import sys
 import time
+import types
 sys.path.insert(0, ".")
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QCoreApplication
@@ -1209,6 +1210,27 @@ class StubLink:
 
 panel.Link = StubLink
 panel.port_busy = lambda p: ""
+# The worker's sensors are pinned for the rest of this section, and the reason is the
+# same one that makes byte sizes comparable anywhere: xigmalcd/sensors.py reads this
+# machine, and a cloud runner has no Super-IO, no temps and no disks behind those
+# paths, so `collect()` comes back with the sections missing - the first CI runner
+# drew its frames out of that and produced a 7 398 B OSD PNG where this bench draws
+# 12.1-13.5 KB, which is not a regression, it is a different picture.  A `--no-fans`
+# host would also drop the tach array from the blob, which is the other thing this
+# section asserts the presence of.  So the fixture below - the readings the
+# gauge-geometry section pins, 57 C CPU and 47 C GPU with a 2 400 RPM CPU fan on
+# board - is what the worker sees here; the picture is then the same picture on any
+# machine, and the byte band below compares like with like.
+# `panel.sensors` is rebound in this process only; the next section starts a fresh
+# one.  What the host's real sensors do is still printed, as a fact about the box.
+import copy
+FIX = {"cpu": {"temperature": 57.0, "load": 42.0},
+       "gpu": {"temperature": 47.0, "load": 38.0, "fan": 45},
+       "fans": [{"onBoard": True, "type": "Fan", "name": "Fan CPU",
+                 "value": 2400}]}
+real_sensors = panel.sensors
+panel.sensors = types.SimpleNamespace(collect=lambda: copy.deepcopy(FIX))
+host_fans = "fans" in sensors.collect()
 worker = panel.Panel("/dev/xigma-stub")
 notes = []
 worker.log.connect(notes.append)
@@ -1221,21 +1243,17 @@ assert uploads[-1][2] == 0.02, uploads[-1]      # the measured pre-byte pause
 assert uploads[-1][0] == "Theme_25.mp4", uploads[-1]
 # PROTOCOL.md §8: the metrics blob is twice at the head of a session and never
 # between files. Feeding it per frame makes the panel stop answering uploads,
-# so this is the rule the GUI has to follow, not a nicety.
-#
-# Whether the blob carries the tach array is this host's own sensors, not a
-# constant: xigmalcd/sensors.py:collect() leaves the whole `fans` section out when
-# nothing reads, so a board with nothing wired to a tach header - or a cloud VM -
-# legitimately sends the blob without it. The author's bench has a Super-IO with
-# the CPU fan on it and reads (0, True); the first CI runner on 2026-11-07 read
-# (0, False) and failed here. What is under test is the *placement* - twice, both
-# before the first file - so the flag is derived from the same call the worker
-# makes instead of pinning the bench's value.
-host_fans = "fans" in sensors.collect()
-assert links[-1].states == [(0, host_fans), (0, host_fans)], links[-1].states
-print(f"  background upload: one file, all {len(blob)} B, gap 0.02 s, "
-      f"named for the clip, `STATE all 1` twice before it "
-      f"({'with' if host_fans else 'without'} this host's fan readings)")
+# so this is the rule the GUI has to follow, not a nicety.  Each tuple is
+# (uploads so far, did the blob carry the tach array): both blobs land before the
+# first file, and the array is there because the fixture has one - which is what
+# makes this the same assertion on a bench with a Super-IO and on a runner with no
+# fan header at all.  Unpinned, that runner read (0, False) on 2026-11-07 and this
+# line failed for a reason that had nothing to do with the ordering.
+assert links[-1].states == [(0, True), (0, True)], links[-1].states
+print(f"  background upload: one file, all {len(blob)} B, gap 0.02 s, named for "
+      f"the clip, `STATE all 1` twice before it with the fixture's fan array "
+      f"(this host's own sensors read "
+      f"{'a fan' if host_fans else 'no tach at all'})")
 
 StubLink.notice = "400"
 assert worker._upload(path=mp4, gap=0.02, chunk=1000) is False
@@ -1245,11 +1263,15 @@ StubLink.notice = "200"
 
 assert worker._frame(theme="alpha", kw={"bg": render.OVERLAY}, fans=False) is True
 name, size = uploads[-1][0], uploads[-1][1]
-# an alpha OSD frame with the gauge rings measures 12.1-13.5 KB offline (the
-# same frame without the rings measured 9.2-9.8 KB); the band below is wide
-# enough to notice a regression - a re-encoded or mis-scaled frame - without
-# tracking PNG trivia
-assert name.endswith(".osd") and 8_000 < size < 40_000, uploads[-1]
+# Drawn from the fixture above, this frame is 12.1-13.5 KB here (the digits of the
+# clock are the host's wall clock, so it moves a little run to run: 12 131 B in the
+# one that wrote this comment).  The band is a regression net - a re-encoded frame, a
+# wrong scale, a canvas that stopped being transparent all move it by more than that -
+# and not a tracker of PNG trivia.  It is wide rather than tight because the two
+# machines' Pillow builds are not the same build either.  What it is *not* is a bet on
+# the host's sensors: unpinned, the first CI runner measured 7 398 B for the same call
+# because that box has no temperatures to draw and every field came out `--`.
+assert name.endswith(".osd") and 10_000 < size < 20_000, uploads[-1]
 # fans=False leaves the host's tach array out of the blob, as --no-fans does in
 # the daemon, and the blob still lands before the file rather than after it
 assert links[-1].states == [(0, False), (0, False)], links[-1].states
@@ -1346,6 +1368,11 @@ assert sum(1 for _, d in opened if d) == 1, opened
 assert opened[0][1] is False and opened[-1][1] is False, opened[:2] + opened[-1:]
 print(f"  reset: one destructive link in {len(opened)} opens, everything else "
       f"non-destructive")
+
+# and the rebinding stops with this block: every assert above saw the fixture, and
+# nothing after this line in this process needs the host's own sensors - the next
+# section starts a fresh python3 anyway
+panel.sensors = real_sensors
 PY
 
 echo
