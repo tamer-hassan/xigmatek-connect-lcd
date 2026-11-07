@@ -2,10 +2,12 @@ __pycache__/
 *.pyc
 docs/scratch/
 
-# The still previews `tools/previews.py` writes.  The README carries animated ones
-# since 0.3 (`tools/preview_gif.py`, and they are tracked: `docs/preview-*.gif`), and
-# the stills are what you run that tool to *look at* - a change to the skin, a theme
-# you are laying out - not an artefact the tree has to carry twice.
+# The still previews `tools/previews.py` writes.  The README's moving previews are
+# tracked (`docs/videos/*.mp4`, made by `tools/preview_gif.py`), and the stills are what
+# you run that tool to *look at* - a change to the skin, a theme you are laying out - not
+# an artefact the tree has to carry twice.  The PNGs are not published for the same
+# reason the videos are packaged-nothing: debian/rules leaves every picture out of the
+# .deb, and part of them is rendered from XIGMATEK's own library.
 docs/preview-*.png
 *.tmp
 

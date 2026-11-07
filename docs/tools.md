@@ -26,7 +26,7 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
 | what did the vendor app itself actually send? | `tools/log_timeline.py LOG`, `tools/capdump.py`, `tools/vendor_capture.py` | ALPHA's 6-17 MB logs folded into a request sequence, the Windows IRP captures parsed without a Windows box, and the `.osd` payloads taken back out of them |
 | the panel is white from the first second | `xigmalcd-reset --yes` (installed) / `tools/reset_panel.py --yes` (checkout) | the vendor's `recovery`, byte-identical to the frame in its own log; the only repair for fields stuck at `2147483647` |
 | what would a frame look like, with no panel in the loop? | `python3 -m xigmalcd --dry-run DIR`, `tools/previews.py`, `tools/preview_gif.py` |
-| the README's previews move, and how would I make another? | `tools/preview_gif.py --clip CLIP --theme T --ink amber` (README's set: `--scale 320 --colors 128 --frames 12 --gif-fps 6`) | the preview pane's composite as an animated GIF, the only thing GitHub plays inline; it prints the file's size, its real per-frame delay, how far its palette moved the text colour, the background's own join against the composited one, and the glyph-vs-halo legibility figure; the readings come from `tools/preview_pin.py`, one fixture for both preview tools | PNGs on disk from the same render path; previews composite over the shipped clip the way the panel composites |
+| the README's previews move, and how would I make another? | `tools/preview_gif.py --clip CLIP --theme T --series FILE --no-gif` (README's set: `--scale 480 --frames 240 --gif-fps 20-or-24 --crf 20 --no-gif`) | the preview pane's composite as a 10-12 s H.264 MP4 — the shape the README links, uploaded through GitHub's editor because an `.mp4` written into markdown becomes an `<img>` nothing plays; with `--series FILE` or `--live-seconds N` every reading in it comes from a recorded `sensors.collect()` series, so the digits, meters and clock move; it prints the bytes, the frame count and length as the written file reports them, how many passes of the clip that is, and the min→max of what it drew | PNGs on disk from the same render path; previews composite over the shipped clip the way the panel composites |
 | what does the window look like, and does the README's picture match the code? | `tools/screenshot.py` | `docs/screenshot-xigmaui.png`: the real Qt window, offscreen, with a port path that does not exist so nothing on the glass is touched |
 | what are ALPHA's theme files, and what do its themes actually contain? | `tools/thm_unlock.py`, `tools/theme_previews.py` | the `.thm` container opened with the app's own constants: 27 layouts, 44 clips, 27 baked overlays in `themes/alpha/`, every byte hashed; and a sheet showing each theme over its own clip |
 
@@ -82,7 +82,15 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   `Link`), the two picture-level rules added at 0.3 - the `dual` ring's filled part against
   its own unfilled part over a decoded clip of the vendor's (100.4 luma where the pale
   default managed 7.4, re-counted every run) and every line of the `clock` theme cropped to
-  its own y band with ink required to stay inside the 480 px panel - the wall-clock cost of
+  its own y band with ink required to stay inside the 480 px panel - the six README videos
+  checked as documents (length and rate as the written file reports them, the untouched
+  field against the clip each marker names, glyph against its own halo over a floor of
+  30, the motion claim from both directions so a layer that never changes cannot pass off
+  the background's movement as its own, and the preview slots themselves - README's five
+  and docs/gui.md's one have to be filled, by a marker naming the right file or by an
+  uploaded link to GitHub's CDN, with the counts adding up and a relative `.mp4` image
+  link rejected outright) - the wall-clock cost of
+  the window re-measured rather than remembered, and the
   the window re-measured rather than remembered, and the
   GUI ledger's own numbers re-read out of `data/glass/` so the table in [the GUI doc](gui.md) cannot
   quietly become folklore. Needs no hardware, so it is what to run after editing
@@ -224,76 +232,85 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   into one line, plus `--census`, `--names` and `--replies`, and `--from/--to/--around` to
   restrict it to one session.
 * `tools/previews.py` — the **still** composite: `docs/preview-<theme>.png`, our transparent
-  OSD over one frame lifted out of the vendor's background MP4. Since 0.3 the README does not
-  embed these; it embeds the animated GIFs from `tools/preview_gif.py`. The PNGs are not
-  tracked (`.gitignore` says so), because they are what you run this tool to *look at* after a
-  change to the skin, not an artefact the tree has to carry in two shapes. Its background
-  defaults to `media/Theme_25.mp4` and takes any clip you point it at.
-  * `tools/preview_pin.py` — the readings **both** preview tools draw, in one place, so a
-  caption cannot disagree with the file beside it. Two kinds of number, labelled: the
-  temperatures and loads and the two fan figures are a *fixture* — 57 °C CPU and 47 °C GPU,
-  the pair ALPHA's own captured frame reads, and 1 957 RPM, inside the tachometer span
-  PROTOCOL §8 measured without being this box's live number — because those decide where the
-  arcs land, and 57 °C on the `gauge` theme's measured 30..75 °C scale is 60 % of the sweep,
-  in the part of the ramp where the colour changes too. The memory, board, disk and CPU-power
-  fields are a dated `sensors.collect()` from the author's bench. The file also records what
-  this box *actually* read - 73 °C at 89.8 % under eight parallel decodes, and 70 °C at 8.8 %
-  with a GPU-using process running - and why the picture uses neither: at 73 °C that arc sits
-  at 95.6 % of the sweep, which reads as pegged rather than as a measurement. `--live` draws
-  those instead.
-  * `tools/preview_gif.py` — the same composite **playing**, as an animated GIF: `ClipPlayer`
-  decoding the background in sequence and `render.draw` drawing our layer over each frame,
-  which is what the window's `playing` preview pane shows. README runs one background per
-  theme - `Theme_25.mp4`, `3.mp4`, `Theme_30.mp4`, `Theme_07.mp4`, `theme_52.mp4` - all five of
-  them files this tree carries, so the set regenerates from a clone. With no `--scrim` it
-  applies the **window's** auto rule rather than the daemon's (the daemon only knows the
-  handful of clips `CLIP_LUMA` measured; the tool measures the clip's luma the way the pane
-  does and puts 150/255 of plate over anything brighter than mid-grey), which is why the
-  `clock` preview over the bright `Theme_07.mp4` carries a plate and the four dark ones do
-  not. It opens no device and needs no Qt. The
-  switches are `--clip --theme --ink --frames --gif-fps --scale --colors --clock --scrim --out
-  --mp4 --live`, and the tool prints its own measurements, because these knobs interact in ways
-  no one guesses right:
-  decoding the background in sequence and `render.draw` drawing our layer over each frame, which
-  is what the window's `playing` preview pane shows. It opens no device and needs no Qt. The
-  switches are `--clip --theme --ink --frames --gif-fps --scale --colors --clock --scrim --out
-  --mp4 --live`, and the tool prints its own measurements, because these knobs interact in ways
-  no one guesses right:
+OSD over one frame lifted out of the vendor's background MP4. README does not embed these;
+it links the moving MP4s from `tools/preview_gif.py`. The PNGs are not tracked (`.gitignore`
+says so), because they are what you run this tool to *look at* after a change to the skin,
+not an artefact the tree has to carry in two shapes. Its background defaults to
+`media/Theme_25.mp4` and takes any clip you point it at.
+* `tools/preview_pin.py` — the readings the **still** previews and the caption-shaped GIFs
+draw, in one place, so a caption cannot disagree with the file beside it. Two kinds of
+number, labelled: the temperatures, loads and two fan figures are a *fixture* — 57 °C CPU
+and 47 °C GPU, the pair ALPHA's own captured frame reads, and 1 957 RPM, inside the
+tachometer span PROTOCOL §8 measured without being this box's live number — because those
+decide where the arcs land, and 57 °C on the `gauge` theme's measured 30..75 °C scale is
+60 % of the sweep, in the part of the ramp where the colour changes too. The memory, board,
+disk and CPU-power fields are a dated `sensors.collect()`. The file also records what this
+box *actually* read - 73 °C at 89.8 % under eight parallel decodes, 70 °C at 8.8 % with a
+GPU-using process running - and why the picture uses neither: at 73 °C that arc sits at
+95.6 % of the sweep, which reads as pegged rather than as a measurement. The README videos
+do the opposite on purpose, and draw from a recorded series instead: see the next entry,
+and `docs/videos/readings-2026-11-08.json`.
+* `tools/preview_gif.py` — the same composite **playing**: `ClipPlayer` decoding the
+background in sequence and `render.draw` drawing our layer over each frame, which is what
+the window's `playing` preview pane shows. It opens no device and needs no Qt. Two shapes
+out of one code path:
+**GIF** (`--out x.gif`, the default) - short, one pinned reading, `--clock` frozen, the
+digits a caption can quote; and **MP4** (`--mp4 --no-gif --out x.mp4`) - 10-12 s at the
+clip's own frame rate, driven by `--live-seconds N` (sample the box once a second and
+record it with `--record FILE`) or `--series FILE` (draw from a series recorded earlier, so
+six files show one minute of one machine). README's set is six of the second kind, at the
+panel's own 480 px, `crf 20`, `preset medium`. The switches are `--clip --theme --ink
+--frames --gif-fps --scale --colors --clock --scrim --out --mp4 --no-gif --crf --preset
+--live --live-seconds --series --record`, and the tool prints its own measurements, because
+these knobs interact in ways nobody guesses right:
   * **sample, never repeat.** Decoding at the clip's own 20-24 fps and then telling ffmpeg
-  `-r 6` shows one frame three times running, and GIF is built on inter-frame diffs: 7 205 675 B
-  for what sampling at the target rate writes in 1 510 157 B, the identical animation. So the
-  sampling happens here, keeping every `rate/gif_fps`-th frame of the one stream.
-  * **the input has to be looped to be longer than itself.** `-frames:v` against a 0.96 s clip
-  stops when the clip does, which made a whole sweep of "3 s and 5 s animations" five rows of the
-  same 12 frames. `-stream_loop -1` is what makes an n-second GIF out of a short loop - and it is
-  also what the glass does with the file.
-  * **the palette budget is the cheapest knob left.** ffmpeg's GIF encoder already offsets and
-  diffs frames (`gifflags=offsetting+transdiff`, on by default), and `gifsicle` is not installed
-  on this bench and would need a password to add, so what is left is scale, rate, length and
-  colour count. 128 colours measured **23 % smaller** than 256 with the drawn colour still within
-  1/255 at 480 px; 64 colours is where ink starts moving at 320 px (7/255); dither off is ~10 %
-  smaller and bands the gradients; `stats_mode=diff` measured 2-3 % *bigger* here.
-  * **what the file cost in colour, measured off the file.** The tool decodes what it wrote and
-  reports the nearest drawn colour to the ink asked for: the amber file in docs/gui.md reads
-  **(253, 195, 1), 2/255 from** `#ffc400`. That is ffmpeg's animation palette, not the
-  256-colour PNG the upload path uses - the suite measures that drift separately at 1/255 - and
-  README says so next to the pictures instead of leaving a reader to assume it.
-  * **delays are quantised.** A 6 fps GIF is 12 frames at a **170 ms** delay, not 167: GIF stores
-  delays in 10 ms units, so the file runs 2.04 s at 5.9 fps. The tool reports what the file holds.
+  `-r 6` shows one frame three times running, and GIF is built on inter-frame diffs:
+  7 205 675 B for what sampling at the target rate writes in 1 510 157 B, the identical
+  animation. So the sampling happens here, keeping every `rate/gif_fps`-th frame of the one
+  stream. In the README videos `--gif-fps` equals the clip's own rate, so nothing is dropped
+  and the picture is the clip's motion, not a resampled one.
+  * **the input has to be looped to be longer than itself.** `-frames:v` against a 0.96 s
+  clip stops when the clip does, which made a whole sweep of "3 s and 5 s animations" come
+  out as five rows of the same 12 frames. `-stream_loop -1` is what makes an n-second GIF
+  out of a short loop - and it is also what the glass does with the file. The videos report
+  how many passes of the loop they contain: `alpha` 10.4, `gauge` 5.7, `dual` 1.8,
+  `bars` 1.2, `clock` 0.6.
+  * **the palette budget only applies to the GIF path.** ffmpeg's GIF encoder already
+  offsets and diffs frames (`gifflags=offsetting+transdiff`, on by default), and `gifsicle`
+  is not installed on this bench and would need a password to add, so what is left is scale,
+  rate, length and colour count: 128 colours measured **23 % smaller** than 256 with the
+  drawn colour still within 1/255 at 480 px; 64 colours is where ink starts moving at
+  320 px (7/255); dither off is ~10 % smaller and bands the gradients; `stats_mode=diff`
+  measured 2-3 % *bigger* here. For MP4 the equivalent knobs are `--crf` and `--preset`:
+  crf 20 / medium on the five previews measured 214 KB - 1.93 MB (the spread is the
+  background: `Theme_30.mp4` moves 0.46 of a mean-absolute step over 3 s, `theme_52.mp4`
+  moves 7.41), and crf 18 / slow is about 40 % bigger.
+  * **delays are quantised - GIF only.** A 6 fps GIF is 12 frames at a **170 ms** delay,
+  not 167: GIF stores delays in 10 ms units, so the file runs 2.04 s at 5.9 fps. An MP4
+  carries a frame rate instead, and the tool now reads it back with ffprobe rather than
+  trusting its own arithmetic: all six README files report 240 frames at 24 or 20 fps =
+  10.00 s or 12.00 s as written.
+  * **what the file did to the ink, measured off the file.** The GIF path reports the
+  nearest drawn colour to the ink asked for - the suite writes a 160 px, 6-frame,
+  128-colour GIF every run and reads `#ffc400` back as **(252, 197, 2)**, 3/255 off. The
+  MP4 path asks the harder question, and answers it per pixel: of the **2 268** pixels the
+  layer paints at exactly that colour, the written file holds 1 144 within 3/255, 2 187
+  within 8/255, 81 unchanged. Two questions, printed side by side, because neither is the
+  256-colour PNG the upload path sends (§10 measures that drift at 1/255 per channel).
 
-  The set README carries (320 px, 128 colours, 12 frames, one background per theme, the same
-  pinned readings): `alpha` 556 558 B, `gauge` 621 464 B, `dual` 59 231 B, `clock` 125 789 B,
-  `bars` 351 015 B, and docs/gui.md's ink figure 555 659 B — **2 269 716 B** for six files. The
-  spread is the backgrounds and not the layers: `Theme_30.mp4` moves 0.92 between the sampled
-  frames, so its composite encodes to 59 KB, while `3.mp4` moves 9.25 and costs ten times that. The same settings at 480 px run 1.05-1.18 MB each,
-  which is the argument for 320 measured rather than assumed: GitHub renders this README's body
-  **624 px** wide in a narrow window, and it displayed the old 480 px PNGs at **281-289 px** in
-  the two-column table, so the extra half-megabyte per file buys nothing at that size. The suite
-  checks these files as documents - 320×320, 12 frames, 170 ms, under 700 KB, a join no worse
-  than the same span of the clip underneath, glyph-vs-halo legibility over a floor of 30, the
-  untouched field matching the clip the caption names, ink within 3/255 - and pointedly not by
-  byte hash, because GIF output is
-  ffmpeg's version's business.
+README's set, as the suite prints it: `alpha` 908 420 B / 10.00 s at 24 fps, `gauge`
+1 930 104 B / 12.00 s at 20 fps, `dual` 214 113 B, `clock` 278 884 B, `bars` 802 310 B,
+the amber ink figure 927 752 B — **5 061 583 B** for six, plus 13 696 B of readings JSON.
+The suite checks these files as documents - frame count against the length and rate the
+written file reports, a length in the 10-12 s README promises, a size ceiling, the
+untouched field matching the clip each marker names (gaps 0.1-13.6), glyph against
+its own halo over a floor of 30, the plate's effect measured both ways on the bright clip
+(53.5 without, 93.0 with), and the motion claim in two directions: the file has to change
+where the layer paints (at least 3/255, and 1.2x the untouched field) *and* the two layers
+it was built from have to differ over 622-6 226 pixels once each sample's own clock is put
+back. Pointedly no byte hash: x264 output is its version's business, and a different
+runner could write different bytes of the same animation.
+
 * `tools/screenshot.py` — regenerates `docs/screenshot-xigmaui.png`, the README's picture of
   the **window** rather than of the glass: a real `xigmaui` built the way the suite builds it
   (`QT_QPA_PLATFORM=offscreen`, `XDG_CONFIG_HOME` in a temporary directory so no remembered

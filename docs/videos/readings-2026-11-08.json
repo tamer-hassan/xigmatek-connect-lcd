@@ -1,0 +1,729 @@
+{
+ "first": 1794090316998,
+ "last": 1794090328014,
+ "samples": 12,
+ "series": [
+  {
+   "metrics": {
+    "cpu": {
+     "load": 64.9,
+     "power": 143,
+     "speedAverage": 5417,
+     "temperature": 70,
+     "usage": 64.9,
+     "voltage": 1.329
+    },
+    "disk": {
+     "activity": 0.0,
+     "load": 0.0,
+     "readSpeed": 0.0,
+     "temperature": 33,
+     "total": 786,
+     "used": 68,
+     "writeSpeed": 0.1
+    },
+    "fans": [
+     {
+      "name": "Fan CPU",
+      "onBoard": true,
+      "type": "Fan",
+      "value": 2142
+     },
+     {
+      "name": "Fan System 5",
+      "onBoard": true,
+      "type": "Chassis",
+      "value": 1543
+     }
+    ],
+    "gpu": {
+     "dedicated": 14654,
+     "dedicatedTotal": 16376,
+     "fan": 34,
+     "load": 100,
+     "memoryUsage": 14654,
+     "power": 148.91,
+     "speed": 2820,
+     "temperature": 50
+    },
+    "memory": {
+     "load": 67.2,
+     "temperature": 50,
+     "total": 126157,
+     "used": 84839
+    },
+    "motherboard": {
+     "temperature": 56
+    },
+    "network": {
+     "download": 0.1,
+     "upload": 0.1
+    },
+    "timestamp": 1794090317105
+   },
+   "timestamp": 1794090316998
+  },
+  {
+   "metrics": {
+    "cpu": {
+     "load": 57.7,
+     "power": 129,
+     "speedAverage": 5403,
+     "temperature": 70,
+     "usage": 57.7,
+     "voltage": 1.319
+    },
+    "disk": {
+     "activity": 0.0,
+     "load": 0.0,
+     "readSpeed": 0.0,
+     "temperature": 33,
+     "total": 786,
+     "used": 68,
+     "writeSpeed": 0.0
+    },
+    "fans": [
+     {
+      "name": "Fan CPU",
+      "onBoard": true,
+      "type": "Fan",
+      "value": 2142
+     },
+     {
+      "name": "Fan System 5",
+      "onBoard": true,
+      "type": "Chassis",
+      "value": 1543
+     }
+    ],
+    "gpu": {
+     "dedicated": 14654,
+     "dedicatedTotal": 16376,
+     "fan": 34,
+     "load": 100,
+     "memoryUsage": 14654,
+     "power": 148.91,
+     "speed": 2820,
+     "temperature": 50
+    },
+    "memory": {
+     "load": 67.3,
+     "temperature": 50,
+     "total": 126157,
+     "used": 84885
+    },
+    "motherboard": {
+     "temperature": 56
+    },
+    "network": {
+     "download": 0.0,
+     "upload": 0.0
+    },
+    "timestamp": 1794090318079
+   },
+   "timestamp": 1794090317999
+  },
+  {
+   "metrics": {
+    "cpu": {
+     "load": 65.1,
+     "power": 112,
+     "speedAverage": 5430,
+     "temperature": 69,
+     "usage": 65.1,
+     "voltage": 1.339
+    },
+    "disk": {
+     "activity": 0.0,
+     "load": 0.0,
+     "readSpeed": 0.0,
+     "temperature": 33,
+     "total": 786,
+     "used": 68,
+     "writeSpeed": 0.0
+    },
+    "fans": [
+     {
+      "name": "Fan CPU",
+      "onBoard": true,
+      "type": "Fan",
+      "value": 2061
+     },
+     {
+      "name": "Fan System 5",
+      "onBoard": true,
+      "type": "Chassis",
+      "value": 1540
+     }
+    ],
+    "gpu": {
+     "dedicated": 14654,
+     "dedicatedTotal": 16376,
+     "fan": 34,
+     "load": 100,
+     "memoryUsage": 14654,
+     "power": 148.91,
+     "speed": 2820,
+     "temperature": 50
+    },
+    "memory": {
+     "load": 67.3,
+     "temperature": 50,
+     "total": 126157,
+     "used": 84908
+    },
+    "motherboard": {
+     "temperature": 57
+    },
+    "network": {
+     "download": 0.2,
+     "upload": 0.2
+    },
+    "timestamp": 1794090319080
+   },
+   "timestamp": 1794090318999
+  },
+  {
+   "metrics": {
+    "cpu": {
+     "load": 60.8,
+     "power": 128,
+     "speedAverage": 5430,
+     "temperature": 68,
+     "usage": 60.8,
+     "voltage": 1.334
+    },
+    "disk": {
+     "activity": 0.1,
+     "load": 0.0,
+     "readSpeed": 0.0,
+     "temperature": 33,
+     "total": 786,
+     "used": 68,
+     "writeSpeed": 0.1
+    },
+    "fans": [
+     {
+      "name": "Fan CPU",
+      "onBoard": true,
+      "type": "Fan",
+      "value": 2061
+     },
+     {
+      "name": "Fan System 5",
+      "onBoard": true,
+      "type": "Chassis",
+      "value": 1540
+     }
+    ],
+    "gpu": {
+     "dedicated": 14654,
+     "dedicatedTotal": 16376,
+     "fan": 34,
+     "load": 100,
+     "memoryUsage": 14654,
+     "power": 148.91,
+     "speed": 2820,
+     "temperature": 50
+    },
+    "memory": {
+     "load": 67.4,
+     "temperature": 50,
+     "total": 126157,
+     "used": 84972
+    },
+    "motherboard": {
+     "temperature": 57
+    },
+    "network": {
+     "download": 0.3,
+     "upload": 0.1
+    },
+    "timestamp": 1794090320077
+   },
+   "timestamp": 1794090319999
+  },
+  {
+   "metrics": {
+    "cpu": {
+     "load": 60.9,
+     "power": 149,
+     "speedAverage": 5419,
+     "temperature": 68,
+     "usage": 60.9,
+     "voltage": 1.334
+    },
+    "disk": {
+     "activity": 0.0,
+     "load": 0.0,
+     "readSpeed": 0.0,
+     "temperature": 33,
+     "total": 786,
+     "used": 68,
+     "writeSpeed": 0.0
+    },
+    "fans": [
+     {
+      "name": "Fan CPU",
+      "onBoard": true,
+      "type": "Fan",
+      "value": 2023
+     },
+     {
+      "name": "Fan System 5",
+      "onBoard": true,
+      "type": "Chassis",
+      "value": 1560
+     }
+    ],
+    "gpu": {
+     "dedicated": 14654,
+     "dedicatedTotal": 16376,
+     "fan": 35,
+     "load": 99,
+     "memoryUsage": 14654,
+     "power": 157.43,
+     "speed": 2820,
+     "temperature": 51
+    },
+    "memory": {
+     "load": 67.4,
+     "temperature": 50,
+     "total": 126157,
+     "used": 85018
+    },
+    "motherboard": {
+     "temperature": 57
+    },
+    "network": {
+     "download": 0.0,
+     "upload": 0.0
+    },
+    "timestamp": 1794090321112
+   },
+   "timestamp": 1794090320999
+  },
+  {
+   "metrics": {
+    "cpu": {
+     "load": 60.3,
+     "power": 163,
+     "speedAverage": 5372,
+     "temperature": 68,
+     "usage": 60.3,
+     "voltage": 1.324
+    },
+    "disk": {
+     "activity": 0.7,
+     "load": 0.0,
+     "readSpeed": 0.0,
+     "temperature": 33,
+     "total": 786,
+     "used": 68,
+     "writeSpeed": 1.9
+    },
+    "fans": [
+     {
+      "name": "Fan CPU",
+      "onBoard": true,
+      "type": "Fan",
+      "value": 2023
+     },
+     {
+      "name": "Fan System 5",
+      "onBoard": true,
+      "type": "Chassis",
+      "value": 1560
+     }
+    ],
+    "gpu": {
+     "dedicated": 14654,
+     "dedicatedTotal": 16376,
+     "fan": 35,
+     "load": 99,
+     "memoryUsage": 14654,
+     "power": 157.43,
+     "speed": 2820,
+     "temperature": 51
+    },
+    "memory": {
+     "load": 67.4,
+     "temperature": 50,
+     "total": 126157,
+     "used": 85029
+    },
+    "motherboard": {
+     "temperature": 57
+    },
+    "network": {
+     "download": 0.0,
+     "upload": 0.0
+    },
+    "timestamp": 1794090322088
+   },
+   "timestamp": 1794090322005
+  },
+  {
+   "metrics": {
+    "cpu": {
+     "load": 91.0,
+     "power": 157,
+     "speedAverage": 5380,
+     "temperature": 70,
+     "usage": 91.0,
+     "voltage": 1.334
+    },
+    "disk": {
+     "activity": 0.0,
+     "load": 0.0,
+     "readSpeed": 0.0,
+     "temperature": 33,
+     "total": 786,
+     "used": 68,
+     "writeSpeed": 0.0
+    },
+    "fans": [
+     {
+      "name": "Fan CPU",
+      "onBoard": true,
+      "type": "Fan",
+      "value": 2027
+     },
+     {
+      "name": "Fan System 5",
+      "onBoard": true,
+      "type": "Chassis",
+      "value": 1557
+     }
+    ],
+    "gpu": {
+     "dedicated": 14654,
+     "dedicatedTotal": 16376,
+     "fan": 35,
+     "load": 99,
+     "memoryUsage": 14654,
+     "power": 157.43,
+     "speed": 2820,
+     "temperature": 51
+    },
+    "memory": {
+     "load": 67.7,
+     "temperature": 50,
+     "total": 126157,
+     "used": 85389
+    },
+    "motherboard": {
+     "temperature": 57
+    },
+    "network": {
+     "download": 0.0,
+     "upload": 0.0
+    },
+    "timestamp": 1794090323118
+   },
+   "timestamp": 1794090323007
+  },
+  {
+   "metrics": {
+    "cpu": {
+     "load": 91.9,
+     "power": 162,
+     "speedAverage": 5361,
+     "temperature": 71,
+     "usage": 91.9,
+     "voltage": 1.319
+    },
+    "disk": {
+     "activity": 0.0,
+     "load": 0.0,
+     "readSpeed": 0.0,
+     "temperature": 33,
+     "total": 786,
+     "used": 68,
+     "writeSpeed": 0.0
+    },
+    "fans": [
+     {
+      "name": "Fan CPU",
+      "onBoard": true,
+      "type": "Fan",
+      "value": 2027
+     },
+     {
+      "name": "Fan System 5",
+      "onBoard": true,
+      "type": "Chassis",
+      "value": 1557
+     }
+    ],
+    "gpu": {
+     "dedicated": 14654,
+     "dedicatedTotal": 16376,
+     "fan": 35,
+     "load": 99,
+     "memoryUsage": 14654,
+     "power": 157.43,
+     "speed": 2820,
+     "temperature": 51
+    },
+    "memory": {
+     "load": 67.0,
+     "temperature": 50,
+     "total": 126157,
+     "used": 84493
+    },
+    "motherboard": {
+     "temperature": 56
+    },
+    "network": {
+     "download": 0.0,
+     "upload": 0.0
+    },
+    "timestamp": 1794090324098
+   },
+   "timestamp": 1794090324009
+  },
+  {
+   "metrics": {
+    "cpu": {
+     "load": 93.7,
+     "power": 147,
+     "speedAverage": 5367,
+     "temperature": 73,
+     "usage": 93.7,
+     "voltage": 1.319
+    },
+    "disk": {
+     "activity": 0.0,
+     "load": 0.0,
+     "readSpeed": 0.0,
+     "temperature": 33,
+     "total": 786,
+     "used": 68,
+     "writeSpeed": 0.0
+    },
+    "fans": [
+     {
+      "name": "Fan CPU",
+      "onBoard": true,
+      "type": "Fan",
+      "value": 2131
+     },
+     {
+      "name": "Fan System 5",
+      "onBoard": true,
+      "type": "Chassis",
+      "value": 1564
+     }
+    ],
+    "gpu": {
+     "dedicated": 14654,
+     "dedicatedTotal": 16376,
+     "fan": 34,
+     "load": 99,
+     "memoryUsage": 14654,
+     "power": 118.43,
+     "speed": 2820,
+     "temperature": 48
+    },
+    "memory": {
+     "load": 67.0,
+     "temperature": 50,
+     "total": 126157,
+     "used": 84519
+    },
+    "motherboard": {
+     "temperature": 57
+    },
+    "network": {
+     "download": 0.0,
+     "upload": 0.0
+    },
+    "timestamp": 1794090325209
+   },
+   "timestamp": 1794090325009
+  },
+  {
+   "metrics": {
+    "cpu": {
+     "load": 94.6,
+     "power": 155,
+     "speedAverage": 5362,
+     "temperature": 72,
+     "usage": 94.6,
+     "voltage": 1.319
+    },
+    "disk": {
+     "activity": 0.0,
+     "load": 0.0,
+     "readSpeed": 0.0,
+     "temperature": 33,
+     "total": 786,
+     "used": 68,
+     "writeSpeed": 0.0
+    },
+    "fans": [
+     {
+      "name": "Fan CPU",
+      "onBoard": true,
+      "type": "Fan",
+      "value": 2131
+     },
+     {
+      "name": "Fan System 5",
+      "onBoard": true,
+      "type": "Chassis",
+      "value": 1564
+     }
+    ],
+    "gpu": {
+     "dedicated": 14654,
+     "dedicatedTotal": 16376,
+     "fan": 34,
+     "load": 99,
+     "memoryUsage": 14654,
+     "power": 118.43,
+     "speed": 2820,
+     "temperature": 48
+    },
+    "memory": {
+     "load": 67.0,
+     "temperature": 50,
+     "total": 126157,
+     "used": 84568
+    },
+    "motherboard": {
+     "temperature": 57
+    },
+    "network": {
+     "download": 0.0,
+     "upload": 0.0
+    },
+    "timestamp": 1794090326103
+   },
+   "timestamp": 1794090326009
+  },
+  {
+   "metrics": {
+    "cpu": {
+     "load": 93.7,
+     "power": 142,
+     "speedAverage": 5377,
+     "temperature": 73,
+     "usage": 93.7,
+     "voltage": 1.324
+    },
+    "disk": {
+     "activity": 0.1,
+     "load": 0.0,
+     "readSpeed": 0.0,
+     "temperature": 33,
+     "total": 786,
+     "used": 68,
+     "writeSpeed": 0.1
+    },
+    "fans": [
+     {
+      "name": "Fan CPU",
+      "onBoard": true,
+      "type": "Fan",
+      "value": 2181
+     },
+     {
+      "name": "Fan System 5",
+      "onBoard": true,
+      "type": "Chassis",
+      "value": 1540
+     }
+    ],
+    "gpu": {
+     "dedicated": 14654,
+     "dedicatedTotal": 16376,
+     "fan": 34,
+     "load": 99,
+     "memoryUsage": 14654,
+     "power": 118.43,
+     "speed": 2820,
+     "temperature": 48
+    },
+    "memory": {
+     "load": 67.0,
+     "temperature": 50,
+     "total": 126157,
+     "used": 84511
+    },
+    "motherboard": {
+     "temperature": 56
+    },
+    "network": {
+     "download": 0.0,
+     "upload": 0.0
+    },
+    "timestamp": 1794090327114
+   },
+   "timestamp": 1794090327014
+  },
+  {
+   "metrics": {
+    "cpu": {
+     "load": 94.0,
+     "power": 165,
+     "speedAverage": 5346,
+     "temperature": 74,
+     "usage": 94.0,
+     "voltage": 1.319
+    },
+    "disk": {
+     "activity": 0.0,
+     "load": 0.0,
+     "readSpeed": 0.0,
+     "temperature": 33,
+     "total": 786,
+     "used": 68,
+     "writeSpeed": 0.0
+    },
+    "fans": [
+     {
+      "name": "Fan CPU",
+      "onBoard": true,
+      "type": "Fan",
+      "value": 2181
+     },
+     {
+      "name": "Fan System 5",
+      "onBoard": true,
+      "type": "Chassis",
+      "value": 1540
+     }
+    ],
+    "gpu": {
+     "dedicated": 14654,
+     "dedicatedTotal": 16376,
+     "fan": 34,
+     "load": 99,
+     "memoryUsage": 14654,
+     "power": 118.43,
+     "speed": 2820,
+     "temperature": 48
+    },
+    "memory": {
+     "load": 67.0,
+     "temperature": 50,
+     "total": 126157,
+     "used": 84469
+    },
+    "motherboard": {
+     "temperature": 57
+    },
+    "network": {
+     "download": 0.0,
+     "upload": 0.0
+    },
+    "timestamp": 1794090328115
+   },
+   "timestamp": 1794090328014
+  }
+ ],
+ "source": "sensors.collect() on the author's bench, 2026-11-08 00:25:16 local time, 12 samples at 1 s (gaps 1.00-1.01 s).  The sampler waited 90 s for this box to fall under 12 % CPU load before the first sample and it never did: the session that made these previews runs its own model server at ~390 % of 24 cores, so sample 1 is 70 C at 64.9 % load, which is not an idle reading and is not presented as one.  For the last 7 samples, 7 parallel `ffmpeg -stream_loop -1 -i media/Theme_25.mp4 -vf scale=1280:1280 -f null -` decodes were running, which is the same work rendering these videos is made of.  Fan figures are the board's own tachometer (`fan1`, `fan2`; PROTOCOL \u00a78 measures `fan1` at 1 360-2 371 RPM tracking `pwm1` on this box).",
+ "span_s": 11.016
+}

@@ -168,19 +168,29 @@ Two measurements decided how the package carries them:
   the prose and the transcripts plain; the changelog still gets compressed, as usual. It
   costs about 90 KB and buys a doc set that reads on an installed machine.
 
-What the images do **not** do is get packaged: `docs/logo.png`, the six
-`docs/preview-*.gif` (the five themes, plus the text-colour figure docs/gui.md carries),
-`docs/screenshot-xigmaui.png` and the two theme contact sheets - **4 944 047 B** of
-them, 2 269 716 B of that the six animated GIFs - and part of that is rendered from XIGMATEK's theme
-library, which is the other package's files and its own licence question. So an installed README shows
-prose with repo-relative image links, and that is said here rather than discovered by a
-reader.
+What the pictures do **not** do is get packaged, and since 0.3 there are two kinds of
+them. The images: `docs/logo.png` and `docs/screenshot-xigmaui.png` (1 077 877 B), the two
+theme contact sheets in `docs/previews/` (1 596 454 B). The videos: the six MP4s in
+`docs/videos/` (5 061 583 B - the README's five previews plus the amber-ink figure
+docs/gui.md carries) and the readings JSON that drives them (13 696 B). **7 749 610 B**
+across eleven files, part of it rendered from XIGMATEK's own theme library, which is the
+other package's files and its own licence question - and the videos are also not package
+material for a second reason: README does not even link them, because a `.mp4` link in
+markdown is an `<img>` no browser plays. They sit in the repository until the owner uploads
+them through GitHub's editor, which is the only place they will play. So an installed
+README shows prose with repo-relative links that point at nothing on disk, and that is said
+here rather than discovered by a reader.
 
-Checked on the unpacked packages, in that layout: **11** markdown files with no `.gz`
-next to any of them, **33** links from one document to another resolving, **8** image
-links marked repo-only, **3** pointers that only make sense in a checkout
-(`LICENSE`, `debian/copyright`, `themes/alpha`), and the one cited transcript present
-uncompressed. `debian/tests/smoke` runs that same accounting against a real install, and
+Checked on the unpacked 0.3 packages, in that layout: **11** markdown files with no `.gz`
+next to any of them, **43** links from one document to another resolving (none dead),
+**3** image links marked repo-only, **3** pointers that only make sense in a checkout
+(`LICENSE`, `debian/copyright`, `themes/alpha`), and the two kept install transcripts
+present uncompressed. The image-link count came down from 8 when the GIFs went: two
+contact-sheet/screenshot links and one `<img>` tag are all the installed prose still
+carries, and the six videos are not links at all. That is why smoke's image rule has to
+stay a rule about links: an installed document pointing at a picture that is not installed
+is a known, chosen shape, and the documents say so.
+`debian/tests/smoke` runs that same accounting against a real install, and
 `tools/selftest.sh` runs the equivalent over the checkout - every relative link in
 README.md and every `docs/*.md` has to name a file that exists, which is what keeps a
 split like this from rotting.
@@ -334,14 +344,15 @@ something smaller, because it no longer carries the vendor's `.thm` containers
 (docs/themes.md, `themes/alpha/README.md`):
 
 ```
-  dpkg-buildpackage -us -uc -b          exit 0, twice, 2026-11-07: 23:09:54-23:10:14
-                                                 and 23:10:16-23:10:35
+  dpkg-buildpackage -us -uc -b          exit 0, twice, 2026-11-08: 01:08:09-01:08:28
+                                                 and 01:08:28-01:08:48, 19-20 s apart
   ls -l ../*.deb
-      xigmatek-connect-lcd_0.3_all.deb                    ~5.2 MB
-      xigmatek-connect-lcd-themes_0.3_all.deb      79 841 286 B   (0.2: 146 137 362 B)
+      xigmatek-connect-lcd-themes_0.3_all.deb      79 843 106 B   (0.2: 146 137 362 B)
+      (the code .deb's own byte count is deliberately absent: this file is installed
+       inside that package, so any number written here moves the number it writes)
   dpkg-deb -f ... Installed-Size
-      themes  83 109 KiB          (0.2: 147 854 KiB)
-      code     5 754 KiB at that build   (0.2: 5 578 KiB: the doc set grew)
+      themes  83 111 KiB          (0.2: 147 854 KiB)
+      code     5 778 KiB at those builds   (0.2: 5 578 KiB: the doc set grew, twice)
   dpkg -c xigmatek-connect-lcd-themes_0.3_all.deb
       114 members: 102 files + 12 directories
       grep -c '\.thm'                  0        (0.2: 30 members under thm/)
@@ -359,20 +370,40 @@ file is installed, no surprises either way.  That is also what keeps a `.thm` fr
 drifting back into the package unnoticed - it would be an unnamed file, and the test fails
 on an unnamed file.
 
-The code package's own byte count is deliberately not quoted, for the reason the first
-table gives: this file is installed inside it, so any size written here moves the number
-it writes.  Its Installed-Size went up 176 KiB from 0.2 for the same reason - the doc set
-grew - and nothing about the modules did.
+The code package's own byte count is deliberately not quoted, for the reason the block
+gives: this file is installed inside it, so any size written here moves the number it
+writes.  Its Installed-Size went up 200 KiB from 0.2 for the same reason - the doc set grew
+twice over, once with the `.thm` notes and once with these - and nothing about the modules
+did.
 
 Two builds of this tree, twenty seconds apart on this bench, came out byte-identical,
 both packages - and the second run really is a run rather than a re-use of the first
 stash: `dh_auto_configure`, `dh_auto_build`, the `override_dh_auto_install` recipe (its
 `install -m 644 media/...` line is in both logs), `dh_install`, `dh_missing`,
 `dh_compress` and both `dh_builddeb` steps appear in each: the same clock pin `debian/rules` documents above, doing the same job on the
-smaller tree.  The themes file is
-`4ce88e6d22b19a1c2ee7648da2c3677957d4b261750f8130d24d39dbb91980ee`, which a reader can
-reproduce from this tree and check with `sha256sum`; it is the number for the tree as it
-stands in this commit, and it will differ for any commit that touches `themes/alpha/`.
+smaller tree.
+
+Two hashes are worth writing down, because only one of them survives an edit to this file.
+The **payload** is the claim about the vendor's library, and a reader can take it from any
+checkout that does not touch `themes/alpha/`:
+
+```
+dpkg -x xigmatek-connect-lcd-themes_0.3_all.deb d
+cd d && find usr/share/xigmalcd -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum
+```
+
+which answers `46fb6f2da1effd1b4e82522df530cbef7bc08016ee0f9e15a44fa864f88a0b17` over
+**100 files** and **85 034 557 B** - computed twice over, from two separately built
+packages, and identical.  The **container** - the `.deb` itself, `dpkg -c` output, byte
+count and all - is deliberately *not* hashed here, and that
+is not modesty: `changelog.gz` ships inside the themes package, the 0.3 stanza is still
+`UNRELEASED`, and every note written into it changes the container.  One earlier build of
+this same library measured `4ce88e6d22b19a1c2ee7648da2c3677957d4b261750f8130d24d39dbb91980ee`
+and 79 841 286 B; the run above, five changelog edits later, is 79 843 106 B - the library
+identical, `46fb6f2d…` in every one of them.  That is the trap two paragraphs below records, met here
+rather than in a reader's bug report.  Once the stanza is stamped and tagged, the container
+hash belongs in the release body, computed from the uploaded files by the release job, where
+it cannot drift: see `## The release` below for exactly that shape of record at 0.1 and 0.2.
 What has *not* been re-measured for 0.3 is the bench-versus-runner half, because 0.3 has
 no tag and the runner has only ever built the `v0.2` one; that stays unclaimed until the
 tag exists.

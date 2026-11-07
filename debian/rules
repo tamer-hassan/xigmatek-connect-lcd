@@ -147,11 +147,10 @@ override_dh_auto_install:
 	# checkout and on the GitHub page.  So the markdown goes in under its own
 	# directory, where those links resolve as they do in the repository.
 	#
-	# The pictures stay out: the six docs/preview-*.gif (animated: the README's
-	# previews play since 0.3, see tools/preview_gif.py), docs/logo.png,
-	# docs/screenshot-xigmaui.png and the two theme contact sheets are the
-	# repository's showcase - 4 944 047 B of them, 2 269 716 B of that the six GIFs,
-	# some of it derived from
+	# The pictures and the videos stay out: docs/logo.png and
+	# docs/screenshot-xigmaui.png, the two docs/previews/ contact sheets, and the
+	# six docs/videos/*.mp4 the README links (plus the readings JSON they draw
+	# from) - 7 749 610 B across eleven files, some of it derived from
 	# XIGMATEK's own theme library, which is the other package's business and its own
 	# licence. An installed system therefore gets the prose, and the README it can
 	# read says what it shows. debian/README.source keeps this difference in mind for

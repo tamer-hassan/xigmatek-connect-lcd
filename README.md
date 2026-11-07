@@ -22,88 +22,41 @@ as such wherever they appear ("Licence", at the end).
 
 ## What it draws
 
-The five previews below **play**: our transparent OSD layer composited over a clip from
-the vendor's own library, running on repeat — the same two-layer picture the panel puts on
-the glass, and the same kind of loop whose restart seam PROTOCOL.md §9 measures there.
-Each theme runs over a *different* background, so the five show the skin against five
-moving pictures instead of the same picture five times. All five clips are in this
-repository, so regenerating them from a clone gives you what is below.
+Five themes, each drawn over a *different* clip from the vendor's own library, and filmed
+moving: the digits, the meters and the clock on the glass all change as you watch. What
+they show is recorded, not invented — `docs/videos/readings-2026-11-08.json` holds 12
+real `sensors.collect()` readings, one per second, taken on the author's bench while
+seven parallel clip decodes were running, which is the load rendering these videos puts
+on a machine. CPU 68 → 74 °C, CPU load 57.7 → 94.6 %, fan 1 540 → 2 181 RPM, clock
+`00:25:16` → `00:25:28`. That box never went idle while this was written — the session
+making the videos runs its own model server at about 390 % of 24 cores — so the `gauge`
+ring spends the clip near the top of its measured 30..75 °C scale. It is a busy machine,
+and the file says so.
 
 | `alpha` (default) over `Theme_25.mp4` | `gauge` over `3.mp4` |
 |---|---|
-| ![the alpha theme's layer, running over the vendored background: two ring gauges reading CPU 57 °C and GPU 47 °C, the warmer arc curving further round its ring and warmer in colour, the cooler a short green arc, fan figures of 1 957 and 1 554 RPM under them, load bars at 42 % and 38 %, clock 11:07:42](docs/preview-alpha.gif) | ![the gauge theme, running over 3.mp4: one large ring with 57 °C in the middle, its arc travelled 60 % of the way round in the vendor's cold-to-hot ramp, CPU TEMP under it and the clock at the bottom](docs/preview-gauge.gif) |
+| `PREVIEW ME: upload docs/videos/alpha-Theme_25.mp4 here, then delete this marker` | `PREVIEW ME: upload docs/videos/gauge-3.mp4 here, then delete this marker` |
 
 | `dual` over `Theme_30.mp4` | `clock` over `Theme_07.mp4` |
 |---|---|
-| ![the dual theme, running over Theme_30.mp4: two rings side by side on a dark neutral track, reading 57 and 47 with the numbers inside them, CPU 42 % and 83 of 123 GB under them, the clock along the bottom](docs/preview-dual.gif) | ![the clock theme, running over Theme_07.mp4 — a bright clip, so the glyphs carry a dark plate behind them: 11:07:42 across the middle, Saturday 07 November 2026 under it, and CPU 57 °C, GPU 47 °C and 1 756 RPM along the bottom, every line inside the panel](docs/preview-clock.gif) |
+| `PREVIEW ME: upload docs/videos/dual-Theme_30.mp4 here, then delete this marker` | `PREVIEW ME: upload docs/videos/clock-Theme_07.mp4 here, then delete this marker` |
 
 | `bars` over `theme_52.mp4` | |
 |---|---|
-| ![the bars theme, running over theme_52.mp4: SYSTEM MONITOR with a row and a meter for CPU, GPU, BOARD, LOAD, RAM, VRAM and two fans, each value printed at the right of its row — CPU 57 °C, GPU 47 °C, BOARD 56 °C, LOAD 42 %, RAM 83 GB, VRAM 14 GB, fans 1 957 and 1 554 RPM](docs/preview-bars.gif) | |
+| `PREVIEW ME: upload docs/videos/bars-theme_52.mp4 here, then delete this marker` | |
 
-They are GIFs because GitHub renders an `.mp4` in a README as an `<img>` no browser
-plays, so motion here has to be a GIF. `tools/preview_gif.py` writes them through the
-same path the window's preview pane uses — `clips.ClipPlayer` decoding the file,
-`render.draw` drawing our layer over it — at 320 px, 12 frames, a 170 ms delay, 128
-colours, and the total for all six figures in the tree is 2 269 716 B. What is *not*
-live: the readings are one pinned set, `tools/preview_pin.py`, the same one the still
-previews use, so the picture says the same thing on every machine — 57 °C CPU and 47 °C
-GPU, CPU load 42 %, 83 of 123 GB of memory, fans 1 957 and 1 554 RPM. 57 °C is
-deliberate: the gauge theme's scale is 30..75 °C, measured off the vendor's layout, so
-the arc sits at 60 % of the sweep, in the part of the ramp where colour changes. This
-bench's *live* number is not that — 73 °C at 89.8 % under eight parallel ffmpeg decodes,
-70 °C at 8.8 % with a GPU-using process running — and at 73 °C that arc would sit at
-95.6 % of the sweep, which reads as pegged rather than as a measurement. Both live
-readings are written down beside the fixture, and `--live` draws them.
+`clock` runs over a bright clip (mean luma 176 of 255), which is why its lettering
+carries a dark plate behind it — the same rule the window applies, described in
+[docs/gui.md](docs/gui.md). The sixth video, the same `alpha` clip with the lettering
+drawn in `#ffc400` instead of white, sits at the bottom of [docs/gui.md](docs/gui.md)
+and needs uploading too.
 
-A scrim plate is part of the same picture: the tool applies the window's own auto rule
-(150/255 of dark plate over a clip measured brighter than mid-grey), which is why the
-`clock` preview over `Theme_07.mp4` — mean luma 176.3 of 255, white glyphs on a bright
-field — carries one and the four dark backgrounds do not. Counted out of the encoded
-files, glyph against the halo the plate hugs: `alpha` 154.3, `dual` 127.4, `gauge` 113.1,
-`clock` 110.3, `bars` 92.6 on a 0-255 scale, where the `clock` figure is 47.1 without the
-plate and the glyph itself is 241.8 either way — the plate darkens the ring around the
-text, it does not brighten the text. The suite holds that at a floor of 30 and prints all
-five every run, and it checks each file is over the background its caption names: the
-theme's untouched pixels against the clip's own mean luma, gaps of 0.4 to 10.4.
-
-And because a GIF carries a length, the restart is worth measuring rather than trusting.
-By PROTOCOL.md §9's own metric — mean absolute difference of the gray plane — each GIF's
-join is compared with what the *same clip* does over the same sampled span, because that
-is the only claim a preview can honestly make: the layer must not add a jump the video
-underneath does not have.
-
-| background | its own join vs a typical step | the GIF over it |
-|---|---|---|
-| `Theme_25.mp4` (0.96 s loop, 24 fps) | 2.60 / 2.68 | 2.32 / 2.35 |
-| `3.mp4` (2.10 s, 20 fps) | **12.34** / 9.25 | **11.19** / 7.24 |
-| `Theme_30.mp4` (5.42 s, 24 fps) | 2.83 / 0.92 | 2.30 / 0.77 |
-| `Theme_07.mp4` (17.62 s, 24 fps) | 0.61 / 0.44 | 0.54 / 0.41 |
-| `theme_52.mp4` (10.10 s, 20 fps) | **13.52** / 2.90 | **10.78** / 1.87 |
-
-Why a restart looks the way it does depends on how much of the loop the GIF covers, and
-two of these five are the interesting cases. `3.mp4` loops in 2.10 s and the GIF runs
-2.04 s, so its restart is the clip's own join — and that is a hard cut, 12.34 against 9.25
-sampled and 12.45 against 4.55 measured at the clip's native 20 fps
-([docs/limits.md](docs/limits.md)); the `gauge` preview above jumps because the video
-under it jumps. `theme_52.mp4` is the other case: its loop is 10.10 s and its own join is
-mild (2.49 against 1.29 typical), but a 2.04 s GIF of it restarts 1.9 s into the clip, so
-what the reader sees is a cut back to the beginning — 13.52 — because that is how much the
-clip moves in two seconds. Neither is the compositing: the same span of the same clip, with
-nothing drawn on it, gives the numbers in the middle column, and the layer is held to them
-by the suite. The GIF palette is ffmpeg's, not the 256-colour PNG the panel is fed;
-measured back out of the encoded files, the drawn colours land 0-2 per channel from what
-`render.py` asked for, and the amber figure in [docs/gui.md](docs/gui.md) holds
-(253, 195, 1) against the `#ffc400` asked for, 2/255.
-
-A word for readers who cannot see the motion: GitHub documents that animated GIFs follow
-the reader's system reduced-motion preference by default, under
-**Settings → Accessibility → Motion → "Autoplay animated images"**
-([Managing accessibility settings](https://docs.github.com/en/account-and-profile/how-tos/account-settings/managing-accessibility-settings)),
-so these five may reach you as a still frame. The files themselves loop for ever
-(`loop = 0` in each, asserted by the suite), the first frame of each is a real composited
-frame rather than a fade-in, and the alt text above says what each picture shows — which
-is what has to carry the description when the motion does not.
+Videos rather than GIFs, because an `.mp4` written into markdown as an image becomes an
+`<img>` tag no browser plays: these have to be uploaded through GitHub's own editor, which
+rewrites the markdown to point at its CDN. Until that happens the placeholders above
+are what you see, and the files wait in `docs/videos/`. Each one is 10–12 s at the
+clip's own frame rate; `tools/preview_gif.py` makes them through the same path the
+window's preview pane uses, and [docs/tools.md](docs/tools.md) carries the command.
 
 `alpha` is the vendor's currently selected theme redrawn widget for widget, with the
 things that theme has no widget for added: a GPU-temperature column, a gauge arc

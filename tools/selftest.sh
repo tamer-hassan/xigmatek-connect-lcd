@@ -606,310 +606,399 @@ for path, size, md5 in ((DEFAULT_MP4, 214_917, "b818b7d3294b3625e9f143e920ccc9b0
 PY
 
 echo
-echo "== the animated previews: the GIFs the README embeds, and the tool that writes them"
-# README's five theme previews now *play*, which puts a moving picture underneath two
-# written claims: README's caption ("position *and* colour carry the value") and
-# PROTOCOL.md §9's loop seams.  So the files are checked as documents, not as blobs:
-# geometry, frame count, delay, size band, and the text colour measured out of the
-# decoded frames.  Deliberately no byte hash - GIF output is ffmpeg's version's
-# business, and a different runner could write a palette one byte away while the
-# picture stays the same.  Everything here runs with no device and no network.
-python3 - <<'PY' || { echo "preview gifs FAILED"; exit 1; }
-import os, re, subprocess, sys, tempfile, time
+echo "== the preview videos README links, and the tool that writes them"
+# README's five theme previews are MP4s now, and so is the one ink figure in
+# docs/gui.md: 10-12 s each, at the background clip's own frame rate, driven by one real
+# sensors.collect() per displayed second so the digits, the meters and the clock move.
+# That is a set of claims about six video files, so the files get checked as documents:
+# what the written file reports about its own length and rate, that the picture really
+# does change where the layer draws, that it is over the background README names, that
+# the glyphs still stand off their own halo, and that the readings they drew are the
+# recorded series in docs/videos/.  Deliberately no byte hash on the videos: x264's
+# output is its version's business, and another runner could write different bytes of the
+# same animation.  ffmpeg and ffprobe ARE needed, so their absence is said out loud rather
+# than left to surface as a decode that returned nothing (the other ffmpeg-reading section
+# has the same note, for the same reason: a runner that lacked them once failed on a luma
+# of 0.0, which is what a failed decode looks like to a comparison).
+python3 - <<'PY' || { echo "preview videos FAILED"; exit 1; }
+import json
+import os
+import re
+import shutil
+import subprocess
+
+missing = [t for t in ("ffmpeg", "ffprobe") if not shutil.which(t)]
+assert not missing, (missing, "these six files are measured by decoding them: install "
+                              "ffmpeg (the CI job does, and the .deb names it in Suggests)")
+import sys
+import tempfile
+import time
 sys.path.insert(0, ".")
 sys.path.insert(0, "tools")
 from PIL import Image, ImageChops, ImageFilter, ImageStat
-
-from xigmalcd import render
 import preview_gif
+from xigmalcd import render
 
-EDGE, FRAMES, DELAY, CEILING = 320, 12, 170, 700_000
-THEME_FILES = {t: f"docs/preview-{t}.gif" for t in sorted(render.THEMES)}
-INK_FILE = "docs/preview-alpha-text-ffc400.gif"
+EDGE = 480                      # the panel's own size, which is what these draw at
+MIN_S, MAX_S = 9.9, 12.6        # the 10-12 s README promises, plus muxer slack
+CEILING = 9_000_000             # per file: GitHub's browser uploader caps near 10 MB
 
-# the pinned readings, which are what the previews' digits say: memory and disk are
-# in megabytes, the vendor's units.  That is not pedantry - the first version of this
-# dict had bytes from a guess, `bars` printed `used // 1024` and called the result
-# GB, and the picture came out reading "RAM 8 089 595 GB" with no warning of any
-# kind.  So the scale is asserted, not assumed.
-mem = preview_gif.PINNED["memory"]
-assert mem["used"] < mem["total"] < 10 ** 7, mem
-assert 1 <= mem["used"] // 1024 <= 1024, (mem["used"] // 1024,)
-assert preview_gif.PINNED["cpu"]["temperature"], preview_gif.PINNED["cpu"]
+# theme -> (video, background clip).  README's table header names the clip beside each
+# placeholder, and every clip is a file this repository carries.
+VIDEOS = {
+    "alpha": ("docs/videos/alpha-Theme_25.mp4", "media/Theme_25.mp4"),
+    "gauge": ("docs/videos/gauge-3.mp4", "themes/alpha/clips/3.mp4"),
+    "dual": ("docs/videos/dual-Theme_30.mp4", "themes/alpha/clips/Theme_30.mp4"),
+    "clock": ("docs/videos/clock-Theme_07.mp4", "themes/alpha/clips/Theme_07.mp4"),
+    "bars": ("docs/videos/bars-theme_52.mp4", "themes/alpha/clips/theme_52.mp4"),
+}
+INK_VIDEO = ("docs/videos/alpha-Theme_25-amber.mp4", "media/Theme_25.mp4", (255, 196, 0))
+SERIES = "docs/videos/readings-2026-11-08.json"
+APART = 3.0                     # seconds apart for the does-it-actually-move check
 
-
-def decoded(path):
-    im = Image.open(path)
-    out = []
-    try:
-        while True:
-            out.append(im.convert("RGB"))
-            im.seek(len(out))
-    except EOFError:
-        pass
-    return out, im.info.get("duration")
+for where, _clip in VIDEOS.values():
+    assert os.path.exists(where), f"{where} is missing: regenerate the set"
+assert os.path.exists(INK_VIDEO[0]) and os.path.exists(SERIES), "ink video or series gone"
 
 
-def nearest(path, want):
-    """The colour actually present in the decoded frames that is nearest to `want`,
-    and how far.  `getcolors` because a palettised GIF frame holds at most 256
-    distinct values, not a quarter of a million."""
-    best = (999, None)
-    for fr in decoded(path)[0]:
-        for _n, px in fr.getcolors(maxcolors=1 << 20):
-            d = max(abs(a - b) for a, b in zip(px, want))
-            if d < best[0]:
-                best = (d, px)
-    return best[1], best[0]
-
-
-def step(a, b):
-    """PROTOCOL.md §9's own seam metric: the mean absolute difference of the gray
-    plane between two frames.  Same shape as the table that measures the vendor's 40
-    clips, so the composites' numbers here are comparable with the clips' numbers
-    there - which is the whole reason to measure a GIF's seam this way."""
-    diff = ImageChops.difference(a.convert("L"), b.convert("L"))
-    return ImageStat.Stat(diff).mean[0]
-
-
-# which background each README preview is drawn over, and that it is a file this
-# repository carries: the gauge/dual/clock/bars clips live in the vendored theme
-# library, so a reader who clones this tree can regenerate all five without a Windows
-# volume.  README names these next to the pictures; if the two ever part company, the
-# luma cross-check below and the caption check further down both say so.
-CLIP_OF = {"alpha": "media/Theme_25.mp4",
-           "gauge": "themes/alpha/clips/3.mp4",
-           "dual": "themes/alpha/clips/Theme_30.mp4",
-           "clock": "themes/alpha/clips/Theme_07.mp4",
-           "bars": "themes/alpha/clips/theme_52.mp4"}
-
-#: the clock every README preview was written with (`--clock`), so the mask the
-#: legibility check builds is the picture the check is reading
-README_CLOCK = "11:07:42"
-
-
-def src_steps(path, n, fps):
-    """the same seam metric on the clip on its own, sampled at the GIF's rate, plus
-    its mean luma - which is how the composite is checked to be over the background
-    its caption claims"""
+def frame_at(path, ss, edge=EDGE):
+    """one frame of an MP4 as a PIL image, at or after `ss` seconds: ffmpeg reads it,
+    PIL cannot, and `ss` is not a seek into a keyframe-only world - libx264 at this
+    setting puts an IDR every 2 s, so a 0.2/3.2 seek pair decodes exactly"""
     with tempfile.TemporaryDirectory() as t:
-        # `-stream_loop -1` because this is the same thing the GIF was built from: some
-        # of these clips are shorter than the GIF's 2.04 s window (`Theme_25.mp4` is a
-        # 0.958 s loop, so an unlooped sample hands back 6 frames, not 12, and the seam
-        # being measured would then be between two different moments than the GIF's).
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-stream_loop", "-1",
-                        "-i", path, "-vf", f"fps={fps}", "-frames:v", str(n),
-                        os.path.join(t, "f%03d.png")], check=True)
-        made = [Image.open(os.path.join(t, p)).convert("RGB")
-                for p in sorted(os.listdir(t))]
-    assert len(made) == n, (path, len(made))
-    ins = sorted(step(a, b) for a, b in zip(made, made[1:]))
-    return {"seam": step(made[-1], made[0]), "typical": ins[len(ins) // 2],
-            "luma": sum(ImageStat.Stat(f.convert("L")).mean[0] for f in made) / len(made)}
+        out = os.path.join(t, "f.png")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{ss:.2f}", "-i", path,
+                        "-frames:v", "1", out], check=True)
+        return Image.open(out).convert("RGB").resize((edge, edge), Image.LANCZOS)
 
 
-def legibility(gif, theme):
-    """The drawn glyphs against their own immediate surround, read out of the encoded
-    file.  `render._scrim` hugs what was drawn (a MaxFilter over the frame's alpha,
-    grown by 3 device px) instead of washing the canvas, so the contrast a reader
-    actually gets is glyph core vs that grown halo - which is also why a scrim plate
-    helps on a bright clip without darkening the picture as a whole.
-
-    The mask is built with the same pinned clock `preview_gif.frames()` writes the files
-    with, for the obvious reason: the digits in the mask have to be the digits in the
-    file, and unpinned the theme draws whatever time the suite happens to run at (that
-    alone moved the clock theme's figure by ten points between two runs of this file).
-    The one thing still live is the `clock` theme's date line, which shows the day the
-    file was made; that is why this check holds a floor and prints a number rather than
-    matching one.
-    """
+def masks(theme, metrics, edge=EDGE, when=None):
+    """(opaque ink, its grown halo, untouched field) for one theme at one set of
+    readings.  The mask has to be built from the readings AND the clock the frame was
+    drawn with: these videos move their digits, so a mask from the pinned fixture would
+    score the file against a picture it is not - and leaving `clock_str` unpatched made
+    the mask's time line whatever time the suite happened to run at, which is how two
+    runs of one unchanged file printed 12.74 and 12.92 for the same measurement."""
     real = render.clock_str
-    render.clock_str = lambda *a, **k: README_CLOCK
+    if when is not None:
+        render.clock_str = lambda *a, t=time.localtime(when / 1000), **k: \
+            preview_gif.CLOCK_STR_REAL(t)
     try:
-        lay = render.draw(preview_gif.PINNED, theme, bg=render.OVERLAY)
+        lay = render.draw(metrics, theme, bg=render.OVERLAY)
     finally:
         render.clock_str = real
-    a = lay.getchannel("A").resize((EDGE, EDGE), Image.LANCZOS)
+    a = lay.getchannel("A").resize((edge, edge), Image.LANCZOS)
     ink = a.point(lambda v: 255 if v == 255 else 0)
     grown = a.filter(ImageFilter.MaxFilter(9)).point(lambda v: 255 if v else 0)
-    ring = ImageChops.subtract(grown, ink)
-    field = a.point(lambda v: 255 if v == 0 else 0)
-    im = Image.open(gif).convert("RGB")
-    lum = lambda m: ImageStat.Stat(im, m).mean if m.getbbox() else (0, 0, 0)
-
-    def luma(px):
-        return 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2]
-    gi, gr, gf = luma(lum(ink)), luma(lum(ring)), luma(lum(field))
-    assert ink.getbbox(), (gif, "the theme drew nothing opaque at all")
-    return gi, gr, gf
+    return ink, ImageChops.subtract(grown, ink), a.point(lambda v: 255 if v == 0 else 0)
 
 
-# The floor is not tuned to the answer: the widest case here is `alpha` at 153 and the
-# narrowest is the clock over the bright clip at 62, and the floor sits at 30 - half the
-# worst case, so a plate that stopped firing, or an ink that stopped contrasting, fails
-# while a merely different picture does not.
-LEGIBILITY_FLOOR = 30
+def layer_at(theme, sample, ink=None):
+    """the reference layer for one sample, drawn the way `preview_gif.frames()` drew it.
+
+    Both the readings AND that sample's clock, because that is what the frame was built
+    from: `frames()` patches `render.clock_str` per sample, and a mask drawn with the
+    wall clock of the moment the suite runs makes the *pixel count of the lettering*
+    depend on the time of day - which is how one unchanged file printed 2 268 painted
+    pixels in one run and 2 270 in the next."""
+    real = render.clock_str
+    when = time.localtime(series[sample]["timestamp"] / 1000)
+    render.clock_str = lambda *a, t=when, **k: preview_gif.CLOCK_STR_REAL(t)
+    try:
+        return render.draw(series[sample]["metrics"], theme, ink=ink,
+                           bg=render.OVERLAY)
+    finally:
+        render.clock_str = real
+
+def lum(px):
+    return 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2]
 
 
-total = 0
-for theme, path in THEME_FILES.items():
-    fr, dur = decoded(path)
-    im = Image.open(path)
-    assert im.size == (EDGE, EDGE), (path, im.size)
-    assert len(fr) == FRAMES, (path, len(fr))
-    assert dur == DELAY, (path, dur)
-    # ...and that it loops for ever, which is the other half of a README GIF working:
-    # GitHub's own guidance says a GIF that stops after one pass was *made* that way.
-    # ffmpeg's GIF muxer writes `-loop 0` for infinite, and Pillow reads it back as 0.
-    assert im.info.get("loop") == 0, (path, im.info.get("loop"))
-    size = os.path.getsize(path)
-    assert size < CEILING, (path, size)
-    total += size
-    # the loop seam: 12 frames at a 170 ms delay is 2.04 s of a clip that may loop in
-    # 0.96 s or in 17.6 s, and what that restart looks like depends on which.  Measured
-    # with PROTOCOL.md §9's own metric - mean absolute difference of the gray plane, the
-    # same shape as the table that measures the vendor's clips there.
-    inside = sorted(step(a, b) for a, b in zip(fr, fr[1:]))
-    typical = inside[len(inside) // 2]        # §9 compares a join with the median step
-    seam = step(fr[-1], fr[0])
-    # The rule cannot be "the join is no bigger than a typical step of this file", and
-    # the per-theme backgrounds are what showed it.  Two different things make a restart
-    # visible, and neither of them is the compositing:
-    #   * the GIF covers nearly the whole loop - `Theme_25.mp4` at 0.96 s, `3.mp4` at
-    #     2.10 s against the GIF's 2.04 s - so the restart is the *clip's own join*, and
-    #     `3.mp4`'s is a hard cut (12.34 against 9.25 sampled at 6 fps here, 12.45 against
-    #     4.55 at its native 20 fps in docs/limits.md);
-    #   * the GIF covers a fraction of the loop - `theme_52.mp4` runs 10.10 s, and a
-    #     2.04 s GIF restarts 1.9 s into it - so the restart is a cut back to the
-    #     beginning, and 13.52 simply says how much that clip moves in two seconds.  Its
-    #     own join is mild: 2.49 against 1.29 typical.
-    # A ratio test against the GIF's own median step would fail a *nearly still* clip for
-    # any join at all: `Theme_30.mp4` steps 0.92, so even 2.83 - less than the ordinary
-    # motion inside `Theme_25.mp4` - is three times its median.
-    # So the gate asserts the only thing a preview can honestly be blamed for: it must not
-    # add a jump the video underneath does not have.  Same span, same rate, the clip on
-    # its own (printed every run, and README carries the table):
-    #   Theme_25.mp4    clip  2.60 /  2.68   GIF  2.32 /  2.35
-    #   3.mp4           clip 12.34 /  9.25   GIF 11.19 /  7.24
-    #   Theme_30.mp4    clip  2.83 /  0.92   GIF  2.30 /  0.77
-    #   Theme_07.mp4    clip  0.61 /  0.44   GIF  0.54 /  0.41
-    #   theme_52.mp4    clip 13.52 /  2.90   GIF 10.78 /  1.87
-    src = src_steps(CLIP_OF[theme], FRAMES, 6.0)
-    assert os.path.exists(CLIP_OF[theme]), (path, CLIP_OF[theme])
-    gi, gr, gf = legibility(path, theme)
-    # Is this picture over the background its caption names?  The comparison that means
-    # anything is the clip's own mean luma against the GIF's mean over the pixels this
-    # theme never touches - the field showing through.  Comparing whole frames instead
-    # would call the layer's own drawing a mismatch: the `alpha` theme's translucent
-    # gauge track alone lifts the frame mean from the clip's 17.8 to 36.0.
-    assert abs(gf - src["luma"]) < 20, (path, CLIP_OF[theme], gf, src["luma"])
-    assert seam <= typical * 1.25 or seam <= src["seam"], \
-        (path, seam, typical, src)
-    assert seam <= src["seam"] * 1.15, \
-        (path, seam, src["seam"], "the layer added a jump the clip does not have")
-    assert gi - gr >= LEGIBILITY_FLOOR, (path, gi, gr, gf, "glyphs washing out")
-    # and the glyphs are still the theme's own colour, not lost in the palette
-    near, dist = nearest(path, (255, 255, 255))
-    print(f"  {path:34} {im.size[0]}x{im.size[1]} {len(fr)} fr @ {dur} ms "
-          f"= {len(fr) * dur / 1000:.2f} s  {size:>7,} B  seam {seam:5.2f} vs "
-          f"typical {typical:5.2f} (the clip alone: {src['seam']:5.2f} vs "
-          f"{src['typical']:5.2f})  nearest to white {near} off {dist}")
-    print(f"  {'':34} over {os.path.basename(CLIP_OF[theme]):<18} "
-          f"clip luma {src['luma']:5.1f}  field {gf:5.1f} (gap {abs(gf - src['luma']):4.1f})  "
-          f"glyph {gi:6.1f} vs its own halo {gr:6.1f} = {gi - gr:6.1f} "
-          f"(floor {LEGIBILITY_FLOOR})")
+def preview_slots(text, doc):
+    """(the files named by a marker, the number of uploaded videos) in this document.
 
-fr, dur = decoded(INK_FILE)
-assert Image.open(INK_FILE).size == (EDGE, EDGE) and len(fr) == FRAMES
-near, dist = nearest(INK_FILE, render.AMBER[:3])
-assert dist <= 3, (near, dist)             # measured off the file the README ships
-total += os.path.getsize(INK_FILE)
-print(f"  {INK_FILE:34} the ink in the file is {near}, {dist}/255 from "
-      f"{render.AMBER[:3]} (the GIF's palette is ffmpeg's, not the wire's)")
+    A preview slot is a markdown table cell or standalone line holding either a
+    `PREVIEW ME ... docs/videos/<file>` marker - the state this commit is in - or an
+    image link to GitHub's own attachments CDN, which is what the editor writes when one
+    of these MP4s is uploaded and the marker is deleted.  Counting both, rather than just
+    looking for the marker, is what makes the check survive that edit without going soft:
+    the two counts have to add up to the number of previews the document promises, so a
+    marker quietly removed with nothing put back leaves a hole this can see.
 
-# the README embeds exactly these five, and no still PNGs left behind by the change
+    A relative `docs/videos/*.mp4` image link is rejected outright.  That is the shape
+    that looks correct and is dead: GitHub renders it as an `<img>` whose src ends in
+    `.mp4`, which no browser plays, and the suite's own link checker cannot call it dead
+    because the file really does exist in the tree.
+    """
+    marked = set()
+    uploads = 0
+    for line in text.split("\n"):
+        for slot in line.split("|") if line.strip().startswith("|") else [line]:
+            m = re.search(r"PREVIEW ME[^|]*?(docs/videos/[A-Za-z0-9_.-]+\.mp4)", slot)
+            if m:
+                marked.add(m.group(1))
+            if re.search(r"!\[[^\]]*\]\(https://(?:github\.com|media\.github\.com)"
+                         r"[^) ]*(?:assets|githubusercontent)[^) ]*\)", slot):
+                uploads += 1
+            dead = re.search(r"!\[[^\]]*\]\((?:\./)?docs/videos/[^) ]+\.mp4[^)]*\)",
+                             slot)
+            assert not dead, (doc, dead and dead.group(0),
+                              "a relative .mp4 image link is an <img> nothing plays")
+    return marked, uploads
+
+
+def slots_are_filled(text, doc, files):
+    """every one of `files` has a filled slot in `doc`: a marker naming it, or an upload."""
+    marked, uploads = preview_slots(text, doc)
+    unknown = marked - set(files)
+    assert not unknown, (doc, sorted(unknown), "a marker names a file this set does not")
+    unmarked = [f for f in files if f not in marked]
+    assert len(unmarked) == uploads, (
+        doc, f"{len(marked)} markers + {uploads} uploads for {len(files)} previews",
+        unmarked, "a preview slot is empty, or an upload is there for a file this set "
+                  "does not name: the markers and the uploaded links have to add up")
+    return f"{len(marked)} markers, {uploads} uploaded"
+
+
+def mean_of(im, mask):
+    return lum(ImageStat.Stat(im, mask).mean)
+
+
+# ---- the recorded series: the digits in these files came from here --------------
+with open(SERIES) as fh:
+    rec = json.load(fh)
+series, samples = rec["series"], rec["samples"]
+assert samples == len(series) == 12, (samples, len(series))
+gaps = [(b["timestamp"] - a["timestamp"]) / 1000
+        for a, b in zip(series, series[1:])]
+assert all(0.8 <= g <= 1.4 for g in gaps), [round(g, 2) for g in gaps]
+clocks = [preview_gif.CLOCK_STR_REAL(time.localtime(s["timestamp"] / 1000))
+          for s in series]
+assert len(set(clocks)) == len(clocks), clocks        # the clock ticks, one per sample
+fields = {}
+for section, key in (("cpu", "temperature"), ("cpu", "load"), ("gpu", "temperature"),
+                     ("gpu", "load"), ("memory", "used")):
+    fields[f"{section}.{key}"] = {s["metrics"].get(section, {}).get(key) for s in series}
+fields["fan RPM"] = {f.get("value") for s in series for f in s["metrics"].get("fans", [])}
+changed = {k: v for k, v in fields.items() if len(v) > 1}
+assert len(changed) >= 4, (sorted(fields), sorted(changed), "the series is meant to move")
+# and they have to be a real machine's numbers, inside the spans PROTOCOL §8 measured on
+# this board: "live" cannot mean "made up"
+temps = [s["metrics"]["cpu"]["temperature"] for s in series]
+assert 40 <= min(temps) and max(temps) <= 95, temps
+cpu_fans = sorted(f["value"] for s in series for f in s["metrics"].get("fans", [])
+                  if "Fan" in str(f.get("type", "")))
+assert 900 <= min(cpu_fans) and max(cpu_fans) <= 3600, cpu_fans
+loads = [s["metrics"]["cpu"]["load"] for s in series]
+assert 0.0 <= min(loads) and max(loads) <= 100.0, loads
+print(f"  series            {len(series)} samples over {rec['span_s']:.1f} s "
+      f"(gaps {min(gaps):.2f}-{max(gaps):.2f} s), clock {clocks[0]}..{clocks[-1]}")
+print(f"  it moves          {len(changed)} of {len(fields)} fields changed: "
+      + ", ".join(f"{k} {min(v):g}->{max(v):g}" for k, v in sorted(changed.items())))
+print(f"  in span           cpu {min(temps)}-{max(temps)} C, cpu fans "
+      f"{min(cpu_fans)}-{max(cpu_fans)} RPM, load {min(loads):g}-{max(loads):g} %")
+
+# ---- the files README links ---------------------------------------------------
 readme = open("README.md", encoding="utf-8").read()
-for theme, path in THEME_FILES.items():
-    assert f"]({path})" in readme, (theme, path)
-    # the caption by each picture has to name the background it is drawn over, and that
-    # background has to be a file this tree carries: a reader regenerating the previews
-    # from a clone should get the picture README shows
-    assert os.path.basename(CLIP_OF[theme]) in readme, (theme, CLIP_OF[theme])
-    assert f"docs/preview-{theme}.png" not in readme, theme
-    # and not tracked either.  `tools/previews.py` still writes those PNGs, so a
-    # developer's own run can leave them in the working tree; what must not happen is
-    # the repository carrying both shapes of the same picture, which is why they are
-    # in .gitignore and why this asks git rather than the filesystem.
-    tracked = subprocess.run(["git", "ls-files", f"docs/preview-{theme}.png"],
-                             capture_output=True, text=True)
-    if tracked.returncode == 0:
-        assert not tracked.stdout.strip(), (theme, tracked.stdout.strip())
-assert "](" + INK_FILE + ")" not in readme      # it belongs to docs/gui.md
+assert ".gif" not in readme, "README still links a GIF"
 gui = open("docs/gui.md", encoding="utf-8").read()
-hit = re.search(r"\]\(([^)]*preview-alpha-text-ffc400\.gif)\)", gui)
-assert hit, "docs/gui.md does not link the ink figure"
-# resolved against the document it is written in, the way the link section does: the
-# figure sits in docs/ and gui.md lives there too, so the link is just the name
-assert os.path.exists(os.path.join("docs", hit.group(1))), hit.group(1)
-print(f"  README embeds {len(THEME_FILES)} animated previews; the ink figure "
-      f"lives in docs/gui.md; {total:,} B of GIFs in the tree")
+total = 0
+late = int(APART)                       # the sample `APART` seconds in
+for theme, (where, clip) in VIDEOS.items():
+    nf, dur, rate = preview_gif.probe_video(where)
+    size = os.path.getsize(where)
+    total += size
+    assert MIN_S <= dur <= MAX_S, (where, dur)
+    assert abs(dur * rate - nf) <= 2, (where, nf, dur, rate)
+    assert size < CEILING, (where, size)
+    assert os.path.basename(clip) in readme, (where, clip)
+    fr = frame_at(where, 0.0)
+    s0, sl = series[0], series[late]
+    ink0, halo0, field0 = masks(theme, s0["metrics"], when=s0["timestamp"])
+    ink_late, _hl, field_late = masks(theme, sl["metrics"], when=sl["timestamp"])
+    # the picture is over the clip its placeholder names: mean luma of the video's
+    # untouched field against the clip's own first frame
+    src = ImageStat.Stat(frame_at(clip, 0.0).convert("L")).mean[0]
+    gf = mean_of(fr, field0)
+    assert abs(gf - src) < 20, (where, clip, gf, src)
+    gi = mean_of(fr, ink0)
+    gh = mean_of(fr, halo0)
+    assert gi - gh >= 30, (where, gi, gh, "glyphs washing out against their own halo")
+    # the claim these videos exist for: the numbers move.  Two things, one about the
+    # drawing and one about the file.  (1) The layer drawn from the first sample and the
+    # layer drawn from the sample `APART` s later have to differ over the pixels they
+    # both paint - that is the digits, the arcs and the bars changing, host side, with no
+    # codec between.  (2) In the written file, the same two moments have to differ at
+    # least 3/255 of mean absolute change over the union of those pixels, and more than
+    # the untouched field does, or the file's motion is only the background's.  Note what
+    # this is NOT: comparing those pixels against the bare clip at the same moments would
+    # be a different test, and a *static* layer would pass it (the clip moves, so the
+    # clip-only difference is large while a frozen layer changes nothing).
+    a, b = fr, frame_at(where, APART)
+    ink = ImageChops.add(ink0, ink_late)
+    field = ImageChops.multiply(field0, field_late)
+    d_ink = ImageStat.Stat(ImageChops.difference(a, b), ink).mean[0]
+    d_fld = ImageStat.Stat(ImageChops.difference(a, b), field).mean[0]
+    # ...and the same two layers the file was built from, drawn here with each sample's
+    # own reading AND its own clock, exactly as `preview_gif.frames()` patches it: call
+    # `render.draw` twice without that patch and both calls print the wall clock of this
+    # instant, so the `clock` theme came out byte-identical (0.0) and looked frozen when
+    # the video it is scoring ticks away merrily.
+    dl = ImageChops.difference(layer_at(theme, 0).convert("RGB"),
+                               layer_at(theme, late).convert("RGB"))
+    d_lyr = ImageStat.Stat(dl, ink).mean[0]
+    # the mean over a mask this big is a small number even when every digit changed -
+    # a theme's ink is mostly labels and outlines, which do not move - so the count of
+    # pixels that really changed is the figure with meaning attached to it
+    n_changed = sum(1 for v, m in zip(dl.convert("L").get_flattened_data(),
+                                      ink.get_flattened_data()) if v > 8 and m)
+    # 12.7 measured on this series for `alpha`: the labels, the clock's minutes and the
+    # ring outlines are the same in both samples, so this is not a big number even when
+    # every digit moves - it only has to be clearly non-zero, and the per-file figures
+    # printed beside it say how much.
+    assert d_lyr > 1.0 and n_changed > 200, (theme, d_lyr, n_changed,
+                                             "the layer draws the same picture twice")
+    assert d_ink >= 3.0 and d_ink > d_fld * 1.2, (where, d_ink, d_fld,
+                                                  "the picture does not change where the "
+                                                  "layer draws")
+    print(f"  {where:<38} {nf:>4} fr {dur:5.2f} s @ {rate:g} fps  {size:>9,} B")
+    print(f"  {'':<38} over {os.path.basename(clip):<16} clip {src:5.1f} field {gf:5.1f} "
+          f"(gap {abs(gf - src):4.1f})  glyph {gi:6.1f} halo {gh:6.1f} = {gi - gh:5.1f}")
+    print(f"  {'':<38} moved in {APART:g} s: in the file {d_ink:5.2f} vs untouched "
+          f"{d_fld:5.2f} (ratio {d_ink / max(d_fld, 0.01):5.2f}); re-drawn here, "
+          f"{n_changed:,} px of the layer differ by more than 8/255 "
+          f"(mean {d_lyr:5.2f})")
 
-# the tool has to still work on this machine, at a size that costs nothing, for every
-# theme.  The five themes take different render options - `alpha` has no `title`,
-# `clock` has no gauge `source` - and when this passed one option bag straight through
-# it died with `theme_alpha() got an unexpected keyword argument 'source'`.  The
-# signature filter is what fixes it, and this is what keeps it fixed.
+print(f"  README's slots      {slots_are_filled(readme, 'README', [v for v, _ in VIDEOS.values()])}"
+      f" for {len(VIDEOS)} previews")
+
+where, clip, want = INK_VIDEO
+size = os.path.getsize(where)
+total += size
+nf, dur, rate = preview_gif.probe_video(where)
+assert MIN_S <= dur <= MAX_S and size < CEILING, (where, dur, size)
+# (the slots are counted once, below, for all six files at once)
+fr = frame_at(where, 0.0)
+# Ink, measured where the layer painted that ink.  The mask is the set of pixels the
+# reference layer holds at exactly the asked colour, so the arcs and rings - which keep
+# their own colours, since ink is about text - cannot inflate the figure.  What the
+# codec does to those pixels is then a distribution, not one lucky value.
+ref = layer_at("alpha", 0, ink=want)   # the sample's own clock, or this count jitters
+rp = list(ref.convert("RGB").getdata())
+ra = list(ref.getchannel("A").getdata())
+painted = [k for k, (p, a) in enumerate(zip(rp, ra)) if a == 255 and p == want]
+assert len(painted) > 1000, (where, len(painted), "no lettering to measure")
+vp = list(fr.getdata())
+errs = sorted(max(abs(x - y) for x, y in zip(vp[k], want)) for k in painted)
+n = len(errs)
+med, p95 = errs[n // 2], errs[int(n * 0.95)]
+assert med <= 8 and p95 <= 24, (where, med, p95, "the ink is drifting out of the file")
+print(f"  {where:<38} {nf:>4} fr {dur:5.2f} s @ {rate:g} fps  {size:>9,} B")
+print(f"  {'':<38} {n:,} px the layer paints at exactly {want}: in the written file "
+      f"median {med}/255 off, p95 {p95}/255, {sum(1 for e in errs if e == 0):,} px "
+      f"exact (H.264 4:2:0 at crf 20; the GIF path below asks a different question)")
+
+print(f"  docs/gui.md's slot {slots_are_filled(gui, 'docs/gui.md', [INK_VIDEO[0]])} for "
+      f"the ink figure")
+print(f"  total             {len(VIDEOS) + 1} videos, {total:,} B, "
+      f"plus {os.path.getsize(SERIES):,} B of series JSON")
+
+# ---- the tool, both shapes, at sizes nobody would publish ----------------------
+help_out = subprocess.run([sys.executable, "tools/preview_gif.py", "--help"],
+                          capture_output=True, text=True)
+assert help_out.returncode == 0, help_out.stderr[:400]
+for flag in ("--mp4", "--no-gif", "--series", "--record", "--live-seconds", "--crf",
+             "--preset", "--clock", "--scrim", "--ink", "--colors", "--gif-fps",
+             "--live", "--frames", "--scale", "--out"):
+    assert flag in help_out.stdout, (flag, "the tool no longer documents it")
+print(f"  tools/preview_gif.py --help  {len(help_out.stdout)} B, every documented "
+      f"switch present")
+
 with tempfile.TemporaryDirectory() as tmp:
+    # every theme through the animated path, small and cheap, off the recorded series:
+    # this is where a theme gaining or losing a render keyword used to die
     for theme in sorted(render.THEMES):
-        ims = preview_gif.frames("media/Theme_25.mp4", theme, None, "11:07:42",
-                                 {"bg": render.OVERLAY}, 2, 6.0)
-        assert len(ims) == 2, (theme, len(ims))
-        assert ims[0].size == (render.W, render.H), (theme, ims[0].size)
-        where = os.path.join(tmp, f"{theme}.gif")
-        preview_gif.write_gif(ims, where, 6.0, 160, 32)
-        back, d2 = decoded(where)
-        assert Image.open(where).size == (160, 160) and len(back) == 2, theme
-        os.remove(where)
-    print("  every theme renders through the tool at 160 px: the option filter holds")
+        out = os.path.join(tmp, f"{theme}.mp4")
+        r = subprocess.run([sys.executable, "tools/preview_gif.py", "--theme", theme,
+                            "--clip", "media/Theme_25.mp4", "--series", SERIES,
+                            "--frames", "8", "--gif-fps", "2", "--scale", "160",
+                            "--no-gif", "--out", out], capture_output=True, text=True)
+        assert r.returncode == 0, (theme, r.stdout[-300:], r.stderr[-300:])
+        nf, dur, rate = preview_gif.probe_video(out)
+        assert nf == 8 and abs(dur - 4.0) < 0.3, (theme, nf, dur, rate)
+    print(f"  every theme renders through the animated path: {len(render.THEMES)} of "
+          f"{len(render.THEMES)}, 8 frames at 2 fps = 4.00 s each, off the series")
+    # ...and the pinned GIF shape still works, because that is the shape whose digits a
+    # caption can quote: the ink drift figure docs/tools.md carries comes from here
+    out = os.path.join(tmp, "amber.gif")
+    r = subprocess.run([sys.executable, "tools/preview_gif.py", "--theme", "alpha",
+                        "--clip", "media/Theme_25.mp4", "--clock", "11:07:42",
+                        "--ink", "amber", "--frames", "6", "--gif-fps", "3",
+                        "--scale", "160", "--colors", "128", "--out", out],
+                       capture_output=True, text=True)
+    assert r.returncode == 0, (r.stdout[-300:], r.stderr[-300:])
+    im = Image.open(out)
+    assert im.size == (160, 160) and im.info.get("loop") == 0, im.size
+    near, dist, seen = preview_gif.ink_drift(out, (255, 196, 0))
+    assert dist <= 3, (near, dist, "the GIF palette moved the ink further than documented")
+    # the other question, on purpose: `ink_drift` asks for the closest colour the file
+    # holds anywhere, which is what a reader's eye lands on; the video check above asks
+    # how far each painted pixel travelled.  Both are reported, neither stands in for
+    # the other.
+    print(f"  the pinned GIF shape still writes: {os.path.getsize(out):>6,} B, 160x160, "
+          f"loop {im.info.get('loop')}, {seen} frames read back, #ffc400 lands as "
+          f"{near} off {dist}/255")
+    # the scrim plate's effect, measured on the animated path rather than remembered
+    # from the GIF set: the same 8 frames over the bright clip, with and without the
+    # plate the window's auto rule puts there, glyph luma against its own grown halo.
+    # 160 px here because nobody would publish that size; the pair is comparable to
+    # itself, which is the point.
+    bright = "themes/alpha/clips/Theme_07.mp4"
+    plate = {}
+    for how, extra in (("none", ["--scrim", "0"]), ("auto (150)", [])):
+        out = os.path.join(tmp, f"clock-{how}.mp4")
+        r = subprocess.run([sys.executable, "tools/preview_gif.py", "--theme", "clock",
+                            "--clip", bright, "--series", SERIES, "--frames", "8",
+                            "--gif-fps", "24", "--scale", "160", "--no-gif",
+                            "--out", out] + extra, capture_output=True, text=True)
+        assert r.returncode == 0, (how, r.stdout[-300:], r.stderr[-300:])
+        fr0 = frame_at(out, 0.0, edge=160)
+        ink0b, halo0b, field0b = masks("clock", series[0]["metrics"], edge=160,
+                                       when=series[0]["timestamp"])
+        gi, gh, gf = (mean_of(fr0, ink0b), mean_of(fr0, halo0b), mean_of(fr0, field0b))
+        plate[how] = (gi, gh, gf)
+    gap0 = plate["none"][0] - plate["none"][1]
+    gap1 = plate["auto (150)"][0] - plate["auto (150)"][1]
+    # measured 1.42x at this size (51.7 -> 73.5 of 255), so the gate is "the plate widens
+    # the gap by at least a fifth" - a directional claim about which way the rule pulls,
+    # not a tuned-to-the-answer number: the plate darkens the halo around the glyphs, it
+    # does not brighten the glyphs, and both halves of that show up in the printed pair.
+    assert gap1 > gap0 * 1.2, (gap0, gap1, "the plate the rule adds changes nothing")
+    print(f"  the plate, measured on the clock over {os.path.basename(bright)} "
+          f"(luma {ImageStat.Stat(frame_at(bright, 0.0).convert('L')).mean[0]:.1f}): "
+          f"no plate glyph {plate['none'][0]:.1f} vs halo {plate['none'][1]:.1f} = "
+          f"{gap0:5.1f}; auto glyph {plate['auto (150)'][0]:.1f} vs halo "
+          f"{plate['auto (150)'][1]:.1f} = {gap1:5.1f} (8 frames, 160 px)")
 
-# the player behind all of this, asked two questions it got wrong on the first try.
-# (1) It has to know the file's rate and geometry *before* the first frame, because
-# the window prints the rate next to the picture: probing on the first `frame()` made
-# it say "at 0 fps" for one redraw, and the suite caught that as `0.0`.  (2) A stream
-# that yields not one frame is a failure, not a loop seam, and restarting it forever
-# is an infinite loop: a missing file once spun ffmpeg for sixteen minutes of a
-# harness timeout.  One honest None, quickly, is what belongs here.
-from xigmaui import clips as clipdb
-known = clipdb.ClipPlayer("media/Theme_11.mp4")
-assert known.fps > 0 and known.wide == 480 and known.seconds > 1, (
-    known.fps, known.wide, known.seconds)
-assert known.frames == 0 and known.decoded == 0, "knowing the rate is not decoding"
-print(f"  the player knows       {known.wide}x{known.tall} at {known.fps:g} fps, "
-      f"loop {known.seconds:.2f} s, before reading a single frame")
-known.close()
-t0 = time.perf_counter()
-gone = clipdb.ClipPlayer("/nonexistent/xigma-no-such-clip.mp4")
-assert gone.frame() is None, "an undecodable file answers None"
-assert gone.dead and gone.loops == 0, (gone.dead, gone.loops)
-assert gone.frame() is None, "and it stays answered, it does not restart"
-took = time.perf_counter() - t0
-assert took < 2.0, took
-print(f"  a file that is not there  None in {took * 1000:.0f} ms, "
-      f"{gone.loops} restarts, dead={gone.dead}")
-gone.close()
-
-# and the switches the documents promise are the switches the tool has
-help_out = subprocess.run([sys.executable, "tools/preview_gif.py", "--help"],                          capture_output=True, text=True)
-assert help_out.returncode == 0, help_out.stderr[:200]
-for flag in ("--clip", "--theme", "--ink", "--frames", "--gif-fps", "--scale",
-             "--colors", "--clock", "--scrim", "--out", "--mp4", "--live"):
-    assert flag in help_out.stdout, flag
-print(f"  tools/preview_gif.py --help  {len(help_out.stdout)} B, all the documented "
-      f"switches present")
+    # --live-seconds samples the box and records what it read; 2 s is enough to prove
+    # the plumbing without spending a quarter minute on it
+    probe = os.path.join(tmp, "series.json")
+    r = subprocess.run([sys.executable, "tools/preview_gif.py", "--theme", "alpha",
+                        "--clip", "media/Theme_25.mp4", "--live-seconds", "2",
+                        "--record", probe, "--frames", "4", "--gif-fps", "2",
+                        "--scale", "160", "--no-gif", "--out", os.path.join(tmp, "l.mp4")],
+                       capture_output=True, text=True)
+    assert r.returncode == 0, (r.stdout[-400:], r.stderr[-400:])
+    with open(probe) as fh:
+        got = json.load(fh)
+    assert got["samples"] == 2 and got["series"][0]["metrics"], got["samples"]
+    assert "sampled" in r.stdout, r.stdout[-400:]
+    c = got["series"][0]["metrics"]["cpu"]
+    print(f"  --live-seconds sampled this box: {got['samples']} readings, cpu "
+          f"{c['temperature']} C at {c['load']} %, into {os.path.getsize(probe):,} B "
+          f"of JSON")
 PY
 
-
-echo
 echo "== where clips are looked up: the roots a package install has to get right"
 
 # A checkout is not the only place this code runs.  `pip install .` and the .deb

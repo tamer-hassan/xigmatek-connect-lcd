@@ -214,13 +214,12 @@ at 24 fps is 23-24 frames a pass (measured 24, then 23, then 23 - the last pass 
 by the fraction of a frame the resampler drops), and the **first frame of successive
 passes is byte-identical** (`f7e5ded0b703` three times), so the restart never splices a
 half frame together. That is the same loop the panel plays, and it is why the README's
-GIFs can claim a measured seam rather than a hope: over this clip the README's `alpha` file
-joins at 2.32 against 2.35 for an ordinary neighbouring step, by PROTOCOL.md §9's metric,
-and the same span of the same clip with nothing drawn on it joins at 2.60 against 2.68 -
-so the restart is no bigger than the motion the file already makes, and the layer adds
-nothing (docs/limits.md has that table for all five backgrounds, including the two whose
-restarts *are* obvious and why: `3.mp4`'s loop is a hard cut, and a 2.04 s GIF of a 10.10 s
-clip cuts back through two seconds of motion).
+the same loops the README videos replay,
+measured there rather than assumed: the `alpha` video runs the 0.958 s clip 10.4 times in
+its 10 s, so its restarts are the clip's own joins - which §9 measures at 2.50 against a
+1.54 typical step at the clip's native rate, and docs/limits.md carries that table for
+all five backgrounds, including `3.mp4`, whose loop *is* a hard cut (12.45 against 4.55).
+A preview is only ever blamed for what it adds, and the suite holds each file to that.
 
 ### The advanced switch
 
@@ -335,23 +334,34 @@ Choosing a dark ink over a bright field is a combination nothing here has measur
 `auto` stays the daemon's white-ink rule rather than inventing a second one - if you pick
 a dark colour over a bright clip, set the scrim yourself and judge it on the glass.
 
-The same layer in motion, as a file rather than as a description - the alpha theme over
-the vendored `Theme_25.mp4` running, its text in amber:
+The same layer in motion, and its lettering in amber rather than the theme's white: a
+10 s take over the vendored `Theme_25.mp4` at the panel's own 480 px, its numbers from
+one real reading per displayed second, so the digits and the rings move while you watch.
+It is the sixth file in `docs/videos/`, and README's five are made the same way over four
+other clips.
 
-![the alpha theme's OSD layer over the vendor's own background playing, with the text
-drawn in #ffc400 instead of the theme's white](preview-alpha-text-ffc400.gif)
+`PREVIEW ME: upload docs/videos/alpha-Theme_25-amber.mp4 here, then delete this marker`
 
-`tools/preview_gif.py --clip media/Theme_25.mp4 --theme alpha --ink amber --scale 320
---colors 128 --frames 12 --gif-fps 6 --clock 11:07:42` writes that file, and it is the
-same composite the `playing` pane shows: `ClipPlayer` in sequence, `render.draw` on top,
-and the pinned readings rather than live ones (so the digits say the same thing on
-every machine). The GIF's own loss is measured off the encoded file rather than assumed:
-the nearest colour that file actually holds to the amber `render.py` asked for is
-**(253, 195, 1), 2/255 away**. That is the GIF's palette - ffmpeg's `palettegen`, 128
-colours for the whole animation - and not the 256-colour PNG the upload path sends,
-whose drift the suite measures separately at 1/255 per channel (§10). Nothing here was
-put on glass to be photographed: the panel cannot be asked what it shows (§11), so this
-is our compositing, encoded.
+```
+tools/preview_gif.py --theme alpha --clip media/Theme_25.mp4 --ink amber \
+  --series docs/videos/readings-2026-11-08.json --frames 240 --gif-fps 24 \
+  --scale 480 --no-gif --out docs/videos/alpha-Theme_25-amber.mp4
+```
+
+That is the same composite the `playing` pane shows - `ClipPlayer` in sequence,
+`render.draw` on top - and the same recorded series behind all six files, so they show
+one minute of one machine rather than six separate guesses. What the encoding does to the
+ink is measured off the file: of the **2 268** pixels that layer
+paints at exactly `#ffc400`, the written file puts **1 144** within 3/255 (median 3, mean
+4.3), **2 187** within 8/255 (95th percentile), and **81** still at the exact value. The
+tail is thin: 19 pixels sit more than 16/255 away, the worst 227, which is what half-
+resolution chroma does to a hairline stroke over a moving picture. That is H.264 at crf 20 quantising in YUV 4:2:0 - it keeps a large flat run of
+saturated colour closely without keeping any one value. The GIF path asks a different
+question and gets a different number: the closest colour *present anywhere in* a
+160 px/6-frame/128-colour GIF written in the same suite run is **(252, 197, 2)**, 3/255
+from what was asked. Neither is the 256-colour PNG the upload path sends, whose drift
+§10 measures at 1/255 per channel. And nothing here was put on glass to be photographed:
+the panel cannot be asked what it shows (§11), so this is our compositing, encoded.
 
 ### Two shortcuts, and why they are the ones they are
 

@@ -1,15 +1,27 @@
 #!/usr/bin/env python3
-"""preview_gif.py - the preview pane's animated composite, written out as a GIF.
+"""preview_gif.py - the preview pane's animated composite, written out as a file.
 
 One code path with the window: `clips.ClipPlayer` decodes the background in order,
 `render.draw` draws this program's layer over it (theme, clock size, scrim and the
 chosen text colour included), and what comes out is what `xigmaui` shows in its
-preview pane while `playing` is ticked - encoded as an animated GIF.
+preview pane while `playing` is ticked - encoded as an animated GIF (`--out x.gif`)
+or as an H.264 MP4 (`--mp4 --no-gif --out x.mp4`).
 
-Why GIF, measured rather than remembered: GitHub's markdown turns
-`![alt](clip.mp4)` into `<img src="...clip.mp4">`, which no browser plays, so an
-MP4 in a README is a link and not a preview.  `--mp4` still writes one, for the
-click-through and the release asset.
+Two shapes, for two different jobs, and the difference is the *digits*:
+
+* **The GIFs are short and say one thing.**  12 frames, 2.04 s, the pinned readings
+  from `tools/preview_pin.py` and `--clock` holding the time still, so a caption can
+  quote the numbers and the suite can measure the file against them.  GIF because
+  GitHub's markdown turns `![alt](clip.mp4)` into `<img src="...clip.mp4">` which no
+  browser plays, so inline motion has to be a GIF.
+* **The MP4s are long and move.**  10-12 s at the clip's own 20-24 fps, driven by
+  `--live-seconds N` or `--series FILE`: one real `sensors.collect()` per second, held
+  for that second's frames, with the on-glass clock following each sample's wall time.
+  So the temperatures, loads, fan figures and the seconds all change the way they do
+  on real glass, and the series is saved beside the video (`--record`) as the record
+  those digits came from.  These are the files README links - uploaded through
+  GitHub's editor, which rewrites the markdown to point at its own CDN, because a
+  `.mp4` written by hand into markdown is a dead `<img>`.
 
 Two things this had to learn the hard way, both by measuring:
 
@@ -36,6 +48,7 @@ from __future__ import annotations
 import argparse
 import inspect
 import io
+import json
 import os
 import subprocess
 import sys
@@ -59,34 +72,148 @@ from xigmaui import clips as clipdb                      # noqa: E402
 #: a measurement.  `--live` draws those instead.
 from preview_pin import PINNED                                      # noqa: E402
 
+#: `render.clock_str` before anything patches it.  Both this tool and the suite set
+#: that attribute to pin or advance the clock on the glass, so anything that wants the
+#: real formatting - `series_note`, or a later draw - has to hold on to the original.
+CLOCK_STR_REAL = render.clock_str
+
+
+def sample_series(seconds: int, period: float = 1.0) -> list[dict]:
+    """`seconds` real `sensors.collect()` calls, one per `period`.
+
+    This is what makes a preview show *changes* rather than one frozen reading: the
+    temperatures, loads, fan figures and the clock on the glass all come from a
+    recorded series, sampled on this machine while the video was being made.  Each
+    entry is `{"timestamp": <ms>, "metrics": <the STATE all 1 body>}`, which is the
+    shape the daemon uploads and the shape `render.draw` takes, so a sample goes
+    straight to the renderer with no translation.
+
+    The sampling is wall-clock paced, and `collect()` itself costs 75-193 ms on this
+    board (measured, three runs, 2026-11-08), so the sleep is the period minus that:
+    otherwise the series drifts a third of a second per sample and a 12 s video shows
+    16 seconds of readings.
+    """
+    out = []
+    for _ in range(seconds):
+        t0 = time.perf_counter()
+        ts = int(time.time() * 1000)
+        m = sensors.collect()
+        if m:
+            out.append({"timestamp": ts, "metrics": m})
+        left = period - (time.perf_counter() - t0)
+        if left > 0:
+            time.sleep(left)
+    return out
+
+
+def save_series(where: str, series: list[dict], source: str) -> None:
+    """Write the series next to the video that drew it, and say where it came from.
+
+    The videos move, so their digits are a claim about a real machine at a real
+    minute; the JSON is what that claim traces back to.  It is in the tree for the
+    same reason `data/` is.
+    """
+    with open(where, "w") as fh:
+        json.dump({"source": source, "samples": len(series),
+                   "first": series[0]["timestamp"], "last": series[-1]["timestamp"],
+                   "span_s": (series[-1]["timestamp"] - series[0]["timestamp"]) / 1000,
+                   "series": series}, fh, indent=1, sort_keys=True)
+        fh.write("\n")
+
+
+def load_series(where: str) -> list[dict]:
+    """Read back a recorded series, so six previews can share one set of readings."""
+    with open(where) as fh:
+        return json.load(fh)["series"]
+
+
+def series_note(series: list[dict]) -> str:
+    """What actually moved in this series, as one line: min -> max per field.
+
+    Printed by the tool and asserted by the suite, because "the numbers change" is
+    the whole point of these files and it is worth checking rather than assuming:
+    an idle box can sit at one temperature and one fan figure for a quarter minute.
+    """
+    def vals(section, key):
+        return [s["metrics"].get(section, {}).get(key) for s in series]
+
+    def fans():
+        got = []
+        for s in series:
+            got += [f.get("value") for f in s["metrics"].get("fans", [])
+                    if f.get("value") is not None]
+        return got
+
+    def rng(name, vs):
+        vs = [v for v in vs if v is not None]
+        if not vs:
+            return f"{name} n/a"
+        return f"{name} {min(vs):g}->{max(vs):g}"
+
+    clocks = [CLOCK_STR_REAL(time.localtime(s["timestamp"] / 1000)) for s in series]
+    parts = [rng("cpu C", vals("cpu", "temperature")),
+             rng("cpu %", vals("cpu", "load")),
+             rng("gpu C", vals("gpu", "temperature")),
+             rng("gpu %", vals("gpu", "load")),
+             rng("fan RPM", fans()),
+             rng("mem MB", vals("memory", "used")),
+             f"clock {clocks[0]}->{clocks[-1]} ({len(set(clocks))} distinct)"]
+    return "  ".join(parts)
+
 
 def frames(path: str, theme: str, ink: tuple | None, clock: str, kw: dict,
-           count: int, gif_fps: float) -> list[Image.Image]:
+           count: int, gif_fps: float, series: list[dict] | None = None,
+           ) -> list[Image.Image]:
     """`count` composited frames, in order, sampled from one streaming decode.
 
     The stream is `ClipPlayer` - the same object the window plays with - and the
     sampling keeps every `source_rate / gif_fps`-th frame of it.  The loop seam is
     the file's own: a clip shorter than the GIF's length simply runs past its end
     again, which is what the glass does with it.
+
+    Without `series`, every frame carries the same pinned reading and the same pinned
+    clock - which is what a GIF in a README wants, because the caption quotes those
+    digits.  With `series`, the reading and the clock come from one sample per output
+    second: the digits change, the arcs move, and `11:07:42` ticks over to
+    `11:07:43` exactly as it does on the glass, one second per second.  The sample is
+    held for a whole second of frames (`gif_fps` of them), because the panel's own
+    reading comes from a one-second poll - a preview that moved its numbers every
+    frame would be showing something no display in this project ever shows.
     """
     player = clipdb.ClipPlayer(path)
     rate = player.fps or 24.0
     step = max(1, round(rate / max(0.1, gif_fps)))
-    render.clock_str = lambda *a, **k: clock
+    per_sec = max(1, round(gif_fps))
     out: list[Image.Image] = []
     seen = 0
     guard = 0
-    while len(out) < count and guard < count * step + 4 * max(1, step):
-        bg = player.frame()
-        if bg is None:
-            break
-        guard += 1
-        if seen % step == 0:
-            base = bg.convert("RGBA").resize((render.W, render.H), Image.LANCZOS)
-            base.alpha_composite(render.draw(PINNED, theme, ink=ink, **kw))
-            out.append(base)
-        seen += 1
-    player.close()
+    real = render.clock_str        # patched for these frames, put back afterwards: a
+    try:                           # leaked patch is how a later draw silently lies
+        while len(out) < count and guard < count * step + 4 * max(1, step):
+            bg = player.frame()
+            if bg is None:
+                break
+            guard += 1
+            if seen % step == 0:
+                if series:
+                    s = series[min(len(out) // per_sec, len(series) - 1)]
+                    metrics = s["metrics"]
+                    # `clock_str(now=...)` wants a struct_time, not an epoch float -
+                    # that is what the daemon hands it.  Following the sample's own
+                    # wall clock is what makes the seconds tick, one per second, the
+                    # way they do on the glass.
+                    when = time.localtime(s["timestamp"] / 1000)
+                    render.clock_str = lambda *a, t=when, **k: CLOCK_STR_REAL(t)
+                else:
+                    metrics = PINNED
+                    render.clock_str = lambda *a, c=clock, **k: c
+                base = bg.convert("RGBA").resize((render.W, render.H), Image.LANCZOS)
+                base.alpha_composite(render.draw(metrics, theme, ink=ink, **kw))
+                out.append(base)
+            seen += 1
+    finally:
+        player.close()
+        render.clock_str = real
     return out
 
 
@@ -118,20 +245,56 @@ def write_gif(images: list[Image.Image], where: str, fps: float, scale: int,
     return os.path.getsize(where)
 
 
-def write_mp4(images: list[Image.Image], where: str, fps: float) -> int:
-    """The same frames as H.264, at the GIF's rate - the two files show the same
-    animation, which is what makes the link honest."""
+def write_mp4(images: list[Image.Image], where: str, fps: float, scale: int = 480,
+              crf: int = 20, preset: str = "medium") -> int:
+    """The same frames as H.264, at the same rate.
+
+    Not an inline preview: GitHub turns an `.mp4` written in markdown into an `<img>`
+    no browser plays, so an MP4 in a README is a dead link.  What they are for is the
+    upload-then-embed path - GitHub's own editor takes a video file and rewrites the
+    markdown to point at its CDN - and a release asset.  H.264 in an MP4 container with
+    `+faststart` is what that editor accepts and what every browser plays once it is on
+    the CDN, and `yuv420p` is not decoration: without it QuickTime refuses the file.
+
+    `crf`/`preset` are exposed because size is the constraint here.  Measured on the
+    five README previews at 320 px, 12 s: crf 20 / medium 0.4-1.4 MB, crf 18 / slow
+    about 40 % bigger and still under 2 MB.  The layer's flat colour and text compress
+    absurdly well; the background clip is what costs.
+    """
     proc = subprocess.run(
         ["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba",
          "-s", f"{render.W}x{render.H}", "-r", f"{fps:g}", "-i", "-",
-         "-vf", "scale=480:480:flags=lanczos", "-c:v", "libx264", "-pix_fmt",
-         "yuv420p", "-movflags", "+faststart", "-an", where],
+         "-vf", f"scale={scale}:{scale}:flags=lanczos", "-c:v", "libx264",
+         "-preset", preset, "-crf", str(crf), "-pix_fmt", "yuv420p",
+         "-movflags", "+faststart", "-an", where],
         input=b"".join(im.convert("RGBA").tobytes() for im in images),
         capture_output=True)
     if proc.returncode:
         raise SystemExit("ffmpeg mp4 failed: "
                          + proc.stderr.decode(errors="replace").strip()[:300])
     return os.path.getsize(where)
+
+
+def probe_video(where: str) -> tuple:
+    """Frames, duration and rate as the written file reports them, not as arithmetic.
+
+    Worth asking rather than computing: x264 and the muxer get the last word on what a
+    file holds, and the claim this tool makes to README is about the file.
+    """
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_frames",
+         "-show_entries", "stream=nb_read_frames,r_frame_rate:format=duration",
+         "-of", "default=nw=1", where], capture_output=True, text=True, check=True)
+    got = {}
+    for line in out.stdout.splitlines():
+        if "=" in line:
+            k, v = line.split("=", 1)
+            got[k] = v
+    num, _, den = got.get("r_frame_rate", "0/1").partition("/")
+    rate = float(num) / float(den or 1)
+    frames = int(got.get("nb_read_frames") or 0)
+    dur = float(got.get("duration") or 0.0)
+    return frames, dur, rate
 
 
 def ink_drift(where: str, want: tuple) -> tuple:
@@ -200,6 +363,26 @@ def main() -> int:
     ap.add_argument("--mp4", action="store_true",
                     help="also write the same frames as an MP4 next to the GIF, "
                          "for a click-through or a release asset")
+    ap.add_argument("--no-gif", action="store_true",
+                    help="write only the .mp4 (implies --mp4).  A 10-12 s preview as a "
+                         "GIF is several MB of the wrong codec; the long files README "
+                         "links are MP4s, uploaded through GitHub's editor and hosted "
+                         "on its CDN, where an <img>-shaped .mp4 link is not the problem")
+    ap.add_argument("--crf", type=int, default=20, metavar="N",
+                    help="x264 quality, lower is bigger: 20 measured 0.4-1.4 MB per "
+                         "12 s preview at 320 px")
+    ap.add_argument("--preset", default="medium",
+                    help="x264 speed/size preset (medium; slow is ~40 %% bigger)")
+    ap.add_argument("--live-seconds", type=int, default=0, metavar="N",
+                    help="sample the real sensors once a second for N seconds and drive "
+                         "the picture from that: temperatures, loads, fans and the on-"
+                         "glass clock all move, one reading per displayed second")
+    ap.add_argument("--series", metavar="FILE",
+                    help="drive the picture from a series recorded earlier by "
+                         "--record, so several previews show the same minute")
+    ap.add_argument("--record", metavar="FILE",
+                    help="with --live-seconds, write the sampled series here as JSON: "
+                         "the record the video's digits came from")
     ap.add_argument("--live", action="store_true",
                     help="read real sensors instead of the pinned readings, so "
                          "the picture says what this machine is doing now")
@@ -240,8 +423,43 @@ def main() -> int:
     if a.live:
         PINNED = sensors.collect()
 
+    # The readings for this picture: one pinned set (the GIF shape, the one a caption
+    # can quote), or one real sample per displayed second (the MP4 shape, where the
+    # digits, the arcs and the clock all move).  A recorded series can be re-used by
+    # several previews so six videos show the same minute of one machine.
+    series = None
+    if a.series:
+        if a.record:
+            print("--series is a recorded series: refusing to overwrite it with "
+                  "--record.  Drop one of the two flags.", file=sys.stderr)
+            return 2
+        series = load_series(a.series)
+    elif a.live_seconds:
+        t0 = time.perf_counter()
+        series = sample_series(a.live_seconds)
+        if not series:
+            print("sensors.collect() returned nothing on this machine", file=sys.stderr)
+            return 1
+        print(f"  sampled           {len(series)} readings in "
+              f"{time.perf_counter() - t0:.1f} s (one sensors.collect() per second)")
+        if a.record:
+            save_series(a.record, series,
+                        f"sensors.collect() on the author's bench, "
+                        f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(series[0]['timestamp'] / 1000))}"
+                        f" local time, {len(series)} samples at 1 s")
+            print(f"  recorded          {a.record}  {os.path.getsize(a.record):,} B")
+    elif a.record:
+        print("--record needs --live-seconds N", file=sys.stderr)
+        return 2
+    if series:
+        print(f"  readings          {len(series)} samples, one per second, and the "
+              f"on-glass clock follows each sample's own time: {series_note(series)}")
+    if a.no_gif:
+        a.mp4 = True
+
     t0 = time.perf_counter()
-    ims = frames(a.clip, a.theme, ink, a.clock, kw, a.frames, a.gif_fps)
+    ims = frames(a.clip, a.theme, ink, "" if series else a.clock, kw, a.frames,
+                 a.gif_fps, series=series)
     made = time.perf_counter() - t0
     if not ims:
         print("no frames decoded: is ffmpeg installed?", file=sys.stderr)
@@ -249,30 +467,48 @@ def main() -> int:
 
     stem = a.out or os.path.join(
         "docs", f"preview-{a.theme}-{os.path.basename(a.clip).rsplit('.', 1)[0]}"
-                + (f"-{render.ink_hex(ink)}" if ink else "") + ".gif")
-    gif = write_gif(ims, stem, a.gif_fps, a.scale, a.colors)
+                + (f"-{render.ink_hex(ink)}" if ink else "")
+                + (".mp4" if a.no_gif else ".gif"))
+    if a.no_gif and not stem.lower().endswith(".mp4"):
+        stem += ".mp4"          # --no-gif without --out: the MP4 is the only ask
     passes = (len(ims) / max(0.1, a.gif_fps)) / dur if dur else 0.0
     print(f"  frames            {len(ims)} composited in {made:.1f} s "
           f"({made / len(ims) * 1000:.0f} ms each: decode + render.draw + composite)")
     print(f"  clip              {a.clip}  {dur:.2f} s loop, {fps:g} fps, "
           f"{wide}x{tall}, mean luma {lum:.1f}")
     print(f"  layer             theme {a.theme}, text "
-          f"{render.ink_hex(ink) or 'theme default'}, clock {a.clock}, "
+          f"{render.ink_hex(ink) or 'theme default'}, "
+          f"{'clock from each sample' if series else 'clock ' + a.clock}, "
           f"scrim {kw.get('scrim', 'auto rule')}")
-    print(f"  gif               {stem}  {gif:,} B  {a.scale}x{a.scale} at "
-          f"{a.gif_fps:g} fps = {len(ims) / a.gif_fps:.1f} s of a {passes:.1f}-pass "
-          f"loop, {a.colors} colours")
-    if ink:
+    vid = None
+    if not a.no_gif:
+        gif = write_gif(ims, stem, a.gif_fps, a.scale, a.colors)
+        print(f"  gif               {stem}  {gif:,} B  {a.scale}x{a.scale} at "
+              f"{a.gif_fps:g} fps = {len(ims) / a.gif_fps:.1f} s of a {passes:.1f}-pass "
+              f"loop, {a.colors} colours")
+        vid = stem.rsplit(".", 1)[0] + ".mp4" if a.mp4 else None
+    else:
+        vid = stem
+    if vid:
+        size = write_mp4(ims, vid, a.gif_fps, a.scale, a.crf, a.preset)
+        nf, nd, nr = probe_video(vid)
+        print(f"  mp4               {vid}  {size:,} B  {a.scale}x{a.scale}, crf {a.crf} "
+              f"{a.preset}: {nf} frames at {nr:g} fps = {nd:.2f} s as the written file "
+              f"reports it ({len(ims) / a.gif_fps:.2f} s asked for, "
+              f"{nd / dur:.1f} passes of the clip)")
+        if ink and a.no_gif:
+            print(f"  ink in the file   not measured here: the drift check reads the "
+                  f"GIF's palette, and an H.264 file has none - it quantises in YUV "
+                  f"4:2:0 instead.  Write the GIF too to get the figure.")
+    if a.mp4 or a.no_gif:
+        print(f"  what an mp4 is    GitHub turns `![alt](x.mp4)` in markdown into an "
+              f"<img> no browser plays, so this file is an upload-for-the-editor or a "
+              f"release asset, never an inline preview")
+    if ink and not a.no_gif:
         near, dist, seen = ink_drift(stem, ink)
         print(f"  ink in the file   nearest drawn colour {near} off {dist}/255 "
               f"(that palette is ffmpeg's, not the 256-colour PNG the upload path "
               f"uses; {seen} frames read back)")
-    if a.mp4:
-        where = stem.rsplit(".", 1)[0] + ".mp4"
-        size = write_mp4(ims, where, a.gif_fps)
-        print(f"  mp4               {where}  {size:,} B  the same {len(ims)} frames "
-              f"at {a.gif_fps:g} fps (GitHub renders an .mp4 in markdown as an "
-              f"<img>, so this is a link or a release asset, not an inline preview)")
     return 0
 
 
