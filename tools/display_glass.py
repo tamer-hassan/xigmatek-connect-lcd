@@ -38,8 +38,8 @@ What it checks rather than hopes:
   panel answered rather than as this path having failed, because the path is the
   thing under test: queued, carried by the loop, verdict read back by the client;
 * a session renewal happens on its own at `--session-ttl`, and the run keeps
-  going through it - which is the long-horizon claim README makes and has never
-  shown for this path;
+  going through it - which is the long-horizon claim docs/limits.md makes and has
+  never shown for this path;
 * `reset` is refused, because the daemon was started without `--allow-reset`.  It
   is asked on purpose and its refusal logged: a gate that is never knocked on is
   not a measured gate.  Nothing here can send `recovery`, and nothing here sends

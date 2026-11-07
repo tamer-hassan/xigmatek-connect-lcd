@@ -9,7 +9,9 @@
 
 [Unit]
 Description=Xigmatek Connect LCD - show system stats on the AIO's front panel
-Documentation=file:/usr/share/doc/xigmatek-connect-lcd/README.md.gz
+Documentation=file:/usr/share/doc/xigmatek-connect-lcd/README.md
+Documentation=file:/usr/share/doc/xigmatek-connect-lcd/docs/usage.md
+Documentation=file:/usr/share/doc/xigmatek-connect-lcd/docs/packaging.md
 Documentation=https://github.com/tamer-hassan/xigmatek-connect-lcd
 After=graphical-session.target
 PartOf=graphical-session.target
@@ -38,7 +40,7 @@ Type=simple
 # to send it.  Nothing in this package sends it by itself - not a maintainer script,
 # not this unit, and not the control socket unless a loop was started with
 # --allow-reset - and debian/tests/smoke fails the install if this unit ever grows
-# --allow-reset.  README.md, "If the panel goes white", is the prose version of this.
+# --allow-reset.  docs/troubleshooting.md is the prose version of this.
 ExecStartPre=/bin/sleep 5
 ExecStart=/usr/bin/xigmalcd --theme alpha --fps 2
 Restart=on-failure

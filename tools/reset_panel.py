@@ -3,9 +3,10 @@
 
 The implementation, and the prose about what the vendor's own reset request is and
 what it does to the panel, is in `xigmalcd/reset.py`: read that, or run
-`tools/reset_panel.py --help`.  This file exists so the command README, PROTOCOL.md
-and the rest of tools/ refer to works from a checkout, and so that one command has
-one implementation - it is a wrapper, not a second copy.
+`tools/reset_panel.py --help`.  This file exists so the command README,
+docs/troubleshooting.md, PROTOCOL.md and the rest of tools/ refer to works from a
+checkout, and so that one command has one implementation - it is a wrapper, not a
+second copy.
 
     tools/reset_panel.py            dry run: show the frame, send nothing
     tools/reset_panel.py --yes      send it once, then wait for the port back

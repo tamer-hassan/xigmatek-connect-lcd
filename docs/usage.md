@@ -1,0 +1,168 @@
+# Running `xigmalcd`: options, the wire, and one port between two processes
+
+The flag table, what goes to the panel and when, and the arrangement that lets a service and a window share a device that allows exactly one opener.
+
+## The background layer, and why the rate matters
+
+The default run uploads the theme background first (`media/Theme_25.mp4`, 215 KB) and
+then draws on a **transparent** canvas, so that background keeps playing behind the picture
+- which is how the vendor's own app does it, and the pair is what its own config names, so
+the default glass is what ALPHA showed you on Windows. `--bg black` paints an opaque field
+over the background instead; `--no-mp4` skips the upload and uses whatever the panel already
+has stored. Two other vendored clips are one flag away: `--mp4 media/Theme_11.mp4` (3.4 MB,
+the quietest loop in the vendor's library) and `--mp4 media/theme_48.mp4` (1.33 MB, nearly
+white under white glyphs, which is why a `--scrim` plate is drawn automatically for it).
+
+Choose the rate deliberately: the glass shows the newest frame the panel has *committed*,
+so what you see is up to one frame period old - the seconds digit runs ~1 s behind at
+1 fps and stops looking behind at 3 fps. 1 fps is the vendor's cadence and its write
+count; every frame is one `transport`/`transported` pair, and the ordering inside that
+pair is not cosmetic, see [Notes and known limits](limits.md).
+## What the panel gets
+
+Two things, in this order:
+
+1. `STATE all 1` — a JSON metrics blob with the same schema and units the Windows app
+   uses (cpu/gpu/disk/memory/network/fans/motherboard). It matches the
+   `attribute:["Status","Fan","Pump"]` the panel reports, i.e. the pages it says it has;
+   this project has never seen those pages render (our OSD covers the screen and there
+   is no readback), so that is the vendor's intent, not an observed behaviour. Sent
+   **twice at
+   startup**, like ALPHA does: the panel stops answering the picture channel if it is
+   fed metrics continuously, so `--state-every` exists but defaults to off.
+2. One PNG per frame — rendered at 960×960 and downscaled for clean type, uploaded as
+   `<timestamp>.osd` through the media transfer channel. The loop never waits on the
+   panel: 40 KB was handed to the kernel in ~50 ms, the panel confirms each file ~100 ms
+   later while the next frame is being drawn, and `--fps` is the metronome. (That write
+   timing was measured when frames went up as RGBA; they are about 12 KB now, and the
+   write has not been re-timed.) The stock files from the Windows app are 480×480 8-bit
+   RGBA PNGs (~24 KB). Ours are the 256-colour file on either canvas, transparent or
+   opaque: **12.2 KB** for one ringed `alpha` frame offline, 12 322-13 372 B a frame in
+   the first window run with that default. The choice was made on glass, not on the
+   offline numbers - the same frame went up both ways at 1 fps, **61 of 61** frames each,
+   42 560-46 415 B against 12 169-12 401 B, and what the offline numbers predict (a gauge
+   ramp drawn in 80 colours coming back in 13) was not visible from the chair.
+   `--truecolor` puts the exact 8-bit RGBA file back on the wire, where the alpha of the
+   half-transparent gauge track is kept to the unit ([Notes and known limits](limits.md),
+   PROTOCOL.md §11).
+
+Sensors on this machine: `k10temp` (Ryzen Tctl), `amdgpu` (iGPU power/voltage),
+`nvme` and `r8169` via hwmon, `nvidia-smi` for the discrete GPU, `/proc` for load,
+memory and network rates, and the board's Nuvoton NCT6687D tachometers once
+`sudo modprobe nct6683` has bound them — that is what makes `CPU FAN nnnn RPM` real
+(`tools/fanscan.py` lists the channels and shows how the CPU one was identified).
+Put the module in `/etc/modules-load.d/` if you want it at every boot.
+
+## Options
+
+| flag | meaning |
+|---|---|
+| `-d, --device PATH` | serial port; default is the first `/dev/ttyACM*` |
+| `-b, --baud N` | 115200 (the panel's only rate) |
+| `-t, --theme NAME` | `alpha` (default), `gauge`, `dual`, `clock`, `bars`. `alpha` is the theme the vendor app currently has selected (`presetTheme[26]` in its `store.json`), redrawn from that file's own widget geometry, with a GPU-temperature column matched to the CPU one, a 30-100 °C gauge arc around each temperature (green through amber to red), a seconds clock and one fan figure under each temperature |
+| `-f, --fps N` | frames per second. 1 is the vendor app's rate and its write count. Higher rates are real, not wasted: the glass takes the newest frame it has committed, so the picture you see is up to one frame period old - the on-screen clock runs ~1 s behind at 1 fps and stops looking behind at 3 fps, and the panel accepted **361/361** frames in one 120 s window and **1173/1175** in a 400 s soak at 3 fps; the ringed `alpha` picture, which is the biggest frame this code sends (39 400-45 244 B), took 3 fps too - **91 of 91** in 30 s. Choose it for the write count you are willing to spend (86 400 uploads a day at 1 fps, 259 200 at 3) |
+| `--duration N` | stop after N seconds |
+| `--once` | push one frame and exit |
+| `--dry-run DIR` | render to PNGs in DIR, never touch the port (test a theme) |
+| `--bg clear\|black` | `clear` (default) draws on a transparent canvas, so the panel's own background layer keeps playing behind our glyphs - the way ALPHA's `.osd` files do, which paint 4.6 percent of their pixels. `black` is the old opaque picture, which covers that layer completely |
+| `--mp4 [PATH]` | upload a 480×480 H.264 MP4 as the panel's background layer at session start, as ALPHA does with its theme background. **On by default**, with `media/Theme_25.mp4` from this repo (214 917 B, 23 frames at 24 fps, a 0.96 s loop, byte-identical to the copy `currentThemeBg` names in `%APPDATA%/alpha`, mean luma 18.7 of 255 so it is dark under white glyphs, 0 black frames). Its measured weakness is the loop join: 2.50 against 1.51 typical frame-to-frame motion, i.e. a small jump once per second. It is the default because it is the vendor's own pairing, not because it measures best; the two measured-quieter vendored clips are one flag away - `--mp4 media/Theme_11.mp4` (3 402 098 B, 363 frames at 24 fps, a 15.1 s loop, luma 13.3-24.1, 0 black frames, join 0.11 against 2.54 - the smoothest loop in the vendor's library, taken in **2.4 s**) and `--mp4 media/theme_48.mp4` (1 333 649 B, 10.85 s, luma 227.3, a near-white field for white text and a join of 4.50 against 0.60, hence the automatic `--scrim`). All figures come from decoding all 40 vendor clips, not from sampling ("Where the defaults come from"). `Theme_24.mp4` in the vendor tree is the smallest upload that still reads seamless (0.94 MB, 4.04 s, join 1.55 vs 2.93) |
+| `--no-mp4` | skip the upload and leave the panel's stored background playing. The panel plays the last media file it took, so what is stored now is whatever the last run uploaded (`Theme_25.mp4` after the 11:04 run); only a reset clears it — `xigmalcd-reset --yes` on an installed system, `tools/reset_panel.py --yes` in a checkout — which puts the still logo back |
+| `--clock-size N` | how tall the clock's digits are, in pixels, for themes that draw one. Default 26 of the panel's 480 |
+| `--gauge-source temperature\|load` | what the arc follows. `temperature` is what ALPHA uses, and on an idle desktop CPU it barely moves (across ALPHA's own 65 captured frames the tip travelled 14 degrees in 43 s); `load` follows CPU busy percent, which moves every second |
+| `--cold N`, `--hot N` | the gauge's scale. Default 30/75, measured off ALPHA: its digits read 57 °C at 55-61 percent of the sweep |
+| `--title TEXT`, `--label TEXT`, `--no-clock` | what the picture says. Themes without a heading ignore `--title`; `--label` defaults to `CPU TEMP`, or `CPU LOAD` with `--gauge-source load` |
+| `--scrim A` | alpha 0-255 of the dark plate drawn behind the glyphs. Unset is automatic: no plate over the shipped dark default (luma 18.7), a plate at `SCRIM_ON_BRIGHT` 150 over a vendored clip measured brighter than mid-grey (`theme_48.mp4` is 227, white on white without it), no plate for `--bg black` or an unmeasured clip. Every glyph is white because the vendor's are (`textColor` `rgba(255,255,255,1)` throughout `store.json`) |
+| `--order notice\|fast` | when `transported` goes out. `notice` (default) holds it until the panel's own file notice lands, which is the order ALPHA's traffic has and the only order that makes the glass redraw every frame; `fast` sends it right after the last file byte, and the panel answers that 1 time in 6 and the picture jumps (`tools/order_probe.py`, PROTOCOL.md §6) |
+| `--truecolor` | put the exact 8-bit RGBA PNG on the wire instead of the 256-colour file that is the default on **every** canvas. Costs 3.4× the bytes — on glass one ringed `alpha` frame measured **42 560-46 415 B against 12 169-12 401 B** (means 43 782 B against 12 289 B) — and it is the only shape that keeps the half-transparent gauge track's alpha to the unit. What the default gives up is in `tools/selftest.sh`'s prints: the gauge ramp drawn in 80 colours coming back in 13, and 74 of 11 149 fully opaque pixels keeping alpha 255. Both shapes went up **61 of 61** frames at 1 fps and the owner could see no difference from the chair, which is why RGBA is the opt-in (PROTOCOL.md §11) |
+| `--palette` | spell the default out: the 256-colour PNG, over a transparent canvas as over an opaque one, which is what `xigmaui/panel.py` has always uploaded. Kept so older command lines and README's encode A/B/A windows mean what they say; `--truecolor` wins if both are given |
+| `--colors N` | palette size for the indexed file (default 256) |
+| `--chunk N`, `--gap S` | raw upload chunk size, and the one pause between the `transport` announcement and the first file byte (the vendor app: 1000 bytes; the pause is 0.02 s and see §6 before setting it to 0) |
+| `--overlay` | old name for `--bg clear`, kept so earlier command lines still work |
+| `--no-state` | skip the metrics blob entirely |
+| `--state-every N` | refresh metrics every Nth frame (see the caveat above) |
+| `--no-fans` | leave fans out entirely: no `fans` section in the metrics blob, and no fan figures on the picture |
+| `--metrics-file PATH` | draw the picture from the sections of a JSON `STATE all 1` body instead of this machine's readings, re-read whenever the file changes. For the layouts the sensors will not produce: the red end of the gauge ramp, a three-digit temperature, a column with no reading. Picture **only** - while anything is pinned the loop sends no metrics blob at all and `--state-every` is refused out loud, so the panel is never handed a number this machine did not measure. Fixtures in `tools/metrics/`, watched windows and wire sizes under "Notes and known limits" |
+| `--no-sleep` | set the panel's idle timeout to 0 so it never blanks the screen (default: vendor's 60 s) |
+| `--session-max N` | renew the serial session every N uploads (default 500, 0 = never) |
+| `--session-ttl N` | also renew it every N seconds of session life (default 300, 0 = never) |
+| `--socket PATH` | where to listen for control requests while drawing. Default: `$XIGMA_SOCKET`, else `$XDG_RUNTIME_DIR/xigmalcd.sock`, else `/run/user/UID`, `~/.local/run`, `/tmp/xigma-UID.sock`. The directory is created 0700 and the socket chmodded 0600, and the peer's uid is checked with `SO_PEERCRED`. See "Two processes, one port" |
+| `--no-control` | do not listen on a control socket at all (also implied by `--once`: a single frame has nothing to control, and a socket left behind by a finished run would only invite a client to knock on a dead link) |
+| `--allow-reset` | let the control socket reach `recovery`, which re-enumerates the USB device and drops the stored background. Off by default; `xigmalcd-reset --yes` (in a checkout, `tools/reset_panel.py --yes`) stays the deliberate way |
+| `--status` | ask the display that is already running what it is showing, print it, exit. One line on the control socket: the serial port is never opened, so this works while the loop runs. Exit 1 with "no display answering" when nothing is listening |
+| `--list` | list candidate ports with their USB descriptions |
+| `-v, --verbose` | log every frame in both directions |
+
+## Two processes, one port
+
+`/dev/ttyACM0` allows exactly one opener (PROTOCOL.md §1), so a service keeping
+the glass updated and a desktop window choosing what goes on it cannot both have
+the port. The way round it is a control socket: **the display process owns the
+serial line and the frame loop, and everything else is a client of it**
+(`xigmalcd/control.py`, and `xigmaui/daemon.py` is the window's half).
+
+The socket is a unix socket at `$XDG_RUNTIME_DIR/xigmalcd.sock` (see `--socket`
+for the fallback chain), directory 0700, socket 0600 whatever the umask says, a
+stale socket from a dead run replaced rather than treated as a conflict, and the
+peer's uid checked with `SO_PEERCRED` even though the file mode already excludes
+other users. That is defence against another ordinary user on this machine, and
+nothing more: a process running as you could already open the port itself.
+
+```
+$ python3 -m xigmalcd --status
+showing alpha at 1.0 fps on /dev/ttyACM0: 24/24 frames confirmed, 0 refused, session 24 uploads / 23 s, space=61472, last notice 200
+  settings: theme alpha, canvas clear, clock 26, scrim auto, title CLI --status
+  counters: 24/24 uploads the panel confirmed, 0 refused, 0 link errors, 0 session renewals, this session 24 uploads 23 s old
+```
+
+That is a real answer, taken out of `data/glass/2026-11-06-161444-socket-run.txt`: the
+`--status` client ran against a display that was mid-run at 1 fps, and nothing about the
+display changed because it asked.
+
+One JSON object per line in each direction, and the same fields back:
+
+| command | what it does |
+|---|---|
+| `status`, `config` | the loop's counters (a copy, so a client reading mid-upload never sees a counter change underneath it) and the effective settings. `refused` counts the **frame** uploads the panel threw away, whether its `1 400` came back as a notice or reached us as an exception - the two used to disagree, which is how a log with four refusals in it read `0 refused`. A refused **background** is not in that number: it is reported in the daemon's own events (`background <name> did not land`), because it is not part of the picture loop. `errors` is a streak - the consecutive failures the loop is sitting on right now, back to 0 after the next accepted frame or recovery - and not a total |
+| `theme`, `fps`, `clock_size`, `bg`, `scrim`, `fans`, `title` | change the settings the loop re-reads every frame, on the daemon's own argparse object. Bounds: fps 0.1-5.0, clock 8-120, scrim 0-255 or `auto`. `fans` is one switch with the daemon's two effects - the line on the picture and the `fans` array in the metrics blob |
+| `pause`, `resume` | nothing goes out on the wire while paused, so the panel keeps the last picture it was given. `resume` re-helloes, and re-opens the port if the pause outlasted `--session-ttl`, which is the clock the measured silence arrives on (§9). A short pause only needs the hello, which is also what wakes a blanked panel |
+| `upload PATH`, `frame` | **queued, not performed**: the server thread leaves one request in a one-slot slot and the frame loop - the only thread that touches the port - carries it out on its next iteration. A second upload while one is waiting is refused rather than stacked |
+| `reset` | refused unless the daemon was started with `--allow-reset` |
+| `quit`, `stop` | refused: stopping the display is `systemctl --user stop xigmalcd`, which is reversible in a way a menu click is not |
+
+What it refuses, and why that is written into the server rather than left to the
+client:
+
+* **anything firmware-shaped.** `.zip`, `.bin`, `.img`, `.tar`, `.gz`, `.hex`,
+  `.elf` are refused by name and the refusal says why: the update path is
+  `type: "firmware"` (§7), which nothing in this project sends, and a socket must
+  not become a route to it. Files over 8 MB are refused as past the largest thing
+  the vendor app has ever pushed here (3.4 MB); only `.mp4`, `.png` and `.osd` are
+  accepted, and an empty file is a mistake rather than a picture.
+* **`recovery` by default**, because it re-enumerates the USB device and clears
+  the stored background (§9). `Link`'s own destructive guard is decided when the
+  port is opened, so a daemon started without `--allow-reset` cannot reach that
+  even from its own loop thread.
+* **a refusal is never reported as silence.** Both the client and the window
+  distinguish "the display answered `no`" from "nothing is listening", because
+  those mean opposite things and are cured by opposite things.
+
+`--status` is the same client from the command line, and `tools/selftest.sh`
+exercises the socket end to end: bounds, the one-slot queue, the `.zip` refusal,
+the `reset` refusal, junk from a client, a second daemon refused on a live socket,
+a failed run leaving no socket behind, and the window driving a display over a
+real socket with the serial layer absent. Cost, measured there: the window's
+Apply button, six socket commands, in **1 ms** - a control command never waits on
+the panel, because the daemon's server thread only touches in-process state.
+
+The gap worth knowing about: **nothing here has been run for hours.** Five 520 s windows
+at 1 fps have now been driven through the socket on real glass to their own end, each
+renewing its session at `--session-ttl` (300 s) and carrying on drawing - 496 of 496
+confirmed, 492 of 496, 496 of 496, 498 of 498, and 496 of 498 in the one run after the
+alpha theme's gauge rings went in; PROTOCOL.md §9 and §11. That is past the ~370 s at which an
+unrenewed session
+goes silent.
+A sixth window was watched and stopped by hand at 5 min, so it counts for the phases it
+reached and not for duration. Beyond that nothing has been measured: no run has been left
+up overnight, and no session has been left paused past its `--session-ttl`, which is the
+case that needs the port reopened rather than the hello. `journalctl --user -u xigmalcd` is
+where a long run would first be seen.

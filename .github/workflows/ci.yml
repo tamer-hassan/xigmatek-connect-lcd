@@ -20,9 +20,10 @@
 # is loud - "no runner matching label" - rather than a silent distro change.
 #
 # What no job here does: touch /dev/ttyACM0, send a frame, or claim anything about
-# real glass.  The measurements about the panel live in README.md and PROTOCOL.md with
-# the bench log they came from; a runner cannot re-derive those, so it does not cite
-# them.  The two places where the suite could reach for hardware are guarded and stay
+# real glass.  The measurements about the panel live in README.md and the docs/ set it
+# links, and in PROTOCOL.md, each with the bench log they came from; a runner cannot
+# re-derive those, so it does not cite them.  The two places where the suite could
+# reach for hardware are guarded and stay
 # guarded: the reset command runs here without --yes (xigmalcd/reset.py, and the
 # suite's own pyproject section asserts "dry run: nothing sent"), and the packaged
 # smoke test renders to a PNG in a temporary directory.
@@ -70,7 +71,7 @@ jobs:
         # frames (`measure` returns 0.0 when the decode fails).  Without it the first
         # CI run failed exactly there: `AssertionError: ('Theme_25.mp4', 0.0)`,
         # 2026-11-07.  The .deb has the same thing in `Suggests: ffmpeg`, and the
-        # figures the assertion compares against are the ones README quotes.
+        # figures the assertion compares against are the ones README and docs/ quote.
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -83,10 +84,11 @@ jobs:
         run: tools/selftest.sh
 
       - name: README's section count is the suite's section count
-        # README's Tools table says how many offline sections the suite has, and
-        # debian/changelog says it in the packaged form.  Both are digits someone has
-        # to remember, so here is the arithmetic: a section added without updating the
-        # prose fails CI, which is cheaper than a README that quietly becomes folklore.
+        # README's "Where the detail lives" page says how many offline sections the
+        # suite has, docs/packaging.md repeats it, and debian/changelog says it in the
+        # packaged form.  All are digits someone has to remember, so here is the
+        # arithmetic: a section added without updating the prose fails CI, which is
+        # cheaper than a document that quietly becomes folklore.
         run: |
           python3 - <<'PY'
           import re
@@ -97,7 +99,7 @@ jobs:
                    "twenty": 20}
           n = sum(1 for ln in open("tools/selftest.sh", encoding="utf-8")
                   if ln.startswith('echo "== '))
-          where = ["README.md", "debian/changelog"]
+          where = ["README.md", "debian/changelog", "docs/packaging.md"]
           bad = []
           for path in where:
               for claim in re.findall(r"(\w+) offline sections",
@@ -107,7 +109,8 @@ jobs:
           if bad:
               print(f"the suite has {n} sections, but these files disagree: {bad}")
               raise SystemExit(1)
-          print(f"  {n} offline sections, and README.md and debian/changelog both say so")
+          print(f"  {n} offline sections, and README, docs/packaging.md and "
+                f"debian/changelog all say so")
           PY
 
   deb:
@@ -325,8 +328,9 @@ jobs:
 
       - name: notes
         # Everything in here is either a fact about the two files or a pointer to the
-        # run that checked them.  What the panel-facing claims rest on is README's and
-        # PROTOCOL.md's own bench logs, and this says so rather than borrowing their
+        # run that checked them.  What the panel-facing claims rest on is README, the
+        # docs/ set it links and PROTOCOL.md's own bench logs, and this says so rather
+        # than borrowing their
         # authority.
         run: |
           set -eu
@@ -395,7 +399,9 @@ jobs:
             echo "printing \`all installed checks passed\`. That transcript is tracked at"
             echo "\`docs/packaging/smoke-2026-11-07.log\`, hashes of the files it"
             echo "installed included. What neither the runner nor the bench judges from"
-            echo "these bytes is the glass itself - README and PROTOCOL.md carry those"
+            echo "these bytes is the glass itself - README, its docs/ set and"
+            echo "PROTOCOL.md carry those claims, each with the bench log it was read"
+            echo "out of."
             echo "claims, each with the bench log it was read out of."
             echo
             echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

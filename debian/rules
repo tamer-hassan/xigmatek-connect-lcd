@@ -106,6 +106,42 @@ override_dh_auto_install:
 	install -d $(TMP)/usr/share/icons/hicolor/256x256/apps
 	install -m 644 install/xigmaui.png \
 		$(TMP)/usr/share/icons/hicolor/256x256/apps/xigmaui.png
+	# The documents the README links, as a `docs/` tree rather than as loose files.
+	# debian/xigmatek-connect-lcd.docs can only name README.md and PROTOCOL.md - what
+	# it installs lands in /usr/share/doc/<package>/ by basename, measured with a
+	# throwaway package (`docs/guide.md` there came out as `guide.md`), and every link
+	# in this tree's README is written `docs/xxx.md` because that is what works in a
+	# checkout and on the GitHub page.  So the markdown goes in under its own
+	# directory, where those links resolve as they do in the repository.
+	#
+	# The pictures stay out: docs/preview-*.png, docs/logo.png,
+	# docs/screenshot-xigmaui.png and the two theme contact sheets are the
+	# repository's showcase - 3.5 MB of rendered PNG, some of it derived from
+	# XIGMATEK's own theme library, which is the other package's business and its own
+	# licence. An installed system therefore gets the prose, and the README it can
+	# read says what it shows. debian/README.source keeps this difference in mind for
+	# whoever packages this next.
+	install -d $(TMP)/usr/share/doc/xigmatek-connect-lcd/docs
+	install -m 644 docs/*.md $(TMP)/usr/share/doc/xigmatek-connect-lcd/docs/
+	# ... and the transcripts those documents cite by path, so a claim in the
+	# installed packaging doc still has its file behind it offline.
+	install -d $(TMP)/usr/share/doc/xigmatek-connect-lcd/docs/packaging
+	install -m 644 docs/packaging/*.log \
+		$(TMP)/usr/share/doc/xigmatek-connect-lcd/docs/packaging/
 
 override_dh_missing:
 	dh_missing --fail-missing
+
+override_dh_compress:
+	# -X.md -X.log: leave the markdown and the kept transcripts uncompressed.  This is
+	# not decoration for its own sake - the documents in this tree link to each other by
+	# relative filename (README.md -> docs/usage.md, and the docs to one another), and
+	# dh_compress would otherwise hand a reader README.md.gz and usage.md.gz, so every
+	# one of those links is broken on an installed system even though the target is
+	# present.  Same for the transcripts: docs/packaging.md cites
+	# docs/packaging/smoke-2026-11-07.log by that name, and a citation a reader cannot
+	# open is worth little.  Uncompressed costs about 90 KB in the package; what it buys
+	# is that `less /usr/share/doc/xigmatek-connect-lcd/README.md` and the unit's
+	# Documentation=file:/usr/share/doc/xigmatek-connect-lcd/docs/usage.md both work,
+	# links and all.  changelog and the rest stay compressed, as usual.
+	dh_compress -X.md -X.log

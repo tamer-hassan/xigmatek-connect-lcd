@@ -200,6 +200,71 @@ done
 say "tools/" "not installed; only the three entry points are on PATH"
 
 echo
+echo "== the documents, and the links between them"
+# README.md is the short page and docs/*.md carry the detail, which means an installed
+# system has to have both for the prose to be readable: the overview's links are written
+# `docs/x.md` because that is what works in a checkout and on GitHub, so the package
+# installs the markdown as a docs/ tree (debian/rules) and keeps it uncompressed
+# (override_dh_compress, or dh_compress would leave a reader with README.md.gz pointing
+# at usage.md.gz and break every link in the tree).
+docdir=/usr/share/doc/xigmatek-connect-lcd
+python3 - "$docdir" <<'PY' || { echo "  documents: FAILED"; exit 1; }
+import os
+import re
+import sys
+
+docdir = sys.argv[1]
+mds = [os.path.join(docdir, "README.md"), os.path.join(docdir, "PROTOCOL.md")]
+sub = os.path.join(docdir, "docs")
+mds += sorted(os.path.join(sub, f) for f in os.listdir(sub) if f.endswith(".md"))
+missing = [p for p in mds if not os.path.isfile(p)]
+assert not missing, missing
+# uncompressed, or the links below cannot resolve
+gz = [p + ".gz" for p in mds if os.path.exists(p + ".gz")]
+assert not gz, gz
+
+dead, links, repo_pointers, images = [], 0, [], 0
+transcripts = sorted(
+    f for f in (os.listdir(os.path.join(sub, "packaging"))
+                if os.path.isdir(os.path.join(sub, "packaging")) else [])
+    if f.endswith(".log") or f.endswith(".log.gz"))
+docroot = os.path.realpath(docdir)
+for path in mds:
+    text = open(path, encoding="utf-8", errors="replace").read()
+    found = [m.group(1) for m in re.finditer(r"!?(?:\[[^\]]*\])\(([^)\s]+)", text)]
+    found += re.findall(r'<img[^>]+src="([^"]+)"', text)
+    for dest in found:
+        dest = dest.split("#", 1)[0]
+        if not dest or dest.startswith(("http://", "https://", "mailto:", "file:")):
+            continue
+        where = os.path.realpath(os.path.join(os.path.dirname(path), dest))
+        # images are the repository's showcase and are deliberately not packaged
+        # (debian/rules says why: some of them are renders of XIGMATEK's library)
+        if dest.endswith((".png", ".jpg", ".jpeg", ".gif", ".svg")):
+            images += 1
+            continue
+        if dest.endswith((".md", ".log")):
+            # what the package promises: every document and transcript the docs link
+            # is installed, and the link resolves
+            links += 1
+            if not os.path.exists(where):
+                dead.append((os.path.relpath(path, docdir), dest))
+        elif not os.path.exists(where):
+            # a pointer into the source repository - LICENSE, debian/copyright,
+            # themes/alpha/ - which the package does not carry, and which the installed
+            # prose explains rather than hides
+            repo_pointers.append((os.path.relpath(path, docdir), dest))
+assert not dead, dead
+print(f"  documents           {len(mds)} markdown files under {docdir}, none compressed")
+print(f"  links               {links} links inside the doc set, all resolving; "
+      f"{images} image link(s) repo-only by design; "
+      f"{len(repo_pointers)} pointer(s) into the source tree "
+      f"({', '.join(sorted({d for _, d in repo_pointers}))})")
+print(f"  transcripts         {len(transcripts)} kept log(s) under docs/packaging/, "
+      f"so a cited claim has its file offline too")
+PY
+
+echo
 echo "== the vendor library, if it is installed"
 lib=/usr/share/xigmalcd/themes/alpha
 if ! dpkg -s xigmatek-connect-lcd-themes >/dev/null 2>&1; then

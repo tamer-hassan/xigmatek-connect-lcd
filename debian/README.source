@@ -38,8 +38,8 @@ called 99-… would land as 60-99-…), and writes no maintainer-script fragment
 `grep -l udevadm /usr/share/debhelper/autoscripts/` on this box answers nothing.
 Measured after the install recorded in docs/packaging/smoke-2026-11-07.log: the rule
 file present, `/dev/xigmatek-lcd` absent, and no ID_MM_DEVICE_IGNORE in
-`udevadm info /dev/ttyACM0` until the device is replugged.  README says the same in
-the user's words.
+`udevadm info /dev/ttyACM0` until the device is replugged.  README and docs/packaging.md
+say the same in the user's words.
 
 `xigmatek-connect-lcd-themes` is ALPHA's own library - the 27 `.thm` files as
 shipped, their decrypted layouts, the clips, the baked overlay PNGs and the
@@ -54,8 +54,31 @@ xigmaui/clips.py.  Nothing reads them at startup, so the display loop keeps work
 with the package absent.
 
 tools/ is not installed by either package.  See debian/rules for the reason, and
-README.md "If the panel goes white" for what a packaged system therefore does and
-does not offer.
+docs/troubleshooting.md ("If the panel goes white") for what a packaged system
+therefore does and does not offer.
+
+Documentation
+-------------
+README.md is the overview, and the detail lives in docs/*.md - install.md, usage.md,
+gui.md, themes.md, packaging.md, tools.md, limits.md, troubleshooting.md - which the
+README links by name.  The whole docs/ set is installed, under
+/usr/share/doc/<package>/docs/, so those links resolve on an installed system the same
+way they do in a checkout; the transcripts under docs/packaging/ go with them, because
+the packaging doc cites them by path.
+
+Why that directory is placed by debian/rules rather than by
+debian/xigmatek-connect-lcd.docs: measured with a throwaway package on this box, what a
+.docs entry names lands at the root of /usr/share/doc/<package>/ under its own basename
+- an entry of `docs/guide.md` installed as `guide.md`, while a *directory* entry keeps
+its name.  Since every link in this tree is written `docs/xxx.md` (it has to, for the
+checkout and for the GitHub page), the files are installed as a tree so the links keep
+working.  README.md and PROTOCOL.md stay at the doc root, as .docs installs them.
+
+The pictures stay out of the package: docs/logo.png, the five docs/preview-*.png,
+docs/screenshot-xigmaui.png and the theme contact sheets are 3.5 MB of rendered PNG,
+part of it derived from XIGMATEK's theme library, which is the other package's files
+and its own licence question.  An installed README therefore shows prose with
+repo-relative image links.
 
 Building
 --------
@@ -70,7 +93,23 @@ Signing: `-us -uc` means no .deb.signing/debsign signature on the .changes or th
 .upload, and no Maintainers signature on the .buildinfo's signature block.  A GitHub
 Release attachment carries no OpenPGP signature at all: authenticity there is HTTPS
 plus the checksums the release body lists.  That is a real difference from an
-archive upload and README says so where the .deb is offered.
+archive upload and docs/packaging.md says so where the .deb is offered.
+
+Reproducibility
+---------------
+Two `dpkg-buildpackage -us -uc -b` runs of one tree, with SOURCE_DATE_EPOCH pinned to a
+moment in the past, come out byte-identical - measured here, both packages, `cmp` clean.
+Nothing in debian/rules sets that variable: dpkg-buildpackage does, from the top
+debian/changelog entry's timestamp, and debhelper computes the same thing in Dh_Lib.pm.
+What bites is that dpkg-deb only pulls archive-member mtimes *down* to that value: if
+the changelog entry is dated ahead of the build, every member keeps the build's own wall
+clock and two machines cannot agree on the bytes.  That is exactly how the published
+v0.1 asset and a build of the same tree on this bench came out 18 B apart with all 37
+file md5s and every control field identical - the 0.1 entry was stamped 04:40:00 +0000
+while the runner built at 04:12Z.  The entry now carries the time it was actually
+written, and tools/selftest.sh fails if the top entry is ever dated in the future again.
+zstd's threading is not a variable here: -19 with -T1 and with -T24 on the same 5.6 MB
+tar gave byte-identical output.  See docs/packaging.md for the whole write-up.
 
 Testing
 -------
@@ -92,7 +131,9 @@ That pair has been run, on the author's bench, on 2026-11-07: both packages from
 port was still free afterwards, `fuser /dev/ttyACM0` empty), and then
 `all installed checks passed`.  The transcript is tracked at
 `docs/packaging/smoke-2026-11-07.log`, including the sha256 of the two .deb files it
-installed; README's "Install from a .deb" section quotes it and points there.
+installed; docs/packaging.md quotes that transcript and points there.  The same pair has
+also run green in CI, on a runner that installed both packages and re-hashed 152/152
+manifest entries there.
 
 The offline suite, tools/selftest.sh, runs before packaging in CI and is the thing
 to run after editing protocol.py, render.py or xigmaui/.  It is not run from

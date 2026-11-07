@@ -16,3 +16,7 @@ usr/lib/udev/rules.d/99-xigmatek-lcd.rules
 usr/lib/systemd/user/xigmalcd.service
 usr/share/applications/xigmaui.desktop
 usr/share/icons/hicolor/256x256/apps/xigmaui.png
+# the documentation tree, placed by override_dh_auto_install above rather than by
+# debian/xigmatek-connect-lcd.docs - that file can only put names at the root of
+# /usr/share/doc/<package>/, and the README's links are written `docs/…`
+usr/share/doc/xigmatek-connect-lcd/docs/

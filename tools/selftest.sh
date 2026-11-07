@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Offline checks: no panel, no serial port needed. Run this after any change to
 # protocol.py or render.py. The live checks against real hardware are the ones in
-# README.md ("Tools"): tools/probe.py, tools/send_image.py, tools/session_limit.py.
+# docs/tools.md (and docs/limits.md's ledgers): tools/probe.py,
+# tools/send_image.py, tools/session_limit.py.
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -499,7 +500,7 @@ for f in ("Theme_11.mp4", "Theme_25.mp4", "theme_48.mp4"):
     b = hashlib.sha256(open(f"themes/alpha/clips/{f}", "rb").read()).hexdigest()
     assert a == b, (f, a[:12], b[:12])
     print(f"  media/{f} == themes/alpha/clips/{f}  {a[:16]}")
-# the contact sheets the README links, at the size the README says they are
+# the contact sheets the README links, at the size the suite pins here
 for name, px in (("alpha-themes-480X480.png", (960, 1548)),
                  ("alpha-themes-320X240.png", (960, 258))):
     p = os.path.join("docs", "previews", name)
@@ -869,6 +870,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 
 from xigmalcd import main as cli
 from xigmalcd import render
@@ -1002,12 +1004,81 @@ else:
                                                    encoding="utf-8").read()
     print("  udev rule              one tracked file, installed by debian/rules")
 
+# The documents the README links have to keep resolving.  README.md is the short page and
+# docs/*.md carry the detail, so almost every pointer in this tree is a relative link from
+# one markdown file to another - and a split like that breaks links silently, because a
+# broken relative path is still valid markdown.  Checked: every `[text](target)` and
+# `![alt](target)` in README.md and in every docs/*.md, with the target resolved against
+# the file it is written in and any #anchor stripped.  Anchors are not checked - GitHub
+# and a plain file viewer derive them differently - but the files are, which is the half
+# that moves.  Images count too here, because in a checkout they exist; the installed
+# package ships the prose without the pictures (debian/rules says why), and
+# debian/tests/smoke checks the installed form for the markdown links only.
+import glob as _glob
+import re as _re
+
+targets = ["README.md"] + sorted(_glob.glob("docs/*.md"))
+links, dead = 0, []
+for doc in targets:
+    text = open(doc, encoding="utf-8").read()
+    found = [m.group(1) for m in _re.finditer(r"!?(?:\[[^\]]*\])\(([^)\s]+)", text)]
+    # the logo is an <img> tag rather than a markdown link, because it floats beside the
+    # overview on the GitHub page; same check, one more pattern
+    found += _re.findall(r'<img[^>]+src="([^"]+)"', text)
+    for dest in found:
+        dest = dest.split("#", 1)[0]
+        if not dest or dest.startswith(("http://", "https://", "mailto:", "file:")):
+            continue
+        links += 1
+        if not os.path.exists(os.path.join(os.path.dirname(doc), dest)):
+            dead.append((doc, dest))
+assert not dead, dead
+print(f"  markdown links       {links} relative links across {len(targets)} documents, "
+      f"every one resolving to a file that exists")
+
 if shutil.which("desktop-file-validate"):
     subprocess.run(["desktop-file-validate", "debian/xigmaui.desktop"], check=True)
     print("  desktop-file-validate  clean on the installed form too")
 else:
     print("  desktop-file-validate  not installed here: SKIPPED on the installed "
           "form (CI installs it as a Build-Depend)")
+
+# Whether the .deb bytes are reproducible, which is what a sha256 in a release note
+# is worth.  Measured on this box with two builds of one tree: with SOURCE_DATE_EPOCH
+# pinned to a moment in the past, the two code packages came out byte-identical
+# (`cmp` clean, same sha256) and so did the two 146 MB themes packages.  Nothing in
+# this tree sets that variable: dpkg-buildpackage does, from the top debian/changelog
+# entry's timestamp (/usr/bin/dpkg-buildpackage line 583,
+# `$ENV{SOURCE_DATE_EPOCH} ||= $changelog->{timestamp} || time`), and debhelper
+# computes the same thing in Dh_Lib.pm.  dpkg-deb then rewrites every tar member's
+# mtime to that value - measured, with a toy package, both ways round:
+#
+#   epoch in the past    members dated 2001-09-09 04:46, twice, same bytes
+#   epoch in the future  members dated at the build's wall clock
+#
+# That second line is the trap: dpkg-deb pulls mtimes *down* to the epoch and leaves
+# earlier ones alone, so a changelog entry dated ahead of the build lets each
+# machine's clock into the archive.  The published v0.1 asset and the same tree built
+# here differ that way - 5 218 596 B against 5 218 614 B, all 37 file md5s and every
+# control field identical - because that entry is stamped 04:40:00 +0000 while the
+# runner built at 04:12Z and this bench at 04:07Z.  Hence this check: the top entry
+# has to be dated in the past, because that is the whole of what makes two builds of
+# one source agree on bytes.
+stamp = subprocess.run(["dpkg-parsechangelog", "-STimestamp"], capture_output=True,
+                       text=True)
+if stamp.returncode:
+    print("  changelog stamp        dpkg-parsechangelog unusable here: SKIPPED the "
+          "reproducibility check")
+else:
+    when = int(stamp.stdout.strip())
+    now = int(time.time())
+    assert when <= now, (
+        f"the top debian/changelog entry is dated {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime(when))}, "
+        "which is in the future: dpkg-deb only pulls mtimes down to SOURCE_DATE_EPOCH, "
+        "so a build now would date every archive member at its own wall clock and two "
+        "machines could not agree on the file's bytes")
+    print(f"  changelog stamp        {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime(when))}"
+          f", {(now - when) // 60} min old: dpkg-deb clamps every member mtime to it")
 PY
 
 echo
@@ -1041,7 +1112,7 @@ import shutil
 missing = [t for t in ("ffmpeg", "ffprobe") if not shutil.which(t)]
 if missing:
     print(f"  needs {', '.join(missing)}: the luma and loop-length figures are decoded "
-          f"from the clips, and the assertion below compares them to README's numbers")
+          f"from the clips, and the assertion below compares them to the docs' numbers")
     raise SystemExit(1)
 found = clipdb.list_clips()
 assert found, "no clips found at all"
@@ -1155,7 +1226,7 @@ assert thumbs < 120, thumbs
 win2.close()
 print(f"  measured here: build {build:.2f} s, one frame render {mid:.1f} ms, "
       f"all {len(win.all_clips)} thumbnails {thumbs:.1f} s   "
-      f"README's Cost paragraph quotes these three")
+      f"docs/gui.md's Cost paragraph quotes these three")
 
 # the scrim rule is the daemon's, and a bright clip must trip it
 win.canvas.setCurrentIndex(0)
@@ -1923,7 +1994,7 @@ test ! -e "$ctltmp/dead.sock" || { echo "socket left behind by a failed run"; ex
 echo "  exit $rc, no $ctltmp/dead.sock: a window must not think a display is up"
 
 echo
-echo "== the glass ledger: the numbers README quotes have a file behind them"
+echo "== the glass ledger: the numbers the docs quote have a file behind them"
 python3 - <<'PY' || { echo "glass ledger driver FAILED"; exit 1; }
 import ast
 
@@ -2021,19 +2092,24 @@ print(f"  {mp4[0]}: blob at the head of the whole-file session too, 214 917 B "
 plain = [p for p in runs
          if "socket-run" not in os.path.basename(p)
          and "gui-" not in os.path.basename(p)]
-readme_here = open("README.md").read()
+# The claim and the file that backs it have to sit in the same sentence somewhere,
+# and "somewhere" used to mean README.md.  It now means the documents the README links:
+# the ledgers live in docs/gui.md and docs/limits.md, the always-on table in docs/usage.md.
+LEDGER = ("README.md", "docs/gui.md", "docs/limits.md", "docs/usage.md",
+          "docs/troubleshooting.md")
+readme_here = "".join(open(p, encoding="utf-8").read() for p in LEDGER)
 for p in plain:
     text = open(p).read()
     fin = re.search(r"(\d+)/(\d+) frames confirmed by the panel", text)
     assert fin, (p, "no frame total")
-    assert os.path.basename(p) in readme_here, (p, "not named in README")
+    assert os.path.basename(p) in readme_here, (p, "not named in README or docs")
     assert f"**{fin.group(1)} of {fin.group(2)}**" in readme_here, \
-        (p, f"README never quotes {fin.group(1)} of {fin.group(2)}")
+        (p, f"neither README nor docs quote {fin.group(1)} of {fin.group(2)}")
     sizes = [int(s) for s in re.findall(r": (\d{4,6}) bytes", text)]
     assert sizes, (p, "no logged frame sizes to quote")
     print(f"  {os.path.basename(p)}: one-process CLI loop on the glass, "
           f"{fin.group(1)}/{fin.group(2)} frames, "
-          f"{min(sizes)}-{max(sizes)} B each, named as such in README")
+          f"{min(sizes)}-{max(sizes)} B each, named as such in the docs")
 
 # The other model: a separate display process, driven over its control socket.
 # Its log has to carry the same kind of evidence, and for this path the claims
@@ -2041,21 +2117,22 @@ for p in plain:
 # `resume` renewing, a queued upload judged by notice, and the loop renewing its
 # own session at --session-ttl and carrying on drawing afterwards.
 sock = [p for p in runs if "socket-run" in os.path.basename(p)]
-assert sock, "no socket-driven glass run kept, and README's always-on section cites one"
+assert sock, ("no socket-driven glass run kept, and the docs' always-on "
+              "section cites one")
 # Two kinds of kept socket log, and they support different claims.  A window the
 # owner stopped with ^C never ran its later phases, so it is evidence only for
 # what it reached - and README has to say that, not quote it as a full window.
 # A window that ran to its own end either passed its checks or listed what
 # failed inside itself.
-readme = open("README.md").read()
+readme = readme_here            # the same corpus: README plus the docs that quote runs
 cut = ("^C: stopping the display", "display exited early")
 stopped = [p for p in sock if any(m in open(p).read() for m in cut)]
 for p in stopped:
     name = os.path.basename(p)
-    assert name in readme, (p, "a stopped run is not named in README")
+    assert name in readme, (p, "a stopped run is not named in README or docs")
     near = readme[max(0, readme.index(name) - 700):readme.index(name) + 1200]
     assert "stopped" in near or "cut short" in near, \
-        (name, "README cites a window that was cut short without saying so")
+        (name, "the docs cite a window that was cut short without saying so")
     print(f"  {name}: cut short by the owner, so it is cited only for the "
           f"phases it reached")
 # a run that failed one of its own checks says so in its own log, so pick the
@@ -2064,7 +2141,7 @@ for p in stopped:
 clean = [p for p in sock if p not in stopped
          and "== every phase checked out" in open(p).read()]
 assert clean, (sock[-1], "no socket run on glass claims its own phases; the "
-                          "always-on numbers in README would be folklore")
+                          "always-on numbers in the docs would be folklore")
 path = clean[-1]
 text = open(path).read()
 assert "== what this run did NOT show" not in text, text[-700:]
@@ -2096,18 +2173,18 @@ quiet = [p for p in sock
 assert path not in quiet, (path, "cited as the run that shows the client, but it "
                                  "has no client lines")
 print(f"  {len(sock)} socket run(s), {len(quiet)} with no `--status|` line at all "
-      f"({', '.join(os.path.basename(p) for p in quiet) or 'none'}): README says "
+      f"({', '.join(os.path.basename(p) for p in quiet) or 'none'}): the docs say "
       f"those ran the CLI phase as a plain socket read")
 # README's ledger is supposed to be the logs, not a memory of them: every kept
 # socket run is named there, and the frame totals it quotes are the ones those
 # files end with
 for p in sock:
     text = open(p).read()
-    assert os.path.basename(p) in readme, (p, "not named in README's ledger")
+    assert os.path.basename(p) in readme, (p, "not named in the docs' ledger")
     fin = re.search(r"(\d+)/(\d+) frames confirmed by the panel", text)
     assert fin, (p, "no frame total in its own log")
     ok, n = fin.groups()
-    assert f"**{ok} of {n}**" in readme, (p, f"README never says {ok} of {n}")
+    assert f"**{ok} of {n}**" in readme, (p, f"the docs never say {ok} of {n}")
     # README: Apply took, "the counters said `showing gauge` from the next poll
     # on and stayed `gauge` for the rest of each run", and `pause` read as a
     # paused gauge rather than a theme that had reverted

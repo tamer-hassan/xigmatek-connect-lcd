@@ -6,7 +6,7 @@ The fuzzer showed `POST mode 1 {"value":N}` and `POST logo 1 {"value":N}` answer
 ["Status","Fan","Pump"] plus fields mode / logo / osdState.  Read that verdict
 carefully: `200` means the body parsed, and on this firmware it is all it means -
 the field lands at `2147483647`, the panel's "not set", which is the white-screen
-state the danger note in README describes.  Whether those commands select the page
+state the danger note in docs/limits.md describes.  Whether those commands select the page
 the panel draws from the `STATE all 1` metrics blob can only be settled by looking
 at the display, so this script cycles the values, slowly, and prints what it sent.
 That is the whole point of the tool, and the reason it needs `--force`: it writes
