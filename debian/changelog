@@ -6,7 +6,7 @@ xigmatek-connect-lcd (0.3) UNRELEASED; urgency=medium
 
   * xigmaui in three columns instead of one long scroll, at the author's own
     1 919x1 055: the clip list had a 190 px viewport with 114 px rows, which is
-    two of 69 clips on screen, and `ResizeMode.Adjust` painted the selected row
+    two clips on screen, and `ResizeMode.Adjust` painted the selected row
     as a block taller than the list itself.  Rows are 66 px now (64 px
     thumbnails, `Fixed`, uniform, and every row *told* its height - uniform
     sizing latches the first row's hint before any thumbnail exists).  The clip
@@ -115,6 +115,29 @@ xigmatek-connect-lcd (0.3) UNRELEASED; urgency=medium
     picture at least ten times in two seconds while its layer tick count does
     not move at all.
 
+  * The clip list is one row per distinct clip, not one per path.  With the
+    themes package installed and the Windows partition mounted, the roots the
+    window walks held 161 mp4 files for 40 clips, so it showed 161 rows for 40
+    backgrounds.  Three kinds of copy: the Windows app re-copies a library clip
+    into its `media/background/` under a millisecond name every time a theme is
+    applied (all 26 `175749*.mp4` there are byte-identical to a `Theme_NN` or
+    `theme_NN` clip, whole-file sha256); the vendor library repeats inside the
+    copy this repository carries (`Theme_31.mp4` == `Theme_26.mp4`,
+    `theme_38.mp4` == `Theme_27.mp4`, `theme_51.mp4` == `Theme_29.mp4`); and the
+    installed packages sit next to the checkout holding the same bytes again.
+    Those 26 are deliberately NOT deleted from the Windows volume: the vendor
+    app's own `store.json` names 31 of them as a theme background, and a program
+    that deleted them would leave that app holding paths to files that are not
+    there.  So the collapse happens in this program's list, keyed on length then
+    sha256 of the first and last MiB (whole file under 2 MiB) - the older
+    (name, length) rule could not see a renamed copy, and left 69 rows standing.
+    Within one root the better-named file wins, because timestamp names sort
+    before `Theme_*` (digits before letters); across roots the precedence order
+    stands, so the row shown is the file `find_media()` would have chosen.
+    Measured: 161 files -> 40 rows, 121 copies dropped, 35 of them under a
+    different name - and 40 is exactly what an independent audit of all 161
+    files by whole-file sha256 found distinct.  The window says the numbers out
+    loud in its log, because a list that quietly gets shorter looks like a bug.
  -- Tamer Hassan <thameruddin@gmail.com>  Sat, 07 Nov 2026 09:45:00 +0200
 xigmatek-connect-lcd (0.2) resolute; urgency=medium
 

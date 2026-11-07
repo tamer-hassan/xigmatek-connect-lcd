@@ -12,7 +12,7 @@ window looks like:
     |  of the glass) |           |            |
     +----------------+-----------+------------+
 
-Three columns, not one long scroll: the clip library wants *height* (69 rows on this
+Three columns, not one long scroll: the clip library wants *height* (40 rows on this
 box, 115 with the Windows partition mounted) and it was sharing a single column with
 four other boxes, which measured out as a 190 px viewport showing two clips at a time
 on a 1 919 px window.  Two rules decide the rest, and both come from measurements:
@@ -346,7 +346,7 @@ class Window(QMainWindow):
         # library column does not
         self._adv_boxes: list = []
         # A third column, used when the window is wide: the clip library wants
-        # *height* (69 rows here, 115 with the Windows partition mounted) and at
+        # *height* (40 distinct clips here, out of 161 files in the roots) and at
         # 1 919 px it was sharing one long column with the display status, the
         # theme box, the panel hello and the log - measured, the list got 190 px
         # of viewport, which is two rows of 114 px.  Two columns give it the
@@ -568,7 +568,7 @@ class Window(QMainWindow):
 
         media = QGroupBox("Background: the layer under our frame")
         mlay = QVBoxLayout(media)
-        # the library is 69 rows on this box and 115 with the Windows partition
+        # the library is 40 rows on this box - 161 files, 121 of them copies
         # mounted, and the row you want is a scroll wheel and a search away:
         # one filter field, matching what a row already shows (name, size, loop
         # length, where it came from), so finding a clip does not need a terminal
@@ -579,7 +579,7 @@ class Window(QMainWindow):
         mlay.addWidget(self.clip_filter)
         self.clips = QListWidget()
         # 64 px icons, not 112: a row's height follows the icon, and 112 px rows
-        # meant 114 px per clip - the list viewport showed two of 69 at a 1 055 px
+        # meant 114 px per clip - the list viewport showed two clips at a 1 055 px
         # window.  Measured with the same call after the change: 66 px rows.
         # `Fixed` + `uniformItemSizes` because the shipped `Adjust` mode lays the
         # rows out in a grid against the viewport, which is what made one selected
@@ -1142,15 +1142,33 @@ class Window(QMainWindow):
                 f"{f'{c.seconds:.1f} s' if c.seconds else 'loop  ?'}   {c.origin}")
 
     def _populate_clips(self) -> None:
-        """List every clip, then fill thumbnails in the background of the list.
+        """List every distinct clip, then fill thumbnails in the background.
 
-        Thumbnails cost an ffmpeg seek each, and the clip library here is 115
-        files (3 vendored, 43 from the vendor's install, 69 the Windows app
-        pushed at some point), so the rows go up at once with what a `stat` gives
-        and the pictures and loop lengths arrive a row per timer tick.
+        Thumbnails cost an ffmpeg seek each, so the rows go up at once with what a
+        `stat` gives and the pictures and loop lengths arrive a row per timer tick.
+
+        One row per *distinct file*, not one per path: `clipdb.list_clips()` walks
+        the roots and collapses copies by length and content (see its docstring).
+        Measured on this bench, where the Windows partition is mounted: **161 mp4
+        files across the roots, 40 distinct contents, 121 copies not listed** - 26
+        of them the Windows app's own upload history, which re-adds a library clip
+        under a millisecond timestamp name (`1757491589240.mp4` is `Theme_25.mp4`,
+        and all 26 are like that), and 3 of them the vendor library repeating
+        itself inside its own tree.  The window says the numbers out loud, because
+        a list that quietly gets shorter looks like a bug.
         """
         self.clips.clear()
         self.all_clips = clipdb.list_clips()
+        scan = clipdb.LAST_SCAN
+        if scan.get("copies"):
+            where = ", ".join(f"{n} {k}" for k, n in
+                              sorted(scan["roots"].items(), key=lambda kv: -kv[1]))
+            self._log(f"clip library: {scan['files']} mp4 files found, "
+                      f"{len(self.all_clips)} distinct clips listed, "
+                      f"{scan['copies']} copies left out ({where}); same bytes so "
+                      f"one row each, and {scan['renamed']} of them were repeats "
+                      f"under a different name - the file listed is the one this "
+                      f"program would pick")
         if not self.all_clips:
             self.clips.addItem("(no MP4 found: media/ is empty and the Windows "
                                "partition is not mounted)")
@@ -1344,7 +1362,7 @@ class Window(QMainWindow):
         from the preview - the preview is our composite, not the glass.
         """
         want = os.path.basename(self.mp4)
-        # mark the row that is on the glass, if this window knows: in a 69-row
+        # mark the row that is on the glass, if this window knows: in a 40-row
         # list (115 with the Windows partition mounted) "which of these is the
         # panel actually storing" is the first question, and the answer comes
         # from the display's ring, not from the panel.  Only touched when the

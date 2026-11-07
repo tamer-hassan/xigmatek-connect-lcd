@@ -672,7 +672,7 @@ echo "== where clips are looked up: the roots a package install has to get right
 # Checked against fake roots: no root, no installed package, nothing written
 # outside a temp directory.
 python3 - <<'PY' || { echo "clip roots FAILED"; exit 1; }
-import os, shutil, sys, tempfile
+import hashlib, os, shutil, sys, tempfile
 sys.path.insert(0, ".")
 from xigmalcd import main as m
 
@@ -752,6 +752,55 @@ with tempfile.TemporaryDirectory() as envdir:
     finally:
         del os.environ[m.MEDIA_ENV]
 print("  $XIGMA_MEDIA       first root, and the clip library lists it alongside the rest")
+
+# ---- one row per distinct clip, whatever it is called ---------------------------
+# The roots hold far more files than there are clips.  Measured on the author's
+# bench, Windows partition mounted: 161 mp4 files, 40 distinct contents, 121 copies -
+# 69 of them the Windows app's own upload history, which copies a library clip into
+# `media/background/` under a millisecond name every time a theme is applied (all 26
+# `175749*.mp4` there are byte-identical to a `Theme_NN` or `theme_NN` clip), and 3 of
+# them the vendor library repeating itself inside its own tree (`Theme_31.mp4` ==
+# `Theme_26.mp4`, `theme_38.mp4` == `Theme_27.mp4`, `theme_51.mp4` == `Theme_29.mp4`,
+# sha256, 2026-11-07).  A rule keyed on (name, length) cannot see a renamed copy,
+# which is why the list is keyed on length and content.  Built here in a temp root,
+# with a same-length different-content pair on the other side: dropping renamed copies
+# must not drop genuinely different clips that merely happen to share a size.
+with tempfile.TemporaryDirectory() as dupdir:
+    def blob(seed, n=3 << 20):
+        # 3 MiB: past the 2 MiB the comparison reads, so this exercises the edge path
+        # rather than the whole-file one
+        h = hashlib.sha256(seed.encode())
+        out = b""
+        while len(out) < n:
+            out += h.digest() * 4096
+            h.update(h.digest())
+        return out[:n]
+
+    same = blob("one clip")
+    open(os.path.join(dupdir, "Theme_probe.mp4"), "wb").write(same)
+    open(os.path.join(dupdir, "1757490000001.mp4"), "wb").write(same)
+    tiny = blob("tiny clip", 4096)      # small: both read windows are the whole file
+    open(os.path.join(dupdir, "tiny_original.mp4"), "wb").write(tiny)
+    open(os.path.join(dupdir, "1757490000002.mp4"), "wb").write(tiny)
+    open(os.path.join(dupdir, "Theme_other.mp4"), "wb").write(blob("another clip"))
+    os.environ[m.MEDIA_ENV] = dupdir
+    try:
+        from xigmaui import clips as clipdb
+        rows = clipdb.list_clips()
+        listed = {os.path.basename(r.path) for r in rows}
+        assert {"Theme_probe.mp4", "tiny_original.mp4", "Theme_other.mp4"} <= listed, \
+            sorted(listed)[:8]
+        assert not {n for n in listed if n.startswith("175749")}, sorted(listed)
+        scan = clipdb.LAST_SCAN
+        assert scan["copies"] >= 2, scan
+        assert scan["renamed"] >= 2, scan      # both copies sat under other names
+        assert sum(scan["roots"].values()) == scan["copies"], scan
+        assert len(clipdb.list_clips()) == len(rows), "the walk is stable"
+        print(f"  dedupe by content  {scan['files']} files walked here, "
+              f"{scan['copies']} copies dropped ({scan['renamed']} renamed), and a "
+              f"same-length different-content pair still gets its own row")
+    finally:
+        del os.environ[m.MEDIA_ENV]
 PY
 
 echo
@@ -1496,12 +1545,13 @@ byname = {c.name: c for c in found}
 # No two rows may be the same clip.  The roots overlap on purpose: the .deb installs
 # its own copy of each vendored clip, the themes package carries clips this project
 # also vendors, and the Windows app's upload history repeats files it pushed more than
-# once.  Deduplicating by realpath does not catch separate files with the same bytes -
-# on this bench, right after both packages were installed, realpath-only dedup listed
-# 161 rows for 69 clips, and 92 of those rows were byte-identical to a row already
-# present (all 92 compared by full sha256, and not one of them a same-name,
-# same-length pair that turned out to hold different bytes).  So the rule is name plus
-# length plus content, and that is what gets pinned here.
+# once.  `realpath` catches none of that - separate files with the same bytes - and a
+# (name, length) rule could not either, because the app renames what it copies: it
+# measured 69 rows for 40 clips, 161 rows on disk.  The rule is length, then sha256 of
+# both 2 MiB edges, and the numbers this bench reports are 161 files walked -> 40 rows,
+# 121 copies dropped, 35 of them under a different name (whole-file sha256 audit,
+# 2026-11-07: 40 distinct contents among those 161, which is what makes the 40 rows
+# exactly right rather than merely fewer).
 shapes = {}
 for cl in found:
     k = (cl.name.casefold(), cl.bytes)
@@ -1534,15 +1584,27 @@ for name, size in (("Theme_25.mp4", 214_917), ("Theme_11.mp4", 3_402_098),
     print(f"  {name:16s} {byname[name].bytes:9d} B  luma {lum:5.1f}  "
           f"{secs:5.2f} s loop")
 
-# the third source is the Windows app's own upload history, reachable only when
-# that partition is mounted, so the assertion is conditional on it being there
+# Where the rows came from, and where the files came from, are two different answers
+# now - which is the whole point of collapsing by content.  The Windows app's own
+# upload history (reachable only when that partition is mounted) is still walked, but
+# on this bench every one of its 69 files duplicates a library clip, so it contributes
+# files and no rows.  Assert the walk happened, via the scan counters: that is the
+# claim that survives the dedupe, and it is the one that would notice a root going
+# missing.  A machine where the app pushed a clip the library does not have would show
+# it as a row, and nothing here forbids that.
 byorigin: dict[str, int] = {}
 for c in found:
     byorigin[c.origin] = byorigin.get(c.origin, 0) + 1
 import os
 from xigmalcd.main import WIN_UPLOADS
+scan = clipdb.LAST_SCAN
 if os.path.isdir(WIN_UPLOADS):
-    assert byorigin.get("app upload", 0) > 0, byorigin
+    assert scan["roots"].get("app upload", 0) > 0, scan
+    assert sum(scan["roots"].values()) == scan["copies"], scan
+    print(f"  app upload root      {os.path.isdir(WIN_UPLOADS)} walked: "
+          f"{scan['roots']['app upload']} of its files were copies of rows already "
+          f"listed, so it adds files and no rows")
+assert set(byorigin) <= {"vendored", "vendor library"}, byorigin
 print(f"  sources: {byorigin}")
 
 # a window against a port that does not exist: it must build, preview every
@@ -1762,7 +1824,7 @@ print("  all three drawing buttons hand the fan flag to the worker")
 # showed a 502 px picture of a 480 px panel.  Both halves of that rule are checks.
 # And the library is a column of its own now, because at 1 919x1 055 the clip list
 # was one box among five in a single long column: measured, its viewport was 190 px
-# with 114 px rows, which is two of 69 clips on screen at a time.
+# with 114 px rows, which is two clips on screen at a time.
 assert win.split.count() == 3, win.split.count()
 pane_l, pane_c, pane_lib = (win.split.widget(i) for i in range(3))
 assert pane_l.maximumWidth() == render.W + app.PANE_CHROME, (
@@ -1841,7 +1903,7 @@ wide_visible = win.clips.viewport().height() // max(1, row_h)
 assert wide_visible >= 8, (wide_visible, "the full-HD window is back to two rows")
 # "rows in view" is capacity, not a claim about how many clips a machine has: the
 # selftest job runs against a checkout with the three vendored clips and no themes
-# package, while the bench has 69 and a mounted Windows partition has 115.
+# package, while the bench lists 40 distinct clips out of 161 files.
 print(f"  clip list               rows {row_h} px: {visible} rows in view at "
       f"{settings.DEFAULTS['size'][0]}x{settings.DEFAULTS['size'][1]}, "
       f"{wide_visible} at 1919x1055, where it used to be 2 "
@@ -1956,7 +2018,7 @@ try:
     assert win.btn_upload.text() == "Send this background to the panel"
     win._stored_bg = os.path.basename(chosen)
     win._refresh_clip_state()
-    # and the 69-row list marks the one that is on the glass, with no help from
+    # and a list this long marks the one that is on the glass, with no help from
     # the panel, which cannot be asked (§11)
     at = next(i for i, c in enumerate(win.all_clips) if c.path == chosen)
     assert win.clips.item(at).font().bold(), "the stored clip is not marked"
@@ -2014,7 +2076,7 @@ assert "320x240" in odd_detail and "not measured" in odd_detail, odd_detail
 print(f"  clip rows carry size   {len(sized)}/{len(win.all_clips)} probed, "
       f"480x480 stated on the row, an odd size called a guess")
 
-# the picker's filter: 69 rows on a bare box, 115 with the Windows partition
+# the picker's filter: 40 rows here out of 161 files, 3 on a CI checkout
 # mounted, and no way to find one short of a scroll wheel
 win.clip_filter.setText("theme_48")
 appq.processEvents()

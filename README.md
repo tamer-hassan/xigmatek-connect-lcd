@@ -89,8 +89,8 @@ preview:
 
 ![xigmaui, the window in three columns: the playing preview and the log on the left,
 the display's status, the theme picker and the text-colour row in the middle, and the
-background clip library on the right showing eight whole rows of this machine's 69
-clips](docs/screenshot-xigmaui.png)
+background clip library on the right listing this machine's clips once per distinct
+file - 40 of them, from 161 mp4 files in the roots it walks](docs/screenshot-xigmaui.png)
 
 It talks to a display loop that is already running when one is running, and drives the
 port itself when nothing is — which is the part that needs care, because the panel

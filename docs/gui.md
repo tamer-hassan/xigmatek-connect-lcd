@@ -72,7 +72,7 @@ one of them (see "How the three columns get their sizes", after the table):
 | the running display | controls | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. It also spells out the settings that display is running with - canvas, clock size, scrim, fans, and **the text colour it holds, as the hex it will answer again** (`text #ffc400`), which is the only place in the window you can see a colour you did not pick yourself. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Measured 1 ms for the commands Apply sends - six on the 0.2 bench ledgers below, seven in the tree, and the suite re-measures the line every run |
 | preview | preview | the background with `render.draw`'s OSD layer composited on top - playing, via one streaming ffmpeg, or as one mid-loop frame (`playing` box, see "The preview plays" below), refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How the three columns get their sizes" below | nothing |
 | theme | controls | the five themes, clock size, **the colour of the text it draws**, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
-| clips | library | every MP4 the roots hold, listed once per clip - **69 rows** on this box: 3 vendored here, 40 more from the vendor's library, 26 more from the 69 files the Windows app has pushed to this panel (the rest are byte-identical re-uploads); the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
+| clips | library | every MP4 the roots hold, listed once per **distinct file** - **40 rows here out of 161 files**: 3 vendored here and 37 from the vendor's library; the other 121 are copies (69 in the Windows app's upload history, 43 in its static media, 9 left by the installed packages), 35 of them under a different name; the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
 | background state | library | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the gate refuses says so, in the gate's words, before the button is pressed | nothing: it is a readout |
 | `One frame now` | library | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
 | `Send frames for 30 s` | library, advanced | the picture loop, so you can watch the real glass | `STATE all 1` twice, then 60 uploads at 2 fps |
@@ -102,14 +102,14 @@ number in that shape comes from a measurement, most of them of a failure:
   minimums are 200 / 300 / 320 px;
 * **the library is a column of its own**, because of one number: at 1 919×1 055 the
   clip list, sitting fifth in a single long column, had a **190 px viewport** and
-  rows **114 px** tall - two of 69 clips on screen at a time, on a full-HD monitor.
+  rows **114 px** tall - two clips on screen at a time, on a full-HD monitor.
   The row height follows the icon, so the thumbnails went from 112 px to 64
   (`CLIP_ICON`), and `ResizeMode.Adjust` - which lays rows out against the viewport
   and is what painted one selected clip as a block taller than the list - went to
   `Fixed` with uniform rows. Measured afterwards, and printed by the suite:
   **66 px rows, and room for 7 clips at the fresh 1180×780 window, 12 at
-  1919×1055** — rows in view, which is capacity: this bench has 69 clips to put in
-  them, a CI checkout with no themes package has 3;
+  1919×1055** — rows in view, which is capacity: this bench has 40 distinct clips to
+  put in them (161 files behind them), a CI checkout with no themes package has 3;
 * **the log sits under the picture**, in the preview column, because that is the one
   place with height to spare: the frame is 480 px and is never scaled up, so a tall
   window leaves room there nothing else can honestly fill - while every pixel of the
@@ -375,8 +375,8 @@ Both halves of that are load-bearing, and the window now shows the ring (under
 "The running display") plus the derived line (`the panel stores: theme_47.mp4`) -
 because a socket `upload` answers `ok` in milliseconds and that `ok` only means
 the file got into the loop's one action slot. The verdict is the second line.
-In the list itself, the row for that clip is drawn **bold**: in a 69-row library
-(115 with the Windows partition mounted) that is the fastest way to see whether the
+In the list itself, the row for that clip is drawn **bold**: in a 40-row library
+(161 files behind it, before the copies were collapsed) that is the fastest way to see whether the
 row you are looking at is the picture the panel is storing under our frame, and no
 row is bold when the display has not reported one.
 
@@ -813,16 +813,45 @@ socket, still logged.
 
 Cost, measured on this box and re-measured by `tools/selftest.sh` (it prints the
 numbers it just got, so these cannot quietly go stale). The picker lists every clip the
-roots hold, and lists each one **once**: 69 rows here - 3 vendored in `media/`, 40 more
-from the vendor library in `themes/alpha/`, and 26 more from the 69 files the Windows
-app has pushed to this panel, the other 43 of those being byte-for-byte re-uploads of
-clips already on the list. That dedup is new, and so is the evidence for it: with the
-packages installed, roots overlap by copies rather than by links, and listing rows for
-every path gave **161 rows for 69 clips**; all 92 dropped pairs were compared by full
-sha256, and not one of them was a same-name, same-length pair that held different
-bytes. The row that survives is the file `find_media()` would have chosen anyway,
-because the roots are walked in precedence order, and `tools/selftest.sh` plants a copy
-of `Theme_25.mp4` in another root to keep that true.
+roots hold, and lists each **distinct file** once: **40 rows here, out of 161 mp4
+files** - 3 vendored in `media/` and 37 from the vendor's library. The other 121 files are
+copies, and where they live is worth naming, because they are three different kinds of
+copy: **69** in the Windows app's own upload history (`AppData/Roaming/alpha/media/`),
+**43** in the vendor's static media on the mounted partition, and **9** copies the
+installed packages left next to files already listed.
+
+**35 of those copies have a different filename from the row they duplicate**, and that is
+the whole reason the rule is length-plus-content rather than name-plus-length. The first
+pass at this - keyed on `(name, size)`, added when the two packages started overlapping
+the checkout - left **69 rows for 161 files**, because the Windows app re-copies a library
+clip into its `media/background/` under a millisecond name every time a theme is applied:
+`1757491589240.mp4` *is* `Theme_25.mp4`, and **all 26** `175749*.mp4` files there are
+byte-identical (whole-file sha256, audited 2026-11-07) to a `Theme_NN`/`theme_NN` clip.
+They are not junk, either: the vendor app's own `store.json` names 31 of them as
+`recentUsedTheme[].background.path`, which is why this project collapses them in its own
+list rather than deleting anything on that volume - the Windows app would then be holding
+paths to files that are not there.
+
+The vendor library repeats itself as well, and this repository carries the repeats because
+the themes package is the library as the vendor ships it, manifest included: **43 clip
+files, 40 distinct** - `Theme_31.mp4` == `Theme_26.mp4`, `theme_38.mp4` == `Theme_27.mp4`,
+`theme_51.mp4` == `Theme_29.mp4` (whole-file sha256). Those files stay in the tree, where
+the suite verifies every byte against the manifest; in the picker they are one row each.
+
+How the comparison works, since it decides what disappears: same length first, then
+sha256 of the first and last MiB. For anything up to 2 MiB those two windows *are* the
+whole file, so 27 of the 40 distinct clips here are matched exactly; the 13 larger ones
+are matched on length plus both edges, and nothing in this library differs only in its
+middle. The audit that produced the figures above used whole-file sha256 on all 161 files,
+which is also how the 40 was cross-checked: the list the window builds has exactly as many
+rows as that audit found distinct contents - no more (nothing hidden) and no fewer (no
+false merges). Two things the row-keeping rule does: the roots are walked in precedence
+order, so the survivor is the file `find_media()` would have chosen anyway; and within one
+root, the copy with a name a person would recognise wins, because the app's timestamp
+names sort *before* `Theme_*` (digits before letters) - a test of the dedupe found
+`1757490000001.mp4` taking `Theme_probe.mp4`'s row before that rule existed, and the suite
+now plants a renamed copy, a same-name copy, and a same-length **different-content** pair
+in a temp root and asserts all three outcomes.
 
 The window builds in **0.21-0.64 s** with those 69 rows up (the spread is the machine
 being busy, not the window: the same code prints 0.21 s in a quiet suite run and 0.64 s

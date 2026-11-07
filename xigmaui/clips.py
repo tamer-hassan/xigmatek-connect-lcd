@@ -39,6 +39,7 @@ import glob
 import hashlib
 import io
 import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -55,6 +56,12 @@ from xigmalcd import render                                      # noqa: E402
 # only because `wide or ...` short-circuits whenever ffprobe answers.
 
 _FRAME_CACHE: dict[tuple[str, float], Image.Image] = {}
+
+#: what the last `list_clips()` walk saw: files looked at, copies left unlisted, and
+#: how many of those were the vendor library repeating itself inside its own tree.
+#: Module state rather than a second return value, so the window can log the numbers
+#: without every caller of `list_clips()` changing shape.
+LAST_SCAN: dict = {}
 
 
 @dataclass
@@ -305,23 +312,44 @@ def luma(img: Image.Image) -> float:
 
 
 def list_clips(extra: str = "") -> list[Clip]:
-    """Every clip the app can offer, best-guess order first."""
+    """Every clip the app can offer, best-guess order first.
+
+    Duplicates are collapsed **by content, not by name**, and the row that stays is
+    the one the roots' precedence order would have chosen anyway (a clip this repo
+    vendors, then the installed copy, then the vendor library, then what the Windows
+    app left behind).  Measured on the author's bench, 161 files in those roots hold
+    **40 distinct clips**: the Windows app's own upload history repeats the vendor's
+    library under a timestamp name - all 26 `175749*.mp4` files are byte-identical
+    copies of a `Theme_NN.mp4` / `theme_NN.mp4` - and a name-keyed rule cannot see
+    that.  It was keying on (name, length), which left 69 rows standing where 40
+    exist.
+
+    The vendor's library repeats itself too, inside our own tracked copy: 43 clip
+    files, 40 distinct, because `Theme_31.mp4` == `Theme_26.mp4`, `theme_38.mp4` ==
+    `Theme_27.mp4` and `theme_51.mp4` == `Theme_29.mp4` (sha256, measured
+    2026-11-07).  Those files stay in the tree - the identity claim is that the
+    library was copied as the vendor ships it, manifest and all, and the suite
+    verifies every byte against it - but the list shows one row for them, and
+    `scan["library_dups"]` says how many.
+    """
     from xigmalcd.main import (MEDIA_ENV, SYSTEM_MEDIA, SYSTEM_THEMES,
                                WIN_STATIC, WIN_UPLOADS, media_roots)
 
     found: list[Clip] = []
     seen = set()          # realpaths: one file, several spellings
-    taken = {}            # (name, length) -> the row already standing for that shape
+    by_size: dict[int, list[int]] = {}      # length -> rows already standing for it
 
     def edge(path: str) -> str:
         """sha256 of the first and the last MiB.
 
-        Only consulted when a name and a length have already matched, which is a
-        handful of pairs however many roots exist.  Reading the whole file would be
-        the honest comparison; this reads 2 MB of the largest clip in the library
-        instead, which is enough to tell a copy apart from a same-named,
-        same-length neighbour - the Windows app's own upload history has 69 entries
-        on this box and repeats itself by name."""
+        Only consulted when two files have already matched on length, which is a
+        handful of pairs however many roots exist.  Reading the whole file is the
+        honest comparison and this costs 2 MB of the largest clip in the library
+        instead; for anything up to 2 MiB the two windows *are* the whole file, so
+        those comparisons are exact (and 39 of the 40 distinct clips here are under
+        5 MB).  Above that, agreement on length and on both edges is treated as the
+        same clip: nothing in this library differs only in its middle.
+        """
         h = hashlib.sha256()
         with open(path, "rb") as fh:
             h.update(fh.read(1 << 20))
@@ -332,31 +360,86 @@ def list_clips(extra: str = "") -> list[Clip]:
             h.update(fh.read(1 << 20))
         return h.hexdigest()
 
+    scan = {"files": 0, "copies": 0, "renamed": 0, "roots": {}}
+
+    def name_score(path: str) -> tuple:
+        """Which of two files with the same bytes deserves the row.
+
+        The vendor app names the copies it makes for itself out of the clock:
+        `1757491589240.mp4` is `Theme_25.mp4`, and 26 of the files in its
+        `media/background/` are that shape.  A `sorted()` walk puts those names
+        *first* (digits before letters), which is how a test of the dedupe found a
+        timestamp copy standing in place of the clip it was copied from.  So the
+        row that stays is the one with a name a person would recognise, and within
+        that the shorter name wins; roots are still walked in precedence order, so a
+        copy in this checkout or the installed package beats one on the Windows
+        partition whatever it is called.
+        """
+        base = os.path.basename(path).casefold()
+        generated = re.fullmatch(r"\d{9,}\.mp4", base) is not None
+        return (0 if generated else 1, -len(base))
+
+    def home_of(path: str) -> str:
+        """Where a dropped copy lives, named by root rather than by the `origin`
+        label - which cannot tell these apart: the installed package's theme
+        library, the vendor's own static media on the Windows partition and this
+        checkout's `themes/alpha/clips` all call themselves "vendor library"."""
+        if path.startswith(WIN_UPLOADS + "/"):
+            return "app upload"          # the Windows app's own history
+        if path.startswith(WIN_STATIC + "/"):
+            return "vendor static"       # Program Files/ALPHA/.../static/media
+        if path.startswith(SYSTEM_MEDIA + "/") or path.startswith(SYSTEM_THEMES + "/"):
+            return "installed"           # the .deb's copies
+        if path.startswith(os.getcwd() + "/"):
+            return "this checkout"
+        return "elsewhere"
+
     def add(path: str, origin: str, note: str = "") -> None:
+        """One candidate row: kept, or dropped as a copy of a row already standing.
+
+        The same clip sits in two roots under the same name or under a different one -
+        this checkout's `media/` and the copy the .deb installed, a clip this project
+        vendors that the themes package also carries, the vendor library repeating
+        itself inside its own tree, and the Windows app's upload history re-adding what
+        its static media already is.  `realpath` alone caught none of that: on the
+        author's bench 161 files stood where 40 clips exist.
+        """
         real = os.path.realpath(path)
+        scan["files"] += 1
         if real in seen:
             return
         size = os.path.getsize(path)
-        key = (os.path.basename(path).casefold(), size)
-        prev = taken.get(key)
-        if prev is not None and edge(found[prev].path) == edge(path):
-            # The same clip sitting in two roots: the checkout's media/ and the copy
-            # the .deb put in /usr/share/xigmalcd/media, or a clip this project
-            # vendors itself and the themes package also carries.  realpath alone did
-            # not catch that - these are separate files with the same bytes - and on
-            # the author's bench, once the packages were installed, it showed as 161
-            # rows where 115 clips exist.  The roots are walked in precedence order,
-            # so the row that stays is the file find_media() would have chosen.
+        for i in by_size.setdefault(size, []):
+            if edge(found[i].path) != edge(path):
+                continue
+            standing = found[i]
             seen.add(real)
+            scan["copies"] += 1
+            if name_score(path) > name_score(standing.path):
+                # the copy that just arrived has the better name, so it takes the row
+                # and the one that was standing here becomes the copy
+                found[i] = Clip(path=path, origin=origin, bytes=size, note=note)
+                dropped = standing.path
+            else:
+                dropped = path
+            scan["roots"][home_of(dropped)] = scan["roots"].get(home_of(dropped), 0) + 1
+            if (os.path.basename(path).casefold()
+                    != os.path.basename(standing.path).casefold()):
+                # the same bytes under two names, which is the case a (name, length)
+                # rule could never catch: every `175749*.mp4` in the Windows app's
+                # history is one of these, and so are the vendor library's own
+                # repeats - Theme_31 == Theme_26, theme_38 == Theme_27,
+                # theme_51 == Theme_29 (sha256, measured 2026-11-07)
+                scan["renamed"] += 1
             return
-        taken[key] = len(found)
+        by_size[size].append(len(found))
         seen.add(real)
         found.append(Clip(path=path, origin=origin, bytes=size, note=note))
 
     # (root, pattern, origin). The root is checked with isdir rather than the
     # pattern's own dirname: for a recursive pattern that dirname is the `**`
     # component, which never exists, and that silently hid every clip the
-    # Windows app had ever pushed - 69 of them on this machine
+    # Windows app had ever pushed - 69 of them on this machine, 40 distinct
     sources = [(_root, "*.mp4", "vendored",
                 "installed with the package" if _root == SYSTEM_MEDIA else
                 ("chosen with $XIGMA_MEDIA" if _root == os.path.abspath(
@@ -379,6 +462,7 @@ def list_clips(extra: str = "") -> list[Clip]:
     # no duration pass here: 115 clips on this box costs 2.4 s of ffprobe, which
     # is 2.4 s of blank window before the first frame. `probe()` fills it in per
     # clip as the picker walks its rows.
+    LAST_SCAN.update(scan)
     return found
 
 

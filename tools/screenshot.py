@@ -105,7 +105,8 @@ def main() -> int:
     # has the .deb installed `import xigmaui` would then silently draw the picture from
     # /usr/lib/python3/dist-packages.  That is exactly what happened on the first run of
     # this tool - 158 clip rows, the installed 0.1's realpath-only dedup, where the tree
-    # here gives 69 - and a screenshot of old code is not evidence about this code.
+    # here gives 40 distinct clips from 161 files - and a screenshot of old code is
+    # not evidence about this code.
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if here not in sys.path:
         sys.path.insert(0, here)
