@@ -83,17 +83,26 @@ Description: ALPHA's own theme library, as shipped, for Xigmatek Connect panels
  debian/copyright says which files those are and what was actually done to
  obtain them.
  .
- What is in here: the 27 `.thm` theme files as shipped, their decrypted
- layouts as readable JSON, the 44 background clips (43 MP4s and one PNG), the
- 27 baked overlay PNGs, and `manifest.json`, whose 152 entries hash those 125
- distinct files - the 27 `background` entries name the same bytes as 27 of
- the clips - so the copy can be checked rather than trusted.  The layouts are
- what xigmalcd/layout.py reads; the clips sit in their own tree, which
- xigmaui/clips.py scans as one optional clip root (the root constant is
- xigmalcd/main.py:SYSTEM_THEMES), so the window's background picker offers the
- 43 MP4s it carries - 40 rows more than the three this project vendors itself,
- three of the 43 being those same clips - and removing this package takes them
- away without touching anything else.
+ What is in here: the 27 decrypted theme layouts as readable JSON, the 44
+ background clips (43 MP4s and one PNG), the 27 baked overlay PNGs, and
+ `manifest.json`, whose 125 entries hash those 98 distinct files - the 27
+ `background` entries name the same bytes as 27 of the clips - so the copy can
+ be checked rather than trusted.  The manifest also records the 27 `.thm`
+ containers this package does NOT carry (vendor path, size, sha256): they were
+ shipped in 0.1 and 0.2 and are not redistributed from 0.3, being the vendor's
+ own encrypted wrapper around media this package already holds unpacked.  See
+ themes/alpha/README.md for where the originals come from (the vendor's own
+ installer) and how to re-hash this package's record against a copy of them.
+ .
+ The layouts are what xigmalcd/layout.py reads; the clips sit in their own tree,
+ which xigmaui/clips.py scans as one optional clip root (the root constant is
+ xigmalcd/main.py:SYSTEM_THEMES).  The window lists clips once per distinct
+ file, so installing this package is what turns its picker from the three
+ vendored clips into 37 vendor clips plus those three - 40 rows, measured on
+ the author's bench out of 161 mp4 files in the roots it walks, the difference
+ being the vendor library's own repeats and the Windows app's upload history.
+ Removing this package takes the vendor's files away without touching anything
+ else.
  .
  Install it to get the vendor's backgrounds and the evidence for every claim
  this project makes about its themes.  Remove it to take them away again:

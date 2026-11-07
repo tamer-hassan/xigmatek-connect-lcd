@@ -44,9 +44,12 @@ file present, `/dev/xigmatek-lcd` absent, and no ID_MM_DEVICE_IGNORE in
 `udevadm info /dev/ttyACM0` until the device is replugged.  README and docs/packaging.md
 say the same in the user's words.
 
-`xigmatek-connect-lcd-themes` is ALPHA's own library - the 27 `.thm` files as
-shipped, their decrypted layouts, the clips, the baked overlay PNGs and the
-manifest that hashes every one of them (145 MB).  Those bytes are XIGMATEK's and
+`xigmatek-connect-lcd-themes` is ALPHA's own library - the 27 decrypted layouts,
+the clips, the baked overlay PNGs, and the manifest that hashes every one of them
+(100 files, 84 926 540 B of vendor bytes).  The 27 `.thm` containers those layouts
+were unpacked from are recorded in that manifest by vendor path, size and sha256 and
+are not in the package: they were in the 0.1 and 0.2 packages and were dropped at
+0.3.  Those bytes are XIGMATEK's and
 nobody licensed them for redistribution here; debian/copyright's `OTHER` paragraph
 says what was actually done to obtain them and why they are carried.  They are a
 separate package so that the act of redistributing them is one deliberate choice at

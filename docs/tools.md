@@ -63,7 +63,7 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   theme, encode/decode round-trips including the panel's malformed-reply case, the encoder
   switches read out of the PNG each dry run writes, what the indexed file gives up next to
   RGBA, the pinned-metrics promise (a pinned frame draws the far end of the ramp and sends no
-  metrics blob at all), the vendor theme library re-hashed against its own manifest (152
+  metrics blob at all), the vendor theme library re-hashed against its own manifest (125
   entries over 125 distinct files, the dedup rule, the root-vendored clips, the contact
   sheets, and the
   `store.json`/`.thm` pairing when the Windows volume is mounted), where the shipped clips
@@ -287,9 +287,15 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   sha256("Byyeetek2368")` and `iv = "ByyeetekByyeetek"` open all 27 without guessing.
   Writes `themes/alpha/`: layouts as readable JSON (base64 media replaced by `mediaFile`
   references), the clips and baked overlay PNGs, and a `manifest.json` hashing every
-  byte.  `--write` is idempotent — a re-run reports `kept`, 126 of them, 0 rewrites — and
-  `--verify --to themes/alpha` re-checks the tree against that manifest with no Windows
-  volume mounted (**152/152 hashes match**).  Reads files, writes files, never the panel.
+  byte.  `--write --no-thm` is how this tree is written: the vendor's encrypted `.thm`
+  containers (66 300 082 B for 27 of them) are not copied, but their vendor path, size
+  and sha256 are still recorded, so the record of them is checkable — the originals come
+  from the vendor's installer, whose URL is in `themes/alpha/README.md`.  `--write` is
+  idempotent — a re-run reports `kept`, 99 of them, 0 rewrites — and `--verify --to
+  themes/alpha` re-checks the tree against that manifest with no Windows volume mounted
+  (**125/125 hashes match**, measured 2026-11-07); add `--from DIR` and it also re-hashes
+  the 27 files this tree does not carry, where they actually are (**152/152** on the
+  author's bench, volume mounted).  Reads files, writes files, never the panel.
 * `tools/theme_previews.py` — composite every copied theme onto a contact sheet: one
   frame lifted from the theme's own clip with ffmpeg, the theme's own baked overlay PNG
   composited over it, so the sheet is a picture of the vendor's theme and not of our

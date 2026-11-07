@@ -9,10 +9,16 @@ The five themes this project draws, what `alpha` is a redraw *of*, and the geome
 renders from live readings. The vendor's 27 are files in the vendor's own format, and
 nothing in this project has ever put one on the wire or read one back:
 
-* the `.thm` files (27 of them, 6.8 MB at the largest) are the panel-side theme
-  definitions the Windows app decrypts and interprets - `tools/thm_unlock.py` opened
-  them with the app's constants to learn what is in them, which is a *reading*, not a
-  path back to the device;
+* the `.thm` files (27 of them, 6.8 MB at the largest, 66 300 082 B together) are the
+  panel-side theme definitions the Windows app decrypts and interprets -
+  `tools/thm_unlock.py` opened them with the app's constants to learn what is in them,
+  which is a *reading*, not a path back to the device.  They are no longer in this
+  repository: since 0.3 the tree keeps the 27 unpacked layouts, the media, and the
+  containers' vendor path + byte count + sha256 (`manifest.json`'s `notRedistributed`),
+  not the vendor's encrypted originals.  Anyone who wants them installs the vendor's own
+  software, which is where this copy came from - `themes/alpha/README.md` names the
+  download and the path it lands at, and `--verify --from DIR` re-hashes our record
+  against whoever has it;
 * the control socket's file gate (`xigmalcd/control.py:check_media_file`) accepts
   `.mp4`, `.png` and `.osd` only, so a `.thm` could not be uploaded through it even
   by hand;

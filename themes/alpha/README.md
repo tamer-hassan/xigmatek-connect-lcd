@@ -4,7 +4,10 @@ This is XIGMATEK's theme library for the Connect 360, taken byte for byte out of
 shipped Windows app and unpacked.  Not a re-creation, not a guess at what the themes
 look like: 27 layout files as the app stores them, the 44 video clips the app ships
 beside them, the 27 baked overlay PNGs the app renders for them, and a `manifest.json`
-hashing every one of those 152 files.
+hashing every one of those bytes — 100 files here, 125 manifest entries (27 of them
+`background` records naming the same bytes as 27 of the clips), plus 27 more entries
+for the vendor's own encrypted `.thm` containers, which this directory **does not
+carry** and records only by size and hash.  See "The `.thm` containers" below.
 
 Why it matters for this project: **the panel never sees any of this.**  PROTOCOL.md §10
 records that across all eight of ALPHA's own logs the app uploaded only two kinds of
@@ -25,11 +28,15 @@ itself; uploads still follow PROTOCOL.md §6.
 | themes | `Program Files/ALPHA/resources/static/theme/butt/{480X480,320X240}` — 23 files (incl. `default.thm`) + 4, 64 MB |
 | clips | `Program Files/ALPHA/resources/static/media` — 43 `.mp4` + 1 `.png`, 81 MB |
 | tool | `tools/thm_unlock.py` |
-| result | `python3 tools/thm_unlock.py --from "/media/windows-c/Program Files/ALPHA/resources/static/theme/butt" --to themes/alpha --write` |
+| result | `python3 tools/thm_unlock.py --from "/media/windows-c/Program Files/ALPHA/resources/static/theme/butt" --media "/media/windows-c/Program Files/ALPHA/resources/static/media" --to themes/alpha --write --no-thm` |
 
 No file outside this repo was created or changed.  The write is idempotent: re-running
-it re-derives every byte and reports `kept` (126 `kept`, 0 `wrote` on the last such
-run), so a second run is a check rather than a rewrite.
+it re-derives every byte and reports `kept` (**99 `kept`, 0 `wrote`** on the last such
+run, 2026-11-07), so a second run is a check rather than a rewrite.  Every byte in the
+`--no-thm` form above was produced by the same code path that produced the bytes this
+directory used to carry: re-running it over the pre-removal tree matched 98 of the 98
+data files and the 125 manifest entries this tree keeps, key for key, with nothing else
+changed.
 
 ### The container, and the cipher
 
@@ -80,15 +87,51 @@ on all 27, are what make the copy below checkable instead of claimed:
   `%APPDATA%\alpha\media\foreground` — **27 of 27**, 26 distinct blobs (two themes,
   1757491589004 and 1757491589687, carry the same PNG under two names).
 
+## The `.thm` containers are recorded, not carried
+
+The tree used to hold the 27 `.thm` files themselves (`thm/`, 27 files, 66 300 082 B —
+64 MB, over 40 % of this directory).  They are **gone since 0.3**: they are the vendor's
+encrypted container, they are the one part of this copy nothing here reads or could send,
+and everything they were evidence *for* — the container format, the cipher and its
+constants, each theme's layout, the fact that all 27 embedded backgrounds equal a loose
+clip and all 27 embedded overlays equal a PNG the running app left in `%APPDATA%` — is
+already in the open in this directory and in PROTOCOL.md §10.  What is kept of the
+containers is their identity: `manifest.json` has a `notRedistributed` array with vendor
+path, byte count and sha256 for all 27, and every row of `themes[]` carries
+`thmFile`/`thmVendorPath`/`thmBytes`/`thmSha256` (the `.thm` column of the table below is
+that field, and it still identifies the source file of each layout).
+
+A reader who wants the originals installs the vendor's own software; that is where they
+come from, and it is where this copy was read from:
+
+```
+https://www.xigmatek.com/wp-content/uploads/files/Connect-Display-Setup-Software-2025-1125.zip
+```
+
+which puts them at `Program Files/ALPHA/resources/static/theme/butt/{480X480,320X240}` —
+the directory `--from` takes.  With that volume mounted, the hashes in this manifest are
+checked rather than asserted:
+
+```
+python3 tools/thm_unlock.py --verify --to themes/alpha \
+  --from "/media/windows-c/Program Files/ALPHA/resources/static/theme/butt"
+```
+
 ## What is in this directory
 
 | dir | files | bytes | what it is |
 |---|---|---|---|
-| `thm/` | 27 | 66 300 082 | the `.thm` files as shipped, untouched — the primary artifact |
 | `layouts/` | 27 | 127 115 | decrypted layouts, `{480X480,320X240}/<themeId>.json` |
 | `clips/` | 44 | 84 392 330 | every loose clip the installer ships (43 `.mp4`, 1 `.png`) |
 | `foreground/` | 27 | 407 095 | the baked overlay PNG each theme embeds |
-| `manifest.json` | 1 | 70 398 | sha256 + byte count + vendor path for all of the above |
+| `manifest.json` | 1 | 78 072 | sha256 + byte count + vendor path for all of the above, plus the 27 `.thm` containers this directory does not carry |
+
+100 files.  The 98 the tool writes come to **84 926 540 B**, and that is the figure
+quoted elsewhere in this repository, because it is a stable one: the manifest records it,
+so it does not move when this README is edited (the other two files are the manifest and
+this README, and `tools/selftest.sh` prints their live sizes rather than pinning them).
+`thm/` is not in any of those totals because it is not here; its 27 entries are in the
+manifest, hashed.
 
 Two deliberate choices:
 
@@ -114,14 +157,19 @@ python3 tools/thm_unlock.py --verify --to themes/alpha
 ```
 
 ```
-themes/alpha: 152/152 files match manifest hashes (verified)
-  counts {'background': 27, 'clip': 44, 'foreground': 27, 'layout': 27, 'thm': 27}
+27 files recorded and NOT redistributed (the vendor's encrypted .thm originals); not checked here — add --from DIR to re-hash them
+themes/alpha: 125/125 files match manifest hashes (verified)
+  counts {'background': 27, 'clip': 44, 'foreground': 27, 'layout': 27}
   layout media references resolved: 54
   theme backgrounds: 27, of which 27 are held by a loose clip of the same bytes
 ```
 
 That needs no Windows volume: it re-hashes what is in the tree against what
-`manifest.json` recorded when the bytes were read.  `tools/selftest.sh` runs it.
+`manifest.json` recorded when the bytes were read.  `tools/selftest.sh` runs it.  With
+the vendor volume mounted the same command takes `--from DIR` and re-hashes the 27
+containers where they live, printing `152/152 files match manifest hashes (verified)` —
+measured that way on the author's bench on 2026-11-07, which is what keeps the record of
+files this tree does not carry from going stale.
 
 ## The 27 themes
 
@@ -132,6 +180,10 @@ file is 24 fps except `Theme_35.mp4` (20), every `theme_NN` file is 20 fps excep
 `theme_38`/`theme_51`, which are 24-fps byte-twins of `Theme_27`/`Theme_29`.  That
 answers the rate question PROTOCOL.md §6 raises.  `fg` is the baked overlay PNG's size
 in bytes.
+
+The `.thm` column names the container each layout came from (`thmFile` in
+`manifest.json`, alongside its vendor path and sha256); the file itself is not here, see
+above.
 
 | theme id | `.thm` | clip | fps | frames | dur s | widgets | fg |
 |---|---|---|---|---|---|---|---|

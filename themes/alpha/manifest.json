@@ -11,19 +11,9 @@
   "background": 27,
   "clip": 44,
   "foreground": 27,
-  "layout": 27,
-  "thm": 27
+  "layout": 27
  },
  "files": [
-  {
-   "bytes": 505547,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\320X240\\theme_1757492775547.thm"
-   },
-   "path": "thm/320X240/theme_1757492775547.thm",
-   "sha256": "5aeada3a8c10bee169059fcf62bb162e5e1dc8d71420c17d7b7cf768c38cdaad"
-  },
   {
    "bytes": 320375,
    "kind": "background",
@@ -56,15 +46,6 @@
    },
    "path": "layouts/320X240/1757492775547.json",
    "sha256": "95019cd6169a4b1f51691497b64e267d6bd265e03238bd9c54eace7ae0ca3356"
-  },
-  {
-   "bytes": 652744,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\320X240\\theme_1757492775574.thm"
-   },
-   "path": "thm/320X240/theme_1757492775574.thm",
-   "sha256": "b583979c56e0200788ce4b33352d915c9659a00c2f5232a781cc6d900065c48e"
   },
   {
    "bytes": 413584,
@@ -100,15 +81,6 @@
    "sha256": "4dfa01cda6e42275ff041e43a3508ccd0c82b84d61298eabae55e7eb45318e94"
   },
   {
-   "bytes": 616985,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\320X240\\theme_1757492775603.thm"
-   },
-   "path": "thm/320X240/theme_1757492775603.thm",
-   "sha256": "e3e8dcb2d5aec4113b67bd28cc3acc4e63da54afbc1284f9284d985e37d5f0d9"
-  },
-  {
    "bytes": 397120,
    "kind": "background",
    "origin": {
@@ -140,15 +112,6 @@
    },
    "path": "layouts/320X240/1757492775603.json",
    "sha256": "28b02c0147a05bb24f87f254fa9de37a470de6d01d4c6edeafbb520d6301e95c"
-  },
-  {
-   "bytes": 327352,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\320X240\\theme_1757492775627.thm"
-   },
-   "path": "thm/320X240/theme_1757492775627.thm",
-   "sha256": "8dfd936d71b51a2e682e9761044419de3051d5b2339f11e0dfe16e9fdf903dd1"
   },
   {
    "bytes": 209791,
@@ -184,15 +147,6 @@
    "sha256": "ee67d40b9fafb39338fce94fa0f73acff7a3e115373c5f4fafac08a05eeb9929"
   },
   {
-   "bytes": 1045220,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\default.thm"
-   },
-   "path": "thm/480X480/default.thm",
-   "sha256": "b24ff23b69a2f634590e2561bf460879e94906580a8f80b3acc65a84d300582a"
-  },
-  {
    "bytes": 659338,
    "kind": "background",
    "origin": {
@@ -224,15 +178,6 @@
    },
    "path": "layouts/480X480/1757491588836.json",
    "sha256": "4f9e8c6a9a1c25bfd6dc2067510abda37e5a7c203f21e67c0b03807add3d8e3f"
-  },
-  {
-   "bytes": 3555730,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588063.thm"
-   },
-   "path": "thm/480X480/theme_1757491588063.thm",
-   "sha256": "30343a0388310804e8d348930737cee3fad566183146d350557ed672ddc9c506"
   },
   {
    "bytes": 2325350,
@@ -268,15 +213,6 @@
    "sha256": "ebeaa3430f5405df58f1d6d40fdd170cfe33a34fea134d66aa7775a076694958"
   },
   {
-   "bytes": 1782056,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588126.thm"
-   },
-   "path": "thm/480X480/theme_1757491588126.thm",
-   "sha256": "4bc64dc6eef047c42f39bbbc7606c729008aa7b9f45f1501b52e38d1b15e8ab8"
-  },
-  {
    "bytes": 1152859,
    "kind": "background",
    "origin": {
@@ -308,15 +244,6 @@
    },
    "path": "layouts/480X480/1757491588126.json",
    "sha256": "f51e4a111994c3bf1c37c8b81b553cf367e096e388fc841200400b842b7b7ac3"
-  },
-  {
-   "bytes": 6848189,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588315.thm"
-   },
-   "path": "thm/480X480/theme_1757491588315.thm",
-   "sha256": "63c85939041fa87577fc8ec0d66b1a61082eb6646c5c7b9ae1f3bad8d33a72f0"
   },
   {
    "bytes": 4495299,
@@ -352,15 +279,6 @@
    "sha256": "ff55b0103f6260f81d2d2232444a2b923b7a2f9c021ba22ad9cb84de5126e79e"
   },
   {
-   "bytes": 6863675,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588497.thm"
-   },
-   "path": "thm/480X480/theme_1757491588497.thm",
-   "sha256": "ff6c38b14f302641801f64464da529201cfa171c94a53897ddaa922440ef9853"
-  },
-  {
    "bytes": 4501258,
    "kind": "background",
    "origin": {
@@ -392,15 +310,6 @@
    },
    "path": "layouts/480X480/1757491588497.json",
    "sha256": "9b2e03f214f57e9f98a7a1dde6ccc0ddd10cfca3c630a649442796041bc66089"
-  },
-  {
-   "bytes": 5405873,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588618.thm"
-   },
-   "path": "thm/480X480/theme_1757491588618.thm",
-   "sha256": "36f94853677a7cf1bdd7ef7fe0b98199fb0444177c7e02ac29f74cc814a4a9da"
   },
   {
    "bytes": 3537195,
@@ -436,15 +345,6 @@
    "sha256": "2d9ccf610ab985a52c2d7d37e9f45fc0d170490762e796472c6442376f1bf86e"
   },
   {
-   "bytes": 5393650,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588804.thm"
-   },
-   "path": "thm/480X480/theme_1757491588804.thm",
-   "sha256": "6c9e88edb71dd7df4bfee30fcb87325adcd9e2f4e476a80ef8992f6d6207b2ea"
-  },
-  {
    "bytes": 3527291,
    "kind": "background",
    "origin": {
@@ -476,15 +376,6 @@
    },
    "path": "layouts/480X480/1757491588804.json",
    "sha256": "d8de78e3d1fc249f53515fc36cb19dd5374ad3e0df5681cf1f6f9597bf914493"
-  },
-  {
-   "bytes": 1998709,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588891.thm"
-   },
-   "path": "thm/480X480/theme_1757491588891.thm",
-   "sha256": "cdecd0fdd7615727ccc9399a0eb2e3f298e58745873a9320342e22a218f147f9"
   },
   {
    "bytes": 1298212,
@@ -520,15 +411,6 @@
    "sha256": "9abdb65339f7db40cf4655a0bc5b17fee4fa5a7bd478c5822d5ebbf742d95220"
   },
   {
-   "bytes": 1938913,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588945.thm"
-   },
-   "path": "thm/480X480/theme_1757491588945.thm",
-   "sha256": "d53efb191edeb183798dad0a525b8cfe1aca500c2c36ad719d9bd85c7e3137e7"
-  },
-  {
    "bytes": 1254507,
    "kind": "background",
    "origin": {
@@ -560,15 +442,6 @@
    },
    "path": "layouts/480X480/1757491588945.json",
    "sha256": "c20add7e448c3d159f2b2f4d424e3591132cd046be75138d692e374346e33aac"
-  },
-  {
-   "bytes": 2105673,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589004.thm"
-   },
-   "path": "thm/480X480/theme_1757491589004.thm",
-   "sha256": "b17aed9a2ad7ef1f916b9be9f5531a5a80c188827b2b75a2da5e087f2488d9a9"
   },
   {
    "bytes": 1372694,
@@ -604,15 +477,6 @@
    "sha256": "763ad8792bf871990bb8e3ade5904f872b040288f1155a0a2ebe02424043c1fe"
   },
   {
-   "bytes": 4418740,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589113.thm"
-   },
-   "path": "thm/480X480/theme_1757491589113.thm",
-   "sha256": "6c6dac447e7ab6e6ed3455bdaadef2e556eea606a86ce54ab0b67e0884b9e08b"
-  },
-  {
    "bytes": 2888770,
    "kind": "background",
    "origin": {
@@ -644,15 +508,6 @@
    },
    "path": "layouts/480X480/1757491589113.json",
    "sha256": "4511f0525e61a92568d0f335282bcbf0525ec4f19e257199ecf95f0cd27d7956"
-  },
-  {
-   "bytes": 3934905,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589217.thm"
-   },
-   "path": "thm/480X480/theme_1757491589217.thm",
-   "sha256": "bb0a2205370bac9ad721d2c873aacc562f8b7908f310986bb555541d235ae940"
   },
   {
    "bytes": 2577837,
@@ -689,15 +544,6 @@
    "sha256": "d8d29dbc3906aaddb42988f8d41e1bfac474aa080ebed59b41eb9c69e02aca37"
   },
   {
-   "bytes": 353063,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589247.thm"
-   },
-   "path": "thm/480X480/theme_1757491589247.thm",
-   "sha256": "f2e54473e744bf97a7e398e17b67787590c694f1e3fa408a81e57c3591e731d1"
-  },
-  {
    "bytes": 214917,
    "kind": "background",
    "origin": {
@@ -729,15 +575,6 @@
    },
    "path": "layouts/480X480/1757491589247.json",
    "sha256": "c78f60895ae4fd750c3fdfd75d5d5aae3cfdfbf47aa79bb75269535e72ed6a21"
-  },
-  {
-   "bytes": 2210890,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589325.thm"
-   },
-   "path": "thm/480X480/theme_1757491589325.thm",
-   "sha256": "b2bc653816c72423501d24491b4bf4d6cf5a5209690579e53685dcf7bcc2dca2"
   },
   {
    "bytes": 1433387,
@@ -773,15 +610,6 @@
    "sha256": "f01c712c7f7cb31f2576ac01f81547c7a505fe03d0a9f74c79eae0618bf4103c"
   },
   {
-   "bytes": 2774962,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589401.thm"
-   },
-   "path": "thm/480X480/theme_1757491589401.thm",
-   "sha256": "9cbc79ba25a6dfbba58c17c8a220a8a0d820299592716d799d4772ed4da5f6cd"
-  },
-  {
    "bytes": 1811136,
    "kind": "background",
    "origin": {
@@ -813,15 +641,6 @@
    },
    "path": "layouts/480X480/1757491589401.json",
    "sha256": "351e45f49bc2e402a99ccf9d2a780da977a23ee4123a62c80341c163427d2c99"
-  },
-  {
-   "bytes": 3222437,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589484.thm"
-   },
-   "path": "thm/480X480/theme_1757491589484.thm",
-   "sha256": "7374552bf810294a7821a8c8efa37491286c3c35cc1c7062e8d591d536424bf8"
   },
   {
    "bytes": 2106948,
@@ -858,15 +677,6 @@
    "sha256": "1380dbc1c9c14f5bc4acd585607791f1be30e597ad56f5e04a568332358cebd6"
   },
   {
-   "bytes": 2410941,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589554.thm"
-   },
-   "path": "thm/480X480/theme_1757491589554.thm",
-   "sha256": "ff1063768c242f5af38c79ff959bc15132c6a397a40ab1aee74ab2fa63dae71b"
-  },
-  {
    "bytes": 1566530,
    "kind": "background",
    "origin": {
@@ -898,15 +708,6 @@
    },
    "path": "layouts/480X480/1757491589554.json",
    "sha256": "771285ec2db6c0482b98c2c9a5a32557c17480a8d63d69d73474c9d31a8a1315"
-  },
-  {
-   "bytes": 724629,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589585.thm"
-   },
-   "path": "thm/480X480/theme_1757491589585.thm",
-   "sha256": "958171e8e48b6f0fb976cdf1c3813799455abe4a717795b668ec93d80d467097"
   },
   {
    "bytes": 462649,
@@ -942,15 +743,6 @@
    "sha256": "6191830a141a1e299bb56ef1514b58f9a491c5c7c05a1da1dcee94e1b7e4be5b"
   },
   {
-   "bytes": 664241,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589611.thm"
-   },
-   "path": "thm/480X480/theme_1757491589611.thm",
-   "sha256": "32e121ef93b7ced569782d8b683f42d49b1e8ecc75dca5685317c22837c079f0"
-  },
-  {
    "bytes": 419763,
    "kind": "background",
    "origin": {
@@ -982,15 +774,6 @@
    },
    "path": "layouts/480X480/1757491589611.json",
    "sha256": "803d64b10db84fd31669e73d24254a0ade0b9c118835982a863016da5d39be29"
-  },
-  {
-   "bytes": 1860678,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589687.thm"
-   },
-   "path": "thm/480X480/theme_1757491589687.thm",
-   "sha256": "e9cd61804d775256ea0f43a4880d01abaf1f3088254d9f9e6835a4261b759171"
   },
   {
    "bytes": 1211106,
@@ -1026,15 +809,6 @@
    "sha256": "4af1abdb729641b721081f370dc32a47253b6bef49ce082bec09d27d46a698a2"
   },
   {
-   "bytes": 2061080,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589759.thm"
-   },
-   "path": "thm/480X480/theme_1757491589759.thm",
-   "sha256": "ce28b6ffa688d96ecc56652d9185ca83753b7978d0e2d3680088f34d46efdbdc"
-  },
-  {
    "bytes": 1333649,
    "kind": "background",
    "origin": {
@@ -1068,15 +842,6 @@
    "sha256": "eae9f3bc95e1da081ef93018b4f693f2954b12010d04896b935a2ad3331bde07"
   },
   {
-   "bytes": 701859,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589804.thm"
-   },
-   "path": "thm/480X480/theme_1757491589804.thm",
-   "sha256": "170469fa7ae2686eeaad5985134038b151d70d31df1dbda765d030e42a09637c"
-  },
-  {
    "bytes": 445318,
    "kind": "background",
    "origin": {
@@ -1108,15 +873,6 @@
    },
    "path": "layouts/480X480/1757491589804.json",
    "sha256": "3074f1510e94a457190f41907f6fc562b29916c6ab032a9acff15bc5ef46759c"
-  },
-  {
-   "bytes": 1921341,
-   "kind": "thm",
-   "origin": {
-    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589871.thm"
-   },
-   "path": "thm/480X480/theme_1757491589871.thm",
-   "sha256": "729a6b85d3c76ee83f6b37eb9ba4d618ac3ad62eb48fec7673e2abd3e0049048"
   },
   {
    "bytes": 1243040,
@@ -1604,9 +1360,282 @@
    "sha256": "ff604e84d8813d32c11708c8268a30e14a757bc618f40195ad649ede3517afc3"
   }
  ],
+ "notRedistributed": [
+  {
+   "bytes": 505547,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\320X240\\theme_1757492775547.thm",
+    "vendorRel": "320X240/theme_1757492775547.thm"
+   },
+   "path": "thm/320X240/theme_1757492775547.thm",
+   "sha256": "5aeada3a8c10bee169059fcf62bb162e5e1dc8d71420c17d7b7cf768c38cdaad"
+  },
+  {
+   "bytes": 652744,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\320X240\\theme_1757492775574.thm",
+    "vendorRel": "320X240/theme_1757492775574.thm"
+   },
+   "path": "thm/320X240/theme_1757492775574.thm",
+   "sha256": "b583979c56e0200788ce4b33352d915c9659a00c2f5232a781cc6d900065c48e"
+  },
+  {
+   "bytes": 616985,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\320X240\\theme_1757492775603.thm",
+    "vendorRel": "320X240/theme_1757492775603.thm"
+   },
+   "path": "thm/320X240/theme_1757492775603.thm",
+   "sha256": "e3e8dcb2d5aec4113b67bd28cc3acc4e63da54afbc1284f9284d985e37d5f0d9"
+  },
+  {
+   "bytes": 327352,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\320X240\\theme_1757492775627.thm",
+    "vendorRel": "320X240/theme_1757492775627.thm"
+   },
+   "path": "thm/320X240/theme_1757492775627.thm",
+   "sha256": "8dfd936d71b51a2e682e9761044419de3051d5b2339f11e0dfe16e9fdf903dd1"
+  },
+  {
+   "bytes": 1045220,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\default.thm",
+    "vendorRel": "480X480/default.thm"
+   },
+   "path": "thm/480X480/default.thm",
+   "sha256": "b24ff23b69a2f634590e2561bf460879e94906580a8f80b3acc65a84d300582a"
+  },
+  {
+   "bytes": 3555730,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588063.thm",
+    "vendorRel": "480X480/theme_1757491588063.thm"
+   },
+   "path": "thm/480X480/theme_1757491588063.thm",
+   "sha256": "30343a0388310804e8d348930737cee3fad566183146d350557ed672ddc9c506"
+  },
+  {
+   "bytes": 1782056,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588126.thm",
+    "vendorRel": "480X480/theme_1757491588126.thm"
+   },
+   "path": "thm/480X480/theme_1757491588126.thm",
+   "sha256": "4bc64dc6eef047c42f39bbbc7606c729008aa7b9f45f1501b52e38d1b15e8ab8"
+  },
+  {
+   "bytes": 6848189,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588315.thm",
+    "vendorRel": "480X480/theme_1757491588315.thm"
+   },
+   "path": "thm/480X480/theme_1757491588315.thm",
+   "sha256": "63c85939041fa87577fc8ec0d66b1a61082eb6646c5c7b9ae1f3bad8d33a72f0"
+  },
+  {
+   "bytes": 6863675,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588497.thm",
+    "vendorRel": "480X480/theme_1757491588497.thm"
+   },
+   "path": "thm/480X480/theme_1757491588497.thm",
+   "sha256": "ff6c38b14f302641801f64464da529201cfa171c94a53897ddaa922440ef9853"
+  },
+  {
+   "bytes": 5405873,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588618.thm",
+    "vendorRel": "480X480/theme_1757491588618.thm"
+   },
+   "path": "thm/480X480/theme_1757491588618.thm",
+   "sha256": "36f94853677a7cf1bdd7ef7fe0b98199fb0444177c7e02ac29f74cc814a4a9da"
+  },
+  {
+   "bytes": 5393650,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588804.thm",
+    "vendorRel": "480X480/theme_1757491588804.thm"
+   },
+   "path": "thm/480X480/theme_1757491588804.thm",
+   "sha256": "6c9e88edb71dd7df4bfee30fcb87325adcd9e2f4e476a80ef8992f6d6207b2ea"
+  },
+  {
+   "bytes": 1998709,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588891.thm",
+    "vendorRel": "480X480/theme_1757491588891.thm"
+   },
+   "path": "thm/480X480/theme_1757491588891.thm",
+   "sha256": "cdecd0fdd7615727ccc9399a0eb2e3f298e58745873a9320342e22a218f147f9"
+  },
+  {
+   "bytes": 1938913,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588945.thm",
+    "vendorRel": "480X480/theme_1757491588945.thm"
+   },
+   "path": "thm/480X480/theme_1757491588945.thm",
+   "sha256": "d53efb191edeb183798dad0a525b8cfe1aca500c2c36ad719d9bd85c7e3137e7"
+  },
+  {
+   "bytes": 2105673,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589004.thm",
+    "vendorRel": "480X480/theme_1757491589004.thm"
+   },
+   "path": "thm/480X480/theme_1757491589004.thm",
+   "sha256": "b17aed9a2ad7ef1f916b9be9f5531a5a80c188827b2b75a2da5e087f2488d9a9"
+  },
+  {
+   "bytes": 4418740,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589113.thm",
+    "vendorRel": "480X480/theme_1757491589113.thm"
+   },
+   "path": "thm/480X480/theme_1757491589113.thm",
+   "sha256": "6c6dac447e7ab6e6ed3455bdaadef2e556eea606a86ce54ab0b67e0884b9e08b"
+  },
+  {
+   "bytes": 3934905,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589217.thm",
+    "vendorRel": "480X480/theme_1757491589217.thm"
+   },
+   "path": "thm/480X480/theme_1757491589217.thm",
+   "sha256": "bb0a2205370bac9ad721d2c873aacc562f8b7908f310986bb555541d235ae940"
+  },
+  {
+   "bytes": 353063,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589247.thm",
+    "vendorRel": "480X480/theme_1757491589247.thm"
+   },
+   "path": "thm/480X480/theme_1757491589247.thm",
+   "sha256": "f2e54473e744bf97a7e398e17b67787590c694f1e3fa408a81e57c3591e731d1"
+  },
+  {
+   "bytes": 2210890,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589325.thm",
+    "vendorRel": "480X480/theme_1757491589325.thm"
+   },
+   "path": "thm/480X480/theme_1757491589325.thm",
+   "sha256": "b2bc653816c72423501d24491b4bf4d6cf5a5209690579e53685dcf7bcc2dca2"
+  },
+  {
+   "bytes": 2774962,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589401.thm",
+    "vendorRel": "480X480/theme_1757491589401.thm"
+   },
+   "path": "thm/480X480/theme_1757491589401.thm",
+   "sha256": "9cbc79ba25a6dfbba58c17c8a220a8a0d820299592716d799d4772ed4da5f6cd"
+  },
+  {
+   "bytes": 3222437,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589484.thm",
+    "vendorRel": "480X480/theme_1757491589484.thm"
+   },
+   "path": "thm/480X480/theme_1757491589484.thm",
+   "sha256": "7374552bf810294a7821a8c8efa37491286c3c35cc1c7062e8d591d536424bf8"
+  },
+  {
+   "bytes": 2410941,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589554.thm",
+    "vendorRel": "480X480/theme_1757491589554.thm"
+   },
+   "path": "thm/480X480/theme_1757491589554.thm",
+   "sha256": "ff1063768c242f5af38c79ff959bc15132c6a397a40ab1aee74ab2fa63dae71b"
+  },
+  {
+   "bytes": 724629,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589585.thm",
+    "vendorRel": "480X480/theme_1757491589585.thm"
+   },
+   "path": "thm/480X480/theme_1757491589585.thm",
+   "sha256": "958171e8e48b6f0fb976cdf1c3813799455abe4a717795b668ec93d80d467097"
+  },
+  {
+   "bytes": 664241,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589611.thm",
+    "vendorRel": "480X480/theme_1757491589611.thm"
+   },
+   "path": "thm/480X480/theme_1757491589611.thm",
+   "sha256": "32e121ef93b7ced569782d8b683f42d49b1e8ecc75dca5685317c22837c079f0"
+  },
+  {
+   "bytes": 1860678,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589687.thm",
+    "vendorRel": "480X480/theme_1757491589687.thm"
+   },
+   "path": "thm/480X480/theme_1757491589687.thm",
+   "sha256": "e9cd61804d775256ea0f43a4880d01abaf1f3088254d9f9e6835a4261b759171"
+  },
+  {
+   "bytes": 2061080,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589759.thm",
+    "vendorRel": "480X480/theme_1757491589759.thm"
+   },
+   "path": "thm/480X480/theme_1757491589759.thm",
+   "sha256": "ce28b6ffa688d96ecc56652d9185ca83753b7978d0e2d3680088f34d46efdbdc"
+  },
+  {
+   "bytes": 701859,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589804.thm",
+    "vendorRel": "480X480/theme_1757491589804.thm"
+   },
+   "path": "thm/480X480/theme_1757491589804.thm",
+   "sha256": "170469fa7ae2686eeaad5985134038b151d70d31df1dbda765d030e42a09637c"
+  },
+  {
+   "bytes": 1921341,
+   "kind": "thm",
+   "origin": {
+    "vendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589871.thm",
+    "vendorRel": "480X480/theme_1757491589871.thm"
+   },
+   "path": "thm/480X480/theme_1757491589871.thm",
+   "sha256": "729a6b85d3c76ee83f6b37eb9ba4d618ac3ad62eb48fec7673e2abd3e0049048"
+  }
+ ],
  "source": {
   "clips": "/media/windows-c/Program Files/ALPHA/resources/static/media",
   "install": "C:\\Program Files\\ALPHA\\resources\\static",
+  "notRedistributed": "the vendor's encrypted `.thm` files are recorded (vendor path, byte count, sha256) and not copied: they are the vendor's own container, 66 300 082 B for 27 of them, and this tree has no use for a container it has already unpacked.  They come from the vendor's installer - https://www.xigmatek.com/wp-content/uploads/files/Connect-Display-Setup-Software-2025-1125.zip - installing which places them under `Program Files/ALPHA/resources/static/theme/butt/`, the directory `--from` takes.",
   "note": "read from the mounted Windows system volume; no file outside this repo was created or changed",
   "themes": "/media/windows-c/Program Files/ALPHA/resources/static/theme/butt"
  },
@@ -1640,7 +1669,10 @@
     "Date": 1,
     "Time": 1
    },
-   "thm": "thm/320X240/theme_1757492775547.thm",
+   "thmBytes": 505547,
+   "thmFile": "theme_1757492775547.thm",
+   "thmSha256": "5aeada3a8c10bee169059fcf62bb162e5e1dc8d71420c17d7b7cf768c38cdaad",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\320X240\\theme_1757492775547.thm",
    "widgetKinds": {
     "bar": 1,
     "data": 5,
@@ -1675,7 +1707,10 @@
     "GPU Power": 1,
     "GPU Temperature": 1
    },
-   "thm": "thm/320X240/theme_1757492775574.thm",
+   "thmBytes": 652744,
+   "thmFile": "theme_1757492775574.thm",
+   "thmSha256": "b583979c56e0200788ce4b33352d915c9659a00c2f5232a781cc6d900065c48e",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\320X240\\theme_1757492775574.thm",
    "widgetKinds": {
     "data": 5,
     "text": 3
@@ -1705,7 +1740,10 @@
     "CPU Temperature": 2,
     "GPU Temperature": 2
    },
-   "thm": "thm/320X240/theme_1757492775603.thm",
+   "thmBytes": 616985,
+   "thmFile": "theme_1757492775603.thm",
+   "thmSha256": "e3e8dcb2d5aec4113b67bd28cc3acc4e63da54afbc1284f9284d985e37d5f0d9",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\320X240\\theme_1757492775603.thm",
    "widgetKinds": {
     "bar": 2,
     "data": 2,
@@ -1738,7 +1776,10 @@
     "Upload Speed": 1,
     "Week": 1
    },
-   "thm": "thm/320X240/theme_1757492775627.thm",
+   "thmBytes": 327352,
+   "thmFile": "theme_1757492775627.thm",
+   "thmSha256": "8dfd936d71b51a2e682e9761044419de3051d5b2339f11e0dfe16e9fdf903dd1",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\320X240\\theme_1757492775627.thm",
    "widgetKinds": {
     "data": 4,
     "text": 1
@@ -1769,7 +1810,10 @@
     "CPU Temperature": 2,
     "Time": 1
    },
-   "thm": "thm/480X480/default.thm",
+   "thmBytes": 1045220,
+   "thmFile": "default.thm",
+   "thmSha256": "b24ff23b69a2f634590e2561bf460879e94906580a8f80b3acc65a84d300582a",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\default.thm",
    "widgetKinds": {
     "arc": 1,
     "data": 2,
@@ -1800,7 +1844,10 @@
     "CPU Usage": 1,
     "Pump Speed": 1
    },
-   "thm": "thm/480X480/theme_1757491588063.thm",
+   "thmBytes": 3555730,
+   "thmFile": "theme_1757491588063.thm",
+   "thmSha256": "30343a0388310804e8d348930737cee3fad566183146d350557ed672ddc9c506",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588063.thm",
    "widgetKinds": {
     "data": 2,
     "text": 2
@@ -1832,7 +1879,10 @@
     "CPU Temperature": 2,
     "CPU Usage": 1
    },
-   "thm": "thm/480X480/theme_1757491588126.thm",
+   "thmBytes": 1782056,
+   "thmFile": "theme_1757491588126.thm",
+   "thmSha256": "4bc64dc6eef047c42f39bbbc7606c729008aa7b9f45f1501b52e38d1b15e8ab8",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588126.thm",
    "widgetKinds": {
     "bar": 1,
     "data": 3,
@@ -1862,7 +1912,10 @@
    "sources": {
     "CPU Temperature": 1
    },
-   "thm": "thm/480X480/theme_1757491588315.thm",
+   "thmBytes": 6848189,
+   "thmFile": "theme_1757491588315.thm",
+   "thmSha256": "63c85939041fa87577fc8ec0d66b1a61082eb6646c5c7b9ae1f3bad8d33a72f0",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588315.thm",
    "widgetKinds": {
     "data": 1,
     "text": 2
@@ -1893,7 +1946,10 @@
     "GPU Temperature": 1,
     "Time": 1
    },
-   "thm": "thm/480X480/theme_1757491588497.thm",
+   "thmBytes": 6863675,
+   "thmFile": "theme_1757491588497.thm",
+   "thmSha256": "ff6c38b14f302641801f64464da529201cfa171c94a53897ddaa922440ef9853",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588497.thm",
    "widgetKinds": {
     "data": 3,
     "line": 2,
@@ -1925,7 +1981,10 @@
     "Pump Speed": 1,
     "Time": 1
    },
-   "thm": "thm/480X480/theme_1757491588618.thm",
+   "thmBytes": 5405873,
+   "thmFile": "theme_1757491588618.thm",
+   "thmSha256": "36f94853677a7cf1bdd7ef7fe0b98199fb0444177c7e02ac29f74cc814a4a9da",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588618.thm",
    "widgetKinds": {
     "bar": 1,
     "data": 2,
@@ -1957,7 +2016,10 @@
     "CPU Usage": 2,
     "GPU Usage": 2
    },
-   "thm": "thm/480X480/theme_1757491588804.thm",
+   "thmBytes": 5393650,
+   "thmFile": "theme_1757491588804.thm",
+   "thmSha256": "6c9e88edb71dd7df4bfee30fcb87325adcd9e2f4e476a80ef8992f6d6207b2ea",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588804.thm",
    "widgetKinds": {
     "bar": 2,
     "data": 3,
@@ -1988,7 +2050,10 @@
     "CPU Temperature": 1,
     "Time": 1
    },
-   "thm": "thm/480X480/theme_1757491588891.thm",
+   "thmBytes": 1998709,
+   "thmFile": "theme_1757491588891.thm",
+   "thmSha256": "cdecd0fdd7615727ccc9399a0eb2e3f298e58745873a9320342e22a218f147f9",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588891.thm",
    "widgetKinds": {
     "data": 2,
     "text": 1
@@ -2019,7 +2084,10 @@
     "CPU Usage": 2,
     "GPU Usage": 2
    },
-   "thm": "thm/480X480/theme_1757491588945.thm",
+   "thmBytes": 1938913,
+   "thmFile": "theme_1757491588945.thm",
+   "thmSha256": "d53efb191edeb183798dad0a525b8cfe1aca500c2c36ad719d9bd85c7e3137e7",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491588945.thm",
    "widgetKinds": {
     "bar": 2,
     "data": 3,
@@ -2049,7 +2117,10 @@
    "sources": {
     "CPU Temperature": 1
    },
-   "thm": "thm/480X480/theme_1757491589004.thm",
+   "thmBytes": 2105673,
+   "thmFile": "theme_1757491589004.thm",
+   "thmSha256": "b17aed9a2ad7ef1f916b9be9f5531a5a80c188827b2b75a2da5e087f2488d9a9",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589004.thm",
    "widgetKinds": {
     "data": 1,
     "text": 2
@@ -2080,7 +2151,10 @@
     "Pump Speed": 1,
     "Time": 1
    },
-   "thm": "thm/480X480/theme_1757491589113.thm",
+   "thmBytes": 4418740,
+   "thmFile": "theme_1757491589113.thm",
+   "thmSha256": "6c6dac447e7ab6e6ed3455bdaadef2e556eea606a86ce54ab0b67e0884b9e08b",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589113.thm",
    "widgetKinds": {
     "bar": 1,
     "data": 2,
@@ -2110,7 +2184,10 @@
    "sources": {
     "CPU Temperature": 1
    },
-   "thm": "thm/480X480/theme_1757491589217.thm",
+   "thmBytes": 3934905,
+   "thmFile": "theme_1757491589217.thm",
+   "thmSha256": "bb0a2205370bac9ad721d2c873aacc562f8b7908f310986bb555541d235ae940",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589217.thm",
    "widgetKinds": {
     "data": 1,
     "text": 2
@@ -2141,7 +2218,10 @@
     "GPU Temperature": 1,
     "Time": 1
    },
-   "thm": "thm/480X480/theme_1757491589247.thm",
+   "thmBytes": 353063,
+   "thmFile": "theme_1757491589247.thm",
+   "thmSha256": "f2e54473e744bf97a7e398e17b67787590c694f1e3fa408a81e57c3591e731d1",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589247.thm",
    "widgetKinds": {
     "data": 3,
     "text": 2
@@ -2172,7 +2252,10 @@
     "CPU Temperature": 2,
     "CPU Usage": 1
    },
-   "thm": "thm/480X480/theme_1757491589325.thm",
+   "thmBytes": 2210890,
+   "thmFile": "theme_1757491589325.thm",
+   "thmSha256": "b2bc653816c72423501d24491b4bf4d6cf5a5209690579e53685dcf7bcc2dca2",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589325.thm",
    "widgetKinds": {
     "bar": 1,
     "data": 3,
@@ -2203,7 +2286,10 @@
     "CPU Usage": 1,
     "Pump Speed": 1
    },
-   "thm": "thm/480X480/theme_1757491589401.thm",
+   "thmBytes": 2774962,
+   "thmFile": "theme_1757491589401.thm",
+   "thmSha256": "9cbc79ba25a6dfbba58c17c8a220a8a0d820299592716d799d4772ed4da5f6cd",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589401.thm",
    "widgetKinds": {
     "data": 2,
     "text": 2
@@ -2233,7 +2319,10 @@
     "Pump Speed": 1,
     "Time": 1
    },
-   "thm": "thm/480X480/theme_1757491589484.thm",
+   "thmBytes": 3222437,
+   "thmFile": "theme_1757491589484.thm",
+   "thmSha256": "7374552bf810294a7821a8c8efa37491286c3c35cc1c7062e8d591d536424bf8",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589484.thm",
    "widgetKinds": {
     "data": 2,
     "text": 1
@@ -2264,7 +2353,10 @@
     "Pump Speed": 1,
     "Time": 1
    },
-   "thm": "thm/480X480/theme_1757491589554.thm",
+   "thmBytes": 2410941,
+   "thmFile": "theme_1757491589554.thm",
+   "thmSha256": "ff1063768c242f5af38c79ff959bc15132c6a397a40ab1aee74ab2fa63dae71b",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589554.thm",
    "widgetKinds": {
     "bar": 1,
     "data": 2,
@@ -2295,7 +2387,10 @@
     "Pump Speed": 1,
     "Time": 1
    },
-   "thm": "thm/480X480/theme_1757491589585.thm",
+   "thmBytes": 724629,
+   "thmFile": "theme_1757491589585.thm",
+   "thmSha256": "958171e8e48b6f0fb976cdf1c3813799455abe4a717795b668ec93d80d467097",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589585.thm",
    "widgetKinds": {
     "data": 2,
     "text": 1
@@ -2326,7 +2421,10 @@
     "GPU Temperature": 1,
     "Time": 1
    },
-   "thm": "thm/480X480/theme_1757491589611.thm",
+   "thmBytes": 664241,
+   "thmFile": "theme_1757491589611.thm",
+   "thmSha256": "32e121ef93b7ced569782d8b683f42d49b1e8ecc75dca5685317c22837c079f0",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589611.thm",
    "widgetKinds": {
     "data": 3,
     "line": 2,
@@ -2356,7 +2454,10 @@
    "sources": {
     "CPU Temperature": 1
    },
-   "thm": "thm/480X480/theme_1757491589687.thm",
+   "thmBytes": 1860678,
+   "thmFile": "theme_1757491589687.thm",
+   "thmSha256": "e9cd61804d775256ea0f43a4880d01abaf1f3088254d9f9e6835a4261b759171",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589687.thm",
    "widgetKinds": {
     "data": 1,
     "text": 2
@@ -2387,7 +2488,10 @@
     "Pump Speed": 1,
     "Time": 1
    },
-   "thm": "thm/480X480/theme_1757491589759.thm",
+   "thmBytes": 2061080,
+   "thmFile": "theme_1757491589759.thm",
+   "thmSha256": "ce28b6ffa688d96ecc56652d9185ca83753b7978d0e2d3680088f34d46efdbdc",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589759.thm",
    "widgetKinds": {
     "bar": 1,
     "data": 2,
@@ -2418,7 +2522,10 @@
     "CPU Usage": 1,
     "Pump Speed": 1
    },
-   "thm": "thm/480X480/theme_1757491589804.thm",
+   "thmBytes": 701859,
+   "thmFile": "theme_1757491589804.thm",
+   "thmSha256": "170469fa7ae2686eeaad5985134038b151d70d31df1dbda765d030e42a09637c",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589804.thm",
    "widgetKinds": {
     "data": 2,
     "text": 2
@@ -2449,7 +2556,10 @@
     "CPU Usage": 2,
     "GPU Usage": 2
    },
-   "thm": "thm/480X480/theme_1757491589871.thm",
+   "thmBytes": 1921341,
+   "thmFile": "theme_1757491589871.thm",
+   "thmSha256": "729a6b85d3c76ee83f6b37eb9ba4d618ac3ad62eb48fec7673e2abd3e0049048",
+   "thmVendorPath": "C:\\Program Files\\ALPHA\\resources\\static\\theme\\butt\\480X480\\theme_1757491589871.thm",
    "widgetKinds": {
     "bar": 2,
     "data": 3,

@@ -138,6 +138,34 @@ xigmatek-connect-lcd (0.3) UNRELEASED; urgency=medium
     different name - and 40 is exactly what an independent audit of all 161
     files by whole-file sha256 found distinct.  The window says the numbers out
     loud in its log, because a list that quietly gets shorter looks like a bug.
+
+  * The vendor's `.thm` containers are out of the tree and out of both packages:
+    27 files, 66 300 082 B, 43.8 % of themes/alpha and roughly 40 % of the whole
+    repository.  They are the vendor's own encrypted ZIP around media this copy
+    already holds unpacked; nothing here reads one, and the control socket's
+    file gate would not accept one.  What is kept is their identity:
+    `manifest.json` gained a `notRedistributed` array (vendor path, byte count
+    and sha256 for all 27) and every theme row keeps
+    `thmFile`/`thmVendorPath`/`thmBytes`/`thmSha256`, so a reader holding the
+    vendor's installer can check this record rather than take it on trust - and
+    they are told where it comes from, since those files arrive inside
+    Connect-Display-Setup-Software-2025-1125.zip from xigmatek.com.
+    `tools/thm_unlock.py --no-thm` writes the tree this way; `--verify` with no
+    Windows volume now prints `125/125 files match manifest hashes` where it
+    printed 152/152, and given `--from DIR` it re-hashes the 27 this tree does
+    not carry where they live (measured 152/152 on the author's bench).  Proof
+    that nothing else moved: a `--no-thm` write re-derived every remaining file
+    and all 125 kept manifest entries byte for byte, key for key, against the
+    pre-removal tree.  themes/alpha is 100 files / 84 926 540 B of vendor bytes
+    now, and the themes .deb measures 79 841 286 B built from this tree against
+    146 137 362 B at 0.2, 102 file members with 0 `.thm` among them,
+    Installed-Size 83 109 KiB against 147 854 KiB; two builds of it twenty
+    seconds apart are byte-identical, and lintian says 0 errors, 0 warnings,
+    0 infos.  `debian/tests/smoke` enforces the shape by walking the installed
+    tree and failing on any file the manifest does not name, and
+    tools/selftest.sh asserts there is no .thm anywhere in the tree, that the
+    27 recorded hashes agree with the per-theme rows, and the 100-file layout.
+
  -- Tamer Hassan <thameruddin@gmail.com>  Sat, 07 Nov 2026 09:45:00 +0200
 xigmatek-connect-lcd (0.2) resolute; urgency=medium
 

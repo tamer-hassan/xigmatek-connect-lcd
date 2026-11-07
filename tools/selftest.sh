@@ -817,13 +817,76 @@ import hashlib, json, os, sys
 from PIL import Image
 man = json.load(open("themes/alpha/manifest.json"))
 # what themes/alpha/README.md's size table claims, re-counted here
-counts = {"thm": (27, 66_300_082), "layout": (27, 127_115),
+counts = {"layout": (27, 127_115),
           "clip": (44, 84_392_330), "foreground": (27, 407_095)}
 for kind, (files, byte_total) in counts.items():
     rows = [e for e in man["files"] if e["kind"] == kind]
     assert len(rows) == files, (kind, len(rows), files)
     assert sum(e["bytes"] for e in rows) == byte_total, (kind,)
     print(f"  {kind:<10} {files:>3} files {byte_total:>10} B as documented")
+
+# ---- the .thm containers are recorded, not carried --------------------------------
+# They were in this tree through 0.2 (27 files, 66 300 082 B, 43.8 % of themes/alpha)
+# and were removed at 0.3: they are the vendor's encrypted wrapper, nothing here reads
+# or could send one, and every fact they supported is already carried as a hash.  So the
+# tree must contain no .thm at all, and the manifest must still say what they were:
+# `notRedistributed` keeps vendor path + size + sha256, and every theme row keeps
+# thmFile/thmBytes/thmSha256, which is what lets a reader holding the vendor's installer
+# check this copy's word.  Asserting the absence is what stops one coming back by
+# accident, in a re-run of the copy tool without --no-thm or in a future commit.
+on_disk = [os.path.join(r, n) for r, _d, fs in os.walk("themes/alpha") for n in fs]
+assert not [p for p in on_disk if p.endswith(".thm")], \
+    sorted(p for p in on_disk if p.endswith(".thm"))[:3]
+assert not os.path.exists("themes/alpha/thm"), "a thm/ dir should not exist"
+assert "thm" not in man["counts"], man["counts"]
+nrd = man["notRedistributed"]
+assert len(nrd) == 27 and all(e["kind"] == "thm" for e in nrd), len(nrd)
+assert sum(e["bytes"] for e in nrd) == 66_300_082, sum(e["bytes"] for e in nrd)
+assert all(e["path"].startswith("thm/") and e["sha256"] and e["origin"]["vendorPath"]
+           for e in nrd)
+assert len({e["sha256"] for e in nrd}) == 27, "the 27 containers are distinct"
+per_theme = {t["id"]: t for t in man["themes"]}
+assert len(per_theme) == 27
+assert all(t.get("thmSha256") and t.get("thmBytes") and t.get("thmVendorPath")
+           for t in man["themes"]), "a theme row lost its container record"
+assert ({t["thmSha256"] for t in man["themes"]} == {e["sha256"] for e in nrd}), \
+    "themes[] and notRedistributed disagree about the containers"
+print(f"  notRedistributed {len(nrd):>3} recorded {sum(e['bytes'] for e in nrd):>10} B "
+      f"(not in this tree: {len([p for p in on_disk if p.endswith('.thm')])} .thm files "
+      f"on disk, and no thm/ entry in manifest counts)")
+# the byte total quoted in the README and in docs/limits.md is the manifest's own sum
+# over the files on disk - 84 926 540 B - not the walk's, because this README is one of
+# the files and editing it would otherwise move the documented figure.  The walk is still
+# checked against it, so a file added or changed in the tree shows up.
+data = [e for e in man["files"] if e["kind"] != "background"]
+assert {e["path"] for e in data} | {"manifest.json", "README.md"} == \
+    {os.path.relpath(x, "themes/alpha") for x in on_disk}, \
+    sorted({os.path.relpath(x, "themes/alpha") for x in on_disk}
+           - {e["path"] for e in data})[:4]
+assert sum(e["bytes"] for e in data) == 84_926_540, sum(e["bytes"] for e in data)
+assert sum(os.path.getsize(os.path.join("themes/alpha", e["path"])) for e in data) \
+    == 84_926_540, "a file on disk no longer matches the manifest's byte count"
+print(f"  themes/alpha    {len(on_disk):>3} files: {len(data):>3} recorded "
+      f"{84_926_540:>9} B (the documented total) + manifest.json "
+      f"{os.path.getsize('themes/alpha/manifest.json'):>6} B + README.md "
+      f"{os.path.getsize('themes/alpha/README.md'):>6} B")
+# the vendor's own install, when this machine has one: the hashes above stop being a
+# claim and become a check.  A runner without the volume is told which it is.  The path
+# is derived from the constant this project already names (xigmalcd.main.WIN_STATIC, the
+# loose-clips directory), because the installer keeps static/theme/butt and
+# static/media as siblings - no second spelling of the same volume.
+import subprocess
+from xigmalcd.main import WIN_STATIC
+butt = os.path.join(os.path.dirname(WIN_STATIC), "theme", "butt")
+if os.path.isdir(butt):
+    print(f"  vendor .thm install found at {butt}: re-hashing what this tree does not "
+          f"carry")
+    subprocess.run([sys.executable, "tools/thm_unlock.py", "--verify",
+                    "--to", "themes/alpha", "--from", butt], check=True)
+else:
+    print("  vendor .thm install not on this machine (the Windows volume is not "
+          "mounted), so the 27 recorded hashes are checked only against the bytes this "
+          "tree does carry; on the author's bench the same run re-hashes 152/152")
 # the dedup the README states: every theme background lives in clips/, none duplicated
 themes = man["themes"]
 assert len(themes) == 27, len(themes)

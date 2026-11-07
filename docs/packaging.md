@@ -38,6 +38,9 @@ build stopping at "PEP517 plugin dependencies are not available" without it.
 
 Both rows are one build on the author's bench, 2026-11-07, of the tree at the `v0.2`
 tag - a build of the tree as it stands now names the files `_0.3_` instead, because the
+(the 0.3 build is measured in its own section below, "What the 0.3 tree packages",
+because the themes package changed shape there: the vendor's `.thm` containers are no
+longer packaged, and the file is 79 839 522 B rather than 146 137 362 B)
 top `debian/changelog` stanza has moved to `0.3 UNRELEASED` and `pyproject.toml` /
 `xigmalcd.__version__` moved with it; `0.3` has been released nowhere, and the two
 published releases stay 0.1 and 0.2 (the CI job that builds the packages fails if those
@@ -207,8 +210,10 @@ resolves inside the
 unpacked tree, the packaged code finds its own three clips by its own root rules at the
 sizes and md5s the suite pins, `xigmalcd --dry-run DIR --once` writes one 480×480 PNG and
 opens no port, `xigmalcd-reset` with no `--yes` prints the 109-byte frame and sends
-nothing, the themes tree re-hashes to its manifest (152 entries, 125 distinct paths, 127
-files on disk), and `desktop-file-validate` is clean on the installed menu entry.
+nothing, the themes tree re-hashes to its manifest (125 entries over 98 distinct paths,
+100 files on disk - the 27 `background` entries naming the same bytes as 27 of the clips,
+and the vendor's 27 `.thm` containers living as hashes in `notRedistributed` rather than
+as files), and `desktop-file-validate` is clean on the installed menu entry.
 
 What an install actually does has now been measured on this bench, root and all:
 `sudo apt install` of both files (apt 3.2.1, Ubuntu 26.04, kernel 7.0.0-42-generic,
@@ -234,7 +239,9 @@ PNG from a dry run with the port never opened, the udev rule, the unit's
 entry clean through `desktop-file-validate`, the icon 256×256 RGBA with transparent
 corners, `/usr/bin/xigmalcd-reset` printing 355 B - the 109-byte frame - and sending
 nothing, nothing from `tools/` on PATH, and 152/152 manifest entries re-hashed under the
-installed themes path. The transcript of that run is in this tree at
+installed themes path - that being the 0.2 package, which carried the 27 `.thm` files;
+the 0.3 package's tree hashes 125 and is measured below. The transcript of that run is in
+this tree at
 **`docs/packaging/smoke-2026-11-07.log`**, which is what every figure in this paragraph
 was read out of, hashes of the two `.deb` files included.
 
@@ -319,6 +326,63 @@ have a reason rather than a shrug:
   `~/.config`, so the text says `/home/runner/...` on a runner and `/home/tamer/...`
   here. Reproduced on one binary on one machine: `HOME=/home/runner xigmaui --help |
   wc -c` answers 1 499 where the same command answers 1 498.
+
+### What the 0.3 tree packages, measured
+
+The 0.2 numbers above are the published ones.  This tree at `0.3 UNRELEASED` packages
+something smaller, because it no longer carries the vendor's `.thm` containers
+(docs/themes.md, `themes/alpha/README.md`):
+
+```
+  dpkg-buildpackage -us -uc -b          exit 0, twice, 2026-11-07: 23:09:54-23:10:14
+                                                 and 23:10:16-23:10:35
+  ls -l ../*.deb
+      xigmatek-connect-lcd_0.3_all.deb                    ~5.2 MB
+      xigmatek-connect-lcd-themes_0.3_all.deb      79 841 286 B   (0.2: 146 137 362 B)
+  dpkg-deb -f ... Installed-Size
+      themes  83 109 KiB          (0.2: 147 854 KiB)
+      code     5 754 KiB at that build   (0.2: 5 578 KiB: the doc set grew)
+  dpkg -c xigmatek-connect-lcd-themes_0.3_all.deb
+      114 members: 102 files + 12 directories
+      grep -c '\.thm'                  0        (0.2: 30 members under thm/)
+  lintian --tag-display-limit 0 --fail-on error,warning ../*.changes
+      errors=0 warnings=0 infos=0 notes=0     (lintian v2.129.0ubuntu2.1, exit 0)
+  cmp build1 build2                themes: clean        code: clean
+```
+
+102 files: 100 under `/usr/share/xigmalcd/themes/alpha` (the 98 the copy tool writes,
+plus `manifest.json` and that directory's own `README.md`) and the `changelog.gz` and
+`copyright` debhelper adds.  The manifest inside the themes package records 125 entries
+over 98 paths and 27 `notRedistributed` rows, and `dpkg -x` answers the question the smoke
+test asks in both directions: every installed file is named by the manifest, every named
+file is installed, no surprises either way.  That is also what keeps a `.thm` from
+drifting back into the package unnoticed - it would be an unnamed file, and the test fails
+on an unnamed file.
+
+The code package's own byte count is deliberately not quoted, for the reason the first
+table gives: this file is installed inside it, so any size written here moves the number
+it writes.  Its Installed-Size went up 176 KiB from 0.2 for the same reason - the doc set
+grew - and nothing about the modules did.
+
+Two builds of this tree, twenty seconds apart on this bench, came out byte-identical,
+both packages - and the second run really is a run rather than a re-use of the first
+stash: `dh_auto_configure`, `dh_auto_build`, the `override_dh_auto_install` recipe (its
+`install -m 644 media/...` line is in both logs), `dh_install`, `dh_missing`,
+`dh_compress` and both `dh_builddeb` steps appear in each: the same clock pin `debian/rules` documents above, doing the same job on the
+smaller tree.  The themes file is
+`4ce88e6d22b19a1c2ee7648da2c3677957d4b261750f8130d24d39dbb91980ee`, which a reader can
+reproduce from this tree and check with `sha256sum`; it is the number for the tree as it
+stands in this commit, and it will differ for any commit that touches `themes/alpha/`.
+What has *not* been re-measured for 0.3 is the bench-versus-runner half, because 0.3 has
+no tag and the runner has only ever built the `v0.2` one; that stays unclaimed until the
+tag exists.
+
+An earlier pair of builds of this tree did *not* compare clean, and the cause is worth
+recording because it is the trap in this kind of check: `debian/changelog` had been
+edited between the two runs, which changes `changelog.gz` and the `md5sums` inside
+`control.tar`, so the two `ar` member size fields differ at byte 122 and 124 of an 80 MB
+file.  A source change between two builds is the one variable the comparison is not
+allowed to contain.
 
 ## The release, and what its hashes do and do not prove
 

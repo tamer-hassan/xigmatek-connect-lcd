@@ -45,14 +45,31 @@ Nothing here touches the panel.  This tool reads files and writes files.
 
     python3 tools/thm_unlock.py --from DIR            summarise, default
     python3 tools/thm_unlock.py --from DIR --layout ID --json
-    python3 tools/thm_unlock.py --from DIR --to themes/alpha --write
+    python3 tools/thm_unlock.py --from DIR --to themes/alpha --write --no-thm
     python3 tools/thm_unlock.py --verify --to themes/alpha    offline re-check
+    python3 tools/thm_unlock.py --verify --to themes/alpha --from DIR
+                                                       # also re-hash the .thm
+                                                       # files this tree does NOT
+                                                       # carry, against the vendor's
 
 `--to` writes the layout JSON with the base64 media replaced by file
 references, the media itself (background per theme, foreground per theme), the
 loose clips from `--media`, and a `manifest.json` recording size + sha256 +
 where each byte came from.  Existing files are only rewritten when their bytes
 already match, so a re-run is a verification, not a churn.
+
+`--no-thm` leaves the vendor's encrypted `.thm` containers out of the written
+tree.  This repository ships without them since 0.3, on the owner's instruction
+that re-distributing the vendor's encrypted originals is not worth the 66 MB:
+what the protocol needs from them — the container format, the cipher, the layout
+of every one of the 27 themes, and the fact that each theme's embedded media is
+the same bytes as a loose clip — is all recorded, and recorded as hashes: the
+manifest keeps a `notRedistributed` entry per `.thm` (vendor path, byte count,
+sha256) and every theme row keeps `thmBytes`/`thmSha256`.  Those hashes are what
+`--verify --from DIR` re-checks, so the claim stays testable on a machine that
+has the vendor install, without the install being part of this tree.  The
+originals come from the vendor's own installer; the URL is in
+themes/alpha/README.md.
 """
 from __future__ import annotations
 
@@ -155,7 +172,7 @@ def put(root: str, rel: str, data: bytes, written: set, report: list) -> None:
     written.add(rel)
 
 
-def verify(tree: str) -> int:
+def verify(tree: str, frm: str | None = None) -> int:
     """Check a written tree against its own manifest, offline.
 
     This is the part that lets the copy be trusted without re-reading the
@@ -164,6 +181,13 @@ def verify(tree: str) -> int:
     *embedded in the `.thm*` — so checking that hash against the loose clip
     on disk re-proves, with no Windows volume involved, that the clip and the
     theme's own payload are the same file.
+
+    The `.thm` containers themselves are not in this tree (`--no-thm`), and the
+    manifest keeps their vendor path, size and sha256 in `notRedistributed`.
+    Given `--from DIR` pointing at a vendor install, `verify` re-hashes those
+    too: the record of files this tree does not carry stays *checked* rather
+    than merely asserted.  Without it they are counted and named as not checked
+    here, which is the honest version of the same line.
     """
     mpath = os.path.join(tree, "manifest.json")
     if not os.path.exists(mpath):
@@ -185,6 +209,29 @@ def verify(tree: str) -> int:
         else:
             ok += 1
 
+    extra = man.get("notRedistributed", [])
+    if extra and frm:
+        # the vendor install is on this machine, so the files this tree does not
+        # carry are re-hashed where they actually are, against the same bar
+        for e in extra:
+            rel = e["origin"].get("vendorRel") or os.path.basename(e["path"])
+            p = os.path.join(frm, rel)
+            if not os.path.exists(p):
+                missing.append(f"{e['path']} (not redistributed; vendor's looked "
+                               f"for at {p})")
+            elif os.path.getsize(p) != e["bytes"]:
+                bad.append((e["path"], "size", e["bytes"], os.path.getsize(p)))
+            elif sha(p) != e["sha256"]:
+                bad.append((e["path"], "sha256", e["sha256"][:16], sha(p)[:16]))
+            else:
+                ok += 1
+        print(f"{len(extra)} files recorded and NOT redistributed, re-hashed "
+              f"against the vendor's own copies under {frm}")
+    elif extra:
+        print(f"{len(extra)} files recorded and NOT redistributed (the vendor's "
+              f"encrypted .thm originals); not checked here — add --from DIR to "
+              f"re-hash them where they live")
+
     refs = []
     for e in man["files"]:
         if e["kind"] != "layout":
@@ -202,7 +249,8 @@ def verify(tree: str) -> int:
             if "pathData" in holder:
                 bad.append((e["path"], "layout still carries base64", "", ""))
 
-    print(f"{tree}: {ok}/{len(man['files'])} files match manifest hashes "
+    counted = len(man["files"]) + (len(extra) if extra and frm else 0)
+    print(f"{tree}: {ok}/{counted} files match manifest hashes "
           f"({'verified' if not bad and not missing else 'PROBLEMS'})")
     print(f"  counts {man['counts']}")
     print(f"  layout media references resolved: {len(refs)}")
@@ -224,9 +272,14 @@ def main() -> int:
     ap.add_argument("--to", help="output root for --write")
     ap.add_argument("--write", action="store_true",
                     help="write layouts, media and manifest under --to")
+    ap.add_argument("--no-thm", action="store_true",
+                    help="do not copy the vendor's encrypted .thm files into the "
+                         "written tree; their vendor path, size and sha256 are "
+                         "still recorded, under 'notRedistributed'")
     ap.add_argument("--verify", action="store_true",
                     help="check a written tree against its manifest.json "
-                         "(sizes, sha256s, and every mediaFile reference)")
+                         "(sizes, sha256s, and every mediaFile reference); with "
+                         "--from DIR, also re-hash the files it does not carry")
     ap.add_argument("--json", action="store_true", help="dump layouts to stdout")
     ap.add_argument("--layout", metavar="ID", help="one theme id, report only")
     args = ap.parse_args()
@@ -235,7 +288,7 @@ def main() -> int:
         if not args.to:
             print("--verify needs --to TREE", file=sys.stderr)
             return 2
-        return verify(args.to)
+        return verify(args.to, args.frm)
 
     if not args.frm:
         print("--from DIR is required (or use --verify --to TREE)", file=sys.stderr)
@@ -334,6 +387,19 @@ def main() -> int:
         },
         "files": [],
     }
+    if args.no_thm:
+        # this is the shape this repository's tree is written in, so the manifest
+        # says out loud what it does not carry and where the reader gets it
+        manifest["notRedistributed"] = []
+        manifest["source"]["notRedistributed"] = (
+            "the vendor's encrypted `.thm` files are recorded (vendor path, byte "
+            "count, sha256) and not copied: they are the vendor's own container, "
+            "66 300 082 B for 27 of them, and this tree has no use for a "
+            "container it has already unpacked.  They come from the vendor's "
+            "installer - https://www.xigmatek.com/wp-content/uploads/files/"
+            "Connect-Display-Setup-Software-2025-1125.zip - installing which "
+            "places them under `Program Files/ALPHA/resources/static/theme/"
+            "butt/`, the directory `--from` takes.")
 
     def record(kind, rel, data, origin):
         manifest["files"].append({"kind": kind, "path": rel, "bytes": len(data),
@@ -342,14 +408,29 @@ def main() -> int:
     written = set()
     report = []
     bg_rel, fg_rel = {}, {}
+    thm_info = {}
     for ratio, tid, path, obj, bg, fg in entries:
         rel_thm = os.path.join("thm", ratio, os.path.basename(path))
         with open(path, "rb") as f:
             raw_thm = f.read()
-        put(root, rel_thm, raw_thm, written, report)
-        record("thm", rel_thm, raw_thm,
-               {"vendorPath": f"{WINDOWS_INSTALL}\\theme\\butt\\{ratio}"
-                              f"\\{os.path.basename(path)}"})
+        vendor_thm = f"{WINDOWS_INSTALL}\\theme\\butt\\{ratio}" \
+                     f"\\{os.path.basename(path)}"
+        if args.no_thm:
+            # the hash of a file this tree does not ship is still the evidence
+            # that the layout written next to it came out of that file and no
+            # other one, which is what keeps the record checkable (see `verify`)
+            manifest["notRedistributed"].append(
+                {"kind": "thm", "path": rel_thm, "bytes": len(raw_thm),
+                 "sha256": sha(raw_thm),
+                 "origin": {"vendorPath": vendor_thm,
+                            # where under --from to find it again, so `--verify
+                            # --from DIR` can re-hash what this tree does not carry
+                            "vendorRel": os.path.join(ratio, os.path.basename(path))}})
+        else:
+            put(root, rel_thm, raw_thm, written, report)
+            record("thm", rel_thm, raw_thm, {"vendorPath": vendor_thm})
+        thm_info[tid] = (os.path.basename(path), vendor_thm,
+                         len(raw_thm), sha(raw_thm))
         # Every theme background we have ever seen is byte-identical to a clip
         # the installer also ships loose, so the clip dir holds the bytes and
         # the layout points at them; only a background with no loose twin gets
@@ -414,7 +495,14 @@ def main() -> int:
                         bucket[prop[key]] = bucket.get(prop[key], 0) + 1
         manifest["themes"].append({
             "id": tid, "ratio": ratio,
-            "thm": os.path.join("thm", ratio, os.path.basename(path)),
+            # NOT a path inside this tree.  The `.thm` container is the vendor's
+            # own and is not redistributed (--no-thm); what is kept is where it
+            # came from, how big it was and what it hashed to, so the layout
+            # beside it still names its source and a reader with the vendor's
+            # install can compare their own bytes against this record.
+            "thmFile": thm_info[tid][0],
+            "thmVendorPath": thm_info[tid][1],
+            "thmBytes": thm_info[tid][2], "thmSha256": thm_info[tid][3],
             "layout": os.path.join("layouts", ratio, f"{tid}.json"),
             "canvas": [obj.get("width"), obj.get("height")],
             "ratioField": obj.get("ratio"),

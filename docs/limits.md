@@ -202,10 +202,16 @@ What has been measured on glass, by whom, with how many frames - and what has no
   every clip row and, for a file that is not 480×480, says under the list that its
   preview is a guess.
 * **The themes package is media and reference material, not a theme list.**
-  `xigmatek-connect-lcd-themes` installs the vendor's own 125 files - 27 `.thm` themes,
-  27 layouts, 27 background and 27 foreground images, 43 clips, under
-  `/usr/share/xigmalcd/themes/alpha/`, re-hashed 152/152 against their manifest by
-  `debian/tests/smoke`. None of it is a theme this program can select: the window's theme
+  `xigmatek-connect-lcd-themes` installs the vendor's own 100 files - 27 layouts, 27
+  background and 27 foreground images, 43 clips, a manifest and a README - under
+  `/usr/share/xigmalcd/themes/alpha/`, every manifest entry re-hashed by
+  `debian/tests/smoke` (125 entries over 98 distinct paths, because each theme's
+  `background` record names the same bytes as one of the clips).  The vendor's encrypted
+  `.thm` containers are not in the package: they were in the 0.1 and 0.2 packages, and
+  since 0.3 the manifest records them by vendor path, byte count and sha256 only.  The
+  smoke test is what keeps that honest in both directions - it walks the installed tree
+  and fails on any file the manifest does not name, so a `.thm` cannot sneak back into the
+  .deb unnoticed. None of it is a theme this program can select: the window's theme
   picker lists `sorted(render.THEMES)`, the five drawings this project renders, because
   nothing here has ever sent a `.thm` to the panel or read one back, and the control
   socket's own `check_media_file` gate does not accept that extension. What that library
@@ -472,12 +478,15 @@ What has been measured on glass, by whom, with how many frames - and what has no
   question entirely.
 * **Version control: local `git` since 2026-11-06, published 2026-11-07** as
   `tamer-hassan/xigmatek-connect-lcd`, public, `main` only. Tracked: the three vendored
-  clips in `media/`, the vendor's theme library in `themes/alpha/` (145 MB: 27 `.thm`
-  originals as shipped, 27 decrypted layouts, 44 clips, 27 baked overlay PNGs, and a
-  `manifest.json` whose 152 entries hash the 125 distinct files they name — 127 files on
-  disk, the other two being that manifest and this directory's own `README.md`, and the 27
-  `background` entries naming the same bytes as 27 of the clips), the theme contact sheets
-  in `docs/previews/`,
+  clips in `media/`, the vendor's theme library in `themes/alpha/` (100 files, 84 926 540
+  B of vendor bytes in the 98 the copy tool writes: 27 decrypted layouts, 44 clips, 27 baked overlay PNGs, and a `manifest.json`
+  whose 125 entries hash the 98 distinct files they name — the other two files being that
+  manifest and this directory's own `README.md`, and the 27 `background` entries naming the
+  same bytes as 27 of the clips), the theme contact sheets in `docs/previews/`, plus the
+  recorded size and sha256 of the 27 vendor `.thm` containers that are deliberately *not*
+  in the tree (66 300 082 B, dropped at 0.3: see docs/themes.md and
+  `themes/alpha/README.md`, which names the vendor installer they come from) — which is 66
+  MB off the repository, one of the reasons the change was worth making,
   the project mark and the files generated from it (`install/artwork/xigma-penguin.jpg`,
   `install/xigmaui.png`, `install/xigmaui.ico`, `docs/logo.png`), and the three
   pinned-number fixtures in `tools/metrics/`. Not tracked, and said so in `.gitignore`:
