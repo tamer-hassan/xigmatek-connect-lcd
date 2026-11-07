@@ -2840,12 +2840,36 @@ win.btn_pause.click()
 assert ctl.paused is False
 print("  pause / resume: the button drives the display, a refresh does not")
 
-# the tray is not there in this environment, and that is a supported answer
+# The tray is not there in this environment, and that is a supported answer.  To test
+# the case where it is, build one through the app's own `_build_tray`: an earlier
+# version of this fixture handed the window a bare `QSystemTrayIcon` instead, and
+# `_tray_sync()` then died with `AttributeError: 'Window' object has no attribute
+# 'tray_line'` - printed by PyQt from inside a Qt slot and swallowed, because a raising
+# slot fails nothing.  The status line and the pause item are built in the same block as
+# the icon, so "an icon with no menu" is not a state this program can be in; faking one
+# tested a state that cannot happen and missed the one that does.
+class _TrayOnThisDesktop(QSystemTrayIcon):
+    @staticmethod
+    def isSystemTrayAvailable():
+        return True
+
+
 assert win.tray is None and not QSystemTrayIcon.isSystemTrayAvailable()
+_real_tray_cls = app.QSystemTrayIcon
+app.QSystemTrayIcon = _TrayOnThisDesktop
+try:
+    win.tray_wanted = True
+    win._build_tray()
+finally:
+    app.QSystemTrayIcon = _real_tray_cls
+assert win.tray is not None, "the tray the desktop offers was not built"
+assert win.tray_line is not None and win.tray_pause is not None, "an icon with no menu"
+# (Qt answers this with a line on stderr, `QObject::connect: No such signal
+# QPlatformNativeInterface::systemTrayWindowChanged(QScreen*)`, because the platform
+# plugin here has no tray host to talk to.  That noise is the fixture, not a failure:
+# the widgets the menu is made of are built and reachable, which is the thing under test.)
 win.show()
 qapp.processEvents()
-win.tray = QSystemTrayIcon()         # what a desktop with a tray gives us
-win.tray_wanted = True
 win.close()
 assert not win.isVisible() and win.daemon.present
 # Hiding to the tray stops the pane's redraw and puts the decode stream away, and
@@ -2861,6 +2885,26 @@ assert looked == [], looked          # hiding never touches the port
 win.show()
 qapp.processEvents()
 assert win.preview_timer.isActive(), "showing starts the pane again"
+# and the tray's own readout of the other process - the call that used to raise
+# AttributeError and have it eaten by the slot machinery.  The window is not driving
+# anything here: another process holds the port, so what the menu says has to come
+# from the control socket's status, which is what it now does.
+win._tray_sync()
+tray_txt = win.tray_line.text()
+st = win.daemon.status
+assert st, "the window has no status to put in the menu"
+# the line is the daemon's status, in the menu's words: which theme, which rate, how
+# many frames the panel has confirmed.  Asserted against the status object rather than
+# against a theme name, because an earlier step of this section has already moved the
+# display to `gauge` by Apply.
+assert tray_txt == f"{st['theme']} at {st['fps']} fps, " \
+    f"{st['ok']}/{st['frames']} confirmed" + (" (paused)" if st.get("paused") else ""), \
+    (tray_txt, st)
+assert win.tray_pause.text() == "Pause the display", win.tray_pause.text()
+assert win.tray_pause.isEnabled() and not win.tray_line.isEnabled(), \
+    "the status line is a label, not a button"
+print(f"  tray menu            {tray_txt!r} / {win.tray_pause.text()!r}, "
+      f"the theme submenu has {len(sorted(render.THEMES))} entries")
 win._quitting = True
 win.close()
 assert not win.preview_timer.isActive() and not win.daemon_timer.isActive()

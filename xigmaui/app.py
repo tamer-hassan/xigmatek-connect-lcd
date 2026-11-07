@@ -1803,6 +1803,13 @@ class Window(QMainWindow):
         self.close()
 
     def _tray_sync(self) -> None:
+        """Repaint the tray menu's status line and pause item from the daemon's status.
+
+        The guard is the tray, not each widget: `tray_line` and `tray_pause` are built in
+        the same block of `_build_tray` as the icon, so an icon with no menu is a state
+        this program cannot be in - which is what a test fixture once forgot, and the
+        AttributeError it produced went into stderr from a Qt slot and failed nothing.
+        """
         if getattr(self, "tray", None) is None:
             return
         st = self.daemon.status
