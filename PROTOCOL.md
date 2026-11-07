@@ -842,8 +842,17 @@ re-helloes without pushing it again.
   measure any of it, and every figure here was measured on 2026-11-06 rather than carried over:
   the seam numbers in the earlier notes were wrong on several clips (`theme_48` was listed at
   0.2 and measures 4.50).
-* **Brightness first, because every glyph on this panel is white** - ours and ALPHA's widgets
-  alike (`textColor: "rgba(255, 255, 255, 1)"` throughout `store.json`).  Mean luma of
+* **Brightness first, because the glyphs are white where it matters** - ours, and the theme
+  ALPHA has actually selected: 6 of its 6 `textColor` values are `rgba(255, 255, 255, 1)`.
+  Counted across the library rather than assumed, and re-derived by `tools/selftest.sh` from
+  the 23 `480X480` layout files the themes package installs: **106** `textColor` values,
+  **88** of them that white, **9** distinct spellings, **18** of the 23 files uniform and
+  **5** carrying other colours for at least some of their lettering (`rgba(62, 62, 62, 1)`
+  six times, `rgba(34, 31, 31, 1)` four, one `rgba(0, 0, 0, 1)`, one `rgba(3, 0, 34, 1)`).
+  `store.json` on this machine agrees: 160 values, 125 white, 13 distinct.  So white is the
+  rule and not a law - the sentence that stood here until 2026-11-07 ("every glyph on this
+  panel is white … throughout `store.json`") overstated the library, and a chosen ink
+  (docs/gui.md) makes the question live.  Mean luma of
   `theme_48` is 227.3 of 255: a near-white field with white text on it.  `Theme_07` (177.5) and
   `Theme_28` (151.7) are close behind; `theme_49`/`theme_40` sit at 111/103.
 * **Then the loop seam.**  Worst joins, seam against typical motion inside the loop: `theme_46`

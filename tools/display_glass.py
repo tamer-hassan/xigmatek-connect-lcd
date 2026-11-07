@@ -230,14 +230,19 @@ def main(argv=None) -> int:
     def apply() -> None:
         """The window's Apply button, as the socket speaks it (`daemon.apply`)."""
         t0 = time.perf_counter()
-        want = [("theme", "gauge"), ("clock_size", 44), ("bg", "clear"),
+        want = [("theme", "gauge"), ("clock_size", 44),
+                ("text_color", "#ffc400"),        # the amber the window offers
+                ("bg", "clear"),
                 ("scrim", None), ("fans", True), ("fps", a.fps),
                 ("title", "APPLY gauge")]
         refused = [cmd for cmd, val in want
                    if not d.ask({"cmd": cmd, "value": val}).get("ok")]
         took = time.perf_counter() - t0
-        say(f"    seven commands in {took * 1000:.0f} ms"
-            + (f", refused: {refused}" if refused else ""))
+        after = d.ask({"cmd": "status"}).get("status", {})
+        say(f"    eight commands in {took * 1000:.0f} ms"
+            + (f", refused: {refused}" if refused else "")
+            + f"; the display now holds text "
+            f"{after.get('text_color') or 'theme default'}")
         until(a.applied, "applied")
 
     def pause() -> None:

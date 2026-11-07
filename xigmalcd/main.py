@@ -230,8 +230,8 @@ BRIGHT_LUMA = 128           # where "white-on-white" starts, on 255
 def _scrim_for(args) -> int:
     """How much dark plate to paint behind the glyphs, 0-255.
 
-    Every glyph in this theme is white because the vendor's are (`textColor`
-    `"rgba(255, 255, 255, 1)"` throughout `store.json`), and ALPHA only ever puts
+    The glyphs are white by default - ours, and 6 of 6 text colours in the
+    layout file of the theme ALPHA has selected - and ALPHA only ever puts
     them over dark clips - which is what the shipped default is, so by default
     nothing is added here and the drawing is the vendor's.  The plate exists for
     the bright opt-in clips: `theme_48.mp4` measures a mean luma of 227.3 of 255,
@@ -310,9 +310,28 @@ def _canvas(args):
     return render.BLACK if getattr(args, "bg", "clear") == "black" else render.OVERLAY
 
 
+def _ink_arg(value: str):
+    """argparse's `type=` for a text colour: the failure says what to do next."""
+    try:
+        return render.parse_ink(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from None
+
+
+def ink_of(args):
+    """The display's chosen text colour, or None for the theme's own skin.
+
+    Read as an attribute with a default because a `Control` built from an older
+    Namespace - the tests, and a socket client talking to a daemon started
+    before this option existed - has no such field, and "no opinion" is the
+    right answer for that.
+    """
+    return getattr(args, "text_color", None)
+
+
 def _theme_kwargs(args):
     """Render options for the chosen theme, keeping only the ones it takes."""
-    kw = {"bg": _canvas(args), "source": args.gauge_source,
+    kw = {"bg": _canvas(args), "source": args.gauge_source, "ink": ink_of(args),
           "clock": not args.no_clock, "cold": args.cold, "hot": args.hot,
           "title": args.title, "fan": not args.no_fans,
           "clock_size": args.clock_size,
@@ -597,6 +616,17 @@ def build_parser() -> argparse.ArgumentParser:
                          "CPU LOAD when --gauge-source load)")
     ap.add_argument("--no-clock", action="store_true",
                     help="leave the clock off the picture")
+    ap.add_argument("--text-color", type=_ink_arg, default=None,
+                    metavar="COLOUR",
+                    help="the ink of the text this program draws, by name "
+                         "(amber, mint, cyan, white...) or #rrggbb. Unset keeps "
+                         "each theme's own skin, which for `alpha` is the "
+                         "white measured off its captured frames (PROTOCOL.md "
+                         "SS10). The vendor's themes keep their text colour in "
+                         "their own files, which nothing here sends, so this "
+                         "changes our layer only - and the frame is uploaded as "
+                         "pixels, so it changes what the panel shows without "
+                         "changing any setting inside it")
     ap.add_argument("--clock-size", type=int, default=26, metavar="N",
                     help="clock height in pixels for themes that draw one "
                          "(default 26 of the panel's 480, i.e. 5.4%% of its "
@@ -700,7 +730,8 @@ def main(argv=None) -> int:
         print(control.describe(st))
         print(f"  settings: theme {st.get('theme')}, canvas {st.get('canvas')}, "
               f"clock {st.get('clock_size')}, scrim "
-              f"{'auto' if st.get('scrim') is None else st.get('scrim')}, "
+              f"{'auto' if st.get('scrim') is None else st.get('scrim')}, text "
+              f"{st.get('text_color') or 'theme default'}, "
               f"title {st.get('title') or '-'}")
         print(f"  counters: {st.get('ok')}/{st.get('frames')} uploads the panel "
               f"confirmed, {st.get('refused')} refused, {st.get('errors')} link "

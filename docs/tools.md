@@ -13,7 +13,7 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
 | If the question is | run | what it answers |
 |---|---|---|
 | is the panel healthy after a boot or a reset? | `tools/state.py`, then `tools/bootcheck.py` | the `conn` snapshot, read-only; then two small and two full uploads. `logo`/`mode` at `2147483647` means it is not healthy |
-| did my edit break the wire format? | `tools/selftest.sh`, then `tools/verify_protocol.py data/captures/*.txt` | seventeen offline sections with no hardware, then every captured Windows frame re-encoded and diffed: **181 frames, 0 mismatches** (130 in one session, 51 in the other). The captures are bench files, so in a fresh clone the first section prints those figures and says it did not re-derive them |
+| did my edit break the wire format? | `tools/selftest.sh`, then `tools/verify_protocol.py data/captures/*.txt` | eighteen offline sections with no hardware, then every captured Windows frame re-encoded and diffed: **181 frames, 0 mismatches** (130 in one session, 51 in the other). The captures are bench files, so in a fresh clone the first section prints those figures and says it did not re-derive them |
 | does this firmware know that topic at all? | `tools/fuzz.py`, `tools/probe.py` | no answer = no topic, `400` = topic exists and the body was wrong, `200` = the JSON parsed — which is not the same as the write landing |
 | will the panel take *my* file? | `tools/send_image.py FILE`; `tools/fileshape.py` if the file's shape is the question | one upload, judged by the panel's own file notice; the second rotates RGBA, indexed, flat and the vendor's own `.osd` files through one session |
 | how fast does the glass tick, and why does the clock only move every 20-40 s? | `tools/frame_lag.py`, `tools/indexprobe.py`, `tools/watchtest.py` | a big frame number and the wall clock painted on the glass, so the answer is a glance rather than a stopwatch. Needs eyes on the unit |
@@ -87,8 +87,10 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   and a slot in the log, and its own start/end clock printed. Goes through
   `xigmaui.panel.Panel`, the window's own worker, and cannot queue `reset`.
   `--no-upload` skips the background overwrite, `--no-fans` also takes the tach array
-  out of the metrics blob rather than only out of the drawing, `--mp4`/`--theme`/
-  `--clock-size` pick what goes up. Tee its output into `data/glass/` under a name that
+  out of the metrics blob rather than only out of the drawing, and `--mp4`/`--theme`/
+  `--clock-size`/`--text-color` pick what goes up - `--text-color` being how a chosen
+  ink would finally get in front of the glass, which no run has done yet
+  ([limits.md](limits.md) keeps that as an open item). Tee its output into `data/glass/` under a name that
   carries the window's date and time: that file is what the ledgers in [gui.md](gui.md) and
   [limits.md](limits.md) quote, and
   `tools/selftest.sh` re-reads it.
@@ -96,7 +98,7 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   `xigmalcd` display process** (given `--duration`, so it cannot outlive the script) and
   then behaves only like a client of its control socket, on a socket of its own
   (`xigmalcd-glass.sock`, never the login unit's). Phases: the loop drawing, `--status`
-  from the command line, the window's Apply as the socket speaks it (the six settings
+  from the command line, the window's Apply as the socket speaks it (the seven settings
   commands plus a `title` label), `pause`, one `frame`
   asked for while paused, `resume`, a queued background upload, an on-purpose `reset`
   request (refused, because the display was started without `--allow-reset`), and the

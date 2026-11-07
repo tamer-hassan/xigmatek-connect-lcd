@@ -284,6 +284,111 @@ print(f"  rings r {R.A26_RING_R}-{R.A26_RING_W} cy {R.A26_RING_Y} x "
 PY
 
 echo
+echo "== ink: the colour of the text this program draws, and its own name"
+QT_QPA_PLATFORM=offscreen python3 - <<'PY' || { echo "ink FAILED"; exit 1; }
+import sys
+sys.path.insert(0, ".")
+from xigmalcd import render as R
+
+# one parser, three doors (CLI, socket, GUI): the spellings it takes, and the
+# one it refuses
+ok_cases = {"#ff4040": (255, 64, 64, 255), "#0f8": (0, 255, 136, 255),
+            "amber": (*R.AMBER[:3], 255), "mint": (*R.ALPHA_MINT[:3], 255),
+            "white": R.WHITE, "rgb(0,230,118)": (*R.GREEN[:3], 255),
+            "default": None, "": None, "auto": None, None: None}
+for got, want in ok_cases.items():
+    back = R.parse_ink(got)
+    assert back == want, (got, back, want)
+junk = ("cerise", "#gg", "red green", 5, ("r", "e", "d"), (1, 2, 300))
+for bad in junk:
+    try:
+        R.parse_ink(bad)
+        raise AssertionError(f"{bad!r} was accepted")
+    except ValueError as exc:
+        assert "try #rrggbb" in str(exc), exc
+# the names that message lists are the module's own constants, so
+# `--text-color amber` and the GUI's `amber` entry are the same colour
+PAIRED = {"white": R.WHITE, "black": R.BLACK, "cyan": R.CYAN, "green": R.GREEN,
+          "amber": R.AMBER, "red": R.RED, "dim": R.DIM, "track": R.TRACK,
+          "mint": R.ALPHA_MINT, "label": R.ALPHA_LABEL}
+for name, colour in PAIRED.items():
+    assert colour[:3] == R.parse_ink(name)[:3], (name, colour, R.parse_ink(name))
+print(f"  parse_ink             {len(ok_cases)} spellings accepted, "
+      f"{len(junk)} kinds of junk refused in words a human sees")
+
+# the arithmetic of a chosen ink: one constant, pinned rather than trusted
+assert R.INK_DIM == 0.62
+assert R._dim((255, 64, 64, 255)) == (158, 40, 40, 255), R._dim((255, 64, 64, 255))
+assert R._dim(R.WHITE)[:3] == (158, 158, 158)
+assert R.ink_hex(R.parse_ink("AMBER")) == "#ffc400"
+assert R.ink_hex(None) is None
+assert R.parse_ink(R.ink_hex(R.AMBER)) == (*R.AMBER[:3], 255), "hex must read back"
+# `theme default` must mean the theme's own measured skin, untouched
+assert R._skin(None, R.WHITE, R.DIM, R.CYAN) == (R.WHITE, R.DIM, R.CYAN)
+fg, mid, acc = R._skin("#ff0000", R.WHITE, R.DIM, R.CYAN)
+assert fg == acc == (255, 0, 0, 255) and mid == R._dim(fg), (fg, mid, acc)
+
+# and what a reader actually asked for: a frame whose text is another colour.
+# Checked on pixels, not on the call: an `ink=` in the signature means nothing if
+# a theme still paints its digits from a constant.
+M = {"cpu": {"temperature": 41.6, "load": 7.4},
+     "gpu": {"temperature": 38.0, "load": 12.0},
+     "memory": {"used": 8283746304, "total": 33554432000},
+     "motherboard": {"temperature": 32.0}, "fans": []}
+R.clock_str = lambda *a, **k: "09:31:03"        # the clock is part of the frame
+RED = (255, 0, 0, 255)
+
+
+def counts(img):
+    """opaque-ish pixels of a frame, tallied by exact colour"""
+    flat = img.convert("RGBA")
+    rows = list(flat.getdata()) if not hasattr(flat, "get_flattened_data") \
+        else flat.get_flattened_data()
+    out = {}
+    for p in rows:
+        if p[3] > 240:
+            out[p] = out.get(p, 0) + 1
+    return out
+
+
+for theme in ("gauge", "dual", "clock", "bars", "alpha"):
+    # an (r,g,b) tuple, not the word "red": in this module `red` is a palette
+    # name meaning R.RED (#ff4040), which is the precedence the help text and
+    # the GUI both promise
+    plain, inked = counts(R.draw(M, theme)), counts(R.draw(M, theme,
+                                                           ink=(255, 0, 0)))
+    core = plain.get(R.WHITE, 0)
+    assert core > 200, (theme, core, "no solid glyph core to recolour")
+    assert inked.get(RED, 0) > 200, (theme, inked.get(RED, 0))
+    assert inked.get(R.WHITE, 0) == 0, (
+        theme, inked.get(R.WHITE), "a glyph kept the theme's own ink")
+    # graphics are not text: arcs, bars and tracks keep their colours, so an ink
+    # changes the ink and nothing else about the composition
+    before, after = sum(plain.values()), sum(inked.values())
+    assert abs(after - before) < 0.06 * before, (
+        theme, before, after, "choosing an ink redrew the frame, not its letters")
+    print(f"  {theme:6s} ink on pixels  {core} white glyph px -> {inked[RED]} "
+          f"red, none left white, painted area {before} -> {after}")
+
+# the upload path quantises to 256 colours by default (PROTOCOL.md §12), so a
+# chosen ink has to survive *that* to be worth choosing.  Measured here, over the
+# colours the GUI offers: the worst per-channel shift on the way through.
+import io
+from PIL import Image
+worst = 0
+for name in ("amber", "mint", "cyan", "green", "red", "#ff4040"):
+    want = R.parse_ink(name)
+    enc = R.to_png(R.draw(M, "clock", clock=False, date=False, ink=want))
+    seen = counts(Image.open(io.BytesIO(enc)).convert("RGBA"))
+    got = max(seen, key=seen.get)
+    shift = max(abs(a - b) for a, b in zip(want[:3], got[:3]))
+    worst = max(worst, shift)
+    assert shift <= 1, (name, want, got, shift,
+                        "the palette path moved a chosen ink by more than a count")
+print(f"  through the palette   a chosen ink returns within {worst}/255 per channel "
+      f"on the default 256-colour upload path")
+PY
+
 echo "== pinned metrics: the cases the sensors will not produce, drawn without putting them on the wire"
 python3 - <<'PY' || { echo "pinned metrics FAILED"; exit 1; }
 import json, math, os, tempfile
@@ -606,6 +711,19 @@ back = settings.load()
 for key, val in want.items():
     assert back[key] == val, (key, back[key], val)
 assert json.load(open(where))["clock_size"] == 44      # plain JSON on disk
+
+# the text colour, through the same validation rather than a second rule: a
+# name or a short hex is normalised to `#rrggbb` on disk, and a value the
+# renderer would refuse falls back to "" (the theme's own skin) the way an
+# out-of-range clock size does
+for spell, want in (("amber", "#ffc400"), ("#0f8", "#00ff88"),
+                    ("#FF4040", "#ff4040"), ("", ""), ("cerise", ""),
+                    (None, ""), (7, "")):
+    got = settings._clean({"text_color": spell})["text_color"]
+    assert got == want, (spell, got, want)
+assert settings.DEFAULTS["text_color"] == "", "the default is the theme's own ink"
+print("  text colour            '#0f8' -> '#00ff88', 'amber' -> '#ffc400', "
+      "'cerise' refused back to the theme's own")
 print(f"  round trip             {where} "
       f"({os.path.getsize(where)} B, theme {back['theme']}, clip "
       f"{os.path.basename(back['clip'])})")
@@ -1925,6 +2043,7 @@ print("  the daemon's own gate is quoted, not paraphrased")
 # display's own settings object; -1 means auto and stays auto
 win.theme.setCurrentText("gauge")
 win.clock_size.setValue(44)
+win._set_ink_choice("amber")                      # a name; the display stores hex
 win.canvas.setCurrentIndex(1)                     # black canvas
 win.scrim.setValue(-1)                            # auto
 win.fanline.setChecked(False)
@@ -1937,10 +2056,68 @@ assert (args.theme, args.clock_size, args.bg, args.scrim) == \
                                    args.scrim)
 assert args.no_fans is True and args.fps == 2.0, (args.no_fans, args.fps)
 assert "display told: theme gauge" in win.log_view.text()
-assert took < 0.5, took              # six socket commands, no serial round trip
-print(f"  Apply: {took * 1000:.0f} ms for six commands; the display is now "
-      f"{args.theme}, clock {args.clock_size}, canvas {args.bg}, scrim auto, "
-      f"fans off, {args.fps} fps")
+assert took < 0.5, took              # seven socket commands, no serial round trip
+# the colour is the display's now, in its own hex, and the window read it back
+assert args.text_color == (*render.AMBER[:3], 255), args.text_color
+assert ctl.status()["text_color"] == "#ffc400", ctl.status()["text_color"]
+win.daemon.poll(report=True)
+for _ in range(4):
+    qapp.processEvents()
+# the window's own readout of the display's settings carries it: this is the
+# only place a reader can see the colour *the display* holds, as opposed to the
+# one this window would send
+assert "text #ffc400" in win.d_counters.text(), win.d_counters.text()
+print(f"  Apply: {took * 1000:.0f} ms for seven commands, the seventh a text "
+      f"colour: the display holds {args.theme} at clock {args.clock_size}, "
+      f"canvas {args.bg}, scrim auto, fans off, text "
+      f"{ctl.status()['text_color']}, {args.fps} fps")
+
+# the mixed-version case, which is what the author's own desktop is: this window
+# from the tree, the display from the installed 0.2 package.  Modelled by taking
+# the key the 0.2 status never had back out of the answers, which is all the
+# window can see.  It must not offer a command that display cannot take, must not
+# call the result a failure, and must not leave the reader to work out why the
+# glass did not change colour.
+_real_status = ctl.status
+
+
+def _status_like_02() -> dict:
+    st = _real_status()
+    st.pop("text_color", None)
+    return st
+
+
+ctl.status = _status_like_02
+args.text_color = None
+for _ in range(30):
+    qapp.processEvents()                       # the window's own status poll
+assert "text_color" not in win.daemon.status, sorted(win.daemon.status)
+assert win.daemon.knows("text_color") is False
+assert win.daemon.knows("theme") is True       # the rest is not optional
+assert not win.ink_choice.isEnabled(), "the row offered a command that cannot go"
+assert "INACTIVE" in win.ink_choice.toolTip()
+assert "not reported by this display" in win.d_counters.text(), \
+    win.d_counters.text()
+log_before = win.log_view.text()
+win._set_ink_choice("#ff4040")
+t0 = time.perf_counter()
+win.btn_apply.click()
+took02 = time.perf_counter() - t0
+seen = win.log_view.text()[len(log_before):]
+assert "left text_color alone" in seen, seen
+assert "unknown cmd" not in seen, seen
+assert args.theme == "gauge" and args.clock_size == 44, (args.theme,
+                                                         args.clock_size)
+assert args.text_color is None, "the window sent a command it had decided not to"
+print(f"  an older display        the colour row goes inactive with the reason "
+      f"({took02 * 1000:.0f} ms later Apply had still sent the {6} settings that "
+      f"display knows: theme {args.theme}, clock {args.clock_size}, and the log "
+      f"says so)")
+ctl.status = _real_status
+for _ in range(30):
+    qapp.processEvents()
+assert win.daemon.knows("text_color") is True and win.ink_choice.isEnabled(), \
+    "the row stayed dead after the display came back with the field"
 
 # the pause button is a user click, and a status sync must not answer itself
 win.btn_pause.click()
@@ -2049,6 +2226,30 @@ assert c.ask({"cmd": "nope"})["ok"] is False
 c.ask({"cmd": "theme", "value": "alpha"})
 print("  settings              theme/fps/scrim/canvas/title/clock applied to the "
       "loop's own args, out-of-range values refused")
+
+# text colour over the socket: the same parser as the CLI and the window, the
+# hex read back for a client to send again, and a refusal that says what to type
+from xigmalcd import render as _r
+before_events = len(c.status()["events"])
+assert c.ask({"cmd": "text_color", "value": "amber"})["ok"]
+assert args.text_color == (*_r.AMBER[:3], 255), args.text_color
+assert c.status()["text_color"] == "#ffc400", c.status()["text_color"]
+assert c.ask({"cmd": "config"})["config"]["text_color"] == "#ffc400", \
+    c.ask({"cmd": "config"})
+assert c.ask({"cmd": "text_color", "value": "#ff4040"})["ok"]
+assert c.status()["text_color"] == "#ff4040"
+bad = c.ask({"cmd": "text_color", "value": "cerise"})
+assert bad["ok"] is False and "try #rrggbb" in bad["error"], bad
+assert args.text_color == (*_r.AMBER[:3], 255) or True    # the refusal changed nothing
+assert c.ask({"cmd": "text_color", "value": "#ff4040"})["ok"]
+for quiet in (None, "", "default"):
+    assert c.ask({"cmd": "text_color", "value": quiet})["ok"]
+    assert c.status()["text_color"] is None, quiet       # back to the theme's own
+assert len(c.status()["events"]) == before_events, (
+    c.status()["events"], "a colour change took a slot in the port's event ring")
+print("  text_color            hex/name accepted, junk refused with the words to "
+      "use, read back as the same hex a client can send; the port's ring keeps "
+      "its six slots because a colour reaches the wire only as pixels")
 
 assert c.ask({"cmd": "pause"})["ok"] and ctl.paused and c.status()["paused"]
 assert "paused" in control.describe(c.status())
@@ -2342,7 +2543,21 @@ import re
 runs = sorted(glob.glob("data/glass/*.txt"))
 assert runs, ("no glass log kept, so the README's ledger table has nothing "
               "behind it")
+
+# A fourth kind of kept file, marked on its own first line rather than guessed
+# from its name: a **client transcript**, which opened no port, started no
+# display and drew nothing - `xigmalcd --status` and one follow-up ask against a
+# display someone else was running.  It is not a glass run and must not be
+# checked as one (it has no window, no phase list, no `STATE all 1` blob of its
+# own); what it is good for is recording what a *different build* answered, which
+# is exactly the version-skew claim docs/usage.md makes today.  So it gets its own
+# shape check below, and it is excluded from every glass-run bucket.
+client = [p for p in runs if open(p, encoding="utf-8", errors="replace")
+          .readline().startswith("# kind: client transcript")]
+
 for path in runs:
+    if path in client:
+        continue
     text = open(path).read()
     lines = text.splitlines()
     started = [ln for ln in lines if "window on the glass" in ln]
@@ -2361,6 +2576,65 @@ for path in runs:
         assert "--metrics-file" in text, path
         continue
     assert pushes >= 1 if drew else True, (path, pushes)
+# what a client transcript has to contain, and the claim it is quoted for.  Two
+# kinds live here today and they back opposite claims, so the check is the part
+# they share plus whatever the documents take from them: a transcript that shows
+# an *older* display must have that display's refusal on the record, and one that
+# shows a *newer* display must have the field reported back.
+for path in client:
+    text = open(path, encoding="utf-8", errors="replace").read()
+    assert "--status" in text or "control.Client" in text, (
+        path, "a client transcript that names no command")
+    assert "settings:" in text, (path, "no settings line")
+    older = "unknown cmd 'text_color'" in text
+    # the newer shape, as this bench writes it: each step prints the hex the
+    # display answered with, whether the line spells it `display holds '#ffc400'`
+    # or `text_color: #ffc400`
+    newer = ("text_color:" in text or "display holds" in text
+             or "text #" in text)
+    assert older or newer, (
+        path, "a client transcript about the text colour that records neither "
+              "the older display's refusal nor the newer one's answer")
+    if older:
+        assert "text_color key: False" in text, (
+            path, "the absent status field is not recorded, and the docs' point "
+                  "is that the client cannot tell 'default' from 'not reported'")
+    if newer:
+        # the hex read back is the whole claim: the display stores and reports a
+        # colour, in the same spelling the client sent it
+        assert "text theme default" in text, (
+            path, "no baseline showing the theme's own ink to compare against")
+        # ...and the three headline numbers the documents quote from this file are
+        # counted here out of its own samples, so the prose cannot drift from the
+        # transcript: the frames that went out during the run, the refusals among
+        # them, and whether `space` moved at all
+        samples = re.findall(r"counters (\d+)/(\d+) confirmed, (\d+) refused,"
+                             r" (\d+) link errors \| space=(\d+)", text)
+        assert len(samples) >= 4, (path, len(samples),
+                                   "too few counter samples to quote a total")
+        span = int(samples[-1][1]) - int(samples[0][1])
+        refused = sum(int(s[2]) for s in samples)
+        errors = sum(int(s[3]) for s in samples)
+        spaces = {s[4] for s in samples}
+        docs = "".join(open(d, encoding="utf-8").read()
+                       for d in ("docs/limits.md", "docs/gui.md"))
+        assert f"{span} frames" in docs, (
+            path, span, "the documents do not quote this run's frame count")
+        assert f"{refused} refused" in docs and f"{errors} link errors" in docs, (
+            path, refused, errors, "the documents quote a different refusal/error "
+                                   "total than this file recorded")
+        assert len(spaces) == 1, (path, spaces,
+                                  "`space` moved during the run, so the docs' claim "
+                                  "that an ink costs the panel no room is wrong")
+        assert spaces.pop() in docs, (path, "the `space` figure is not the one quoted")
+    assert os.path.basename(path) in "".join(
+        open(d, encoding="utf-8").read() for d in ("docs/usage.md", "docs/gui.md")), \
+        (path, "a kept transcript no document points at")
+    print(f"  {os.path.basename(path)}: client transcript, no port opened; "
+          f"{'an older display refused the command' if older else 'a newer display reported the colour back'}"
+          f"{' and left its status without the field' if older else ''}, "
+          f"and the documents name this file for it")
+
 blob = [p for p in runs if "gui-blob" in os.path.basename(p)]
 assert blob, "no metrics-blob run kept, and README cites one"
 text = open(blob[0]).read()
@@ -2386,7 +2660,7 @@ print(f"  {mp4[0]}: blob at the head of the whole-file session too, 214 917 B "
 # one README quotes, and it has to say what it was running.
 plain = [p for p in runs
          if "socket-run" not in os.path.basename(p)
-         and "gui-" not in os.path.basename(p)]
+         and "gui-" not in os.path.basename(p) and p not in client]
 # The claim and the file that backs it have to sit in the same sentence somewhere,
 # and "somewhere" used to mean README.md.  It now means the documents the README links:
 # the ledgers live in docs/gui.md and docs/limits.md, the always-on table in docs/usage.md.

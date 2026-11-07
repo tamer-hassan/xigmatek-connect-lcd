@@ -1,3 +1,55 @@
+xigmatek-connect-lcd (0.3) UNRELEASED; urgency=medium
+
+  * NOT RELEASED.  This stanza describes the tree since the v0.2 tag.  The
+    version and the date stamp get settled when 0.3 is cut; until then a build
+    of this tree produces a 0.3 package that has not been published anywhere.
+
+  * xigmaui in three columns instead of one long scroll, at the author's own
+    1 919x1 055: the clip list had a 190 px viewport with 114 px rows, which is
+    two of 69 clips on screen, and `ResizeMode.Adjust` painted the selected row
+    as a block taller than the list itself.  Rows are 66 px now (64 px
+    thumbnails, `Fixed`, uniform, and every row *told* its height - uniform
+    sizing latches the first row's hint before any thumbnail exists).  The clip
+    library is its own column, the log sits under the preview where the height
+    cannot be used for anything else, and a fresh window opens at 1180x780.
+    Measured rows in view: 7 at the default, 12 at 1 919x1 055, where it was 2.
+
+  * `advanced controls`: one checkbox, default off, folding six secondary things
+    - canvas, scrim, fan figures, the display's event ring, the panel's `conn 1`
+    hello, the 30 s frame run.  Pixels only, never values: Apply sends what is
+    hidden.  The guarded factory reset is deliberately never folded away.
+
+  * Thumbnails are letterboxed rather than stretched: 3 of the 43 clips the
+    themes package installs are 320x240, and drawing a 4:3 frame as a square
+    contradicted the `320x240` printed on the same row.
+
+  * The text this program draws can be another colour, from all three doors:
+    `--text-color` on the display's command line, `{"cmd": "text_color",
+    "value": "#ff4040"}` on the control socket, and a `text colour` row in the
+    window's theme box - its own palette by name, with swatches, or the colour
+    dialog.  One parser, `render.parse_ink`, so the doors cannot drift.  Our own
+    layer only: a vendor theme's lettering is decided inside that theme's layout
+    file, and those are not all white either - 88 of the 106 text colours in the
+    library's 23 480x480 layouts are white, and the suite re-derives that count
+    now the claim is in the documents.  Measured off glass: an inked frame's
+    painted area is unchanged, every glyph core moves to the chosen colour, and
+    the ink survives the default 256-colour palette encoding within 1/255 per
+    channel.  Measured on glass too: five inks over the control socket at 1 fps,
+    80 frames, 0 refused, `space` unchanged the whole way, and the colours read
+    as the colours sent - `data/glass/2026-11-07-102041-ink-on-glass-watch.txt`.
+
+  * Against a display too old to know the new command - the installed 0.2
+    service driven by this window, which is the author's own machine - the row
+    goes inactive with the reason, Apply sends what that display does know and
+    says which one it left alone, and the state line reads `text not reported by
+    this display` rather than the misleading `text theme default`.
+
+  * tools/selftest.sh, eighteen offline sections; tools/screenshot.py frames the
+    window at 1380x860 and finishes probing the rows a picture can show;
+    tools/display_glass.py's Apply phase sends the colour command along with the
+    rest, so the next bench run can settle the glass half.
+
+ -- Tamer Hassan <thameruddin@gmail.com>  Sat, 07 Nov 2026 09:45:00 +0200
 xigmatek-connect-lcd (0.2) resolute; urgency=medium
 
   * README.md is the overview and the detail lives in docs/ - install.md,

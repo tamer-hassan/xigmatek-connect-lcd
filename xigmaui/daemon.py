@@ -124,6 +124,27 @@ class Daemon(QObject):
         """`recovery`, and almost always a refusal: see control.py."""
         return self.send("reset")
 
+    #: commands that only a display new enough to have them will know, with the
+    #: status field that proves it knows one.  A window and a display of the same
+    #: build agree by construction; the mixed case is the installed 0.2 service
+    #: driven by a newer window, which is what the author actually has, and the
+    #: answer there is to not offer a command that comes back `unknown cmd` and
+    #: then call that a failed Apply.
+    OPTIONAL = {"text_color": "text_color"}
+
+    def knows(self, cmd: str) -> bool:
+        """Does the running display report the field that goes with `cmd`?
+
+        A heuristic, and deliberately the weakest one possible: it asks the
+        display what it is doing and looks at what it volunteered.  An empty
+        status answers "yes", because knowing nothing is not evidence of an old
+        display - `apply` is only reached after a poll that found a display.
+        """
+        field = self.OPTIONAL.get(cmd)
+        if field is None or not self.status:
+            return True
+        return field in self.status
+
     def apply(self, state: dict) -> bool:
         """Send the window's pickers to a display that is already running.
 
@@ -131,13 +152,33 @@ class Daemon(QObject):
         what lets the daemon refuse one of them on its own merits.  The window's
         `scrim` of -1 means "the daemon's rule", which is sent as `auto` rather
         than as a number the window made up.
+
+        A command the display has never heard of is not a refusal and is not
+        sent: it is left out, said out loud, and the rest still goes.  Counting
+        that as a failure was the bug - on the installed 0.2 service, Apply with
+        a colour picked reported "the display kept its old text_color" as though
+        nothing had been applied, when in fact every setting it does know about
+        had been.
         """
         want = [("theme", state["theme"]),
                 ("clock_size", state["clock_size"]),
+                # "" is the theme's own skin, which is what the socket's `null`
+                # means; the display answers with the hex it kept, so the window
+                # reads back the colour actually in force (xigmalcd/control.py)
+                ("text_color", state["text_color"] or None),
                 ("bg", state["canvas"]),
                 ("scrim", None if state["scrim"] < 0 else state["scrim"]),
                 ("fans", state["fans"]),
                 ("fps", state["fps"])]
+        unknown = [cmd for cmd, _ in want if cmd in self.OPTIONAL
+                   and not self.knows(cmd)]
+        if unknown:
+            want = [(c, v) for c, v in want if c not in unknown]
+            self.log.emit(
+                "left " + " and ".join(unknown) + " alone: the display running "
+                "here does not report it, so it is older than this window. "
+                "Everything else was sent; the option works against this tree's "
+                "own `python3 -m xigmalcd`, or once the package is updated")
         refused = []
         for cmd, value in want:
             if not self.send(cmd, value=value)["ok"]:
@@ -147,7 +188,9 @@ class Daemon(QObject):
             return False
         self.log.emit(
             f"display told: theme {state['theme']}, clock {state['clock_size']}, "
-            f"canvas {state['canvas']}, scrim "
+            + ("" if unknown else
+               f"text {state['text_color'] or 'theme default'}, ")
+            + f"canvas {state['canvas']}, scrim "
             f"{'auto' if state['scrim'] < 0 else state['scrim']}, fans "
             f"{'on' if state['fans'] else 'off'}, {state['fps']} fps")
-        return True
+        return not refused

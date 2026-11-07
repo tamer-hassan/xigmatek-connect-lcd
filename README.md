@@ -55,7 +55,7 @@ And because this panel cannot be asked what it is showing, the window says what 
 *knows*: the background the running display reported putting there, and the last six
 things it did on the port. Three columns — preview, controls, clip library — with an
 `advanced controls` switch that folds the secondary knobs away without changing their
-values. This is a capture of the real program (`tools/screenshot.py`, no panel attached),
+values - and one row, always in sight, for the colour of the text it draws. This is a capture of the real program (`tools/screenshot.py`, no panel attached),
 with this machine's live readings in the preview:
 
 ![xigmaui, the window in three columns: the preview and the log on the left, the
@@ -134,7 +134,7 @@ names, so the default glass is what `ALPHA` showed you on Windows.
 | [PROTOCOL.md](PROTOCOL.md) | the wire: the handshake, the frame format, the media upload, the session limit — every claim from a capture |
 
 Everything in those files is measured on the author's bench or read out of a kept log,
-and the gaps are named as gaps. `tools/selftest.sh` runs the seventeen offline sections
+and the gaps are named as gaps. `tools/selftest.sh` runs the eighteen offline sections
 that hold the claims which do not need hardware — it is what CI runs first, on a machine
 that has never seen a panel.
 

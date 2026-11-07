@@ -47,6 +47,13 @@ def main(argv=None) -> int:
                     help="the background to upload (default: the shipped clip)")
     ap.add_argument("--theme", default="alpha", choices=sorted(render.THEMES))
     ap.add_argument("--clock-size", type=int, default=30)
+    ap.add_argument("--text-color", type=render.parse_ink, default=None,
+                    metavar="COLOUR",
+                    help="the ink of the glyphs this run draws (name or #rrggbb); "
+                         "unset keeps the theme's own skin, which for `alpha` "
+                         "is the white measured in PROTOCOL.md §10. This is "
+                         "the tool that would put the claim on glass: the "
+                         "suite measures the ink off-glass, so far")
     ap.add_argument("--fps", type=float, default=2.0,
                     help="live rate: 1 is the vendor's, 2 is the daemon's default")
     ap.add_argument("--live-seconds", type=float, default=30.0,
@@ -77,11 +84,13 @@ def main(argv=None) -> int:
     scrim = SCRIM_ON_BRIGHT if lum > BRIGHT_LUMA else 0
     print(f"clip {a.mp4}\n  {os.path.getsize(a.mp4)} B, mean luma {lum:.1f}/255 "
           f"-> scrim {scrim} ({'plate' if scrim else 'no plate'}), "
-          f"theme {a.theme}, clock {a.clock_size} px")
+          f"theme {a.theme}, clock {a.clock_size} px, text "
+          f"{render.ink_hex(a.text_color) or 'theme default'}")
 
     def kw(title: str) -> dict:
         return {"bg": render.OVERLAY, "clock_size": a.clock_size,
-                "fan": not a.no_fans, "scrim": scrim, "title": title}
+                "fan": not a.no_fans, "scrim": scrim, "title": title,
+                "ink": a.text_color}
 
     steps: list[tuple[str, dict, str]] = [("status", {}, "baseline")]
     # `fans` here is not the drawing: it decides whether the host's tach and

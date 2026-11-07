@@ -19,6 +19,29 @@ nothing in this project has ever put one on the wire or read one back:
 * and the panel is not asked what theme it holds, because it cannot be
   (PROTOCOL.md §11).
 
+The same files also say what colour their lettering is, and the honest answer
+is **mostly white, not all**.  Counted across the 23 `480X480` layout files -
+the ones the panel's size, byte-identical to what the themes package installs, and
+re-derived by the suite's vendor-library section so the sentence cannot rot:
+
+| what | measured |
+|---|---|
+| `textColor` values in those 23 files | 106, in 9 distinct spellings |
+| …that are `rgba(255, 255, 255, 1)` | 88 |
+| files whose text is exclusively white | 18 of 23 |
+| files mixing in other colours | 5 — `rgba(62,62,62,1)` ×6, `rgba(34,31,31,1)` ×4, `rgba(204,253,255,1)` ×2, `rgba(24,91,105,1)` ×2, one each of `rgba(0,0,0,1)`, `rgba(3,0,34,1)`, `rgba(0,255,229,1)`, `rgba(0,255,113,0.87)` |
+| the theme ALPHA has selected (`1757491589871`) | 6 of 6 white |
+| `store.json`, this machine | 160 values, 125 white, 13 distinct |
+
+So the window's `text colour` row and `--text-color` do not try to change a
+vendor theme's lettering at all: they repaint the layer this program draws.  A
+vendor theme's text is decided by that theme's own layout file, and the only way
+to change it would be to send the file - which is the thing this section is about
+not doing ([docs/gui.md](gui.md)).  It also matters to the claim PROTOCOL.md §10
+used to make ("every glyph on this panel is white"); that is now written as what
+was counted - white for the selected theme and for the majority of the library,
+not for all of it.
+
 What the library **is** good for here, both of them used: its 27 layouts are the
 measured geometry the `alpha` preset was redrawn from (`xigmalcd/layout.py`, and the
 paragraph below about rings and text sizes), and its media is uploadable -

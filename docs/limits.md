@@ -2,6 +2,35 @@
 
 What has been measured on glass, by whom, with how many frames - and what has not. Every number here names the run it came from; the gaps are named too.
 
+* **A chosen text colour reaches the upload, not the panel, and it survives the
+  palette encoding.** `--text-color` and the window's `text colour` row change the ink of
+  the glyphs this program draws; the frame is then uploaded as pixels, which is the only
+  reason the option exists on a device that answers nothing (§11). Measured off-glass by
+  the suite: painting `gauge` in red leaves its painted area at exactly 6 087 px as with
+  the theme's own white, moves 1 509 solid white glyph pixels to 1 830 red ones with none
+  left white, and holds for all five themes; and after the default 256-colour palette
+  encoding (§12) the ink returns within **1/255 per channel**.
+
+  And on glass, 2026-11-07 at 10:20-10:22
+  (`data/glass/2026-11-07-102041-ink-on-glass-watch.txt`): five inks sent over the control
+  socket to a display running from this tree at 1 fps - the theme's own white, `amber`
+  `#ffc400`, the off-palette `#8a2be2`, `red` `#ff4040`, `mint` `#00fae8` - held 15 s each,
+  **80 frames, 0 refused, 0 link errors**, and `space` reading **67124 at every sample,
+  before and after**: an ink changes the pixels of a frame that was going to be uploaded
+  anyway, so it costs the panel no room at all. The author watched the panel through the
+  run and reports every change on the lettering about a second after its command - the
+  next frame, at that fps - and the colours reading as the colours sent, `#8a2be2`
+  included. That last one is the interesting case: it is not one of this program's palette
+  names, so the only thing between it and the glass was the loop's default 256-colour PNG
+  encoding, whose drift the suite measures at 1/255 per channel and the eye agreed with.
+  One session renewal landed inside the run and the reported colour never drifted from
+  what was sent - it is a setting the frame loop re-reads, not session state.
+  Still unmeasured on glass: a **dark** ink over a **bright** clip (the automatic scrim
+  rule is measured for white glyphs, and mixing the two would be inventing a threshold),
+  and the two bench tools' own Apply/upload phases have not been re-run with the colour
+  command in them (`tools/display_glass.py` and `tools/gui_glass.py --text-color` both
+  send it now, and this run was driven over the socket by hand instead). A vendor theme's lettering is outside all of this: its
+  colour is inside its own files (docs/themes.md).
 * **A frame costs one upload, and its verdict is read as part of it.** The loop sends
   `transport` + the file + `transported`, and `Link.send_media(order="notice")` holds that
   last request until the panel's file notice has landed — which is exactly the order ALPHA's

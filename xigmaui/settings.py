@@ -7,8 +7,8 @@ not always mounted) falls back to the daemon's default background rather than
 drawing a blank preview.
 
 Nothing here decides a wire rule. What is stored is only what the window would
-have looked like: port, theme, clock size, canvas, scrim, fan figures, preview
-rate, whether closing the window hides it to the tray, the clip that was
+have looked like: port, theme, clock size, its text colour, canvas, scrim, fan
+figures, preview rate, whether closing the window hides it to the tray, the clip that was
 selected, and how wide the two columns were. The panel itself is never asked
 what it remembers, because it cannot be (PROTOCOL.md §11).
 """
@@ -18,6 +18,8 @@ import json
 import os
 import sys
 
+from xigmalcd import render
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 APP = "xigmaui"
@@ -26,6 +28,7 @@ DEFAULTS: dict = {
     "device": "/dev/ttyACM0",
     "theme": "alpha",
     "clock_size": 30,          # pixels, 16-96: the theme's own default is 26
+    "text_color": "",          # "" = the theme's own skin; else "#rrggbb"
     "canvas": "clear",         # or "black"
     "scrim": -1,               # -1 = the daemon's luma rule
     "fans": True,
@@ -64,6 +67,22 @@ def _clean(loaded: dict) -> dict:
         out["device"] = loaded["device"]
     if loaded.get("theme") in render.THEMES:
         out["theme"] = loaded["theme"]
+    # the text colour goes through the renderer's own parser, so the window, the
+    # socket and `--text-color` cannot disagree about what a colour is: a junk
+    # value in a hand-edited file falls back to "" (the theme's skin) the same
+    # way an out-of-range clock size does, and a valid one is normalised to
+    # `#rrggbb` on the way back out.
+    raw = loaded.get("text_color")
+    if isinstance(raw, str):
+        try:
+            out["text_color"] = render.ink_hex(render.parse_ink(raw)) or ""
+        except ValueError:
+            out["text_color"] = ""
+    elif isinstance(raw, (list, tuple)):
+        try:
+            out["text_color"] = render.ink_hex(render.parse_ink(tuple(raw))) or ""
+        except ValueError:
+            out["text_color"] = ""
     for key, lo, hi in (("clock_size", 16, 96), ("scrim", -1, 255)):
         try:
             n = int(loaded[key])

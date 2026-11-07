@@ -28,6 +28,149 @@ RED = (255, 64, 64, 255)
 DIM = (150, 170, 180, 255)
 TRACK = (120, 200, 220, 255)
 
+# ---- ink: the colour of the glyphs we draw ----------------------------------
+#
+# Each theme used to paint its text with a constant chosen at import time.  It
+# is a parameter now, because this is the one part of a frame's look this
+# project can honestly change: the text is drawn here, on this machine, and
+# uploaded as pixels.
+#
+# What it is *not*: the vendor's themes keep their text colour inside their own
+# files, and those colours are not all white.  Counted, over the 23 480x480
+# layout files the themes package installs (the same bytes this repository
+# carries under themes/alpha/layouts, and the suite re-derives them): 106
+# `textColor` values, 9 distinct, 88 of them `rgba(255, 255, 255, 1)`, in 18 of
+# the 23 files exclusively and in 5 mixed with greys and near-blacks.  The theme
+# ALPHA has selected is one of the exclusively-white ones - 6 of its 6.  That
+# colour is read by the panel's firmware from a `.thm`/layout file, and nothing
+# in this project sends one, so nothing here changes it (docs/themes.md,
+# docs/limits.md, PROTOCOL.md §10).
+#
+# `INK_DIM` is a design constant, not a measurement: how much darker the lines
+# a theme treats as secondary get when a reader picks an ink.  It lives here so
+# the suite can pin the arithmetic rather than trust the prose.
+INK_DIM = 0.62
+
+#: spellings that mean "use the theme's own skin"
+DEFAULT_INK = ("", "default", "theme default", "theme", "auto")
+
+
+def parse_ink(value):
+    """One entry point for a text colour: CLI flag, socket value, GUI setting.
+
+    Returns an (r, g, b, a) tuple, or None for "the theme's own skin".  Raises
+    ValueError in words fit to be shown to a human, because the socket's answer
+    and argparse's error are both read by people.
+
+    Accepted: empty, `default`/"theme default"/"auto" (all -> None); `#rgb`,
+    `#rrggbb`, `#rrggbbaa`; the names of this module's own palette (`amber`,
+    `mint`, `cyan` - the colours the themes actually ship with, so a choice
+    made from the GUI's list can be spelled the same way on the command line);
+    anything else PIL's colour table names, which is how `rebeccapurple` or
+    `rgb(0,230,118)` work; and tuples/lists, which is what this module's own
+    defaults and the tests hand in.
+    """
+    from PIL import ImageColor
+    if value is None or isinstance(value, (tuple, list)):
+        if not value:
+            return None
+        try:
+            return _argb(tuple(value))
+        except ValueError:
+            # a tuple can arrive from a hand-written JSON request as well as from
+            # Python, and either way the words end up in someone's log, so the
+            # message is the same one as for a bad string
+            raise ValueError(_ink_help(value)) from None
+    text = str(value).strip()
+    key = text.lower()
+    if not text or key in DEFAULT_INK:
+        return None
+    named = {"white": WHITE, "black": BLACK, "cyan": CYAN, "green": GREEN,
+             "amber": AMBER, "red": RED, "dim": DIM, "track": TRACK,
+             "mint": ALPHA_MINT, "label": ALPHA_LABEL}
+    if key in named:
+        return _argb(named[key])
+    try:
+        got = ImageColor.getrgb(text)
+    except (ValueError, AttributeError):
+        raise ValueError(_ink_help(text, named)) from None
+    return _argb(got)
+
+
+def _ink_help(value, named=None) -> str:
+    """The one sentence every rejected text colour comes back with.
+
+    It reaches a person twice - argparse's error line on a terminal, and the
+    socket's `error` field in the window's log - so it names what to write
+    rather than what went wrong internally.
+    """
+    names = " ".join(sorted(named)) if named else (
+        " ".join(sorted((k for k in ("white", "black", "cyan", "green", "amber",
+                                     "red", "dim", "track", "mint", "label")))))
+    return (f"text colour {value!r} is not something I can read: try #rrggbb "
+            f"(like #ff4040), one of {names}, or 'default' for the theme's own")
+
+
+def _argb(c) -> tuple:
+    """Any PIL-shaped colour -> 8-bit RGBA.
+
+    The channel check is not fussiness: `parse_ink` also takes a list or tuple,
+    and without it `("r","e","d")` would have been accepted as three channels of
+    text and reached PIL's drawer, where it fails far from its cause.
+    """
+    def ok(v):
+        return isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 255
+    if len(c) in (3, 4) and all(ok(v) for v in c):
+        return (c[0], c[1], c[2], c[3] if len(c) == 4 else 255)
+    raise ValueError(f"not a colour: {c!r}")
+
+
+def ink_hex(ink) -> str | None:
+    """`#rrggbb` for a colour that crossed the socket, or None for 'default'.
+
+    The status and config answers carry the display's ink, and a tuple arrives
+    as a JSON array nobody would read.  Hex is what `parse_ink` accepts back, so
+    the value round-trips: read it, send it, get the same colour.  The alpha
+    channel is dropped, because the glyph's transparency is the theme's doing,
+    not the reader's choice.
+    """
+    if ink is None:
+        return None
+    r, g, b, _a = _argb(ink)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def _dim(ink, k: float = INK_DIM) -> tuple:
+    """`ink` at `k` of its brightness, alpha kept.
+
+    Straight sRGB multiplication, which is what "dimmer" means on this panel:
+    there is no contrast knob on the wire, and blending towards black keeps the
+    hue.  The suite pins the arithmetic.
+    """
+    r, g, b, a = _argb(ink)
+    return (round(r * k), round(g * k), round(b * k), a)
+
+
+def _skin(ink, primary, secondary, accent):
+    """The three glyph colours of one theme, reader's override applied.
+
+    `ink=None` keeps the theme's own measured skin - the default, and the
+    reason the `alpha` replica still matches what was captured (its text
+    measures white, §10).  Any other value paints every glyph with it; the
+    lines a theme treats as secondary - `DIM` in dual/clock/bars, the label and
+    clock tints in gauge - get the same hue at `INK_DIM`, so changing the ink
+    changes the colour without flattening the page.  Arcs, bars and tracks keep
+    their own colours either way: they are graphics, and several of those
+    colours are measurements.
+    """
+    if ink is None:
+        return primary, secondary, accent
+    # `parse_ink`, not `_argb`: a theme can be called straight from Python with
+    # `ink="red"` or `ink=(255,0,0)`, and a colour that fails should fail with
+    # the sentence this module promises rather than inside a drawer.
+    fg = parse_ink(ink)
+    return fg, _dim(fg), fg
+
 # ALPHA's own skin, measured off the 65 `.osd` frames captured from its log
 # (data/vendor_frames).  Only 4.6 % of its pixels are painted - 9 162 opaque plus
 # 10 807 translucent of 230 400 - which is how its picture lets the panel's
@@ -247,7 +390,7 @@ def _title(img, s, y=22, size=24, colour=WHITE):
 # ----------------------------------------------------------------- themes --
 def theme_gauge(m, title="Smart Display", clock=True, label="CPU TEMP",
                 cold=30.0, hot=75.0, gradient="stock", bg=OVERLAY,
-                source="temperature"):
+                source="temperature", ink=None):
     """The stock skin, drawn where ALPHA draws its own: arc, digits, label, clock.
 
     Geometry and colours come from ALPHA's captured frames (see the ALPHA_*
@@ -258,6 +401,7 @@ def theme_gauge(m, title="Smart Display", clock=True, label="CPU TEMP",
     tracks CPU busy percent instead, which does move every second.
     """
     img = Image.new("RGBA", (W * SS, H * SS), bg)
+    fg, mid, acc = _skin(ink, WHITE, ALPHA_LABEL, ALPHA_MINT)
     cpu = m.get("cpu") or {}
     val = cpu.get(source) if source in ("temperature", "load") else None
     if val is None:
@@ -271,21 +415,22 @@ def theme_gauge(m, title="Smart Display", clock=True, label="CPU TEMP",
     gauge(img, 236, 236, 127, frac, width=22, track=ALPHA_TRACK, cold=ramp,
           start=140, sweep=260, span="sweep")
     if title:
-        _title(img, title, y=19, size=20)
+        _title(img, title, y=19, size=20, colour=fg)
     if val is not None:
         s = (f"{round(val)}\u00b0C" if source == "temperature" else f"{val:.0f}%")
-        _text(img, (236, 236), s, _fit(img, s, 165, 52), WHITE)
+        _text(img, (236, 236), s, _fit(img, s, 165, 52), fg)
     if label:
-        _text(img, (236, 318), label, font(14), ALPHA_LABEL)
+        _text(img, (236, 318), label, font(14), mid)
     if clock:
-        _text(img, (236, 458), clock_str(), font(22), ALPHA_MINT)
+        _text(img, (236, 458), clock_str(), font(22), acc)
     return img.resize((W, H), Image.LANCZOS)
 
 
 def theme_dual(m, title="CPU  /  GPU", clock=True, cold=30.0, hot=90.0,
-               bg=OVERLAY):
+               bg=OVERLAY, ink=None):
     """Two arc gauges side by side, plus a load bar and the clock."""
     img = Image.new("RGBA", (W * SS, H * SS), bg)
+    fg, mid, acc = _skin(ink, WHITE, DIM, CYAN)
     cpu = m.get("cpu") or {}
     gpu = m.get("gpu") or {}
     for cx, dev, name in ((128, cpu, "CPU TEMP"), (352, gpu, "GPU TEMP")):
@@ -294,10 +439,10 @@ def theme_dual(m, title="CPU  /  GPU", clock=True, cold=30.0, hot=90.0,
         gauge(img, cx, 228, 96, frac, width=20, cold=heat, span="sweep")
         if t is not None:
             s = f"{round(t)}"
-            _text(img, (cx, 222), s, _fit(img, s, 120, 52), WHITE)
-        _text(img, (cx, 298), name, font(15), DIM)
+            _text(img, (cx, 222), s, _fit(img, s, 120, 52), fg)
+        _text(img, (cx, 298), name, font(15), mid)
     if title:
-        _title(img, title, y=26)
+        _title(img, title, y=26, colour=fg)
     mem = m.get("memory") or {}
     util = cpu.get("load")
     if util is not None:
@@ -306,19 +451,20 @@ def theme_dual(m, title="CPU  /  GPU", clock=True, cold=30.0, hot=90.0,
         if mem.get("total"):
             line += (f"    {mem.get('used', 0) // 1024} / "
                      f"{mem.get('total', 0) // 1024} GB")
-        _text(img, (240, 372), line, font(17), DIM)
+        _text(img, (240, 372), line, font(17), mid)
     if clock:
-        _text(img, (240, 444), clock_str(), font(30), CYAN)
+        _text(img, (240, 444), clock_str(), font(30), acc)
     return img.resize((W, H), Image.LANCZOS)
 
 
-def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY):
+def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY, ink=None):
     """Mostly a clock: huge time, one line of readings underneath."""
     img = Image.new("RGBA", (W * SS, H * SS), bg)
+    fg, mid, acc = _skin(ink, WHITE, DIM, CYAN)
     t = clock_str()
-    _text(img, (240, 190), t, _fit(img, t, 440, big), WHITE)
+    _text(img, (240, 190), t, _fit(img, t, 440, big), fg)
     if date:
-        _text(img, (240, 286), time.strftime("%A %d %B %Y"), font(22), DIM)
+        _text(img, (240, 286), time.strftime("%A %d %B %Y"), font(22), mid)
     cpu = (m.get("cpu") or {}).get("temperature")
     gpu = (m.get("gpu") or {}).get("temperature")
     parts = []
@@ -330,13 +476,14 @@ def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY):
     if fans:
         parts.append(f"{round(sum(fans) / len(fans))} RPM")
     if parts:
-        _text(img, (240, 358), "    ".join(parts), font(26), CYAN)
+        _text(img, (240, 358), "    ".join(parts), font(26), acc)
     return img.resize((W, H), Image.LANCZOS)
 
 
-def theme_bars(m, clock=True, bg=OVERLAY):
+def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
     """Row per reading with a meter: temps, load, memory, fans."""
     img = Image.new("RGBA", (W * SS, H * SS), bg)
+    fg, mid, acc = _skin(ink, WHITE, DIM, CYAN)
     cpu = m.get("cpu") or {}
     gpu = m.get("gpu") or {}
     mem = m.get("memory") or {}
@@ -357,21 +504,21 @@ def theme_bars(m, clock=True, bg=OVERLAY):
         if fan.get("value"):
             rows.append((str(fan.get("name") or "FAN")[:10], fan["value"],
                          0, 3000, lambda v: f"{round(v)}"))
-    _title(img, "SYSTEM MONITOR", y=30)
+    _title(img, "SYSTEM MONITOR", y=30, colour=fg)
     d = ImageDraw.Draw(img)
     y, span = 72, 320
     row_h = min(56, max(28, span // max(len(rows), 1)))
     for name, val, lo, hi, fmt in rows:
         if val is None:
             continue
-        d.text((28 * SS, y * SS), name, font=font(18), fill=DIM, anchor="lm")
-        d.text((452 * SS, y * SS), fmt(val), font=font(20), fill=WHITE,
+        d.text((28 * SS, y * SS), name, font=font(18), fill=mid, anchor="lm")
+        d.text((452 * SS, y * SS), fmt(val), font=font(20), fill=fg,
                anchor="rm")
         bar(img, 28, y + 17, 424, 10, (val - lo) / (hi - lo),
             heat((val - lo) / (hi - lo)))
         y += row_h
     if clock:
-        _text(img, (240, 452), clock_str(), font(28), CYAN)
+        _text(img, (240, 452), clock_str(), font(28), acc)
     return img.resize((W, H), Image.LANCZOS)
 
 
@@ -547,9 +694,14 @@ A26_FAN_F, A26_FAN_MIN = 24, 16      # size range; both figures share one size,
 
 
 def theme_alpha(m, title=None, clock=True, clock_size=26, fan=True,
-                bg=OVERLAY):
+                bg=OVERLAY, ink=None):
     """The theme ALPHA has selected, plus GPU temp, clock and fan figures."""
     img = Image.new("RGBA", (W * SS, H * SS), bg)
+    # every glyph in this theme measures white (§10, and `A26_WHITE` above), so
+    # the theme has no secondary ink to preserve: an override lands on all of
+    # it uniformly.  That is a departure from the measured replica, and the GUI
+    # says so rather than leaving the reader to notice.
+    fg, mid, acc = _skin(ink, A26_WHITE, A26_WHITE, A26_WHITE)
     cpu = m.get("cpu") or {}
     gpu = m.get("gpu") or {}
 
@@ -571,9 +723,9 @@ def theme_alpha(m, title=None, clock=True, clock_size=26, fan=True,
                          r_in, A26_RING_R, A26_ARC_START, A26_ARC_SWEEP,
                          A26_TVAL_F))
     for x, label in zip(A26_TCOL_X, ("CPU TEMP", "GPU TEMP")):
-        _text(img, (x, A26_TLBL_Y), label, tlbl, A26_WHITE, anchor="ma")
+        _text(img, (x, A26_TLBL_Y), label, tlbl, fg, anchor="ma")
     for x, temp in zip(A26_TCOL_X, temps):
-        _text(img, (x, A26_TVAL_Y), temp, tval, A26_WHITE, anchor="ma")
+        _text(img, (x, A26_TVAL_Y), temp, tval, fg, anchor="ma")
 
     # fans: this theme has no fan widget, so there is no geometry to copy.  One
     # figure per column, sitting in the ring's open mouth, so each one is under
@@ -584,19 +736,19 @@ def theme_alpha(m, title=None, clock=True, clock_size=26, fan=True,
             _fit_size(img, s, A26_FAN_MAX_W, A26_FAN_F, bold=False)
             for s in (left, right)))
         for x, figure in zip(A26_FAN_X, (left, right)):
-            _text(img, (x, A26_FAN_Y), figure, font(size, False), A26_WHITE,
+            _text(img, (x, A26_FAN_Y), figure, font(size, False), fg,
                   anchor="ma")
 
     # usage: vendor geometry, exact, its values left-aligned on their anchors
-    _text(img, (100, 300), "CPU USED", font(20, bold=False), A26_WHITE,
+    _text(img, (100, 300), "CPU USED", font(20, bold=False), fg,
           anchor="la")
     _text(img, (320, 290), _pct(cpu.get("load")), font(32, bold=False),
-          A26_WHITE, anchor="la")
+          fg, anchor="la")
     hbar(img, 100, 330, 280, 10, (cpu.get("load") or 0) / 100.0)
-    _text(img, (100, 370), "GPU USED", font(20, bold=False), A26_WHITE,
+    _text(img, (100, 370), "GPU USED", font(20, bold=False), fg,
           anchor="la")
     _text(img, (322, 362), _pct(gpu.get("load")), font(32, bold=False),
-          A26_WHITE, anchor="la")
+          fg, anchor="la")
     hbar(img, 100, 400, 280, 10, (gpu.get("load") or 0) / 100.0)
 
     # clock, small and centred along the bottom, below the lower bar (which
@@ -606,9 +758,9 @@ def theme_alpha(m, title=None, clock=True, clock_size=26, fan=True,
     if clock:
         t = clock_str()
         _text(img, (240, 470), t, _fit(img, t, 452, clock_size, bold=False),
-              A26_WHITE, anchor="ms")
+              fg, anchor="ms")
     if title:
-        _title(img, title, y=26, size=20)
+        _title(img, title, y=26, size=20, colour=fg)
     return img.resize((W, H), Image.LANCZOS)
 
 
@@ -692,9 +844,9 @@ THEMES = {"gauge": theme_gauge, "dual": theme_dual, "clock": theme_clock,
 def _scrim(img: Image.Image, alpha: int, grow: int = 6) -> Image.Image:
     """Put a translucent dark plate under everything the theme painted.
 
-    Needed because every glyph in the vendor's theme is white (`textColor:
-    "rgba(255, 255, 255, 1)"` throughout `store.json`) and the panel always has
-    a moving picture behind it.  The clip this project ships with is dark, so by
+    Needed because the glyphs of the theme ALPHA selected are all white - 6 of 6
+    `textColor` values in its layout file, and ours are white unless the reader
+    picks another ink - and the panel always has a moving picture behind it.  The clip this project ships with is dark, so by
     default nothing is added here; a bright vendored clip, `theme_48.mp4`,
     measures a mean luma of 227.3 of 255 - a near-white field - and white on
     white is unreadable, so for clips measured that bright the OSD carries its
@@ -715,7 +867,12 @@ def _scrim(img: Image.Image, alpha: int, grow: int = 6) -> Image.Image:
 
 
 def draw(metrics, theme="gauge", scrim: int = 0, **kw) -> Image.Image:
-    """Render one 480x480 frame of `theme` from a metrics dict."""
+    """Render one 480x480 frame of `theme` from a metrics dict.
+
+    `kw` reaches the theme, so `ink=(r,g,b)` - or the string form, once put
+    through `parse_ink` - recolours the glyphs of any theme without touching
+    its geometry or its graphics colours.
+    """
     img = THEMES.get(theme, theme_gauge)(metrics, **kw)
     if scrim:
         img = _scrim(img, max(1, min(255, int(scrim))))

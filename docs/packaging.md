@@ -16,6 +16,11 @@ dpkg-buildpackage -us -uc -b          # the .deb files land one directory up
 lintian ../xigmatek-connect-lcd_*.changes
 ```
 
+Before either package is worth building there is one gate, and CI puts it first: the
+offline suite - eighteen offline sections with no panel in sight - and the `.deb` job
+`needs`
+it, so a tree that fails a check never produces a package (`.github/workflows/ci.yml`).
+
 That list is `debian/control`'s own Build-Depends plus `devscripts` (where
 `dpkg-buildpackage` and `lintian` come from) and `build-essential`, which
 debian/control deliberately does not name - an archive builder is assumed to have it -
@@ -189,7 +194,9 @@ and `tools/selftest.sh` now checks that path the same way, so it stays a sentenc
 What has been measured about those bytes without installing them: `lintian
 2.129.0ubuntu2.1` on the `.changes` says **0 errors, 0 warnings, 0 infos**; unpacked into
 a plain directory, with nothing of ours on the import path, the three commands answer
-`--help` (9 808, 1 498 and 637 bytes), `import xigmalcd.protocol` resolves inside the
+`--help` (10 488, 1 498 and 637 bytes for this tree - `xigmalcd` was 9 808 in the 0.2
+build below, before its `--text-color` flag existed), `import xigmalcd.protocol`
+resolves inside the
 unpacked tree, the packaged code finds its own three clips by its own root rules at the
 sizes and md5s the suite pins, `xigmalcd --dry-run DIR --once` writes one 480×480 PNG and
 opens no port, `xigmalcd-reset` with no `--yes` prints the 109-byte frame and sends

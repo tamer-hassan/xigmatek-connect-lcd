@@ -64,7 +64,7 @@ from PIL import Image                                            # noqa: E402
 from PyQt6.QtCore import QEvent, QSize, Qt, QTimer        # noqa: E402
 from PyQt6.QtGui import (QAction, QBrush, QColor, QIcon, QImage,
                          QKeySequence, QPixmap)                    # noqa: E402
-from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox,
+from PyQt6.QtWidgets import (QApplication, QCheckBox, QColorDialog, QComboBox,
                              QDoubleSpinBox, QFormLayout, QGroupBox,
                              QHBoxLayout, QLabel, QLineEdit, QListWidget,
                              QListWidgetItem, QMainWindow, QMenu, QMessageBox,
@@ -121,6 +121,10 @@ LOG_KEEP = 200
 #: almost twice as many clips.  `_thumb_batch` decodes to whatever this is set
 #: to on the widget, so the two cannot drift.
 CLIP_ICON = QSize(64, 64)
+
+#: px of border and layout allowance around the preview label, added to the
+#: pixmap's own height when the card is clamped to it (`_fit`).
+FRAME_CHROME = 4
 
 
 def app_icon() -> QIcon:
@@ -258,6 +262,14 @@ class Window(QMainWindow):
         # the picture keeps first call on this column's height: the log under
         # it is a readout that can scroll, while a preview that cannot reach 1:1
         # is a smaller picture of the glass for no reason
+        # `6` against the log's `1`: below the 480 px the frame caps at, any
+        # height left in the column belongs to the log, which scrolls.  The
+        # picture must still *expand* into the square its width allows - with
+        # stretch 0 the label collapsed to its pixmap's old sizeHint and the
+        # frame came back 160 px at a 520 px pane (measured), which is the same
+        # mistake in the other direction.
+        self.preview.setSizePolicy(QSizePolicy.Policy.Expanding,
+                                   QSizePolicy.Policy.Expanding)
         lay.addWidget(self.preview, 6)   # stretch: the frame keeps its square
         self.caption = QLabel()
         self.caption.setWordWrap(True)
@@ -293,6 +305,10 @@ class Window(QMainWindow):
         # everything else.  A form row whose field is hidden and whose label is
         # not is a gap with a word in it, so both go.
         self._adv_hide: list = []
+        # whole boxes the switch folds, parked here until the controls column is
+        # finished: they belong at its foot, in the slack that column has and the
+        # library column does not
+        self._adv_boxes: list = []
         # A third column, used when the window is wide: the clip library wants
         # *height* (69 rows here, 115 with the Windows partition mounted) and at
         # 1 919 px it was sharing one long column with the display status, the
@@ -388,14 +404,16 @@ class Window(QMainWindow):
         def adv_row(label: str, field) -> None:
             """A settings row the advanced switch covers, label and field both.
 
-            QFormLayout leaves the label standing when only the field is hidden,
-            which is how a compact form ends up with an orphaned word in it.
+            The label is made here rather than read back out of the form: a string
+            passed to `addRow` is not always reachable as a widget through
+            `itemAt(row, LabelRole)` - it came back None, the labels were never
+            registered, and the compact form shipped three orphaned words
+            (`canvas`, `scrim`, `fans`) over hidden fields. Seen in a render at
+            1 919x1 055, missed by the offscreen checks until it was looked for.
             """
-            form.addRow(label, field)
-            item = form.itemAt(form.count() - 1,
-                               QFormLayout.ItemRole.LabelRole)
-            if item is not None and item.widget() is not None:
-                self._adv_hide.append(item.widget())
+            lab = QLabel(label)
+            form.addRow(lab, field)
+            self._adv_hide.append(lab)
             self._adv_hide.append(field)
 
         self.theme = QComboBox()
@@ -416,10 +434,14 @@ class Window(QMainWindow):
         # vendor's own files - .thm themes, layouts, baked overlays, clips - and
         # this project has measured one use for them: as background media.  It
         # has never sent a .thm, and it cannot draw one.
+        # one line shorter than it was, on purpose: this note is the reason the
+        # controls column at the fresh 1180x780 default needed 742 of its 744 px,
+        # and a column that scrolls by a hand's width because of a footnote is a
+        # bad trade.  The full explanation is the combo's tooltip (set just above)
+        # and docs/themes.md, which is what the parenthetical points to.
         vendor = QLabel(
-            "the five names are what this program draws; the package's 27 vendor "
-            "themes are its own files for the panel (hover the combo, and "
-            "docs/themes.md)")
+            "the five are what this program draws; the package's 27 vendor themes "
+            "are the vendor's own files (docs/themes.md)")
         vendor.setWordWrap(True)
         vendor.setStyleSheet("color:#888;font-style:italic;")
         form.addRow("", vendor)
@@ -428,6 +450,48 @@ class Window(QMainWindow):
         self.clock_size.setValue(self.cfg["clock_size"])
         self.clock_size.valueChanged.connect(self._changed)
         form.addRow("clock size", self.clock_size)
+        self.ink_choice = QComboBox()
+        # the colours this module's own palette already ships with, so a choice
+        # made here can be spelled the same way on the command line
+        # (`--text-color amber`) and on the socket (`{"cmd":"text_color",
+        # "value":"amber"}`): one name, one meaning, three doors.  A swatch on
+        # each entry, because "mint" is a word and the question is about a colour.
+        for label, colour in (("theme default", None),
+                              ("white", render.WHITE),
+                              ("amber", render.AMBER),
+                              ("mint", render.ALPHA_MINT),
+                              ("cyan", render.CYAN),
+                              ("green", render.GREEN),
+                              ("red", render.RED),
+                              ("dim", render.DIM)):
+            # the data is the hex form, so whatever the entry is called on
+            # screen, the value the window saves and sends is one spelling
+            self.ink_choice.addItem(label, render.ink_hex(colour))
+        self.ink_choice.addItem("pick a colour...", None)
+        for i in range(self.ink_choice.count() - 1):
+            ink = render.parse_ink(self.ink_choice.itemData(i))
+            if ink is None:
+                continue
+            chip = QPixmap(14, 14)
+            chip.fill(QColor(ink[0], ink[1], ink[2]))
+            self.ink_choice.setItemIcon(i, QIcon(chip))
+        self._set_ink_choice(self.cfg.get("text_color") or "")
+        self.ink_choice.activated.connect(self._choose_ink)
+        self._ink_tip = (
+            "the ink of the text this program draws. It changes our own layer "
+            "only: the vendor's themes keep their text colour inside their own "
+            "files - the package's 23 480x480 layout files carry 106 `textColor` "
+            "values, 88 of them `rgba(255, 255, 255, 1)`, and 5 of the 23 use "
+            "other colours for at least some of their lettering - and nothing "
+            "here sends those files, so what a vendor theme's lettering is stays "
+            "a property of that theme. The panel is not asked either: the colour "
+            "is baked into the frame before it is uploaded, which is the only "
+            "reason this option exists on a device with no readback. `theme "
+            "default` leaves each theme's own skin alone, and for `alpha` that "
+            "skin is measured: 6 of 6 text colours in the layout ALPHA has "
+            "selected are white (PROTOCOL.md §10)")
+        self.ink_choice.setToolTip(self._ink_tip)
+        form.addRow("text colour", self.ink_choice)
         self.canvas = QComboBox()
         # short entries, long explanations in tooltips: a combo sizes itself to
         # its longest item, and an inline explanation here set a floor under the
@@ -565,7 +629,12 @@ class Window(QMainWindow):
         slay.addLayout(rrow)
         self.status.setMinimumHeight(70)
         self.status_box = status
-        lcol.addWidget(status, 2)
+        # controls column, not library: `conn 1` answers with fourteen fields and
+        # they wrap to about ten lines in a 300 px column, which is height taken
+        # straight off the clip list.  The controls column has the slack instead
+        # (measured: ~450 px of it empty at 1 919x1 055), and this box is behind
+        # the advanced switch anyway, where it cannot push the reset box away.
+        self._adv_boxes.append(status)
         self._adv_hide.append(status)
 
         danger = QGroupBox("Factory reset")
@@ -587,6 +656,15 @@ class Window(QMainWindow):
         row2.addWidget(self.btn_reset)
         dlay.addLayout(row2)
         col.addWidget(danger)
+        for _b in self._adv_boxes:
+            col.addWidget(_b)
+        # The tail of the column: without it, QBoxLayout shares a tall window's
+        # leftover height out between every box, so a one-line note label came
+        # back 249 px tall (measured) and the controls column grew a blank band
+        # under it - the same slack that padding the group boxes with is trying
+        # to fill.  Let the boxes have their natural heights and the empty part
+        # be plainly at the bottom, where nothing has to explain it.
+        col.addStretch(1)
 
         self.log_view = QLabel()
         self.log_view.setWordWrap(True)
@@ -608,7 +686,9 @@ class Window(QMainWindow):
         # the log goes under the picture, not at the end of the controls stack:
         # the preview column has room below a 480 px frame that nothing else can
         # honestly fill (the picture is never scaled up), while the library column
-        # is where the height is scarce - every pixel there is another clip row
+        # is where the height is scarce - every pixel there is another clip row.
+        # `1` against the frame's `0`: the picture takes exactly what a square of
+        # the pane's width is, and the log gets whatever height that leaves.
         lay.addWidget(slog, 1)
 
         split = QSplitter()
@@ -654,6 +734,53 @@ class Window(QMainWindow):
         self._set_advanced(self.adv_toggle.isChecked())
 
     # ---- preview ---------------------------------------------------------
+    # ---- the text colour -------------------------------------------------
+    def _set_ink_choice(self, value) -> None:
+        """Select the entry for a colour, adding one if nothing matches.
+
+        Matched on the parsed colour rather than the label, so `#ffc400` read
+        back from a settings file or from a running display's `status` lands on
+        the `amber` entry instead of standing beside it as a second name for the
+        same colour.  Colours outside the palette - one chosen with the dialog,
+        one another user set on the display - get their own entry, labelled with
+        the hex and carrying its swatch.
+        """
+        ink = render.parse_ink(value)
+        if ink is None:
+            self.ink_choice.setCurrentIndex(0)
+            return
+        hexv = render.ink_hex(ink)
+        for i in range(self.ink_choice.count()):
+            if render.ink_hex(render.parse_ink(self.ink_choice.itemData(i))) == hexv:
+                self.ink_choice.setCurrentIndex(i)
+                return
+        chip = QPixmap(14, 14)
+        chip.fill(QColor(ink[0], ink[1], ink[2]))
+        self.ink_choice.insertItem(self.ink_choice.count() - 1, QIcon(chip),
+                                   hexv, hexv)
+        self.ink_choice.setCurrentIndex(self.ink_choice.count() - 2)
+
+    def _choose_ink(self, index: int) -> None:
+        """A palette entry is a choice; the last row opens the colour dialog."""
+        if index != self.ink_choice.count() - 1:
+            self._changed()
+            return
+        was = self.ink_choice.currentIndex()
+        had = render.parse_ink(self.ink_choice.itemData(was)) or render.WHITE
+        got = QColorDialog.getColor(QColor(had[0], had[1], had[2]), self,
+                                    "Text colour")
+        if not got.isValid():              # cancelled: put the old choice back
+            self.ink_choice.setCurrentIndex(was)
+            return
+        self._set_ink_choice(got.name(QColor.NameFormat.HexRgb))
+        self._changed()
+
+    def _ink(self):
+        """The chosen colour as (r,g,b,a), or None for the theme's own skin."""
+        if self.ink_choice.currentIndex() < 1:
+            return None
+        return render.parse_ink(self.ink_choice.currentData())
+
     def _render_kw(self) -> dict:
         """The options `render.draw` takes, taken from the widget state.
 
@@ -673,6 +800,7 @@ class Window(QMainWindow):
                 want = SCRIM_ON_BRIGHT if lum > BRIGHT_LUMA else 0
         kw = {"bg": render.BLACK if self.canvas.currentIndex() else render.OVERLAY,
               "clock_size": self.clock_size.value(),
+              "ink": self._ink(),
               "fan": self.fanline.isChecked(), "source": "temperature"}
         # themes take different options, exactly as `main._theme_kwargs` finds
         # out by reading the signature rather than keeping a table of them.
@@ -722,9 +850,26 @@ class Window(QMainWindow):
             return
         room = self.preview.size()
         side = max(16, min(room.width(), room.height(), render.W))
-        self.preview.setPixmap(self._pix.scaled(
-            side, side, Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation))
+        pm = self._pix.scaled(side, side, Qt.AspectRatioMode.KeepAspectRatio,
+                              Qt.TransformationMode.SmoothTransformation)
+        self.preview.setPixmap(pm)
+        # and the dark card hugs the picture.  An Expanding label in a tall
+        # column keeps the slack *inside itself*, so a 1 055 px window drew the
+        # 480 px frame with ~130 px of black above and below it, framed by the
+        # same border: on a panel that is one exact square, black bands that are
+        # not the glass are worse than no decoration, because they read as part
+        # of it.  Clamping the label to the pixmap's own height hands that
+        # height to the log under it, which can scroll, instead.
+        # Clamped from the pane's *width*, never from the pixmap that is on
+        # screen: a height taken from the current pixmap feeds back - the card
+        # shrinks to a narrow pane, and then its own maximum height keeps it
+        # small when the pane widens again, which is how a 1 919 px window came
+        # back with a 343 px frame (the suite caught it as QSize(343, 343)).
+        # Width is set by the splitter, so it is the quantity that is actually
+        # free to grow.
+        want = min(room.width(), render.W) + FRAME_CHROME
+        if self.preview.maximumHeight() != want:
+            self.preview.setMaximumHeight(want)
 
     def eventFilter(self, obj, event) -> bool:         # noqa: N802
         """Refit the preview whenever the pane itself changed shape.
@@ -754,6 +899,7 @@ class Window(QMainWindow):
     def _state(self) -> dict:
         return {"device": self.port, "theme": self.theme.currentText(),
                 "clock_size": self.clock_size.value(),
+                "text_color": self.ink_choice.currentData() or "",
                 "canvas": "black" if self.canvas.currentIndex() else "clear",
                 "scrim": self.scrim.value(), "fans": self.fanline.isChecked(),
                 "preview_fps": self.preview_fps, "clip": self.mp4,
@@ -1174,7 +1320,9 @@ class Window(QMainWindow):
             f"{st.get('last_name') or '-'} {st.get('last_bytes') or 0} B, "
             f"notice {st.get('last_notice') or '-'}\n"
             f"uptime {st.get('uptime', 0):.0f} s, canvas {st.get('canvas')}, "
-            f"clock {st.get('clock_size')}, scrim "
+            f"clock {st.get('clock_size')}, text "
+            f"{'not reported by this display' if 'text_color' not in st else (st.get('text_color') or 'theme default')}, "
+            f"scrim "
             f"{'auto' if st.get('scrim') is None else st.get('scrim')}, fans "
             f"{'on' if st.get('fans') else 'off'}, pending "
             f"{st.get('pending') or '-'}, space={dev.get('space')}")
@@ -1184,6 +1332,7 @@ class Window(QMainWindow):
                         or ["   (nothing it has chosen to report since it "
                             "started)"]))
         self._read_ring(st.get("events") or [])
+        self._sync_ink_control()
         # the panel-status box, too: over the socket there is no fresh `conn 1`,
         # but the display published the one it got at its session start, and a
         # labelled copy of that is worth more here than "not asked yet".
@@ -1203,7 +1352,34 @@ class Window(QMainWindow):
             self.statusBar().showMessage(self._owner_line())
         self._tray_sync()
 
+    def _sync_ink_control(self) -> None:
+        """The text-colour row, enabled or explained away.
+
+        Against a display too old to know the command, the row would offer a
+        choice that cannot be sent - which is what the author's installed 0.2
+        service and this window looked like: Apply came back `unknown cmd
+        'text_color'` and the log read as though the settings had failed.  So the
+        row goes inactive and says why, in the same breath naming the way to make
+        it live.  The preview keeps the colour either way, because the window
+        draws that picture itself: it is an honest preview of the frame that
+        *would* go out, and it has never been a mirror of the glass (§11).
+        """
+        st = self.daemon.status or {}
+        old_display = bool(self.daemon.present) and bool(st) and \
+            "text_color" not in st
+        self.ink_choice.setEnabled(not old_display)
+        self.ink_choice.setToolTip(
+            self._ink_tip + ("" if not old_display else
+                             "\n\nINACTIVE: the display running here is older "
+                             "than this window - its status reports no "
+                             "text-colour field, so there is no such command to "
+                             "send. Everything else in Apply still goes. Stop it "
+                             "(`systemctl --user stop xigmalcd`) and run this "
+                             "tree's `python3 -m xigmalcd`, or update the "
+                             "package, and the choice becomes sendable"))
+
     def _display_changed(self, present: bool) -> None:
+        self._sync_ink_control()
         if present:
             self._set_display_widgets(True)
             self.statusBar().showMessage(self._owner_line())
@@ -1237,13 +1413,17 @@ class Window(QMainWindow):
         applied = self.daemon.apply({
             "theme": self.theme.currentText(),
             "clock_size": self.clock_size.value(),
+            # hex or "" ("" = the theme's own skin), which is what the socket
+            # and the settings file both use; the display answers with the hex it
+            # kept, so the state line under the buttons shows the colour in force
+            "text_color": self.ink_choice.currentData() or "",
             "canvas": "black" if self.canvas.currentIndex() else "clear",
             "scrim": self.scrim.value(),
             "fans": self.fanline.isChecked(),
             "fps": self.d_fps.value(),
         })
         # and what it deliberately left alone, said out loud.  A background is
-        # not one of these six settings - it is a file that overwrites what the
+        # not one of these settings - it is a file that overwrites what the
         # panel stores - so Apply never sends one, and on the bench that
         # distinction read as a broken picker: a clip selected in the list, Apply
         # pressed, and the glass going on drawing over the old picture.

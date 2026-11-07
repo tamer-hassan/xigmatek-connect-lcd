@@ -69,9 +69,9 @@ one of them (see "How the three columns get their sizes", after the table):
 
 | box | column | what it does | what lands on the wire |
 |---|---|---|---|
-| the running display | controls | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Measured 1 ms for the six commands Apply sends |
+| the running display | controls | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. It also spells out the settings that display is running with - canvas, clock size, scrim, fans, and **the text colour it holds, as the hex it will answer again** (`text #ffc400`), which is the only place in the window you can see a colour you did not pick yourself. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Measured 1 ms for the commands Apply sends - six on the 0.2 bench ledgers below, seven in the tree, and the suite re-measures the line every run |
 | preview | preview | the stored background frame with `render.draw`'s OSD layer composited on top, refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How the three columns get their sizes" below | nothing |
-| theme | controls | the five themes, clock size, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
+| theme | controls | the five themes, clock size, **the colour of the text it draws**, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
 | clips | library | every MP4 the roots hold, listed once per clip - **69 rows** on this box: 3 vendored here, 40 more from the vendor's library, 26 more from the 69 files the Windows app has pushed to this panel (the rest are byte-identical re-uploads); the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
 | background state | library | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the gate refuses says so, in the gate's words, before the button is pressed | nothing: it is a readout |
 | `One frame now` | library | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
@@ -150,6 +150,103 @@ the switch is on or off: hiding the one thing that can put a panel back to its d
 would trade a wasted 90 px for a feature people search for when their panel has gone
 white (docs/troubleshooting.md).
 
+### The colour of the text
+
+One row in the theme box, visible whether the advanced switch is on or not, because
+"can I make it say a different colour" is a first-run question and not a specialist one.
+The entries are `theme default`, this program's own seven palette colours - each with a
+swatch, because "mint" is a word and the question is about a colour - and
+`pick a colour...`, which opens the toolkit's dialog; a colour chosen that way gets its
+own entry, labelled with its hex, so the choice stays visible instead of turning into a
+string.
+
+What it actually reaches is the ink of the glyphs **this program draws**:
+
+* it lands in the preview as you pick it, and on the glass when you press Apply - one
+  socket command, `text_color`, whose value the display answers back as the hex it kept
+  (`text #ffc400` in the state line above), so the colour in force is readable and not
+  remembered;
+* one parser serves all three doors - `--text-color amber` on the command line,
+  `{"cmd": "text_color", "value": "amber"}` on the socket, and the window's combo all go
+  through `xigmalcd/render.py:parse_ink`, so they cannot drift into three different rules.
+  Palette names win over the CSS/X11 table, deliberately: `red` here is this program's
+  `#ff4040`, not CSS's `#ff0000`, and the suite asserts the whole name list against the
+  module's own constants;
+* the settings file keeps the hex form, so `#0f8` becomes `#00ff88`, `amber` becomes
+  `#ffc400`, and a value the renderer would refuse (`cerise`) falls back to the theme's
+  own ink the same way an out-of-range clock size does;
+* `theme default` is not a colour, it is "leave the theme alone" - and for `alpha` that
+  theme's ink *is* a measurement: its text measures white across the captured frames and
+  its own layout files (PROTOCOL.md §10), so the default of the replica stays the
+  replica.
+
+Two measurements came out of building it, both off-glass and both re-derived by the suite:
+
+* the ink changes the ink and nothing else.  Drawing `gauge` with an ink of pure red
+  leaves its painted area exactly where it was (6 087 px before, 6 087 after) and moves
+  1 509 solid white glyph pixels to 1 830 red ones with none left white; the same holds
+  for all five themes (`alpha` 5 397 white → 5 397 red, 14 995 px painted either way).
+  The arcs, bars and tracks keep their colours because those are graphics, and several of
+  them are measurements of the vendor's;
+* the upload path quantises to 256 colours by default (§12), which is the obvious place
+  for a chosen colour to be lost.  It is not: through `to_png`'s palette encoding the
+  inked pixel colour comes back within **1/255 per channel** for every colour the window
+  offers.
+
+What it does not do, said plainly because the combo invites the question: it does not
+change the lettering of a **vendor** theme.  Those themes keep their text colour in their
+own layout files, and the panel's firmware reads those; nothing in this project sends
+one, so nothing here changes that.  And they are not all white, which is worth knowing
+before choosing an ink to sit next to one: across the 23 480×480 layouts there are 106
+`textColor` values in 9 spellings, 88 of them white, 18 of the 23 themes exclusively
+white and 5 mixing in greys and near-blacks - the table is in
+[docs/themes.md](themes.md).  And the panel is never told a colour either: the ink is in the
+pixels before the upload, which is the only reason the option exists at all on a device
+with no readback (§11).
+
+**It has been put on the glass, and it is the colour that was sent.** On 2026-11-07 at
+10:20-10:22 a display running from this tree at 1 fps took five inks over its control
+socket - its own white, `amber` (`#ffc400`), the off-palette `#8a2be2`, `red`
+(`#ff4040`), `mint` (`#00fae8`) - held 15 s each: **80 frames, 0 refused, 0 link errors**,
+and `space` reading **67124 at every sample before and after**, because an ink changes the
+pixels of a frame that was going to be uploaded anyway and costs the panel no room. The
+author watched the panel through it and saw every change on the lettering about a second
+after its command - the next frame at that rate - with each colour reading as the colour
+that was sent. `#8a2be2` is the one worth naming: it is not a palette entry, so the only
+thing between it and the glass was the loop's default 256-colour PNG encoding, which the
+suite measures at 1/255 per channel and the eye agreed with. The run is kept as
+`data/glass/2026-11-07-102041-ink-on-glass-watch.txt`; docs/limits.md carries the same
+numbers and the two things still unmeasured - a dark ink over a bright clip, and this
+command inside the two bench tools' own phases.
+
+One mixed-version case, walked into rather than imagined: the installed **0.2** display
+has no such command, so its `status` answer carries no text-colour field. The window
+notices that and stops offering the choice -
+
+* the row goes **inactive**, and its tooltip says why and how to make it live
+  (`systemctl --user stop xigmalcd` and run this tree's `python3 -m xigmalcd`, or update
+  the package);
+* Apply still sends the six settings that display does know, in the same millisecond it
+  always took, and says which one it left out: *"left text_color alone: the display
+  running here does not report it, so it is older than this window. Everything else was
+  sent"* - not a failure, because it is not one;
+* the state line reads `text not reported by this display`, not the misleading
+  `text theme default`: an old display and a new one sitting on its default answer that
+  line differently, and the client knows which it is talking to because of what the
+  answer contains (`xigmaui/daemon.py:knows`);
+* the preview keeps the colour you picked regardless, because the window draws that
+  picture itself and has never been a mirror of the glass (§11).
+
+The suite drives exactly this shape - a display whose status lacks the field - and the 0.2
+side of it is a kept transcript as well,
+`data/glass/2026-11-07-095918-text-color-status.txt`.
+
+One interaction to know about: the automatic scrim plate is a rule measured for
+**white** glyphs over bright clips (`theme_48.mp4` at mean luma 227.3, plate at 150).
+Choosing a dark ink over a bright field is a combination nothing here has measured, so
+`auto` stays the daemon's white-ink rule rather than inventing a second one - if you pick
+a dark colour over a bright clip, set the scrim yourself and judge it on the glass.
+
 ### Two shortcuts, and why they are the ones they are
 
 `Apply these settings` is Ctrl+Return, the upload button is Ctrl+Shift+U. The second
@@ -186,7 +283,8 @@ because it looked like a broken feature rather than a missing label: a backgroun
 was picked from the list **three times**, three different clips, and the panel kept
 drawing the picture it already had. Nothing on screen said why. What had actually
 happened is that `Apply these settings` had been pressed each time, and Apply sends
-six settings - theme, clock size, canvas, scrim, fans, fps - and *never a file*, by
+the settings - on that build six of them, theme, clock size, canvas, scrim, fans, fps,
+and the text colour since - and *never a file*, by
 design, because a background upload overwrites what the panel stores and only the
 guarded factory reset undoes that. Picking a row is a selection; the clips box is
 what sends it. Three things came out of that afternoon, all in the window now:
@@ -641,8 +739,9 @@ indexed rather than 9.2-9.8 KB.
 
 **What it remembers.** `~/.config/xigmaui/config.json`, written by
 `xigmaui/settings.py`: the port, theme, clock size, canvas, scrim, fan figures, preview
-rate, window size, the three splitter widths, whether the advanced controls are folded
-away, whether closing the window hides it to the tray, and the clip that was selected. The write is atomic and debounced -
+rate, window size, the three splitter widths, the text colour, whether the advanced
+controls are folded away, whether closing the window hides it to the tray, and the clip
+that was selected. The write is atomic and debounced -
 500 ms behind a burst of clicks, once more on close - and the read goes through
 validation rather than trust: a truncated or hand-edited file falls back to the
 defaults instead of stopping the window, out-of-range values are dropped, and a clip

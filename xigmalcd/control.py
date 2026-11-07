@@ -22,6 +22,7 @@ Protocol, one JSON object per line in each direction:
     {"cmd": "status"}                     -> {"ok": true, "status": {...}}
     {"cmd": "theme", "value": "gauge"}    -> {"ok": true, "status": {...}}
     {"cmd": "fps", "value": 1.5}          {"cmd": "clock_size", "value": 40}
+    {"cmd": "text_color", "value": "#ff4040"}   {"cmd": "text_color", "value": null}
     {"cmd": "bg", "value": "black"}       {"cmd": "scrim", "value": "auto"}
     {"cmd": "fans", "value": false}       {"cmd": "title", "value": "Xigma"}
     {"cmd": "pause"} / {"cmd": "resume"}
@@ -147,6 +148,26 @@ class Control:
             return self._set_number("fps", obj.get("value"), 0.1, 5.0)
         if cmd == "clock_size":
             return self._set_number("clock_size", obj.get("value"), 8, 120)
+        if cmd == "text_color":
+            # the ink of the glyphs we draw.  `null`/"" means "the theme's own
+            # skin" - for `alpha` that is the white measured off its captured
+            # frames.  The vendor's themes keep their text colour in their own
+            # files, which nothing here sends, so this is a change to our layer
+            # and to the pixels we upload, never to a setting inside the panel.
+            from . import render
+            try:
+                ink = render.parse_ink(obj.get("value"))
+            except ValueError as exc:
+                return {"ok": False, "error": str(exc)}
+            with self.lock:
+                self.args.text_color = ink
+            # deliberately no `note`: this ring is the record of what the display
+            # did *on the port*, and it is also where the window reads "the panel
+            # stores X" from.  A colour reaches the wire only as pixels on the
+            # next frame, so giving it a slot would push real port evidence out
+            # of the six the window shows.  The value is in `status` anyway,
+            # which is what the window prints (see its `text #rrggbb` field).
+            return {"ok": True, "status": self.status()}
         if cmd == "scrim":
             if obj.get("value") in (None, "", "auto", -1):
                 # back to the daemon's own rule: a plate only over a clip
@@ -277,6 +298,7 @@ class Control:
                 "title": getattr(self.args, "title", ""),
                 "canvas": getattr(self.args, "bg", ""),
                 "clock_size": getattr(self.args, "clock_size", 0),
+                "text_color": _ink_field(self.args),
                 "scrim": getattr(self.args, "scrim", None),
                 "fans": not getattr(self.args, "no_fans", False),
                 "port": self.port,
@@ -294,6 +316,7 @@ class Control:
                 "clip": getattr(self.args, "mp4", "") or "",
                 "canvas": getattr(self.args, "bg", ""),
                 "clock_size": getattr(self.args, "clock_size", 0),
+                "text_color": _ink_field(self.args),
                 "scrim": getattr(self.args, "scrim", None),
                 "title": getattr(self.args, "title", ""),
                 "fans": not getattr(self.args, "no_fans", False),
@@ -308,6 +331,19 @@ class Control:
 #: update path (PROTOCOL.md §7) and a .zip is how the vendor ships it; a socket
 #: must not become a route to either.
 REFUSED_SUFFIXES = (".zip", ".bin", ".img", ".tar", ".gz", ".hex", ".elf")
+
+
+def _ink_field(args) -> str | None:
+    """The display's chosen text colour, as hex, for `status` and `config`.
+
+    A local import because that is how this module reaches `render` already
+    (`_set_theme`), and the socket must not be the reason the display pays for
+    the imaging module at import time.  Hex rather than a tuple: a tuple crosses
+    as a JSON array nobody reads, and `render.parse_ink` takes this string back,
+    so the value a client reads is a value it can send.
+    """
+    from . import render
+    return render.ink_hex(getattr(args, "text_color", None))
 
 
 def check_media_file(path) -> tuple[bool, str]:
