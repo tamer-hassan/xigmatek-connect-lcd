@@ -875,11 +875,7 @@ class Window(QMainWindow):
         # shows through the bars - and the row's measured `320x240` is the number
         # a reader should trust about the file.
         side = self.clips.iconSize().width()
-        thumb = img.convert("RGBA")
-        thumb.thumbnail((side, side), Image.Resampling.LANCZOS)
-        box = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-        box.paste(thumb, ((side - thumb.width) // 2, (side - thumb.height) // 2),
-                  thumb)
+        box = clipdb.letterbox(img, side)
         q = QImage(box.tobytes("raw", "RGBA"), side, side, side * 4,
                    QImage.Format.Format_RGBA8888).copy()
         item.setIcon(QIcon(QPixmap.fromImage(q)))

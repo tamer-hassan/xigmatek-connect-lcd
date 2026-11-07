@@ -1368,24 +1368,22 @@ assert all(win.clips.item(i).sizeHint().height() >= app.CLIP_ICON.height()
 assert all(win.clips.item(i).sizeHint().height() <= app.CLIP_ICON.height() + 8
            for i in range(win.clips.count())), "rows are padding themselves again"
 # a thumbnail never distorts the file it came from: the row states the measured
-# pixel size, and the picture keeps the aspect ratio (letterboxed into the square)
+# pixel size, and the picture keeps its own aspect ratio, letterboxed into the
+# square.  Tested on the fit itself rather than on a clip that happens to be 4:3,
+# because the selftest job runs against a checkout with only the three vendored
+# clips - the themes package is a separate .deb - and a search for a 320x240 file
+# there died with StopIteration on the runner (run 42350703043) while passing here.
 from PIL import Image as _PILImage
-_tall = next(i for i, c in enumerate(win.all_clips) if c.px == (320, 240))
-clipdb.probe(win.all_clips[_tall])
-win._pending = [_tall] + list(win._pending)
-win._thumb_batch()
-appq.processEvents()
-ico = win.clips.item(_tall).icon()
-assert not ico.isNull(), "the odd-size clip has no thumbnail at all"
-pm = ico.pixmap(app.CLIP_ICON.width(), app.CLIP_ICON.height())
-img = pm.toImage()
-assert img.hasAlphaChannel(), "the letterbox bars are not transparent"
-# a 320x240 frame fit into a 64 px square leaves bars above and below (the width
-# binds first), so the sample that must be clear is a corner of the box
-bar = img.pixelColor(img.width() // 2, 1)
-assert bar.alpha() == 0, (bar.rgba(), "the bar beside a 4:3 frame is not clear")
-inside = img.pixelColor(img.width() // 2, img.height() // 2)
-assert inside.alpha() > 0, (inside.rgba(), "the frame itself was pasted away")
+_box = clipdb.letterbox(_PILImage.new("RGBA", (320, 240), (255, 0, 0, 255)), 64)
+assert _box.size == (64, 64), _box.size
+assert _box.getpixel((32, 1))[3] == 0, "the bar above a 4:3 frame is not clear"
+assert _box.getpixel((32, 62))[3] == 0, "the bar below a 4:3 frame is not clear"
+assert _box.getpixel((32, 32))[3] > 0, "the frame itself was pasted away"
+assert _box.getbbox() == (0, 8, 64, 56), (_box.getbbox(),
+                                          "a 320x240 frame does not fit 64 px at 4:3")
+_sq = clipdb.letterbox(_PILImage.new("RGBA", (480, 480), (0, 255, 0, 255)), 64)
+assert _sq.getbbox() == (0, 0, 64, 64), "a square frame gained bars it did not need"
+print("  clip thumbnails          letterboxed: 4:3 keeps its ratio, 1:1 fills the square")
 assert win.clips.iconSize() == app.CLIP_ICON, (win.clips.iconSize(), app.CLIP_ICON)
 win.resize(1919, 1055)                 # a full-HD desk, the case reported
 for _ in range(10):

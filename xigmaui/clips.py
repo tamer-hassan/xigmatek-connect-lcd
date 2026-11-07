@@ -102,6 +102,23 @@ def _ffprobe_look(path: str) -> tuple[float, int, int]:
         return 0.0, 0, 0
 
 
+def letterbox(img: Image.Image, side: int) -> Image.Image:
+    """`img` fitted into a `side` x `side` RGBA square, bars left transparent.
+
+    The picker's thumbnails go here.  Stretching is the obvious implementation and
+    it is a lie about the file: three of the 43 clips the themes package installs
+    are 320x240, and a 4:3 frame drawn into a square shows a picture that is not in
+    the file - right next to a row printing `320x240`.  Fitting and leaving the bars
+    clear means the square in the list never contradicts the number on the row, and
+    the list's own background shows through.
+    """
+    thumb = img.convert("RGBA")
+    thumb.thumbnail((side, side), Image.Resampling.LANCZOS)   # keeps the ratio
+    box = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    box.paste(thumb, ((side - thumb.width) // 2, (side - thumb.height) // 2), thumb)
+    return box
+
+
 def frame(path: str, at: float = 0.5) -> Image.Image | None:
     """One RGBA frame from `path`, `at` of the way through its loop.
 
