@@ -1,6 +1,7 @@
 """Re-encode every frame captured on Windows and compare byte-for-byte."""
+import os
 import re, sys, json, collections
-sys.path.insert(0, '/home/tamer/work/xigma')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from xigmalcd.protocol import encode, decode, checksum_ok, read_frame, compact
 
 def records(path):
@@ -47,6 +48,14 @@ def frames(s):
     return out, runs
 
 def main():
+    if len(sys.argv) < 2:
+        print("usage: verify_protocol.py CAPTURE [CAPTURE ...]\n"
+              "  CAPTURE is a serial monitor's text render (UTF-16, one row per serial\n"
+              "  IRP - tools/vendor_capture.py documents the columns).  The author's two\n"
+              "  Windows sessions are bench files under data/captures/, which .gitignore\n"
+              "  keeps out of the repo, so a fresh clone has none to point at here: see\n"
+              "  README.md, 'Licence', for what that costs and what it means.")
+        return 2
     tot = collections.Counter()
     cl_ok = collections.Counter()
     diffs = []
@@ -84,4 +93,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

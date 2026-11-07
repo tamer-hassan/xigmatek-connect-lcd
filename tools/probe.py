@@ -23,8 +23,8 @@ wire tells me what it changed".
 No firmware/update/recovery topic is touched at any point, and nothing that
 deletes media is sent.
 """
-import argparse, json, sys, time
-sys.path.insert(0, "/home/tamer/work/xigma")
+import argparse, json, os, sys, time
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from xigmalcd.protocol import (BLOCKED_TOPICS, Link,
                                ProtocolError)
 

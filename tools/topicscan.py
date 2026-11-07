@@ -20,8 +20,8 @@ That is why it needs `--force`.
     tools/topicscan.py --force            scan the candidate topic names
     tools/topicscan.py --force --device PATH
 """
-import argparse, json, sys, time
-sys.path.insert(0, "/home/tamer/work/xigma")
+import argparse, json, os, sys, time
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from xigmalcd.protocol import BLOCKED_TOPICS, Link, ProtocolError
 
 TOPICS = (

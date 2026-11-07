@@ -22,8 +22,8 @@ it to.  Eyes on the panel, or do not run it.
 
 Without `--force` it states the cost and sends nothing.
 """
-import argparse, json, sys, time
-sys.path.insert(0, "/home/tamer/work/xigma")
+import argparse, json, os, sys, time
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from xigmalcd.protocol import Link, ProtocolError
 
 KEYS = ("mode", "logo", "osdState", "brightness", "timeout", "space")
