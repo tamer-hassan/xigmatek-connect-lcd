@@ -87,7 +87,11 @@ above).  Two of **our** drawing rules were re-measured while the previews were r
 now fits the same 440 px budget the big time line always had - the readings line measured
 494.2 px against a 480 px panel and was simply losing its end glyphs - and the `dual`
 theme's rings sit on a neutral track, because the pale cyan default measured 7.4 of 255
-luma from its own fill, which is not a meter.  The two
+luma from its own fill, which is not a meter.  Worth knowing for anyone drawing from these
+themes: the `clock` theme also draws a **date line** (`%A %d %B %Y`, fitted to the same
+440 px budget), and since 0.3 its time and its date come from one hook, `render._now()` - so
+a frame cannot pair one instant's seconds with another day's date, and a preview can freeze
+the whole frame rather than just the clock string.  The two
 temperature columns are deliberately alike - same label size and weight, one shared size
 for both numbers, chosen from whichever reading is wider, so neither can end up bigger
 than the other.  Each reading sits inside its ring's hole: at 97 px outer radius the two

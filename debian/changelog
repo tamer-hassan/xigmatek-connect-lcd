@@ -120,6 +120,23 @@ xigmatek-connect-lcd (0.3) UNRELEASED; urgency=medium
     short GIFs showed there was that GIF cutting back through two seconds of a
     10.10 s loop).  What survives of the seam rule is the part that matters: a
     preview is only ever blamed for a jump the video underneath does not have.
+  * A frame's clock is one instant, and the zone has to travel with the
+    recording.  CI measured a different picture than the bench out of
+    byte-identical videos: `clock`'s glyph-against-halo gap read 134.6 here
+    and 126.2 there.  The files were fine - the masks and reference layers
+    scored against them were drawn with time.localtime(), so one instant
+    printed 00:25:16 at UTC+02:00 and 22:25:16 in UTC, and theme_clock's date
+    line, calling time.strftime by itself, printed a different day entirely.
+    render.py now has one hook, _now(), which clock_str() and the new
+    date_str() both read, so patching a frame pins its seconds and its date
+    together; the series JSON beside the videos carries clock_offset_s (7 200
+    s) plus a note, and rendering honours that zone instead of the machine's.
+    Re-rendering clock-Theme_07.mp4 through the new path came out
+    byte-identical to the published file (0f73b6be…), and the whole preview
+    section prints the same table under TZ=UTC and TZ=Asia/Karachi.  The
+    pinned GIF shape freezes the same way: `--clock 11:07:42` sits beside this
+    tool's reference day, 2026-11-05, not beside whatever day the machine
+    happens to think it is.
   * Two drawing fixes, both measured on decoded frames rather than judged.
     `dual` draws its unfilled arc in ARC_TRACK, the neutral this module already
     used for the alpha rings, instead of a pale cyan picked at import time:
@@ -162,8 +179,14 @@ xigmatek-connect-lcd (0.3) UNRELEASED; urgency=medium
     straight through died with `theme_alpha() got an unexpected keyword argument
     'source'`), writes one pinned GIF to keep the caption shape honest (#ffc400
     lands as (252, 197, 2), 3/255 off), and samples two live readings to prove
-    --live-seconds and --record work.  The other picture-level rules added at
-    0.3 stay: the `dual` ring's filled part against its own unfilled part over a
+    --live-seconds and --record work - printing whichever sections the box
+    answered rather than assuming a CPU temperature exists, because a runner
+    has no thermal zones and no tach header behind the paths sensors.py reads
+    (docs/packaging.md measures the same absence for the runner's screenshot,
+    where every field draws `--`).  The section also honours the zone the
+    series was sampled in, and says so in its own output.  The other
+    picture-level rules added at 0.3 stay: the `dual` ring's filled part
+    against its own unfilled part over a
     decoded clip of the vendor's (100.4 luma against the pale default's 7.4),
     and every line of the `clock` theme cropped to its own band with ink
     required to stay inside 480 px.  The two clocks stay separate: with the

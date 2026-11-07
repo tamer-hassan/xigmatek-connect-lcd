@@ -1,4 +1,6 @@
 {
+ "clock_note": "each sample's on-glass clock is its epoch ms read at UTC+02:00, the zone this box was in when it was sampled - not the zone of whatever machine renders from the file afterwards",
+ "clock_offset_s": 7200,
  "first": 1794090316998,
  "last": 1794090328014,
  "samples": 12,

@@ -46,6 +46,7 @@ wrote and prints it, so the README can quote a number instead of a hope.
 from __future__ import annotations
 
 import argparse
+import datetime
 import inspect
 import io
 import json
@@ -76,6 +77,48 @@ from preview_pin import PINNED                                      # noqa: E402
 #: that attribute to pin or advance the clock on the glass, so anything that wants the
 #: real formatting - `series_note`, or a later draw - has to hold on to the original.
 CLOCK_STR_REAL = render.clock_str
+
+#: The day a pinned preview draws beside its frozen `--clock`.  The GIF shape is the one
+#: whose digits a caption quotes, so the whole frame has to be frozen - including the
+#: `clock` theme's date line, which used to follow the wall clock and so changed daily and
+#: across time zones.  The day is the bench date the vendor's own captured frame is dated
+#: with, spelled out here rather than inherited from the machine.
+PINNED_DAY = (2026, 11, 5)
+
+
+def pinned_when(clock: str):
+    """a struct_time for `--clock HH:MM:SS` on PINNED_DAY, or None if it does not parse.
+
+    tm_wday and tm_yday are filled in, because `strftime("%A")` reads the former and a
+    struct built from a bare tuple would print a weekday of its own inventing.
+    """
+    try:
+        hm = time.strptime(clock, "%H:%M:%S")
+    except (ValueError, TypeError):
+        return None
+    d = datetime.date(*PINNED_DAY)
+    return time.struct_time((*PINNED_DAY, hm.tm_hour, hm.tm_min, hm.tm_sec,
+                             d.isoweekday() - 1, d.timetuple().tm_yday, -1))
+
+
+def series_clock(sample, offset=None):
+    """the struct_time a sample's on-glass clock shows, with the zone spelled out.
+
+    A series stores epoch milliseconds, and `time.localtime()` is what turns them into the
+    digits the glass shows - so one sample reads `00:25:16` on a bench at UTC+02:00 and
+    `22:25:16` on a runner in UTC.  Nothing about the picture changes, and that is exactly
+    the problem: a mask or a reference layer drawn at the runner's zone is not the picture
+    the video holds, which is how one unchanged file's `clock` glyph luma measured 241.0
+    here and 225.5 there.  So the JSON beside the videos records `clock_offset_s`, and
+    passing that offset - not the reading machine's idea of local - reproduces the frame.
+
+    With no offset, this machine's own, which is what a freshly sampled series wants:
+    `save_series` writes that same offset into the file it saves.
+    """
+    ts = sample["timestamp"] / 1000.0
+    if offset is None:
+        offset = time.localtime(ts).tm_gmtoff
+    return time.gmtime(ts + offset)
 
 
 def sample_series(seconds: int, period: float = 1.0) -> list[dict]:
@@ -113,8 +156,14 @@ def save_series(where: str, series: list[dict], source: str) -> None:
     minute; the JSON is what that claim traces back to.  It is in the tree for the
     same reason `data/` is.
     """
+    off = time.localtime(series[0]["timestamp"] / 1000).tm_gmtoff
     with open(where, "w") as fh:
         json.dump({"source": source, "samples": len(series),
+                   "clock_offset_s": off,
+                   "clock_note": f"each sample's on-glass clock is its epoch ms read at "
+                                 f"UTC{off // 3600:+02d}:{abs(off) % 3600 // 60:02d}, the "
+                                 f"zone this box was in when it was sampled - not the zone "
+                                 f"of whatever machine renders from the file afterwards",
                    "first": series[0]["timestamp"], "last": series[-1]["timestamp"],
                    "span_s": (series[-1]["timestamp"] - series[0]["timestamp"]) / 1000,
                    "series": series}, fh, indent=1, sort_keys=True)
@@ -127,7 +176,13 @@ def load_series(where: str) -> list[dict]:
         return json.load(fh)["series"]
 
 
-def series_note(series: list[dict]) -> str:
+def load_clock_offset(where: str):
+    """the `clock_offset_s` a recorded series carries, or None if it predates the field."""
+    with open(where) as fh:
+        return json.load(fh).get("clock_offset_s")
+
+
+def series_note(series: list[dict], offset=None) -> str:
     """What actually moved in this series, as one line: min -> max per field.
 
     Printed by the tool and asserted by the suite, because "the numbers change" is
@@ -150,7 +205,7 @@ def series_note(series: list[dict]) -> str:
             return f"{name} n/a"
         return f"{name} {min(vs):g}->{max(vs):g}"
 
-    clocks = [CLOCK_STR_REAL(time.localtime(s["timestamp"] / 1000)) for s in series]
+    clocks = [CLOCK_STR_REAL(series_clock(s, offset)) for s in series]
     parts = [rng("cpu C", vals("cpu", "temperature")),
              rng("cpu %", vals("cpu", "load")),
              rng("gpu C", vals("gpu", "temperature")),
@@ -163,7 +218,7 @@ def series_note(series: list[dict]) -> str:
 
 def frames(path: str, theme: str, ink: tuple | None, clock: str, kw: dict,
            count: int, gif_fps: float, series: list[dict] | None = None,
-           ) -> list[Image.Image]:
+           offset=None) -> list[Image.Image]:
     """`count` composited frames, in order, sampled from one streaming decode.
 
     The stream is `ClipPlayer` - the same object the window plays with - and the
@@ -187,8 +242,9 @@ def frames(path: str, theme: str, ink: tuple | None, clock: str, kw: dict,
     out: list[Image.Image] = []
     seen = 0
     guard = 0
-    real = render.clock_str        # patched for these frames, put back afterwards: a
-    try:                           # leaked patch is how a later draw silently lies
+    real = (render._now, render.clock_str)   # patched for these frames, put back
+    try:                                    # afterwards: a leaked patch is how a
+                                            # later draw in the same process lies
         while len(out) < count and guard < count * step + 4 * max(1, step):
             bg = player.frame()
             if bg is None:
@@ -198,22 +254,35 @@ def frames(path: str, theme: str, ink: tuple | None, clock: str, kw: dict,
                 if series:
                     s = series[min(len(out) // per_sec, len(series) - 1)]
                     metrics = s["metrics"]
-                    # `clock_str(now=...)` wants a struct_time, not an epoch float -
-                    # that is what the daemon hands it.  Following the sample's own
-                    # wall clock is what makes the seconds tick, one per second, the
-                    # way they do on the glass.
-                    when = time.localtime(s["timestamp"] / 1000)
-                    render.clock_str = lambda *a, t=when, **k: CLOCK_STR_REAL(t)
+                    # Every time-shaped line in the frame comes from one hook, so one
+                    # patch moves them all: the seconds tick one per second the way the
+                    # glass does, and the `clock` theme's date line is the sample's date
+                    # rather than the date of the minute this happened to render.  (It
+                    # used to patch `clock_str` alone, which left the date reading the
+                    # wall clock - and off machine, the wall clock follows the reader's
+                    # time zone, not the recording's.)
+                    when = series_clock(s, offset)
+                    render._now = lambda t=when: t
                 else:
                     metrics = PINNED
-                    render.clock_str = lambda *a, c=clock, **k: c
+                    when = pinned_when(clock)
+                    if when:
+                        render._now = lambda t=when: t
+                    else:
+                        # a 12-hour `--clock "09:31 PM"` cannot be turned into an instant,
+                        # so only the time line is pinned - and the date line then says
+                        # what day this ran, which is worth knowing rather than hiding
+                        render.clock_str = lambda *a, c=clock, **k: c
+                        if not out:          # say it once, not once per frame
+                            print("  note              --clock %r is not HH:MM:SS, so "
+                                  "the date line follows this machine" % clock)
                 base = bg.convert("RGBA").resize((render.W, render.H), Image.LANCZOS)
                 base.alpha_composite(render.draw(metrics, theme, ink=ink, **kw))
                 out.append(base)
             seen += 1
     finally:
         player.close()
-        render.clock_str = real
+        render._now, render.clock_str = real
     return out
 
 
@@ -427,14 +496,21 @@ def main() -> int:
     # can quote), or one real sample per displayed second (the MP4 shape, where the
     # digits, the arcs and the clock all move).  A recorded series can be re-used by
     # several previews so six videos show the same minute of one machine.
-    series = None
+    series, offset = None, None      # offset: the zone a recorded series was sampled in
     if a.series:
         if a.record:
             print("--series is a recorded series: refusing to overwrite it with "
                   "--record.  Drop one of the two flags.", file=sys.stderr)
             return 2
         series = load_series(a.series)
+        offset = load_clock_offset(a.series)
+        if offset is not None:
+            print(f"  clock zone        the series carries its own: its on-glass clock "
+                  f"is its epoch ms read at UTC{offset // 3600:+02d}"
+                  f":{abs(offset) % 3600 // 60:02d}, so this render shows the same "
+                  f"seconds the recorded one did")
     elif a.live_seconds:
+        offset = None            # this box, this minute - save_series writes the zone down
         t0 = time.perf_counter()
         series = sample_series(a.live_seconds)
         if not series:
@@ -453,13 +529,14 @@ def main() -> int:
         return 2
     if series:
         print(f"  readings          {len(series)} samples, one per second, and the "
-              f"on-glass clock follows each sample's own time: {series_note(series)}")
+              f"on-glass clock follows each sample's own time: "
+              f"{series_note(series, offset)}")
     if a.no_gif:
         a.mp4 = True
 
     t0 = time.perf_counter()
     ims = frames(a.clip, a.theme, ink, "" if series else a.clock, kw, a.frames,
-                 a.gif_fps, series=series)
+                 a.gif_fps, series=series, offset=offset)
     made = time.perf_counter() - t0
     if not ims:
         print("no frames decoded: is ffmpeg installed?", file=sys.stderr)

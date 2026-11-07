@@ -172,7 +172,7 @@ What the pictures do **not** do is get packaged, and since 0.3 there are two kin
 them. The images: `docs/logo.png` and `docs/screenshot-xigmaui.png` (1 077 877 B), the two
 theme contact sheets in `docs/previews/` (1 596 454 B). The videos: the six MP4s in
 `docs/videos/` (5 061 583 B - the README's five previews plus the amber-ink figure
-docs/gui.md carries) and the readings JSON that drives them (13 696 B). **7 749 610 B**
+docs/gui.md carries) and the readings JSON that drives them (13 916 B). **7 749 830 B**
 across eleven files, part of it rendered from XIGMATEK's own theme library, which is the
 other package's files and its own licence question - and the videos are also not package
 material for a second reason: README does not even link them, because a `.mp4` link in
@@ -344,15 +344,15 @@ something smaller, because it no longer carries the vendor's `.thm` containers
 (docs/themes.md, `themes/alpha/README.md`):
 
 ```
-  dpkg-buildpackage -us -uc -b          exit 0, twice, 2026-11-08: 01:08:09-01:08:28
-                                                 and 01:08:28-01:08:48, 19-20 s apart
+  dpkg-buildpackage -us -uc -b          exit 0, twice, 2026-11-08: 01:25:18-01:25:28
+                                                 and 01:25:28-01:25:39, 10-11 s apart
   ls -l ../*.deb
-      xigmatek-connect-lcd-themes_0.3_all.deb      79 843 106 B   (0.2: 146 137 362 B)
+      xigmatek-connect-lcd-themes_0.3_all.deb      79 844 056 B   (0.2: 146 137 362 B)
       (the code .deb's own byte count is deliberately absent: this file is installed
        inside that package, so any number written here moves the number it writes)
   dpkg-deb -f ... Installed-Size
       themes  83 111 KiB          (0.2: 147 854 KiB)
-      code     5 778 KiB at those builds   (0.2: 5 578 KiB: the doc set grew, twice)
+      code     5 782 KiB at those builds   (0.2: 5 578 KiB: the doc set grew, twice)
   dpkg -c xigmatek-connect-lcd-themes_0.3_all.deb
       114 members: 102 files + 12 directories
       grep -c '\.thm'                  0        (0.2: 30 members under thm/)
@@ -393,14 +393,15 @@ cd d && find usr/share/xigmalcd -type f -print0 | sort -z | xargs -0 sha256sum |
 ```
 
 which answers `46fb6f2da1effd1b4e82522df530cbef7bc08016ee0f9e15a44fa864f88a0b17` over
-**100 files** and **85 034 557 B** - computed twice over, from two separately built
-packages, and identical.  The **container** - the `.deb` itself, `dpkg -c` output, byte
+**100 files** and **85 034 557 B** - computed independently out of two separately built
+packages an hour of editing apart, and identical.  The **container** - the `.deb` itself, `dpkg -c` output, byte
 count and all - is deliberately *not* hashed here, and that
 is not modesty: `changelog.gz` ships inside the themes package, the 0.3 stanza is still
 `UNRELEASED`, and every note written into it changes the container.  One earlier build of
 this same library measured `4ce88e6d22b19a1c2ee7648da2c3677957d4b261750f8130d24d39dbb91980ee`
-and 79 841 286 B; the run above, five changelog edits later, is 79 843 106 B - the library
-identical, `46fb6f2d…` in every one of them.  That is the trap two paragraphs below records, met here
+and 79 841 286 B; the run above, eight changelog edits later, is 79 844 056 B - the library
+identical, `46fb6f2d…` in all four: four builds this sitting, four identical digests.  That
+is the trap two paragraphs below records, met here
 rather than in a reader's bug report.  Once the stanza is stamped and tagged, the container
 hash belongs in the release body, computed from the uploaded files by the release job, where
 it cannot drift: see `## The release` below for exactly that shape of record at 0.1 and 0.2.

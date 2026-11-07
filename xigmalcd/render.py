@@ -387,9 +387,28 @@ def bar(img, x, y, w, h, frac, colour, bg=(40, 46, 50, 255)):
                             fill=colour)
 
 
+def _now():
+    """This frame's idea of "now", as a struct_time - the one hook every clock line uses.
+
+    A frame's time and date have to come from one instant, and a preview, a suite check or
+    a replay wants to say what that instant is.  Patching `clock_str` alone used to leave
+    the `clock` theme's date line reading the wall clock by itself, so a preview could pair
+    a recorded `00:25:16` with the date of whatever moment it happened to render - and off
+    machine, `time.localtime()` follows the reader's zone: the same epoch milliseconds read
+    at UTC say `Friday 07 November 2026` where a UTC+02:00 render showed `Saturday 08
+    November 2026`.  Everything time-shaped in a theme goes through here, so one patch
+    moves the whole frame.
+    """
+    return time.localtime()
+
+
+def date_str(now=None, fmt="%A %d %B %Y"):
+    """The `clock` theme's date line, from the same instant its time line comes from."""
+    return time.strftime(fmt, now or _now())
+
+
 def clock_str(now=None, fmt24=True):
-    now = now or time.localtime()
-    return time.strftime("%H:%M:%S" if fmt24 else "%I:%M %p", now)
+    return time.strftime("%H:%M:%S" if fmt24 else "%I:%M %p", now or _now())
 
 
 def _title(img, s, y=22, size=24, colour=WHITE):
@@ -497,7 +516,7 @@ def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY, ink=None):
     # time line already used and what the other two did not.
     _text(img, (240, 190), t, _fit(img, t, 440, big), fg)
     if date:
-        date_s = time.strftime("%A %d %B %Y")
+        date_s = date_str()
         # `Wednesday 31 December 2099` measures 382.5 panel px at 22, so the date
         # fits today and the budget is insurance for the day it does not - a locale
         # with a longer month name, which is the `Week_en`/`Time_hh:mm` format gap

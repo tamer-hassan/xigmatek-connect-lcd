@@ -254,11 +254,15 @@ and `docs/videos/readings-2026-11-08.json`.
 background in sequence and `render.draw` drawing our layer over each frame, which is what
 the window's `playing` preview pane shows. It opens no device and needs no Qt. Two shapes
 out of one code path:
-**GIF** (`--out x.gif`, the default) - short, one pinned reading, `--clock` frozen, the
-digits a caption can quote; and **MP4** (`--mp4 --no-gif --out x.mp4`) - 10-12 s at the
+**GIF** (`--out x.gif`, the default) - short, one pinned reading, `--clock` freezing the
+whole frame's clock (the `clock` theme draws a date line too, so `--clock 11:07:42` pins it
+to the tool's reference day, 2026-11-05, rather than letting it follow the machine); and
+**MP4** (`--mp4 --no-gif --out x.mp4`) - 10-12 s at the
 clip's own frame rate, driven by `--live-seconds N` (sample the box once a second and
 record it with `--record FILE`) or `--series FILE` (draw from a series recorded earlier, so
-six files show one minute of one machine). README's set is six of the second kind, at the
+six files show one minute of one machine, in the zone that minute was sampled in - the
+series JSON records `clock_offset_s`, and a render honours that instead of its own machine's
+zone). README's set is six of the second kind, at the
 panel's own 480 px, `crf 20`, `preset medium`. The switches are `--clip --theme --ink
 --frames --gif-fps --scale --colors --clock --scrim --out --mp4 --no-gif --crf --preset
 --live --live-seconds --series --record`, and the tool prints its own measurements, because
@@ -300,7 +304,7 @@ these knobs interact in ways nobody guesses right:
 
 README's set, as the suite prints it: `alpha` 908 420 B / 10.00 s at 24 fps, `gauge`
 1 930 104 B / 12.00 s at 20 fps, `dual` 214 113 B, `clock` 278 884 B, `bars` 802 310 B,
-the amber ink figure 927 752 B — **5 061 583 B** for six, plus 13 696 B of readings JSON.
+the amber ink figure 927 752 B — **5 061 583 B** for six, plus 13 916 B of readings JSON.
 The suite checks these files as documents - frame count against the length and rate the
 written file reports, a length in the 10-12 s README promises, a size ceiling, the
 untouched field matching the clip each marker names (gaps 0.1-13.6), glyph against

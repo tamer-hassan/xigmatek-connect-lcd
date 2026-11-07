@@ -428,8 +428,9 @@ What has been measured on glass, by whom, with how many frames - and what has no
   `docs/` can honestly say "the picture above", and the encoding settings are now x264's
   (`crf 20`, `preset medium`) rather than a palette's.
 
-  Every figure in this table is printed by `tools/selftest.sh` from the written files, on
-  every run, and reproduced identically across two runs on 2026-11-08:
+  Every figure in this table is printed by `tools/selftest.sh` from the written files on
+  every run, and it came out identical across four runs on 2026-11-08 - two of them with the
+  machine's own zone set to UTC, which is how the clock-zone bullet below was found:
 
   | the file | frames | length | rate | bytes | clip → field luma | glyph − halo | moved over 3 s: drawn / untouched |
   |---|---|---|---|---|---|---|---|
@@ -440,8 +441,9 @@ What has been measured on glass, by whom, with how many frames - and what has no
   | `bars-theme_52.mp4` | 240 | 12.00 s | 20 fps | 802 310 | 11.9 → 9.8 (2.1) | 139.0 − 40.6 = **98.3** | 11.46 / 7.41 (×1.55) |
   | `alpha-Theme_25-amber.mp4` | 240 | 10.00 s | 24 fps | 927 752 | *(the ink figure: see below)* | | |
 
-  **5 061 583 B** for all six, the largest 1.93 MB, and 13 696 B of series JSON beside
-  them. Every file stays under 2 MB: GitHub's own browser upload limit is a thing of
+  **5 061 583 B** for all six, the largest 1.93 MB, and 13 916 B of series JSON beside
+  them - that file grew 220 B when it gained one field, the zone it was sampled in; see the
+  clock-zone bullet below. Every file stays under 2 MB: GitHub's own browser upload limit is a thing of
   GitHub's and has not been measured here, so the ceiling the suite holds is 9 MB per file,
   which is comfortably below where that limit is reported to be.
 
@@ -491,6 +493,25 @@ What has been measured on glass, by whom, with how many frames - and what has no
     a 160 px / 6-frame / 128-colour GIF written in the same run is **(252, 197, 2)**, 3/255
     off - and neither stands in for the other, or for the 256-colour PNG the upload path
     sends (§10, 1/255 per channel).
+  * **A frame's clock is one instant, and its zone has to be written down.** The first CI
+    run of this section measured a different picture than the bench from byte-identical
+    files: `clock`'s glyph-against-halo gap read **134.6** here and **126.2** there.  The
+    videos were fine.  What differed was the *mask* and the *reference layer* they were
+    scored against - both drawn with `time.localtime()`, which follows the machine: the same
+    epoch milliseconds print `00:25:16` at UTC+02:00 and `22:25:16` in UTC, and the `clock`
+    theme's **date** line, which the theme draws through its own `time.strftime` call, read
+    a whole different *day*.  Three fixes.  The series JSON carries `clock_offset_s`
+    (7 200 s here, plus a `clock_note` saying what it is for) and anything rendering from it
+    uses that zone rather than its own; `render.py` gained `_now()`, one hook every
+    time-shaped line in a frame goes through, with `clock_str()` and the new `date_str()`
+    both reading it, so patching a frame pins its seconds *and* its date; and the pinned GIF
+    shape freezes the whole frame too, `--clock 11:07:42` landing beside this tool's
+    reference day - 2026-11-05, the day the vendor's own captured frame is dated with -
+    instead of beside whatever day the machine thinks it is.
+    Verified by re-rendering `clock-Theme_07.mp4` through the new path: byte-identical to
+    the published file (`0f73b6be…`), because the date it drew at render time happened to be
+    the sample's date too.  And verified across zones: the whole section prints the same
+    table under `TZ=UTC` and `TZ=Asia/Karachi`, glyph 241.0 / halo 106.4 / gap 134.6 in both.
   * **The scrim plate, measured on the animated path.** Over the bright clip
     (`Theme_07.mp4`, luma 176.2 of 255): with no plate, glyph 244.8 against its own halo
     191.3, a gap of 53.5; with the plate the window's auto rule puts there (150/255), glyph

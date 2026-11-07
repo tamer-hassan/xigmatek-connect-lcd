@@ -411,6 +411,7 @@ echo
 echo "== ink: the colour of the text this program draws, and its own name"
 QT_QPA_PLATFORM=offscreen python3 - <<'PY' || { echo "ink FAILED"; exit 1; }
 import sys
+import time
 sys.path.insert(0, ".")
 from xigmalcd import render as R
 
@@ -459,7 +460,11 @@ M = {"cpu": {"temperature": 41.6, "load": 7.4},
      "gpu": {"temperature": 38.0, "load": 12.0},
      "memory": {"used": 8283746304, "total": 33554432000},
      "motherboard": {"temperature": 32.0}, "fans": []}
-R.clock_str = lambda *a, **k: "09:31:03"        # the clock is part of the frame
+# The whole frame's clock, not just its seconds: `theme_clock` draws a date line as well,
+# and a frozen time next to a live date is how one file measured a different picture in a
+# different zone.  One hook, one instant.
+WHEN = time.strptime("2026-11-05 09:31:03", "%Y-%m-%d %H:%M:%S")
+R._now = lambda: WHEN
 RED = (255, 0, 0, 255)
 
 
@@ -676,17 +681,19 @@ def masks(theme, metrics, edge=EDGE, when=None):
     """(opaque ink, its grown halo, untouched field) for one theme at one set of
     readings.  The mask has to be built from the readings AND the clock the frame was
     drawn with: these videos move their digits, so a mask from the pinned fixture would
-    score the file against a picture it is not - and leaving `clock_str` unpatched made
-    the mask's time line whatever time the suite happened to run at, which is how two
-    runs of one unchanged file printed 12.74 and 12.92 for the same measurement."""
-    real = render.clock_str
+    score the file against a picture it is not - and leaving the clock unpatched made the
+    mask's time line whatever time the suite happened to run at, which is how two runs of
+    one unchanged file printed 12.74 and 12.92 for the same measurement.  `render._now` is
+    patched rather than `clock_str` because the `clock` theme draws a date line too, and
+    the instant comes from the series' recorded zone, not this machine's."""
+    real = render._now
     if when is not None:
-        render.clock_str = lambda *a, t=time.localtime(when / 1000), **k: \
-            preview_gif.CLOCK_STR_REAL(t)
+        fixed = preview_gif.series_clock({"timestamp": when}, TZOFF)
+        render._now = lambda t=fixed: t
     try:
         lay = render.draw(metrics, theme, bg=render.OVERLAY)
     finally:
-        render.clock_str = real
+        render._now = real
     a = lay.getchannel("A").resize((edge, edge), Image.LANCZOS)
     ink = a.point(lambda v: 255 if v == 255 else 0)
     grown = a.filter(ImageFilter.MaxFilter(9)).point(lambda v: 255 if v else 0)
@@ -697,18 +704,19 @@ def layer_at(theme, sample, ink=None):
     """the reference layer for one sample, drawn the way `preview_gif.frames()` drew it.
 
     Both the readings AND that sample's clock, because that is what the frame was built
-    from: `frames()` patches `render.clock_str` per sample, and a mask drawn with the
-    wall clock of the moment the suite runs makes the *pixel count of the lettering*
-    depend on the time of day - which is how one unchanged file printed 2 268 painted
-    pixels in one run and 2 270 in the next."""
-    real = render.clock_str
-    when = time.localtime(series[sample]["timestamp"] / 1000)
-    render.clock_str = lambda *a, t=when, **k: preview_gif.CLOCK_STR_REAL(t)
+    from: `frames()` patches `render._now` per sample, and a mask drawn with the wall
+    clock of the moment the suite runs makes the *pixel count of the lettering* depend on
+    the time of day - which is how one unchanged file printed 2 268 painted pixels in one
+    run and 2 270 in the next.  Both the time line and the date line come from that one
+    hook, at the zone the series recorded."""
+    real = render._now
+    when = preview_gif.series_clock(series[sample], TZOFF)
+    render._now = lambda t=when: t
     try:
         return render.draw(series[sample]["metrics"], theme, ink=ink,
                            bg=render.OVERLAY)
     finally:
-        render.clock_str = real
+        render._now = real
 
 def lum(px):
     return 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2]
@@ -768,11 +776,22 @@ def mean_of(im, mask):
 with open(SERIES) as fh:
     rec = json.load(fh)
 series, samples = rec["series"], rec["samples"]
+# the zone the videos were rendered in, spelled out in the file rather than inherited from
+# whichever machine is measuring: the videos show `00:25:16`, a UTC runner reading the same
+# epoch milliseconds with time.localtime() prints `22:25:16`, and then scores the committed
+# pixels against a layer drawn with different digits.  (CI did exactly that on 2026-11-08:
+# `clock`'s glyph luma read 241.0 on the bench and 225.5 on the runner, same bytes.)
+TZOFF = rec.get("clock_offset_s")
+assert TZOFF is not None, (SERIES, "a series that drives published videos has to record "
+                                  "the zone its on-glass clock was read at")
+assert abs(TZOFF) < 14 * 3600, (TZOFF, "not a plausible zone offset")
+print(f"  clock zone        the series carries UTC{TZOFF // 3600:+02d}"
+      f":{abs(TZOFF) % 3600 // 60:02d}, which is what the six files were rendered at")
 assert samples == len(series) == 12, (samples, len(series))
 gaps = [(b["timestamp"] - a["timestamp"]) / 1000
         for a, b in zip(series, series[1:])]
 assert all(0.8 <= g <= 1.4 for g in gaps), [round(g, 2) for g in gaps]
-clocks = [preview_gif.CLOCK_STR_REAL(time.localtime(s["timestamp"] / 1000))
+clocks = [preview_gif.CLOCK_STR_REAL(preview_gif.series_clock(s, TZOFF))
           for s in series]
 assert len(set(clocks)) == len(clocks), clocks        # the clock ticks, one per sample
 fields = {}
@@ -993,10 +1012,30 @@ with tempfile.TemporaryDirectory() as tmp:
         got = json.load(fh)
     assert got["samples"] == 2 and got["series"][0]["metrics"], got["samples"]
     assert "sampled" in r.stdout, r.stdout[-400:]
-    c = got["series"][0]["metrics"]["cpu"]
-    print(f"  --live-seconds sampled this box: {got['samples']} readings, cpu "
-          f"{c['temperature']} C at {c['load']} %, into {os.path.getsize(probe):,} B "
-          f"of JSON")
+    # What the box answered, whatever it is.  A runner under a hypervisor has no thermal
+    # zones, no tach header and no disks behind the paths xigmalcd/sensors.py reads -
+    # docs/packaging.md measures the same absence for the runner's screenshot - and the
+    # first CI run of this section died on exactly that, KeyError: 'temperature', because
+    # the probe assumed a CPU temperature exists.  Plumbing is what this proves: that
+    # --live-seconds sampled twice, that the sections a preview draws came back, and that
+    # --record wrote a file a later render can read.  The machine's identity is not.
+    m0 = got["series"][0]["metrics"]
+    print(f"  --live-seconds sampled this box: {got['samples']} readings, sections "
+          f"{sorted(m0)}, into {os.path.getsize(probe):,} B of JSON")
+    for sec in sorted(m0):
+        d = m0[sec]
+        if isinstance(d, dict):
+            brief = {k: v for k, v in d.items()
+                     if k in ("temperature", "load", "used", "total", "power")}
+            print(f"    {sec:<8} {brief}")
+        else:
+            print(f"    {sec:<8} {d}")
+    assert "cpu" in m0 and "load" in m0["cpu"], (sorted(m0),
+                                                 "no CPU load, so no meter had anything "
+                                                 "to draw")
+    assert got.get("clock_offset_s") == time.localtime(
+        got["series"][0]["timestamp"] / 1000).tm_gmtoff, (
+        got.get("clock_offset_s"), "--record did not write down the zone it sampled in")
 PY
 
 echo "== where clips are looked up: the roots a package install has to get right"
