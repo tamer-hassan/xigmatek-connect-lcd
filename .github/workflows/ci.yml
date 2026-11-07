@@ -210,15 +210,29 @@ jobs:
           dpkg-deb -c ../xigmatek-connect-lcd-themes_*_all.deb | grep -c '^-[^d]' \
             | sed 's/^/  themes package, files: /'
 
+      - name: collect what the build wrote, inside the workspace this time
+        # dpkg-buildpackage writes its artifacts one directory above the source tree,
+        # which is normal and is what debian/README.source tells a packager to expect.
+        # It is not something actions/upload-artifact will read: the first attempt at
+        # this step failed before looking for any file -
+        #   Invalid pattern '../xigmatek-connect-lcd_*_all.deb'.
+        #   Relative pathing '.' and '..' is not allowed.
+        # So the files are copied into the workspace, into two directories rather than
+        # one because the second one is the 146 MB that a pull request does not need to
+        # download.  Nothing here is rebuilt or re-compressed: these are the same bytes
+        # lintian just checked and the install job below will install.
+        run: |
+          set -eu
+          mkdir -p pkg-code pkg-themes
+          cp ../*.changes ../*.buildinfo ../lintian.log ../lintian-summary.txt pkg-code/
+          mv ../xigmatek-connect-lcd_*_all.deb pkg-code/
+          mv ../xigmatek-connect-lcd-themes_*_all.deb pkg-themes/
+          ls -l pkg-code pkg-themes
+
       - uses: actions/upload-artifact@v7
         with:
           name: deb-code
-          path: |
-            ../xigmatek-connect-lcd_*_all.deb
-            ../xigmatek-connect-lcd_*_amd64.changes
-            ../xigmatek-connect-lcd_*_amd64.buildinfo
-            ../lintian.log
-            ../lintian-summary.txt
+          path: pkg-code/
           compression-level: 0        # already xz'd inside the .deb
           retention-days: 14
           if-no-files-found: error
@@ -229,7 +243,7 @@ jobs:
         if: github.ref_type == 'tag'
         with:
           name: deb-themes
-          path: ../xigmatek-connect-lcd-themes_*_all.deb
+          path: pkg-themes/
           compression-level: 0
           retention-days: 14
           if-no-files-found: error
