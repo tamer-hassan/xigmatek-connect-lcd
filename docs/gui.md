@@ -280,6 +280,37 @@ table against its table of bodies so a phase cannot silently point at the wrong 
 The fourth run is the one that shows the separate client: three lines from the subprocess,
 counters included, and the display never noticed the difference.
 
+**A fifth window, which nobody drove.** After the 0.2 upgrade, the packaged user unit
+started on its own (docs/packaging.md keeps that story, including what is not established
+about it) and drew unattended for 14 minutes: `/usr/bin/xigmalcd --theme alpha --fps 2`,
+one process, `NRestarts=0`. The evidence is the unit's own journal plus three reads over
+the control socket, kept as `data/glass/2026-11-07-072155-service-2fps-journal.log`, and
+it is thinner by design than a `tools/display_glass.py` log: no phases, no per-frame byte
+sizes, no client actions. What it does say:
+
+| | |
+|---|---|
+| uploads | **1 667** in 13.9 min at 2 fps: **1 664 confirmed, 3 refused**, 0 link errors |
+| session renewals | 3, each logged `session renewed after 500 uploads, 250 s` - the packaged unit passes no session flags, so this is the defaults, and at 2 fps the **500-upload** limit is what fires: 500 uploads is 250 s, inside the 300 s age limit (`--session-max`, `--session-ttl` in the options table) |
+| the upload the panel refused | all three refusals are `device refused the file: 400 b''` on ordinary frames (1029, 1097, 1167), ~34 s apart, in the 4 minutes after a renewal; unlike the four refusals in the table above, no client `upload` was in flight - the `upload` rows above are deliberate requests, these are the loop's own frames. Nothing in this tree explains a `400` on a `.osd` file, so it is recorded as seen, not as understood ("Notes and known limits") |
+| the background at start | `Theme_25.mp4 refused (device refused the file: 400 b''); retrying once` at 07:21:57, then `214917 B -> notice 200 in 2.3 s, space 69084 -> 69104` at 07:21:58 - the retry path doing its job, and the same `400 b''` answer as the frame refusals |
+| what it costs | systemd's own accounting at 13.9 min: `CPUUsageNSec=75 192 540 000`, `MemoryPeak=36 003 840 B` (36.0 MB), `NRestarts=0`. That is **45.2 ms of CPU per confirmed frame**, or **9.0 % of one core** sustained at 2 fps |
+
+That last row is the loop's cost, and it is worth setting beside the window's: the Cost
+section above measures `render.draw` at 12.4-14.1 ms and draw-plus-PNG-encode at about
+23 ms, because a preview neither writes the metrics blob nor pushes a file nor pumps a
+serial session. The real path costs roughly twice that, and 9 % of a core sustained is
+still nowhere near the reason not to run it - the reason is the upload count (172 800
+a day at 2 fps against 86 400 at 1, the `--fps` row in the options table).
+
+One honesty note about that 14 minutes, because the counters are steadier than the
+picture was: two reads four minutes apart reported different settings - `clock 44` at
+07:26 and `clock 30` at 07:30 - while the packaged `ExecStart` passes no `--clock-size`
+at all. A client sent a settings change over the socket in between (the `Apply` row
+above is that path); nothing in the kept file says who or when, so this window supports
+statements about counters, renewals and cost, and not about what the glass looked like
+frame by frame.
+
 The fifth window is the watched one, and it is also the one that caught the driver being
 dishonest about itself. It ran 16:55:49-17:00:58 and had reached the renewal wait when the
 owner stopped it with `^C`. What it measures, with a person watching: `--status` from a

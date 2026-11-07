@@ -102,7 +102,14 @@ Four things an install does that a checkout does not:
   `systemctl preset` from the helper (not called, as just shown) and `udevadm trigger
   --action=change` (which the transcript's own script ran at 07:21:47, and which re-ran
   rules for every device - visible as KDE losing and regaining its DRM render nodes at
-  07:21:47 - but has no path to a user unit with no device dependency). Settling it needs
+  07:21:47 - but has no path to a user unit with no device dependency). Two data points
+  sit on the other side: both times this package has been installed into a machine with no
+  logged-in session holding a user manager - the 0.1 install on this bench, and every CI
+  runner install - smoke then printed the unit `enabled` and `inactive` with the port free,
+  and the runner's install job now prints `unit state  inactive; is-enabled --user=enabled,
+  --global=enabled`. So the auto-start has been seen once, on an upgrade inside a live
+  session, and never on a fresh install. That is a correlation, and it is written as one.
+  Settling it needs
   a second upgrade on a machine where the answer can be varied deliberately - with and
   without a `systemctl --user daemon-reload` either side - and until then the honest
   summary for a reader is the operational one: **upgrading this package on a logged-in

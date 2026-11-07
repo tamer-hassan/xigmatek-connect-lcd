@@ -2211,6 +2211,64 @@ print(f"  {path}: {silence.group(1)} s paused moved {silence.group(2)} frames an
       f"{back.group(2)} uploads; reset refused; the loop renewed itself after "
       f"{ren.group(1)} uploads / {ren.group(2)} s and was at {after.group(1)} "
       f"uploads right after; the --status client answered in {len(cli)} lines")
+# A second kind of kept evidence: the packaged unit's own journal.  It is a `.log` and
+# not a `.txt` on purpose, so the loop above does not read it as an instrumented window -
+# no driver made it, there are no phases in it and no per-frame byte sizes.  What it does
+# carry is the daemon's counters, its session-renewal lines and systemd's own accounting,
+# and the numbers docs/gui.md quotes from it are re-derived here rather than remembered.
+svc = sorted(p for p in glob.glob("data/glass/*.log") if "-service-" in p)
+if not svc:
+    print("  service journal      SKIPPED: no packaged-unit journal kept on this machine")
+else:
+    gui_doc = open("docs/gui.md", encoding="utf-8").read()
+    lim_doc = open("docs/limits.md", encoding="utf-8").read()
+    for path in svc:
+        text = open(path).read()
+        assert os.path.basename(path) in gui_doc and os.path.basename(path) in lim_doc, \
+            (path, "the journal is kept but no document cites it")
+        reads = [(int(c), int(t), int(r)) for c, t, r in
+                 re.findall(r"(\d+)/(\d+) frames confirmed, (\d+) refused", text)]
+        assert reads, (path, "no counters read in this journal")
+        for ok, tot, ref in reads:
+            assert ok + ref == tot, (path, ok, tot, ref)      # every attempt accounted for
+        assert all(b[1] >= a[1] for a, b in zip(reads, reads[1:])), \
+            (path, "counters went backwards: two processes in one file?")
+        ren = re.findall(r"session renewed after (\d+) uploads, (\d+) s", text)
+        assert ren, (path, "no renewal line")
+        # the packaged ExecStart passes no session flags, so the defaults are what fires:
+        # --session-max 500, and the seconds have to be 500 uploads at the unit's fps
+        fps = float(re.search(r"--fps (\d+)", text).group(1))
+        ups = int(ren[-1][0])
+        assert ups == 500, (path, "the packaged unit renewed at something other than the"
+                                  " default 500 uploads", ups)
+        assert abs(int(ren[-1][1]) - ups / fps) <= 3, (path, ren[-1], ups, fps)
+        refuses = re.findall(r"! frame (\d+): device refused the file: 400", text)
+        # and every refused frame the file names has to be named in the docs that quote it
+        for n in refuses:
+            assert n in gui_doc, (path, n, "a refusal the GUI ledger does not name")
+            assert n in lim_doc, (path, n, "a refusal the limits write-up does not name")
+        cpu = re.search(r"CPUUsageNSec=(\d[\d ]*)", text)
+        mem = re.search(r"MemoryPeak=(\d[\d ]*)", text)
+        assert cpu and mem, (path, "no systemd accounting in this journal")
+        ns = int(cpu.group(1).replace(" ", ""))
+        peak = int(mem.group(1).replace(" ", ""))
+        ok, tot, ref = reads[-1]
+        ms = ns / 1e9 / ok * 1000
+        pct = ns / 1e9 / (tot / fps) * 100
+        assert f"{ms:.1f} ms of CPU per confirmed frame" in gui_doc, (ms, "gui.md's figure")
+        assert f"{pct:.1f} % of one core" in gui_doc, (pct, "gui.md's figure")
+        assert f"{peak / 1e6:.1f} MB" in gui_doc, (peak, "gui.md's memory figure")
+        # what the docs say about the refusals has to be in the file, in the same shape:
+        # the frame numbers, and the totals they are quoted under
+        assert refuses, path
+        for n, tot in ((c, t) for c, t, r in reads[-1:]):
+            assert f"{tot:,}".replace(",", " ") in gui_doc or str(tot) in gui_doc, \
+                (path, tot, "gui.md never names this total")
+        print(f"  {os.path.basename(path)}: {len(reads)} counter reads, "
+              f"{ok}/{tot} confirmed/refused-accounted, {len(refuses)} refusals "
+              f"(frames {', '.join(refuses)}), renewal at {ups} uploads / {fps} fps, "
+              f"{ms:.1f} ms CPU per frame = {pct:.1f}% of a core, peak {peak/1e6:.1f} MB - "
+              f"all three cost figures re-derived from the file gui.md quotes them in")
 print(f"  {len(runs)} glass log(s) in data/glass/, each stamped with its window")
 PY
 else

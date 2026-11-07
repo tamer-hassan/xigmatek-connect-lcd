@@ -114,6 +114,32 @@ What has been measured on glass, by whom, with how many frames - and what has no
   `send_media()` raises instead of calling that success. Reading that notice is the
   only reliable check: `transported` answers `{"state":"success"}` even for a refused
   file, and `space` does not move for accepted uploads either.
+* **Three refusals in fourteen unattended minutes, and no explanation for them.** The
+  packaged unit, left drawing `alpha` at 2 fps after the 0.2 upgrade, logged
+  `! frame 1029 / 1097 / 1167: device refused the file: 400 b''` - three `1 400` notices
+  on ordinary frames, about 34 s apart, inside the four minutes after a session renewal,
+  with `1 664 of 1 667` uploads confirmed and 0 link errors around them
+  (`data/glass/2026-11-07-072155-service-2fps-journal.log`). What makes them worth
+  writing down is what they are *not*: every other `400` in this tree's logs is a
+  background `.mp4` the panel declined, in a window where a client had deliberately asked
+  for an upload (the four cases in the GUI ledger). Here nothing asked - it was the loop's
+  own frame, one of the three between renewals, and the next frame landed normally. The
+  same `400 b''` did appear at 07:21:57 for the background at session start and was
+  accepted 2.3 s after the retry, so the answer is at least transient rather than fatal.
+  Not established: whether a renewal in flight raced the upload, whether the panel
+  refuses a `.osd` file that arrives while it is committing the previous one, or whether
+  this has been happening in the 1 fps windows too and simply never reached 3 in one. What
+  would settle it is an instrumented run of the service path (`-v`, both directions
+  logged, and `tools/display_glass.py` phases over a unit-started display rather than a
+  hand-started one), which is the gap in the next bullet. Until then the honest statement
+  is the rate: 3 of 1 667, self-recovered, unexplained.
+* **The service path has been observed, not instrumented.** Everything in the GUI
+  ledger's always-on column was produced by `tools/display_glass.py` driving a
+  hand-started display, so it has per-frame byte sizes, phase checks and a client. The
+  packaged unit - the thing a person who ran `apt install` actually gets - has been
+  watched (counters, renewals, cost, journal) and never driven through the same phases.
+  A soak of an installed system at 2 fps, with the phases and the byte log, is still
+  unclaimed.
 * Uploads are **timing sensitive**, and this is the part that cost the most time. The
   whole exchange — `POST transport`, the raw file, `POST transported` — has to go out as
   one burst, and the first file byte must land at least ~20 ms after the announcement.
