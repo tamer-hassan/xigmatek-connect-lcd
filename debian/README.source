@@ -25,10 +25,21 @@ say so in the changelog when one moves.
 Which bytes go in which package
 -------------------------------
 `xigmatek-connect-lcd` is the code plus what the code needs to look like the vendor
-app out of the box: the two Python packages, the three console scripts
-(`xigmalcd`, `xigmaui`, `xigmalcd-reset`), the three
-background clips this project vendors (4.8 MB), the udev rule, the user unit, the
-menu entry and the icon.
+app out of the box: the two Python packages, the three console scripts (`xigmalcd`,
+`xigmaui`, `xigmalcd-reset`), the three background clips this project vendors
+(4.8 MB), the udev rule, the user unit, the menu entry and the icon.
+
+The udev rule is installed by debian/rules into /usr/lib/udev/rules.d and nothing
+reloads udev afterwards - by design, since a rule change belongs to a replug or to an
+administrator's `udevadm control --reload-rules`.  `dh_installudev` would not do it
+either: it is in the default sequence, no-ops without a debian/<package>.udev file,
+prefixes the installed name with its --priority (60 by default, so a file already
+called 99-… would land as 60-99-…), and writes no maintainer-script fragment -
+`grep -l udevadm /usr/share/debhelper/autoscripts/` on this box answers nothing.
+Measured after the install recorded in docs/packaging/smoke-2026-11-07.log: the rule
+file present, `/dev/xigmatek-lcd` absent, and no ID_MM_DEVICE_IGNORE in
+`udevadm info /dev/ttyACM0` until the device is replugged.  README says the same in
+the user's words.
 
 `xigmatek-connect-lcd-themes` is ALPHA's own library - the 27 `.thm` files as
 shipped, their decrypted layouts, the clips, the baked overlay PNGs and the

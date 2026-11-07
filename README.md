@@ -228,7 +228,18 @@ Four things an install does that a checkout does not:
 * no `.pyc` is in either `.deb` - they are written on the target, by the target's
   interpreter;
 * the udev rule lands in `/usr/lib/udev/rules.d`, the distro's own directory rather than
-  `/etc/udev/rules.d`, so removing the package removes the rule with it.
+  `/etc/udev/rules.d`, so removing the package removes the rule with it - and installing
+  it does not make udev read it. Measured on this bench immediately after that install:
+  the file was there (`/usr/lib/udev/rules.d/99-xigmatek-lcd.rules`, 634 B, dated with
+  the install), and `/dev/xigmatek-lcd` did not exist, and `udevadm info /dev/ttyACM0`
+  showed `ID_MODEL=Xigmatek_USB_Device` with no `ID_MM_DEVICE_IGNORE` in its properties.
+  What applies a rule is udev reading it: replug the panel, or
+  `sudo udevadm control --reload-rules && sudo udevadm trigger --action=change`. There is
+  no debhelper hook that does it for you either - `dh_installudev` is in the default
+  sequence, does nothing without a `debian/<package>.udev` file, installs one when
+  present (with a `--priority` prefix on the name), and adds no maintainer-script
+  fragment: `grep -l udevadm /usr/share/debhelper/autoscripts/` answers nothing on this
+  box.
 
 And `tools/` is installed by neither package, which is the reason the reset command is a
 command of its own - see "If the panel goes white".
