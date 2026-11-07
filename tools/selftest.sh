@@ -1401,7 +1401,7 @@ try:
     assert win.btn_upload.toolTip() == win.clip_state.text().split(" - ", 1)[1]
     win._load_background(byname["Theme_25.mp4"].path)
     win._refresh_clip_state()
-    assert win.btn_upload.isEnabled() and "Ctrl+U" in win.btn_upload.toolTip()
+    assert win.btn_upload.isEnabled() and "Ctrl+Shift+U" in win.btn_upload.toolTip()
     print("  background state        unknown / stores X / this clip, three "
           "wordings, and the gate's refusal read before the click")
 finally:

@@ -69,7 +69,7 @@ there is one place to change when a number is re-measured.
 | the running display | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Measured 1 ms for the six commands Apply sends |
 | preview | the stored background frame with `render.draw`'s OSD layer composited on top, refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How wide each half gets" below | nothing |
 | theme | the five themes, clock size, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
-| clips | every MP4 the roots hold, listed once per clip - **69 rows** on this box: 3 vendored here, 40 more from the vendor's library, 26 more from the 69 files the Windows app has pushed to this panel (the rest are byte-identical re-uploads); the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. Each row gets an ffmpeg thumbnail and its measured mean luma. One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+U): `STATE all 1` twice, then the whole file as one media file |
+| clips | every MP4 the roots hold, listed once per clip - **69 rows** on this box: 3 vendored here, 40 more from the vendor's library, 26 more from the 69 files the Windows app has pushed to this panel (the rest are byte-identical re-uploads); the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. Each row gets an ffmpeg thumbnail and its measured mean luma. One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
 | background state | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the gate refuses says so, in the gate's words, before the button is pressed | nothing: it is a readout |
 | `One frame now` | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
 | `Send frames for 30 s` | the picture loop, so you can watch the real glass | `STATE all 1` twice, then 60 uploads at 2 fps |
@@ -102,6 +102,16 @@ than a designer's taste:
 * and the picture refits when the **label** resizes, not when the window does:
   dragging the splitter never fired the window's `resizeEvent`, which is why the
   preview used to stay at its old scale while its pane changed shape.
+
+### Two shortcuts, and why they are the ones they are
+
+`Apply these settings` is Ctrl+Return, the upload button is Ctrl+Shift+U. The second
+of those was Ctrl+U first, and the bench measured why it cannot be: with the button
+holding a bare Ctrl+U, pressing Ctrl+U in the **filter field directly above it** queued
+an upload and left the field's text alone. Qt's `QLineEdit` binds nothing on Ctrl+U -
+the muscle memory behind that key comes from readline - so the keystroke went to the
+panel path instead of to the text the reader was editing. On Ctrl+Shift+U the button
+still fires and the field is untouched, which is the pair the suite now checks.
 
 ### What the window can and cannot tell you about the background
 

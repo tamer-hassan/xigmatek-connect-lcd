@@ -434,7 +434,14 @@ class Window(QMainWindow):
         mlay.addWidget(self.clip_state)
         row = QHBoxLayout()
         self.btn_upload = QPushButton("Send this background to the panel")
-        self.btn_upload.setShortcut(QKeySequence("Ctrl+U"))
+        # Ctrl+Shift+U rather than Ctrl+U, because of what the field directly
+        # above this button is for.  Measured offscreen: while the button held a
+        # bare Ctrl+U, pressing it in the filter row *queued an upload* and left
+        # the field alone - the reader's keystroke (Ctrl+U is readline's "kill the
+        # line", and Qt's own QLineEdit binds nothing there) went to the panel
+        # path instead.  On Ctrl+Shift+U the button still fires and the field is
+        # untouched.
+        self.btn_upload.setShortcut(QKeySequence("Ctrl+Shift+U"))
         self.btn_upload.clicked.connect(lambda: self.queue(
             "upload", path=self.mp4,
             # the two upload knobs come from the protocol module rather than
@@ -861,7 +868,7 @@ class Window(QMainWindow):
             "send the selected file to the panel as its stored background layer, "
             "under the frame we draw. This overwrites what is stored, and only "
             "the guarded factory reset clears it (docs/troubleshooting.md). "
-            "Ctrl+U")
+            "Ctrl+Shift+U")
         if not self.daemon.present:
             self.btn_upload.setText("Send this background to the panel")
             self.clip_state.setStyleSheet("font-family:monospace;color:#888;")
@@ -1105,7 +1112,7 @@ class Window(QMainWindow):
             if self._stored_bg and self._stored_bg != want:
                 self._log(f"settings sent; the background did not go with them. "
                           f"The panel stores {self._stored_bg} and this window "
-                          f"has {want} selected: the clips box sends it (Ctrl+U)")
+                          f"has {want} selected: the clips box sends it (Ctrl+Shift+U)")
             elif self._stored_bg == want:
                 self._log(f"settings sent; the panel already stores {want}, so "
                           f"the layer under the frame stayed as it was")
