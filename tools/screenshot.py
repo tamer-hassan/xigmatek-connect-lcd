@@ -134,6 +134,22 @@ def main() -> int:
         pending = getattr(win, "_pending", [])
         if len(win.all_clips) - len(pending) >= a.keep_thumbnails:
             break
+    # and every row the frame can actually show carries its numbers: the probe
+    # pass is one clip per timer tick by design (115 ffmpeg seeks is 12.7 s on this
+    # box and the rows below the fold are not the rows you are looking at), which
+    # in a picture means a third of the visible list still reads `size ?  loop ?`.
+    # So the visible rows are finished before the grab, through the window's own
+    # batching, and nothing else about the lazy pass changes.
+    from xigmaui import clips as clipdb
+    row_h = win.clips.visualItemRect(win.clips.item(0)).height() or 1
+    shown = min(len(win.all_clips), win.clips.viewport().height() // row_h + 1)
+    win._pending = [i for i in range(shown)
+                    if not win.all_clips[i].px[0]] + list(win._pending)
+    for _ in range(shown):
+        if not win._pending:
+            break
+        win._thumb_batch()
+        app.processEvents()
     done = len(win.all_clips) - len(getattr(win, "_pending", []))
     pm = win.grab()
     pm.save(a.out, "PNG")

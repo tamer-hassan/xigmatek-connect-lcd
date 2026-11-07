@@ -111,7 +111,11 @@ number in that shape comes from a measurement, most of them of a failure:
 * **the log sits under the picture**, in the preview column, because that is the one
   place with height to spare: the frame is 480 px and is never scaled up, so a tall
   window leaves room there nothing else can honestly fill - while every pixel of the
-  library column is another clip row. The picture still keeps first call on that
+  library column is another clip row - with one caveat about the picture: a thumbnail is drawn into a
+  64 px square, and a clip that is not the panel's shape (3 of the library's are
+  320×240) is letterboxed into it rather than stretched, so the square in the list is
+  not a claim about the file's proportions. The `320x240` on the row is.
+  The picture still keeps first call on that
   column's height (stretch 6 against the log's), so the log scrolls rather than
   shrinking the glass; the list has a 150 px floor and the log an 84 px one, so a
   short window scrolls instead of turning the picker into a strip;

@@ -795,8 +795,16 @@ class Window(QMainWindow):
             self.clips.addItem("(no MP4 found: media/ is empty and the Windows "
                                "partition is not mounted)")
             return
+        side = self.clips.iconSize().height()
         for c in self.all_clips:
             item = QListWidgetItem(self._row(c))
+            # The row is told its height, not asked to guess it. With
+            # `uniformItemSizes` the first item's sizeHint sets the height for all
+            # of them, and that hint is taken before any thumbnail exists - which
+            # latched every row to 17 px of text and clipped the icons that arrived
+            # a tick later. Measured: 17 px at first paint, 66 px only after the
+            # lazy pass had run and something else re-hinted the view.
+            item.setSizeHint(QSize(0, side + 2))
             item.setData(Qt.ItemDataRole.UserRole, c.path)
             # the daemon's own gate, run here: a row that would come back
             # "the display refused upload: …" is marked before it is ever
@@ -860,10 +868,20 @@ class Window(QMainWindow):
         img = clipdb.frame(clip.path)
         if img is None:
             return
-        side = self.clips.iconSize().width()      # never drift from the widget
-        rgb = img.convert("RGB").resize((side, side), Image.Resampling.LANCZOS)
-        q = QImage(rgb.tobytes("raw", "RGB"), side, side,
-                   QImage.Format.Format_RGB888).copy()
+        # never drift from the widget's icon size.  And the fit keeps the file's
+        # proportions: three of the library's clips are 320x240, and stretching a
+        # 4:3 frame into a 64 px square would show a picture that is not in the
+        # file.  Letterbox instead, transparently, so the list's own background
+        # shows through the bars - and the row's measured `320x240` is the number
+        # a reader should trust about the file.
+        side = self.clips.iconSize().width()
+        thumb = img.convert("RGBA")
+        thumb.thumbnail((side, side), Image.Resampling.LANCZOS)
+        box = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+        box.paste(thumb, ((side - thumb.width) // 2, (side - thumb.height) // 2),
+                  thumb)
+        q = QImage(box.tobytes("raw", "RGBA"), side, side, side * 4,
+                   QImage.Format.Format_RGBA8888).copy()
         item.setIcon(QIcon(QPixmap.fromImage(q)))
 
     def _clip_chosen(self, item: QListWidgetItem | None, *_a) -> None:

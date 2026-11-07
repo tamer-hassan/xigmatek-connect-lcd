@@ -1359,6 +1359,33 @@ assert visible >= 4, (visible, row_h, win.clips.viewport().height(),
 assert win.clips.uniformItemSizes() and \
     win.clips.resizeMode() == win.clips.ResizeMode.Fixed, \
     "the list is back in the mode that paints one selected row as a block"
+# and every row is *told* how tall it is: with uniform sizes the first item's
+# sizeHint sets the height for all of them, taken before any thumbnail exists,
+# which once latched every row to 17 px of text and clipped the icons that
+# arrived a tick later (measured: 17 px at first paint, 66 px only afterwards)
+assert all(win.clips.item(i).sizeHint().height() >= app.CLIP_ICON.height()
+           for i in range(win.clips.count())), "a row is shorter than its thumbnail"
+assert all(win.clips.item(i).sizeHint().height() <= app.CLIP_ICON.height() + 8
+           for i in range(win.clips.count())), "rows are padding themselves again"
+# a thumbnail never distorts the file it came from: the row states the measured
+# pixel size, and the picture keeps the aspect ratio (letterboxed into the square)
+from PIL import Image as _PILImage
+_tall = next(i for i, c in enumerate(win.all_clips) if c.px == (320, 240))
+clipdb.probe(win.all_clips[_tall])
+win._pending = [_tall] + list(win._pending)
+win._thumb_batch()
+appq.processEvents()
+ico = win.clips.item(_tall).icon()
+assert not ico.isNull(), "the odd-size clip has no thumbnail at all"
+pm = ico.pixmap(app.CLIP_ICON.width(), app.CLIP_ICON.height())
+img = pm.toImage()
+assert img.hasAlphaChannel(), "the letterbox bars are not transparent"
+# a 320x240 frame fit into a 64 px square leaves bars above and below (the width
+# binds first), so the sample that must be clear is a corner of the box
+bar = img.pixelColor(img.width() // 2, 1)
+assert bar.alpha() == 0, (bar.rgba(), "the bar beside a 4:3 frame is not clear")
+inside = img.pixelColor(img.width() // 2, img.height() // 2)
+assert inside.alpha() > 0, (inside.rgba(), "the frame itself was pasted away")
 assert win.clips.iconSize() == app.CLIP_ICON, (win.clips.iconSize(), app.CLIP_ICON)
 win.resize(1919, 1055)                 # a full-HD desk, the case reported
 for _ in range(10):
