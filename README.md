@@ -53,12 +53,14 @@ The same controls in a Qt application: pick a theme, pick a background from ever
 the machine can find, watch the preview, put one frame or the whole loop on the glass.
 And because this panel cannot be asked what it is showing, the window says what it
 *knows*: the background the running display reported putting there, and the last six
-things it did on the port. This is a capture of the real program
-(`tools/screenshot.py`, no panel attached), with this machine's live readings in the
-preview:
+things it did on the port. Three columns — preview, controls, clip library — with an
+`advanced controls` switch that folds the secondary knobs away without changing their
+values. This is a capture of the real program (`tools/screenshot.py`, no panel attached),
+with this machine's live readings in the preview:
 
-![xigmaui, the window: preview on the left, the running display's status, theme
-picker and background clips on the right](docs/screenshot-xigmaui.png)
+![xigmaui, the window in three columns: the preview and the log on the left, the
+running display's status and the theme pickers in the middle, and the background clip
+library on the right, showing twenty of this machine's 69 clips](docs/screenshot-xigmaui.png)
 
 It talks to a display loop that is already running when one is running, and drives the
 port itself when nothing is — which is the part that needs care, because the panel

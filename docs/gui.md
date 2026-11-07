@@ -64,22 +64,27 @@ repeated - `protocol.MEDIA_GAP` and `MEDIA_CHUNK` for the upload shape,
 session can take - so the window and `python3 -m xigmalcd` cannot drift apart, and
 there is one place to change when a number is re-measured.
 
-| pane | what it does | what lands on the wire |
-|---|---|---|
-| the running display | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Measured 1 ms for the six commands Apply sends |
-| preview | the stored background frame with `render.draw`'s OSD layer composited on top, refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How wide each half gets" below | nothing |
-| theme | the five themes, clock size, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
-| clips | every MP4 the roots hold, listed once per clip - **69 rows** on this box: 3 vendored here, 40 more from the vendor's library, 26 more from the 69 files the Windows app has pushed to this panel (the rest are byte-identical re-uploads); the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
-| background state | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the gate refuses says so, in the gate's words, before the button is pressed | nothing: it is a readout |
-| `One frame now` | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
-| `Send frames for 30 s` | the picture loop, so you can watch the real glass | `STATE all 1` twice, then 60 uploads at 2 fps |
-| status | the panel's `conn 1` reply: sn, versions, `space`, `brightness`, `mode`, `logo`, `osdState`, `timeout`, each annotated only where PROTOCOL.md records what it means | `conn 1`, `power resume`, `timeout 60` - and no metrics blob, because it puts no picture on the glass. With a display running there is no fresh `conn 1` to ask for, so the box shows the one that display read at its own session start, labelled as such |
-| reset | the vendor's `recovery` | needs the word `reset` typed in, then a confirm dialog. With a display running it goes over the socket, which refuses it unless that display was started `--allow-reset`, and the refusal is quoted in the daemon's words |
+The three columns are preview / controls / library, and the boxes below sit in
+one of them (see "How the three columns get their sizes", after the table):
 
-### How wide each half gets, and why the preview is never bigger than the glass
+| box | column | what it does | what lands on the wire |
+|---|---|---|---|
+| the running display | controls | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Measured 1 ms for the six commands Apply sends |
+| preview | preview | the stored background frame with `render.draw`'s OSD layer composited on top, refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How the three columns get their sizes" below | nothing |
+| theme | controls | the five themes, clock size, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
+| clips | library | every MP4 the roots hold, listed once per clip - **69 rows** on this box: 3 vendored here, 40 more from the vendor's library, 26 more from the 69 files the Windows app has pushed to this panel (the rest are byte-identical re-uploads); the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
+| background state | library | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the gate refuses says so, in the gate's words, before the button is pressed | nothing: it is a readout |
+| `One frame now` | library | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
+| `Send frames for 30 s` | library, advanced | the picture loop, so you can watch the real glass | `STATE all 1` twice, then 60 uploads at 2 fps |
+| status | library, advanced | the panel's `conn 1` reply: sn, versions, `space`, `brightness`, `mode`, `logo`, `osdState`, `timeout`, each annotated only where PROTOCOL.md records what it means | `conn 1`, `power resume`, `timeout 60` - and no metrics blob, because it puts no picture on the glass. With a display running there is no fresh `conn 1` to ask for, so the box shows the one that display read at its own session start, labelled as such |
+| log | preview, under the picture | the window's own last 200 lines (`LOG_KEEP`): what it sent, what the panel answered, what failed and why. Scrollable, selectable, newest at the bottom; the display's full record is its journal, `journalctl --user -u xigmalcd -f` (docs/usage.md) | nothing: it is a readout |
+| `advanced controls` | controls, top row | folds away the six secondary things named further down; it hides pixels and never values | nothing |
+| reset | controls, always on | the vendor's `recovery` | needs the word `reset` typed in, then a confirm dialog. With a display running it goes over the socket, which refuses it unless that display was started `--allow-reset`, and the refusal is quoted in the daemon's words |
 
-The two columns sit in a splitter, and three measured rules decide its shape rather
-than a designer's taste:
+### How the three columns get their sizes, and why the preview is never bigger than the glass
+
+The window is a splitter with three panes - preview, controls, library - and every
+number in that shape comes from a measurement, most of them of a failure:
 
 * the frame `render.draw` produces is **480×480**, exactly what the panel is, and
   `_fit()` caps the pixmap at that size. Qt's `scaled(KeepAspectRatio)` grows a
@@ -87,21 +92,57 @@ than a designer's taste:
   480 px picture at 502 px - a picture of the glass containing 22 px of invented
   detail. The suite pins both directions: 1:1 on a wide window, and shrunk to the
   pane when the handle is dragged narrow (`xigmaui/app.py:_fit`);
-* so a preview column wider than 480 px + chrome is dead space. The left pane gets
-  a maximum width (`render.W + PANE_CHROME`, 532 px here) and the controls get the
-  rest. Before that cap, a 2 259 px window gave the preview column ~993 px for a
-  480 px picture - and, with the upscale bug above, drew that picture at ~993 px -
-  while the parts you actually work with shared 1 266 px. The floor on the other
-  side is a measurement too: the first version of the cap applied its sizes before
-  the splitter had ever been laid out, and at 2 259 px the controls column came back
-  **116 px** wide. That is the "invisible half" failure, and it is why the sizes are
-  set after the window's own `resize`, why the right pane has a 320 px minimum, and
-  why the suite asserts both. Where the handle ends up is remembered - the settings
-  file's `split` key - and a restored `0` width is rejected rather than restored, so
-  a pane hidden by an over-eager drag cannot come back as a permanent hole.
+* so a preview column wider than 480 px + chrome is dead space. That pane gets a
+  maximum width (`render.W + PANE_CHROME`, 532 px here). Before the cap, a 2 259 px
+  window gave the preview ~993 px for a 480 px picture - and, with the upscale bug,
+  drew it at that size - while everything else shared 1 266 px. The floor on the
+  other side is a measurement too: the first version applied its sizes before the
+  splitter had ever been laid out, and at 2 259 px the controls came back **116 px**
+  wide. Hence the sizes are set after the window's own `resize`, and the three
+  minimums are 200 / 300 / 320 px;
+* **the library is a column of its own**, because of one number: at 1 919×1 055 the
+  clip list, sitting fifth in a single long column, had a **190 px viewport** and
+  rows **114 px** tall - two of 69 clips on screen at a time, on a full-HD monitor.
+  The row height follows the icon, so the thumbnails went from 112 px to 64
+  (`CLIP_ICON`), and `ResizeMode.Adjust` - which lays rows out against the viewport
+  and is what painted one selected clip as a block taller than the list - went to
+  `Fixed` with uniform rows. Measured afterwards, and printed by the suite:
+  **66 px rows, 7 clips in view at the fresh 1180×780 window, 12 at 1919×1055**;
+* **the log sits under the picture**, in the preview column, because that is the one
+  place with height to spare: the frame is 480 px and is never scaled up, so a tall
+  window leaves room there nothing else can honestly fill - while every pixel of the
+  library column is another clip row. The picture still keeps first call on that
+  column's height (stretch 6 against the log's), so the log scrolls rather than
+  shrinking the glass; the list has a 150 px floor and the log an 84 px one, so a
+  short window scrolls instead of turning the picker into a strip;
+* where the handles end up is remembered - the settings file's `split`, now three
+  numbers, with a two-number file from the old layout grown a third and a restored
+  `0` width rejected rather than restored, so a pane hidden by an over-eager drag
+  cannot come back as a permanent hole;
 * and the picture refits when the **label** resizes, not when the window does:
-  dragging the splitter never fired the window's `resizeEvent`, which is why the
+  dragging a splitter handle never fired the window's `resizeEvent`, which is why the
   preview used to stay at its old scale while its pane changed shape.
+
+The fresh window default is **1180×780** (`xigmaui/settings.py`) - wide enough for
+three columns, short enough for a 1080p screen - and the README's capture frames it at
+1380×860. Both figures are asserted against the code by the suite, so neither sentence
+can go stale.
+
+### The advanced switch
+
+A checkbox at the top of the controls column, default **off**, folds away six
+secondary things: the `canvas` and `scrim` pickers, the fan-figures switch, the
+display's event ring, the panel's own `conn 1` hello, and the "send frames for 30 s"
+run. It is about pixels and nothing else - every hidden control keeps its value and
+`Apply` sends it, which is what the suite checks by setting `scrim` while it is
+invisible, restarting the window and reading the same 200 back. The choice is
+remembered (`advanced` in the settings file), and the note beside the switch names
+what is folded so a reader is never hunting for a control that exists.
+
+The **guarded factory reset is deliberately not in there**. It stays on screen whether
+the switch is on or off: hiding the one thing that can put a panel back to its default
+would trade a wasted 90 px for a feature people search for when their panel has gone
+white (docs/troubleshooting.md).
 
 ### Two shortcuts, and why they are the ones they are
 
@@ -594,8 +635,8 @@ indexed rather than 9.2-9.8 KB.
 
 **What it remembers.** `~/.config/xigmaui/config.json`, written by
 `xigmaui/settings.py`: the port, theme, clock size, canvas, scrim, fan figures, preview
-rate, window size, whether closing the window hides it to the tray, and the clip that
-was selected. The write is atomic and debounced -
+rate, window size, the three splitter widths, whether the advanced controls are folded
+away, whether closing the window hides it to the tray, and the clip that was selected. The write is atomic and debounced -
 500 ms behind a burst of clicks, once more on close - and the read goes through
 validation rather than trust: a truncated or hand-edited file falls back to the
 defaults instead of stopping the window, out-of-range values are dropped, and a clip

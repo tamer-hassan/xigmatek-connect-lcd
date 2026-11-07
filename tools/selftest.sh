@@ -1098,6 +1098,7 @@ QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME=$cfgtmp XIGMA_SOCKET=$cfgtmp/no-displa
     python3 - <<'PY' || { echo "gui FAILED"; exit 1; }
 import inspect
 import os
+import re as _re
 import sys
 import time
 import types
@@ -1305,21 +1306,26 @@ wired = inspect.getsource(app.Window._build).count("fans=self.fanline.isChecked(
 assert wired == 3, wired
 print("  all three drawing buttons hand the fan flag to the worker")
 
-# ---- the two columns, and what the preview is allowed to do with its pixels ----
+# ---- the three columns, and what the preview is allowed to do with its pixels ----
 # The preview column's width is capped at the picture's own size plus the pane's
 # chrome, because `_fit()` must never draw the 480 px frame larger than 480:
 # Qt's `scaled(KeepAspectRatio)` happily grows a pixmap, and on a wide window that
 # showed a 502 px picture of a 480 px panel.  Both halves of that rule are checks.
-pane_l, pane_r = win.split.widget(0), win.split.widget(1)
+# And the library is a column of its own now, because at 1 919x1 055 the clip list
+# was one box among five in a single long column: measured, its viewport was 190 px
+# with 114 px rows, which is two of 69 clips on screen at a time.
+assert win.split.count() == 3, win.split.count()
+pane_l, pane_c, pane_lib = (win.split.widget(i) for i in range(3))
 assert pane_l.maximumWidth() == render.W + app.PANE_CHROME, (
     pane_l.maximumWidth(), render.W, app.PANE_CHROME)
 assert pane_l.maximumWidth() >= render.W, "the frame could never be shown 1:1"
-assert pane_r.minimumWidth() >= 300, pane_r.minimumWidth()
+assert pane_c.minimumWidth() >= 300 and pane_lib.minimumWidth() >= 320, \
+    (pane_c.minimumWidth(), pane_lib.minimumWidth())
 win.show()
 for _ in range(6):
     appq.processEvents()
 win.resize(1600, 900)
-win.split.setSizes([1200, 380])        # the handle dragged as far right as it goes
+win.split.setSizes([1200, 380, 520])   # the handle dragged as far right as it goes
 for _ in range(6):
     appq.processEvents()
 assert pane_l.width() == pane_l.maximumWidth(), (pane_l.width(),
@@ -1327,7 +1333,7 @@ assert pane_l.width() == pane_l.maximumWidth(), (pane_l.width(),
 win._fit()
 assert win.preview.width() >= render.W, win.preview.width()
 assert win.preview.pixmap().width() == render.W, win.preview.pixmap().size()
-win.split.setSizes([180, 1400])        # and as far left
+win.split.setSizes([180, 1400, 500])   # and as far left
 for _ in range(6):
     appq.processEvents()
 win._fit()
@@ -1336,6 +1342,80 @@ assert win.preview.pixmap().width() == win.preview.width() < render.W, \
 print(f"  preview column          capped at {pane_l.maximumWidth()} px for a "
       f"{render.W} px frame: 1:1 on a wide window, {win.preview.pixmap().width()} "
       f"px when the pane is dragged narrow, never bigger than the glass")
+
+# How much clip the library column actually shows, at the sizes a reader gets:
+# rows follow the icon size, so this is the number that decides whether the list is
+# a tool or a scroll wheel.  Both are measurements of the live widget, not of the
+# intent: `fixed` layout mode, 64 px icons, uniform sizes.
+win.resize(1180, 780)                  # the window's own default size
+win.split.setSizes(list(settings.DEFAULTS["split"]))
+for _ in range(10):
+    appq.processEvents()
+row_h = win.clips.visualItemRect(win.clips.item(0)).height()
+visible = win.clips.viewport().height() // max(1, row_h)
+assert row_h <= 80, (row_h, "a clip row taller than this wastes the column")
+assert visible >= 4, (visible, row_h, win.clips.viewport().height(),
+                      "the library column shows too few clips to browse")
+assert win.clips.uniformItemSizes() and \
+    win.clips.resizeMode() == win.clips.ResizeMode.Fixed, \
+    "the list is back in the mode that paints one selected row as a block"
+assert win.clips.iconSize() == app.CLIP_ICON, (win.clips.iconSize(), app.CLIP_ICON)
+win.resize(1919, 1055)                 # a full-HD desk, the case reported
+for _ in range(10):
+    appq.processEvents()
+wide_visible = win.clips.viewport().height() // max(1, row_h)
+assert wide_visible >= 8, (wide_visible, "the full-HD window is back to two rows")
+print(f"  clip list               rows {row_h} px: {visible} of {win.clips.count()} "
+      f"clips at {settings.DEFAULTS['size'][0]}x{settings.DEFAULTS['size'][1]}, "
+      f"{wide_visible} at 1919x1055 (it was 2 there)")
+
+# the detail line under the list repeats nothing: the row above it already says
+# what the file is called, its size, its length and where it came from
+win.split.setSizes(list(settings.DEFAULTS["split"]))
+win.clips.setCurrentRow(next(i for i, c in enumerate(win.all_clips)
+                             if c.name == "Theme_11.mp4"))
+for _ in range(6):
+    appq.processEvents()
+detail = win.clip_info.text()
+assert "Theme_11" not in detail, detail[:120]
+assert "mean luma" in detail and "overwrites" not in detail.replace("replaces", ""), \
+    detail[:160]
+print("  clip detail             the readout under the list, not a second copy of the row")
+
+# ---- the advanced switch: what folds away, and what hiding never changes ----
+# Default: folded.  Everything hidden keeps its value and still goes out on Apply -
+# the switch is about pixels, not about defaults - and the factory reset stays put,
+# because a guarded recovery that is hard to find is worse than one in the way.
+folded = [win.canvas, win.scrim, win.fanline, win.d_events, win.btn_live,
+          win.status_box]
+assert all(not w.isVisible() for w in folded), [w.objectName() for w in folded
+                                                if w.isVisible()]
+assert all(w.isVisible() for w in (win.clips, win.theme, win.btn_upload,
+                                   win.btn_apply, win.btn_reset, win.log_box)), \
+    "the compact view lost something a first run needs"
+win.scrim.setValue(200)                # reachable and in force while invisible
+assert not win.scrim.isVisible() and win.scrim.value() == 200
+win.adv_toggle.setChecked(True)
+for _ in range(6):
+    appq.processEvents()
+assert all(w.isVisible() for w in folded), "advanced did not show what it names"
+assert win.adv_toggle.text().lower().startswith("advanced")
+win._save_now()
+assert settings.load()["advanced"] is True, settings.load()
+again2 = app.Window(bad, None, restore=True)
+assert again2.adv_toggle.isChecked() is True, "the switch was not remembered"
+assert again2.scrim.value() == 200, (again2.scrim.value(),
+                                     "a hidden control came back at its default")
+for _t in (again2.preview_timer, again2.thumb_timer):
+    _t.stop()
+again2.panel.stop()
+again2.panel.wait(2000)
+win.adv_toggle.setChecked(False)
+for _ in range(6):
+    appq.processEvents()
+print("  advanced switch         folds the six secondary controls, keeps their values, "
+      "remembers itself, and leaves the reset box where it was")
+
 # and the split is remembered, with a collapsed pane refused rather than restored
 moved = list(win.split.sizes())
 win._save_now()
@@ -1343,13 +1423,33 @@ saved2 = settings.load()
 assert saved2["split"] == moved, (saved2["split"], moved)
 assert settings._clean({"split": [0, 700]})["split"] == settings.DEFAULTS["split"], \
     "a collapsed pane came back as a collapsed pane"
+assert len(settings._clean({"split": [500, 700]})["split"]) == 3, \
+    "a file from the two-column layout did not grow a third"
 back = app.Window(bad, None, restore=True)
 assert back.cfg["split"] == moved, back.cfg["split"]
 for _t in (back.preview_timer, back.thumb_timer):
     _t.stop()
 back.panel.stop()
 back.panel.wait(2000)
-print(f"  split remembered        {moved}, a 0-width pane rejected")
+print(f"  split remembered        {moved}, a 0-width pane rejected, a 2-number file grown to 3")
+
+# the default window size the docs quote is the one the code uses
+want = f"{settings.DEFAULTS['size'][0]}x{settings.DEFAULTS['size'][1]}"
+shot = _re.search(r'--size",\s*default="(\d{3,4}x\d{3,4})"',
+                  open("tools/screenshot.py", encoding="utf-8").read())
+assert shot, "the capture tool no longer carries a --size default to check"
+# the prose figure is the one that can rot; the tool's own default is read back
+# out of the tool, and both have to agree with what docs/tools.md says
+tools_txt = open("tools/screenshot.py", encoding="utf-8").read()
+assert shot.group(1) in tools_txt and "settings.DEFAULTS" in tools_txt, \
+    "the capture tool does not say where the fresh window size comes from"
+doc_txt = open("docs/tools.md", encoding="utf-8").read()
+assert want in doc_txt, (doc_txt[:0] or "docs/tools.md", want,
+                         "the fresh window size is quoted as something else")
+assert shot.group(1) in doc_txt, (shot.group(1),
+                                  "the README framing is quoted as something else")
+print(f"  docs quote the sizes    {want} fresh / {shot.group(1)} captured, both matching "
+      f"the code")
 
 # ---- one upload control, and the state it reports ----
 # There used to be two buttons labelled "Upload background", one per column, and

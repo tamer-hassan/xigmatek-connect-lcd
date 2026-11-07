@@ -3,21 +3,29 @@
 Layout follows what this panel actually supports rather than what the vendor's
 window looks like:
 
-    +----------------+-----------+  the running display: its counters, and
-    | preview        | theme +   |  the last things it did on the port
-    | (480x480,      | clock +   |  background clip list, with measured luma
-    |  our           | canvas    |  status from the panel
-    |  composite,    | pickers   |  log pane
-    |  not a mirror  | buttons   |  guarded reset
-    |  of the glass) |           |
-    +----------------+-----------+
+    +----------------+-----------+------------+  the running display: its counters,
+    | preview        | theme     | clip list  |  and the last things it did on the
+    | (480x480,      | + clock   | (filter,   |  port; the theme and its pickers;
+    |  our           | + canvas  |  rows,     |  the library of backgrounds and the
+    |  composite,    | + advanced|  state)    |  panel's own hello; and, under the
+    |  not a mirror  | + reset   |            |  picture, the log
+    |  of the glass) |           |            |
+    +----------------+-----------+------------+
 
-Two rules decide those proportions, and both come from measurements rather than
-taste.  The frame we draw is exactly 480x480 and `_fit()` never scales it up
-(showing pixels the glass does not have would be a lie), so a preview column
-wider than 480 px is dead space: it gets a maximum width and the controls get
-the rest.  And both columns sit in scroll areas, because on a laptop-height
-screen the right column is taller than the window.
+Three columns, not one long scroll: the clip library wants *height* (69 rows on this
+box, 115 with the Windows partition mounted) and it was sharing a single column with
+four other boxes, which measured out as a 190 px viewport showing two clips at a time
+on a 1 919 px window.  Two rules decide the rest, and both come from measurements:
+the frame we draw is exactly 480x480 and `_fit()` never scales it up (showing pixels
+the glass does not have would be a lie), so a preview column wider than 480 px is
+dead space; and a clip row follows its icon, so the thumbnails are 64 px, not the
+112 px that made every row 114 px tall.
+
+The `advanced controls` switch folds away the six secondary things (canvas, scrim,
+fan figures, the display's event log, the panel's `conn 1` hello, the 30 second
+frame run).  It is pixels only, never values: what is hidden keeps its setting and
+`Apply` sends it.  The guarded factory reset stays on screen whatever the switch
+says, because a recovery that is hard to find is worse than one that is in the way.
 
 The preview is `tools/previews.py`'s composite running live: the stored
 background frame underneath, `render.draw` on top. It is labelled in the window
@@ -106,6 +114,13 @@ PANE_CHROME = 52
 #: back; the display's journal (`journalctl --user -u xigmalcd -f`, docs/usage.md)
 #: is where the full record of a run lives.
 LOG_KEEP = 200
+
+#: The clip picker's thumbnail edge, in pixels, and so the row height too: a
+#: QListWidget row follows its icon.  112 was the first guess and it cost a row
+#: each 114 px of list; 64 still reads as a picture and the same list shows
+#: almost twice as many clips.  `_thumb_batch` decodes to whatever this is set
+#: to on the widget, so the two cannot drift.
+CLIP_ICON = QSize(64, 64)
 
 
 def app_icon() -> QIcon:
@@ -240,7 +255,10 @@ class Window(QMainWindow):
         # event filter on the label is the one hook that sees every way the pane
         # can move.
         self.preview.installEventFilter(self)
-        lay.addWidget(self.preview, 1)      # stretch: the frame keeps its square
+        # the picture keeps first call on this column's height: the log under
+        # it is a readout that can scroll, while a preview that cannot reach 1:1
+        # is a smaller picture of the glass for no reason
+        lay.addWidget(self.preview, 6)   # stretch: the frame keeps its square
         self.caption = QLabel()
         self.caption.setWordWrap(True)
         self.caption.setStyleSheet("color:#888;font-style:italic;")
@@ -252,6 +270,37 @@ class Window(QMainWindow):
 
         right = QWidget()
         col = QVBoxLayout(right)
+        # one switch, and it says what it hides rather than leaving the reader to
+        # find the missing knobs: everything it covers is still in effect, it is
+        # only off screen until asked for.
+        head = QHBoxLayout()
+        self.adv_toggle = QCheckBox("advanced controls")
+        self.adv_toggle.setToolTip(
+            "show the canvas and scrim pickers, the fan figures switch, the "
+            "display's event log, the panel's own `conn 1` hello, and the 30 "
+            "second frame run. Hiding them does not change them: what is not "
+            "shown is still what is set, and Apply sends it either way")
+        self.adv_toggle.setChecked(bool(self.cfg.get("advanced")))
+        self.adv_toggle.toggled.connect(self._set_advanced)
+        head.addWidget(self.adv_toggle)
+        self.adv_note = QLabel("canvas, scrim, fans, the event log, panel hello")
+        self.adv_note.setStyleSheet("color:#888;font-style:italic;")
+        self.adv_note.setWordWrap(True)
+        head.addWidget(self.adv_note, 1)
+        col.addLayout(head)
+        # what the toggle covers, filled in as the boxes are built: pairs of
+        # (form label, field) for the QFormLayout rows, and whole widgets for
+        # everything else.  A form row whose field is hidden and whose label is
+        # not is a gap with a word in it, so both go.
+        self._adv_hide: list = []
+        # A third column, used when the window is wide: the clip library wants
+        # *height* (69 rows here, 115 with the Windows partition mounted) and at
+        # 1 919 px it was sharing one long column with the display status, the
+        # theme box, the panel hello and the log - measured, the list got 190 px
+        # of viewport, which is two rows of 114 px.  Two columns give it the
+        # height and leave the settings where they are.
+        lib = QWidget()
+        lcol = QVBoxLayout(lib)
 
         live = QGroupBox("The running display")
         self.display_box = live
@@ -329,11 +378,26 @@ class Window(QMainWindow):
             Qt.TextInteractionFlag.TextSelectableByMouse)
         self.d_events.setStyleSheet("font-family:monospace;color:#888;")
         llay.addWidget(self.d_events)
+        self._adv_hide.append(self.d_events)
         self._set_display_widgets(False)
         col.addWidget(live)
 
         theme = QGroupBox("Theme on the glass")
         form = QFormLayout(theme)
+
+        def adv_row(label: str, field) -> None:
+            """A settings row the advanced switch covers, label and field both.
+
+            QFormLayout leaves the label standing when only the field is hidden,
+            which is how a compact form ends up with an orphaned word in it.
+            """
+            form.addRow(label, field)
+            item = form.itemAt(form.count() - 1,
+                               QFormLayout.ItemRole.LabelRole)
+            if item is not None and item.widget() is not None:
+                self._adv_hide.append(item.widget())
+            self._adv_hide.append(field)
+
         self.theme = QComboBox()
         self.theme.addItems(sorted(render.THEMES))
         self.theme.setCurrentText(self.cfg["theme"])
@@ -353,11 +417,9 @@ class Window(QMainWindow):
         # this project has measured one use for them: as background media.  It
         # has never sent a .thm, and it cannot draw one.
         vendor = QLabel(
-            "the five names are what this program draws. The vendor's 27 themes "
-            "are its own files for the panel's firmware: nothing here can draw "
-            "one, and nothing here has ever sent one. What the themes package "
-            "does give this window is its clips and images, in the list below "
-            "(docs/themes.md)")
+            "the five names are what this program draws; the package's 27 vendor "
+            "themes are its own files for the panel (hover the combo, and "
+            "docs/themes.md)")
         vendor.setWordWrap(True)
         vendor.setStyleSheet("color:#888;font-style:italic;")
         form.addRow("", vendor)
@@ -380,7 +442,7 @@ class Window(QMainWindow):
                                 Qt.ItemDataRole.ToolTipRole)
         self.canvas.setCurrentIndex(1 if self.cfg["canvas"] == "black" else 0)
         self.canvas.currentIndexChanged.connect(self._changed)
-        form.addRow("canvas", self.canvas)
+        adv_row("canvas", self.canvas)
         self.scrim = QSpinBox()
         self.scrim.setRange(-1, 255)
         self.scrim.setValue(self.cfg["scrim"])
@@ -390,7 +452,7 @@ class Window(QMainWindow):
                               "luma is over "
                               f"{BRIGHT_LUMA}/255, at {SCRIM_ON_BRIGHT}.")
         self.scrim.valueChanged.connect(self._changed)
-        form.addRow("scrim", self.scrim)
+        adv_row("scrim", self.scrim)
         self.fanline = QCheckBox("fan figures")
         self.fanline.setToolTip("draws `CPU FAN nnnn RPM` under the CPU "
                                 "temperature and `GPU FAN nn%` under the GPU "
@@ -400,7 +462,7 @@ class Window(QMainWindow):
                                 "the drawing and the data we send")
         self.fanline.setChecked(self.cfg["fans"])
         self.fanline.stateChanged.connect(self._changed)
-        form.addRow("fans", self.fanline)
+        adv_row("fans", self.fanline)
         col.addWidget(theme)
 
         media = QGroupBox("Background: the layer under our frame")
@@ -415,13 +477,24 @@ class Window(QMainWindow):
         self.clip_filter.textChanged.connect(self._filter_clips)
         mlay.addWidget(self.clip_filter)
         self.clips = QListWidget()
-        self.clips.setIconSize(QSize(112, 112))
+        # 64 px icons, not 112: a row's height follows the icon, and 112 px rows
+        # meant 114 px per clip - the list viewport showed two of 69 at a 1 055 px
+        # window.  Measured with the same call after the change: 66 px rows.
+        # `Fixed` + `uniformItemSizes` because the shipped `Adjust` mode lays the
+        # rows out in a grid against the viewport, which is what made one selected
+        # row paint as a block taller than the list itself.
+        self.clips.setIconSize(CLIP_ICON)
+        self.clips.setResizeMode(QListWidget.ResizeMode.Fixed)
+        self.clips.setUniformItemSizes(True)
         # elide rather than scroll: a horizontal bar inside a column that also
         # scrolls vertically is very hard to use
         self.clips.setTextElideMode(Qt.TextElideMode.ElideRight)
-        self.clips.setResizeMode(QListWidget.ResizeMode.Adjust)
         self.clips.currentItemChanged.connect(self._clip_chosen)
-        mlay.addWidget(self.clips)
+        # the list is the reason this column exists, and a column that is shorter
+        # than four rows makes it useless: let the column scroll instead of
+        # squeezing the picker into a strip
+        self.clips.setMinimumHeight(150)
+        mlay.addWidget(self.clips, 1)
         self.clip_info = QLabel()
         self.clip_info.setWordWrap(True)
         mlay.addWidget(self.clip_info)
@@ -466,7 +539,7 @@ class Window(QMainWindow):
         self.progress.setTextVisible(False)
         self.progress.hide()
         mlay.addWidget(self.progress)
-        col.addWidget(media)
+        lcol.addWidget(media, 9)        # the list is why this column exists
 
         status = QGroupBox("Panel status (what conn 1 reports)")
         slay = QVBoxLayout(status)
@@ -488,8 +561,12 @@ class Window(QMainWindow):
             "live", theme=self.theme.currentText(), kw=self._render_kw(),
             fps=2.0, seconds=30, fans=self.fanline.isChecked()))
         rrow.addWidget(self.btn_live)
+        self._adv_hide.append(self.btn_live)
         slay.addLayout(rrow)
-        col.addWidget(status)
+        self.status.setMinimumHeight(70)
+        self.status_box = status
+        lcol.addWidget(status, 2)
+        self._adv_hide.append(status)
 
         danger = QGroupBox("Factory reset")
         dlay = QVBoxLayout(danger)
@@ -526,7 +603,13 @@ class Window(QMainWindow):
         slog = QGroupBox("Log")
         slog.setLayout(QVBoxLayout())
         slog.layout().addWidget(scroll)
-        col.addWidget(slog)
+        self.log_box = slog
+        scroll.setMinimumHeight(84)
+        # the log goes under the picture, not at the end of the controls stack:
+        # the preview column has room below a 480 px frame that nothing else can
+        # honestly fill (the picture is never scaled up), while the library column
+        # is where the height is scarce - every pixel there is another clip row
+        lay.addWidget(slog, 1)
 
         split = QSplitter()
         # The preview column gets exactly the room the picture can use and no
@@ -546,12 +629,17 @@ class Window(QMainWindow):
         # buttons per row are unreadable, and the window then has an invisible
         # half rather than a narrow one
         controls = _scroll(right)
-        controls.setMinimumWidth(320)
+        controls.setMinimumWidth(300)
+        library = _scroll(lib)
+        library.setMinimumWidth(320)
         split.addWidget(pane)
         split.addWidget(controls)
+        split.addWidget(library)
         split.setCollapsible(0, False)
         split.setCollapsible(1, False)
-        split.setStretchFactor(1, 1)
+        split.setCollapsible(2, False)
+        split.setStretchFactor(1, 2)
+        split.setStretchFactor(2, 3)
         split.setSizes(self.cfg["split"])
         split.splitterMoved.connect(lambda *_a: self.save_timer.start())
         self.split = split
@@ -561,6 +649,9 @@ class Window(QMainWindow):
         self.statusBar().showMessage(f"port {self.port}")
         self._populate_clips()
         self._refresh_clip_state()
+        # the switch's initial position: setChecked() above ran before the
+        # `toggled` connect, so the folding has to be applied here as well
+        self._set_advanced(self.adv_toggle.isChecked())
 
     # ---- preview ---------------------------------------------------------
     def _render_kw(self) -> dict:
@@ -666,6 +757,7 @@ class Window(QMainWindow):
                 "canvas": "black" if self.canvas.currentIndex() else "clear",
                 "scrim": self.scrim.value(), "fans": self.fanline.isChecked(),
                 "preview_fps": self.preview_fps, "clip": self.mp4,
+                "advanced": self.adv_toggle.isChecked(),
                 "size": [self.width(), self.height()],
                 # the split as it stands, not as it was saved: the splitter's
                 # own handle position is the thing the user moved, and the left
@@ -768,8 +860,9 @@ class Window(QMainWindow):
         img = clipdb.frame(clip.path)
         if img is None:
             return
-        rgb = img.convert("RGB").resize((112, 112), Image.Resampling.LANCZOS)
-        q = QImage(rgb.tobytes("raw", "RGB"), 112, 112,
+        side = self.clips.iconSize().width()      # never drift from the widget
+        rgb = img.convert("RGB").resize((side, side), Image.Resampling.LANCZOS)
+        q = QImage(rgb.tobytes("raw", "RGB"), side, side,
                    QImage.Format.Format_RGB888).copy()
         item.setIcon(QIcon(QPixmap.fromImage(q)))
 
@@ -787,7 +880,9 @@ class Window(QMainWindow):
         self._queued_bg = ""          # a new pick has not been asked for yet
         self._refresh_clip_state()
         self.save_timer.start()          # next start opens on the clip you chose
-        self.clip_info.setText(item.text() + self._clip_detail(path))
+        # the detail only: the row itself is the line directly above this label,
+        # and repeating it cost two wrapped lines of a short column
+        self.clip_info.setText(self._clip_detail(path))
 
     def _clip_detail(self, path: str) -> str:
         for c in self.all_clips:
@@ -809,11 +904,28 @@ class Window(QMainWindow):
                                  f"panel's {render.W}x{render.H}: what it does with "
                                  f"that is not measured, so the preview above is a "
                                  f"guess")
-                return (f"\n{how}: {lum:.1f}/255 - {need}"
+                return (f"{how}: {lum:.1f}/255 - {need}"
                         f"{size_note}"
-                        f"\nsending it overwrites what the panel stores, and "
-                        f"only a reset clears that again.")
+                        f"\nsending it replaces what the panel stores; only the "
+                        f"factory reset clears it again")
         return ""
+
+    # ---- the advanced switch --------------------------------------------
+    def _set_advanced(self, on: bool) -> None:
+        """Show or hide the knobs a first-run reader does not need.
+
+        Hiding is only ever about screen area: every control keeps its value and
+        `Apply` sends it, so a compact window is not a window running on defaults
+        - the note beside the switch says what is folded away.  The factory-reset
+        box stays on screen whatever the switch says: a guarded recovery that is
+        hard to find is worse than one that is merely in the way.
+        """
+        for w in self._adv_hide:
+            w.setVisible(bool(on))
+        self.adv_note.setText(
+            "canvas, scrim, fans, the event log, panel hello, the 30 s run"
+            if not on else "shown, and they keep their values either way")
+        self.save_timer.start()
 
     # ---- what the panel actually holds ----------------------------------
     def _read_ring(self, events: list) -> None:

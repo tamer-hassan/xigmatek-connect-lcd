@@ -30,8 +30,10 @@ DEFAULTS: dict = {
     "scrim": -1,               # -1 = the daemon's luma rule
     "fans": True,
     "preview_fps": 2.0,        # host-side only; a frame renders in ~9 ms
-    "size": [1000, 620],       # the window as you left it
-    "split": [520, 900],       # the two columns, as you left the splitter between
+    "advanced": False,         # the folded-away knobs: see app.py:_set_advanced
+    "size": [1180, 780],       # the window as you left it: wide enough for the
+                               # three columns, and short enough for a 1080p screen
+    "split": [520, 460, 560],  # the three columns, as you left the splitter between
                                # them.  The left one is capped by the window at
                                # the width of the 480 px frame (see app.py:
                                # _fit never scales *up*), so these numbers decide
@@ -75,6 +77,8 @@ def _clean(loaded: dict) -> dict:
         out["fans"] = loaded["fans"]
     if isinstance(loaded.get("tray"), bool):
         out["tray"] = loaded["tray"]
+    if isinstance(loaded.get("advanced"), bool):
+        out["advanced"] = loaded["advanced"]
     try:
         fps = float(loaded["preview_fps"])
         if 0.5 <= fps <= 10:
@@ -88,13 +92,17 @@ def _clean(loaded: dict) -> dict:
             and all(isinstance(n, (int, float)) and 400 <= n <= 8000 for n in size)):
         out["size"] = [int(n) for n in size]
     split = loaded.get("split")
-    # the splitter's two widths.  Like `size`, only accepted if they are two
+    # the splitter's widths, one per column.  Like `size`, only accepted as
     # numbers a layout could honour: 0 is what a collapsed pane reports, and
     # restoring that leaves a window with an invisible half.
-    if (isinstance(split, (list, tuple)) and len(split) == 2
+    if (isinstance(split, (list, tuple)) and len(split) in (2, 3)
             and all(isinstance(n, (int, float)) and 160 <= n <= 6000
                     for n in split)):
-        out["split"] = [int(n) for n in split]
+        # two numbers are a file written before the library column existed: the
+        # third pane then takes its minimum, which is what a splitter does with
+        # a size it was never given
+        out["split"] = [int(n) for n in split] + (
+            [420] if len(split) == 2 else [])
     clip = loaded.get("clip")
     if isinstance(clip, str) and os.path.isfile(clip):
         # DEFAULT_MP4 is built relative to the module, so it arrives as
