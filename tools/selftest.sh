@@ -673,6 +673,14 @@ print(f"  reset gate           {scripts['xigmalcd-reset']} with no --yes sends "
 # setuptools >=77.
 import hashlib
 declared = cfg["project"].get("license")
+# one number, four places: pyproject.toml, debian/changelog (checked by the build job,
+# which also compares it with the tag), the wheel's METADATA that pyproject generates,
+# and xigmalcd/__init__.py.  The last one is the one a reader meets in a traceback or an
+# import, and nothing but this line keeps it equal to the others.
+import xigmalcd
+pkg_version = cfg["project"].get("version")
+assert xigmalcd.__version__ == pkg_version, (xigmalcd.__version__, pkg_version)
+print(f"  version            xigmalcd.__version__ == pyproject.toml == {pkg_version}")
 assert declared == "GPL-3.0-or-later", declared
 lfiles = cfg["project"].get("license-files")
 assert lfiles == ["LICENSE"], lfiles

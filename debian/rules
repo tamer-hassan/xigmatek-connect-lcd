@@ -79,8 +79,41 @@ export PYBUILD_DISABLE = test
 
 TMP := debian/tmp
 
+# The moment every archive member is dated with: the top debian/changelog entry, which
+# is exactly what dpkg-buildpackage puts in SOURCE_DATE_EPOCH (/usr/bin/dpkg-buildpackage
+# line 583).  It is recomputed here rather than read from the environment because the
+# recipe below has to have it whether or not the builder exported it.
+epoch := $(shell dpkg-parsechangelog -STimestamp)
+
 %:
 	dh $@ --with python3 --buildsystem=pybuild
+
+execute_before_dh_builddeb:
+	# Pin the staged trees to one moment, so the .deb is a function of the source and
+	# not of the clock of whichever machine ran the build.
+	#
+	# Why dpkg-deb's own normalisation is not enough: it pulls archive-member mtimes
+	# *down* to SOURCE_DATE_EPOCH and leaves earlier ones alone.  Measured, both ways -
+	# an epoch of 2001 rewrites every member to 2001; an epoch in 2027 leaves every
+	# member at the build's wall clock.  So a build whose working files are older than
+	# the changelog stamp keeps each file's own date.  That is precisely how two builds
+	# of one commit came out 2 bytes apart while all 47 file md5s and every control
+	# field matched: the runner had cloned the tree minutes earlier, so every member
+	# was newer than the stamp and came out uniform at 05:10, and on this bench
+	# PROTOCOL.md was 05:03, debian/copyright 03:50, the lintian override 04:13.
+	#
+	# Touching the staged trees - not the source, and nothing that goes into the
+	# package's content - makes both machines agree on the stamp.  zstd's threading is
+	# not a variable here and needed no pinning: -19 with -T1 and with -T24 on the same
+	# 5.6 MB tar produced byte-identical output (2142d58e9439ee41...).
+	set -eu; \
+	for p in $$(dh_listpackages); do \
+		for d in debian/$$p debian/tmp; do \
+			if [ -d "$$d" ]; then \
+				find "$$d" -exec touch -h -d "@$(epoch)" {} +; \
+			fi; \
+		done; \
+	done
 
 override_dh_auto_install:
 	# pybuild first (it fills debian/tmp: modules, entry points, METADATA), then

@@ -18,9 +18,12 @@ expect to move it to 3.0 (quilt) with a repacked tarball, and expect the FTP mas
 to ask about themes/alpha/ - debian/copyright answers the question rather than
 leaving it to be found.
 
-Version: debian/changelog's `0.1` is pyproject.toml's `0.1`, which is also the
-version in the wheel's METADATA.  Three places, one number; keep them equal and
-say so in the changelog when one moves.
+Version: one number, written in four places - debian/changelog, pyproject.toml,
+`xigmalcd/__init__.py`'s __version__, and the wheel's METADATA that pyproject
+generates - plus the tag, which is the same number with a `v` in front.  The build
+job's "the version, where it is written" step compares changelog with pyproject and,
+on a tag, with the tag; tools/selftest.sh compares pyproject with
+`xigmalcd.__version__`.  Keep them equal and say so in the changelog when one moves.
 
 Which bytes go in which package
 -------------------------------
@@ -113,7 +116,7 @@ tar gave byte-identical output.  See docs/packaging.md for the whole write-up.
 
 Testing
 -------
-    sudo apt install ./../xigmatek-connect-lcd_0.1_all.deb
+    sudo apt install ./../xigmatek-connect-lcd_*_all.deb
     debian/tests/smoke
 
 debian/tests/smoke runs the checks that only make sense after an install: both

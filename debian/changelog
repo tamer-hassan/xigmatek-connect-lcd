@@ -1,3 +1,47 @@
+xigmatek-connect-lcd (0.2) resolute; urgency=medium
+
+  * README.md is the overview and the detail lives in docs/ - install.md,
+    usage.md, gui.md, themes.md, packaging.md, tools.md, limits.md,
+    troubleshooting.md - cut out of the old README by line range rather than
+    rewritten, so no measured figure changed on the way.  155 lines of README
+    and a nine-row table of where the rest is.
+
+  * The links are checked, because a split is exactly the kind of change that
+    breaks a relative path while leaving valid markdown: tools/selftest.sh
+    resolves every link in README.md and every docs/*.md (44 of them across ten
+    documents), and debian/tests/smoke does the same for the installed layout.
+
+  * docs/screenshot-xigmaui.png, made by tools/screenshot.py: the real window,
+    built offscreen the way the suite builds it, with a device path that must
+    not exist so that taking the picture never opens anyone's port.
+
+  * The package installs the documents: debian/rules stages them as
+    /usr/share/doc/xigmatek-connect-lcd/docs/ because debian/<package>.docs
+    installs by basename, and override_dh_compress leaves the markdown and the
+    transcripts uncompressed (dh_compress -X.md -X.log) because gzipped ones
+    break every relative link in the set.  The images stay out on purpose.
+
+  * Reproducible archives, measured rather than asserted.  debian/changelog's
+    0.1 entry was dated ahead of the build that built it, and dpkg-deb pulls
+    member mtimes down to SOURCE_DATE_EPOCH while leaving earlier ones alone -
+    which is how the published v0.1 asset and a build of the same tree came out
+    18 B apart with every file md5 matching.  The 0.1 entry now carries the time
+    it was written; the staged trees are touched to the changelog's stamp before
+    dh_builddeb; the build job fails if the two packages do not carry exactly
+    one member date, equal to that stamp; and a build of 8ac3a32 here and the
+    runner's build of 8ac3a32 are the same bytes (5 165 848 B, sha256
+    bf887c0eb296c481730a125c8234c6e8584c8f5fb9b69d4f4abb2c46d33fe264).
+
+  * tools/selftest.sh grew with it: the glass-ledger checks read the docs that
+    quote the runs, the changelog stamp must not be in the future, the package's
+    own __version__ has to agree with pyproject.toml, the PyQt6-absent path is
+    checked by hiding PyQt6 behind an import blocker, and the clip-root check
+    asserts the rule instead of the state of one machine.  Seventeen offline
+    sections, and README, docs/packaging.md, debian/changelog and CI all agree
+    on that number.
+
+ -- Tamer Hassan <thameruddin@gmail.com>  Sat, 07 Nov 2026 06:54:31 +0200
+
 xigmatek-connect-lcd (0.1) resolute; urgency=medium
 
   * First packaged form of the project, and the first form that is not a git

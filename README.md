@@ -68,11 +68,14 @@ and the glass ledger for it with the log file each number came from.
 ### 1. Debian, Kubuntu, Ubuntu: install the `.deb` files
 
 ```bash
-# the two files are on the releases page; building them from this tree is
-# docs/packaging.md
+# 1. get the two files - the releases page in a browser, or with gh:
+gh release download --latest --pattern '*.deb'
+# 2. install both from one command line (building them instead is docs/packaging.md):
 sudo apt install ./xigmatek-connect-lcd_*_all.deb ./xigmatek-connect-lcd-themes_*_all.deb
+# 3. the udev rule is installed but not read yet - replug, or:
 sudo udevadm control --reload-rules && sudo udevadm trigger --action=change
-systemctl --user start xigmalcd.service     # install enables the unit; it does not start it
+# 4. the install *enables* the unit and does not start it:
+systemctl --user start xigmalcd.service
 xigmaui                                     # the window; needs `sudo apt install python3-pyqt6`
 ```
 

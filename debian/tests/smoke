@@ -3,7 +3,7 @@
 # package has been unpacked into the layout an install produces.  Runs under
 # autopkgtest (debian/tests/control) and by hand on any installed system:
 #
-#     sudo apt install ./../xigmatek-connect-lcd_0.1_all.deb
+#     sudo apt install ./../xigmatek-connect-lcd_*_all.deb
 #     debian/tests/smoke
 #
 # Deliberately never opens a serial port: the render goes to a PNG in a temporary

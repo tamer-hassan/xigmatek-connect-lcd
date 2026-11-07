@@ -186,6 +186,33 @@ jobs:
         # above the checkout, outside the source tree.
         run: dpkg-buildpackage -us -uc -b
 
+      - name: every member of the archive carries one date, and it is the changelog's
+        # The bytes of a .deb are a function of the source *and* of the clock of the
+        # machine that built it.  dpkg-deb rewrites archive-member mtimes to
+        # SOURCE_DATE_EPOCH - which dpkg-buildpackage sets from the top
+        # debian/changelog entry - but only for members NEWER than that value: measured
+        # on the bench, a member dated 05:03 local with a stamp of 03:10:42Z stayed at
+        # 05:03.  That is why two builds of one commit, with md5sums and control
+        # matching exactly, still came out 2 bytes apart: the runner had just checked the
+        # tree out, so every file was newer than the stamp and came out uniform, while
+        # this bench's working files were older and kept their own times.  debian/rules
+        # now pins the staged trees to the stamp before dh_builddeb, and this step is
+        # the check that it worked: one distinct date across both packages, equal to the
+        # changelog's.  Cheap, and it is the precondition for the hashes in a release
+        # note meaning anything to someone building from source.
+        run: |
+          set -euo pipefail
+          stamp=$(dpkg-parsechangelog -STimestamp)
+          want=$(TZ=UTC date -u -d "@$stamp" '+%Y-%m-%d %H:%M')
+          echo "debian/changelog stamp: $want UTC"
+          for f in ../*.deb; do
+            dates=$(TZ=UTC dpkg-deb --fsys-tarfile "$f" | tar -tv | awk '{print $4, $5}' | sort -u)
+            n=$(printf '%s\n' "$dates" | wc -l)
+            printf '  %-46s %s distinct date(s): %s\n' "$(basename "$f")" "$n" "$(printf '%s' "$dates" | tr '\n' ';')"
+            test "$n" = 1 || { echo "  more than one mtime in this archive"; exit 1; }
+            [ "$dates" = "$want" ] || { echo "  not the changelog stamp ($want)"; exit 1; }
+          done
+
       - name: lintian
         # --tag-display-limit 0 so nothing is folded away ("and 7 more"), and the
         # gate is errors *and* warnings: the build on the author's bench measured 0
@@ -341,7 +368,11 @@ jobs:
             echo "Two .deb files, built by this run from the tree at this tag on"
             echo "\`ubuntu-26.04\` (\`dpkg-buildpackage -us -uc -b\`, no OpenPGP"
             echo "signature - the hashes below and HTTPS are what a release asset"
-            echo "carries):"
+            echo "carries).  Those hashes are reproducible from the source: every"
+            echo "archive member is dated from \`debian/changelog\`, so a build of"
+            echo "this tag on the same distro and dpkg version gives these same"
+            echo "bytes.  docs/packaging.md keeps that measurement, including the"
+            echo "machine whose clock was leaking before it was made."
             echo
             echo "| file | bytes | sha256 |"
             echo "|---|---|---|"

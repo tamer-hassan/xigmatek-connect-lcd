@@ -28,8 +28,8 @@ build stopping at "PEP517 plugin dependencies are not available" without it.
 
 | file | what is in it | `.deb` | contents |
 |---|---|---|---|
-| `xigmatek-connect-lcd_0.1_all.deb` | the three commands in `/usr/bin`, `xigmalcd/` and `xigmaui/` in `/usr/lib/python3/dist-packages`, the three vendored clips in `/usr/share/xigmalcd/media`, the udev rule in `/usr/lib/udev/rules.d`, the user unit in `/usr/lib/systemd/user`, the menu entry in `/usr/share/applications`, the icon in `/usr/share/icons/hicolor/256x256/apps`, and the documentation: `README.md`, `PROTOCOL.md` and the ten `docs/*.md` files they link, under `/usr/share/doc/xigmatek-connect-lcd` | 5.2 MB | 47 files |
-| `xigmatek-connect-lcd-themes_0.1_all.deb` | ALPHA's own library under `/usr/share/xigmalcd/themes/alpha`: 27 `.thm` files, their decrypted layouts, 44 background clips (43 MP4 and one PNG), 27 baked overlay PNGs, and `manifest.json`, which hashes all 152 entries of the 125 distinct files | 146 MB | 129 files |
+| `xigmatek-connect-lcd_0.2_all.deb` | the three commands in `/usr/bin`, `xigmalcd/` and `xigmaui/` in `/usr/lib/python3/dist-packages`, the three vendored clips in `/usr/share/xigmalcd/media`, the udev rule in `/usr/lib/udev/rules.d`, the user unit in `/usr/lib/systemd/user`, the menu entry in `/usr/share/applications`, the icon in `/usr/share/icons/hicolor/256x256/apps`, and the documentation: `README.md`, `PROTOCOL.md` and the ten `docs/*.md` files they link, under `/usr/share/doc/xigmatek-connect-lcd` | 5.2 MB | 47 files |
+| `xigmatek-connect-lcd-themes_0.2_all.deb` | ALPHA's own library under `/usr/share/xigmalcd/themes/alpha`: 27 `.thm` files, their decrypted layouts, 44 background clips (43 MP4 and one PNG), 27 baked overlay PNGs, and `manifest.json`, which hashes all 152 entries of the 125 distinct files | 146 MB | 129 files |
 
 Both rows are one build on the author's bench, 2026-11-07: Ubuntu 26.04 "resolute",
 debhelper 13.31ubuntu1, dh-python 7.20260309, python3-all 3.14.3-0ubuntu2,
@@ -256,13 +256,71 @@ for the 37 files either way). `tools/selftest.sh` now keeps the one input that d
 this honest: it fails if the top `debian/changelog` entry is dated in the future,
 because that is the whole of what lets a build's clock into the archive.
 
-The stamp correction has been measured on the real tree since: with `debian/changelog`
-dated `05:10:42 +0200` - the time the entry was written, commit `e06cd94` - two
-`dpkg-buildpackage -us -uc -b` runs here put out the same 146 MB themes package byte for
-byte, `18945ab727ff8df21715f153ed07a3e4c2d01b64840dc36f7a30d3e344ec3d2e`, 146 136 774 B
-each. The two code packages from those runs differed, and they were meant to: the second
-one was built after `override_dh_compress` was added, which is a content change. What a
-machine's clock is no longer doing to either of them is the point - and what has *not*
-yet been measured is this tree's bytes agreeing between the runner and the bench, which
-needs a build on both of the same commit; that number goes in the table above the first
-time it is taken.
+### The clock was still in there, and where it was hiding
+
+Correcting the stamp was necessary and not sufficient. Two builds of one commit -
+`8ac3a32`, the runner and this bench - came out **2 bytes apart**: 5 165 848 B
+(`bf887c0eb296c481730a125c8234c6e8584c8f5fb9b69d4f4abb2c46d33fe264`) against 5 165 850 B
+(`ba72590bcba4d3ae319f776ab07bde29e39ed2551a09e53298407716bba612ea`), with all 47
+`md5sums` entries identical, the two `control` members identical, and - the tell - the
+decompressed `control.tar` streams identical while the `data.tar` streams were not.
+
+`data.tar` differs where member **mtimes** differ, and this is the half of the rule that
+was not understood when the stamp was fixed: `dpkg-deb` pulls mtimes *down* to
+`SOURCE_DATE_EPOCH` and leaves earlier ones alone. The runner had cloned the tree minutes
+before building, so every staged file was newer than the stamp and came out uniform at the
+stamp; on this bench the working files were older than it and kept their own dates -
+`PROTOCOL.md` at 05:03, `debian/copyright` at 03:50, the lintian override at 04:13, 68 of
+78 entries in `debian/xigmatek-connect-lcd` older than the stamp and 10 newer.
+
+So `debian/rules` has an `execute_before_dh_builddeb` that touches every entry of the
+staged trees (`debian/<package>`, `debian/tmp`) to `$(epoch)`, the changelog's own
+timestamp - `dpkg-buildpackage` puts the same value in `SOURCE_DATE_EPOCH`, and it is
+recomputed here so the recipe does not depend on the builder having exported it. The
+archive is then a function of the source, whatever the machine's files remember. The CI
+build job checks it before anything else touches the artifacts: one distinct date across
+both packages, equal to `dpkg-parsechangelog -STimestamp`. Measured, this bench:
+
+```
+75 entries in data.tar, 6 in control.tar, one distinct date between them: 2026-11-07 03:10 (the changelog stamp)
+```
+
+and the point of the exercise: with the pin in place, a build of `8ac3a32` on this
+24-core bench and the build of `8ac3a32` the 4-core `ubuntu-26.04` runner uploaded are the
+**same bytes** - `cmp` clean, both `5 165 848 B`, both
+`sha256 bf887c0eb296c481730a125c8234c6e8584c8f5fb9b69d4f4abb2c46d33fe264`. Two consecutive
+builds here are identical too, including the 146 MB themes package
+(`146 136 356 B`, `9fbcb6e06ab6642e406f37a99d3ff9e4093066cd7dd383ff1e20fd9f7597c82c`),
+which is the first time that one has been compared across machines at all: it needs a tag
+run to upload it, and the number for it goes in the table below as soon as one has.
+
+zstd needed no pinning and was measured so that this could be said: `-19 -T1` and
+`-19 -T24` on the same 5 652 480 B tar produce byte-identical output
+(`2142d58e9439ee41…`), and the two builds' `control.tar.zst` members are the same 3 634
+bytes with the same frame header.
+
+### The 0.2 tree, built twice here
+
+The version that carries the pin, measured on this bench rather than described:
+
+```
+two `dpkg-buildpackage -us -uc -b` runs, `cmp` clean on both packages
+  5 168 042 B  sha256 24f564cd06763678cd3ae9964dbbd98d1faad49bf96da195a7a396c208220dd6  code
+146 137 362 B  sha256 db4362c2ce1a01717459997f8c85e70d6866f665ef7af825351b83d0c3451b19  themes
+one distinct archive-member date in each, equal to debian/changelog's stamp
+  2026-11-07 06:54 local = 04:54 UTC, across 75+6 tar entries in the code package and 145+3 in the themes package
+47 files / 47 md5sums entries / Installed-Size 5 576 KB     code package
+129 files / 129 md5sums entries / Installed-Size 147 854 KB  themes package
+lintian 2.129.0ubuntu2.1 --fail-on error,warning: 0 errors, 0 warnings, 0 infos
+```
+
+The date the members carry is the moment the changelog entry was made, not the moment the
+build ran - which is the whole mechanism, in one line of output. What those four numbers
+have not yet met is a build of the same commit on the runner; for `8ac3a32` that
+comparison has been made and came out identical, and the number for the tagged tree goes
+here as soon as its release job has published.
+
+The 0.2 changelog entry is 80 columns wide on purpose: `lintian` flagged
+`debian-changelog-line-too-long` at two lines of the first draft (4 warnings, one per
+long line per binary package, because both packages carry the same `changelog.gz`), and
+the wrapping is what silenced it rather than an override.
