@@ -180,16 +180,22 @@ The tree packages itself: `debian/` is debhelper 13 with dh-python
 because the second one is not ours to license.
 
 ```bash
-sudo apt install devscripts debhelper dh-python pybuild-plugin-pyproject python3-all \
-                 python3-setuptools python3-wheel desktop-file-utils lintian
+sudo apt install build-essential devscripts debhelper dh-python \
+                 pybuild-plugin-pyproject python3-all python3-setuptools \
+                 python3-wheel desktop-file-utils lintian
 dpkg-buildpackage -us -uc -b          # the .deb files land one directory up
 lintian ../xigmatek-connect-lcd_*.changes
 ```
 
-That package list is `debian/control`'s own Build-Depends plus `devscripts` (which is
-where `dpkg-buildpackage` and `lintian` come from). `pybuild-plugin-pyproject` is not
-decoration: `debian/rules` records the build stopping at "PEP517 plugin dependencies are
-not available" without it.
+That list is `debian/control`'s own Build-Depends plus `devscripts` (where
+`dpkg-buildpackage` and `lintian` come from) and `build-essential`, which
+debian/control deliberately does not name - an archive builder is assumed to have it -
+and which the CI runner's `dpkg-checkbuilddeps` did not have either: its first attempt
+on a clean `ubuntu-26.04` machine reported `build-essential:native` among the unmet,
+alongside everything else - debhelper Depends on dpkg-dev, and dpkg-dev only Recommends
+build-essential (or a `c-compiler`), so an install of Build-Depends with
+`--no-install-recommends` does not bring it in. `pybuild-plugin-pyproject` is not decoration either: `debian/rules` records the
+build stopping at "PEP517 plugin dependencies are not available" without it.
 
 | file | what is in it | `.deb` | contents |
 |---|---|---|---|
@@ -271,12 +277,28 @@ hicolor file itself before giving up: the window's icon does not depend on that 
 working.
 
 CI (`.github/workflows/ci.yml`) runs the same pair on a machine that has never seen this
-tree: the seventeen-section offline suite, then the build, `lintian` with warnings as
-failures, then `sudo apt install ./debs/*.deb` and `debian/tests/smoke`; on a `v*` tag
-the same two files become a GitHub Release. The offline suite and the build's dependency
-step have run green there; the install job had not finished its first attempt when this
-was written, so what this section claims rests on the bench transcript above and on
-whatever that job reports from now on.
+tree, and that machine now answers for itself: run
+[`42335665086`](https://github.com/tamer-hassan/xigmatek-connect-lcd/actions/runs/42335665086),
+2026-11-07, green end to end on `ubuntu-26.04` - seventeen offline sections with no panel
+in sight, then `dpkg-buildpackage -us -uc -b` exit 0, then `lintian 2.129.0ubuntu2.1
+--fail-on error,warning` printing `errors=0 warnings=0 infos=0`, then `sudo apt install
+./debs/*.deb` - the code package alone, because a pull-request run does not carry the
+146 MB, with apt's own line reading `Recommended packages: xigmatek-connect-lcd-themes`
+and the plan going ahead anyway - and then `debian/tests/smoke` printing `all installed
+checks passed`, its themes section saying SKIPPED because that package was not installed
+to check.
+
+One figure in that CI transcript differs from the bench transcript above, and it is the
+same difference this work keeps turning up: the dry-run frame smoke wrote on the runner is
+7 339 B where it is 12 652 B here, because that machine has no thermal zones, no tach
+header and no disks behind the paths `xigmalcd/sensors.py` reads, so every field draws
+`--` and the PNG carries less ink. Same packaging, same code, different host - which is
+why the offline suite pins what it draws instead of comparing two machines' pictures.
+
+On a `v*` tag the same two files are published as a GitHub Release, with their sizes and
+sha256s written into the release body from the files being uploaded; that job has never
+run, so until it does, that last sentence describes the workflow file and reports no
+result.
 
 ## What the panel gets
 
