@@ -340,7 +340,7 @@ one real reading per displayed second, so the digits and the rings move while yo
 It is the sixth file in `docs/videos/`, and README's five are made the same way over four
 other clips.
 
-`PREVIEW ME: upload docs/videos/alpha-Theme_25-amber.mp4 here, then delete this marker`
+https://github.com/user-attachments/assets/c119f478-eeb6-4a48-ac70-9c3fa0cd4f35
 
 ```
 tools/preview_gif.py --theme alpha --clip media/Theme_25.mp4 --ink amber \
