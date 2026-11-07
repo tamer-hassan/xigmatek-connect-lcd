@@ -290,37 +290,69 @@ and the point of the exercise: with the pin in place, a build of `8ac3a32` on th
 **same bytes** - `cmp` clean, both `5 165 848 B`, both
 `sha256 bf887c0eb296c481730a125c8234c6e8584c8f5fb9b69d4f4abb2c46d33fe264`. Two consecutive
 builds here are identical too, including the 146 MB themes package
-(`146 136 356 B`, `9fbcb6e06ab6642e406f37a99d3ff9e4093066cd7dd383ff1e20fd9f7597c82c`),
-which is the first time that one has been compared across machines at all: it needs a tag
-run to upload it, and the number for it goes in the table below as soon as one has.
+(`146 136 356 B`, `9fbcb6e06ab6642e406f37a99d3ff9e4093066cd7dd383ff1e20fd9f7597c82c`) -
+and the tagged build, two sections below, is the first time that package has been
+compared between two machines at all.
 
 zstd needed no pinning and was measured so that this could be said: `-19 -T1` and
 `-19 -T24` on the same 5 652 480 B tar produce byte-identical output
 (`2142d58e9439ee41…`), and the two builds' `control.tar.zst` members are the same 3 634
 bytes with the same frame header.
 
-### The 0.2 tree, built twice here
-
-The version that carries the pin, measured on this bench rather than described:
+### The 0.2 tag, built here and built by the runner: the same bytes
 
 ```
-two `dpkg-buildpackage -us -uc -b` runs, `cmp` clean on both packages
-  5 168 042 B  sha256 24f564cd06763678cd3ae9964dbbd98d1faad49bf96da195a7a396c208220dd6  code
+two `dpkg-buildpackage -us -uc -b` runs of `v0.2` (commit `f627491`) on this bench, and
+the release job's own build of the same tag on `ubuntu-26.04`, downloaded back:
+
+  5 168 602 B  sha256 f8c0cd69c07e81d706f277e6302b3be988388335973ee6eb360d6e0d283bf21c  code
 146 137 362 B  sha256 db4362c2ce1a01717459997f8c85e70d6866f665ef7af825351b83d0c3451b19  themes
-one distinct archive-member date in each, equal to debian/changelog's stamp
-  2026-11-07 06:54 local = 04:54 UTC, across 75+6 tar entries in the code package and 145+3 in the themes package
-47 files / 47 md5sums entries / Installed-Size 5 576 KB     code package
-129 files / 129 md5sums entries / Installed-Size 147 854 KB  themes package
-lintian 2.129.0ubuntu2.1 --fail-on error,warning: 0 errors, 0 warnings, 0 infos
+
+  build1 vs build2 here:  `cmp` clean, both packages
+  the bench vs the runner: `cmp` clean, both packages - 5 168 602 B and 146 137 362 B
 ```
 
-The date the members carry is the moment the changelog entry was made, not the moment the
-build ran - which is the whole mechanism, in one line of output. What those four numbers
-have not yet met is a build of the same commit on the runner; for `8ac3a32` that
-comparison has been made and came out identical, and the number for the tagged tree goes
-here as soon as its release job has published.
+That is the claim the whole mechanism exists to make, and it holds for both files: the
+146 MB themes package had never been compared across machines before, because it is only
+uploaded on a tag. The hashes in the release body below are therefore something a reader
+can produce themselves - `dpkg-buildpackage -us -uc -b` on Ubuntu 26.04 with dpkg 1.23.7
+and the debhelper/dh-python/python3 versions named at the top of this file, then
+`sha256sum ../xigmatek-connect-lcd_*_all.deb`, and the number matches. A different dpkg or
+libzstd can produce a different container around the same files, which is the honest edge
+of the statement; `md5sums` inside the package is what travels between toolchains.
 
-The 0.2 changelog entry is 80 columns wide on purpose: `lintian` flagged
-`debian-changelog-line-too-long` at two lines of the first draft (4 warnings, one per
-long line per binary package, because both packages carry the same `changelog.gz`), and
-the wrapping is what silenced it rather than an override.
+One more measured thing from this cycle, about lintian rather than about bytes: the first
+draft of the 0.2 changelog entry drew `debian-changelog-line-too-long` four times - once
+per long line, per binary package, because both packages carry the same `changelog.gz`.
+The lines were wrapped to 80 columns instead of being overridden; the overrides file still
+holds only the three `no-manual-page` lines and the one override that explains itself.
+
+### The published v0.2 release
+
+[`v0.2`](https://github.com/tamer-hassan/xigmatek-connect-lcd/releases/tag/v0.2): an
+annotated tag object (`9a164f3`) on commit `f627491`, published by run
+[`42341460379`](https://github.com/tamer-hassan/xigmatek-connect-lcd/actions/runs/42341460379)
+- all four jobs green there, the install job taking both packages this time
+(`Setting up xigmatek-connect-lcd-themes (0.2)` then `Setting up xigmatek-connect-lcd
+(0.2)`, `159 MB`, the same `Created symlink '/etc/systemd/user/default.target.wants/…'`
+line as the bench), and `debian/tests/smoke` printing `all installed checks passed` with
+`manifest 152/152 files hashed clean` and the document section
+(`11 markdown files … none compressed`, `33 links … all resolving`) on a machine that had
+never seen this tree.
+
+| asset | bytes | sha256 |
+|---|---|---|
+| `xigmatek-connect-lcd_0.2_all.deb` | 5 168 602 | `f8c0cd69c07e81d706f277e6302b3be988388335973ee6eb360d6e0d283bf21c` |
+| `xigmatek-connect-lcd-themes_0.2_all.deb` | 146 137 362 | `db4362c2ce1a01717459997f8c85e70d6866f665ef7af825351b83d0c3451b19` |
+| `xigmatek-connect-lcd_0.2_amd64.changes` | 4 106 | `fdb62b76f0361b46ac33ccf88443e9db7459c913a631af5ea2312c98130d5299` |
+| `xigmatek-connect-lcd_0.2_amd64.buildinfo` | 8 636 | `d4b2f8966b720654f561c6247578bd31ddd39ef4bda7d3e8aa21b0f4df089f48` |
+
+The release body is generated from those bytes by the job that uploads them, and it now
+says in words what the section above proves: that the hashes are reproducible from the
+source, and that `docs/packaging.md` - this file - keeps the measurement.
+
+One thing to be exact about, because a document about a file it sits inside cannot quote
+that file's own bytes: this table was committed *after* `v0.2`, so the published
+`.deb` carries a version of this page without the table. The comparison above is between
+builds of `f627491`, the tagged tree, which is the tree the release job built - and it is
+why the size of each `.deb` in the table at the top of this file stays rounded.
