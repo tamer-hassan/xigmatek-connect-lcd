@@ -59,6 +59,7 @@ def main():
     tot = collections.Counter()
     cl_ok = collections.Counter()
     diffs = []
+    sent = replies = ck_ok = 0
     for path in sys.argv[1:]:
         recs = records(path)
         for fn, dr in (('IRP_MJ_WRITE', 'DOWN'), ('IRP_MJ_READ', 'UP')):
@@ -69,7 +70,12 @@ def main():
                 m = decode(fr)
                 tot[(m.line, bool(m.body))] += 1
                 if fn != 'IRP_MJ_WRITE':
+                    # the panel's own frames: no re-encoding to do, but the strict
+                    # checksum is a claim we make about them, so check it here
+                    replies += 1
+                    ck_ok += checksum_ok(fr)
                     continue
+                sent += 1
                 obj = json.loads(m.body) if m.body else None
                 # rebuild the header block from scratch: a true round-trip test
                 hdrs = {k: m.headers[k] for k in ("SeqNumber", "Date") if k in m.headers}
@@ -84,7 +90,9 @@ def main():
 
     print('\nframe kinds:', dict(tot))
     print('ContentLength matches unescaped JSON length:', dict(cl_ok))
-    print('mismatched frames: %d' % len(diffs))
+    print('host->panel frames re-encoded: %d, mismatched frames: %d'
+          % (sent, len(diffs)))
+    print('panel replies read: %d, strict checksum ok: %d' % (replies, ck_ok))
     for line, ref, mine in diffs[:4]:
         print('\n%s' % line)
         print('  ref  %r' % ref[:120])
