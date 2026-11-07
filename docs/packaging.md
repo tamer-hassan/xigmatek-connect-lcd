@@ -36,7 +36,13 @@ build stopping at "PEP517 plugin dependencies are not available" without it.
 | `xigmatek-connect-lcd_0.2_all.deb` | the three commands in `/usr/bin`, `xigmalcd/` and `xigmaui/` in `/usr/lib/python3/dist-packages`, the three vendored clips in `/usr/share/xigmalcd/media`, the udev rule in `/usr/lib/udev/rules.d`, the user unit in `/usr/lib/systemd/user`, the menu entry in `/usr/share/applications`, the icon in `/usr/share/icons/hicolor/256x256/apps`, and the documentation: `README.md`, `PROTOCOL.md` and the ten `docs/*.md` files they link, under `/usr/share/doc/xigmatek-connect-lcd` | 5.2 MB | 47 files |
 | `xigmatek-connect-lcd-themes_0.2_all.deb` | ALPHA's own library under `/usr/share/xigmalcd/themes/alpha`: 27 `.thm` files, their decrypted layouts, 44 background clips (43 MP4 and one PNG), 27 baked overlay PNGs, and `manifest.json`, which hashes all 152 entries of the 125 distinct files | 146 MB | 129 files |
 
-Both rows are one build on the author's bench, 2026-11-07: Ubuntu 26.04 "resolute",
+Both rows are one build on the author's bench, 2026-11-07, of the tree at the `v0.2`
+tag - a build of the tree as it stands now names the files `_0.3_` instead, because the
+top `debian/changelog` stanza has moved to `0.3 UNRELEASED` and `pyproject.toml` /
+`xigmalcd.__version__` moved with it; `0.3` has been released nowhere, and the two
+published releases stay 0.1 and 0.2 (the CI job that builds the packages fails if those
+three spellings of the number ever part company, and `debian/README.source` says why).
+The build quoted here ran on Ubuntu 26.04 "resolute",
 debhelper 13.31ubuntu1, dh-python 7.20260309, python3-all 3.14.3-0ubuntu2,
 python3-setuptools 78.1.1-0.1build1, `dpkg-buildpackage -us -uc -b` exit 0. The file
 counts are `dpkg-deb -c | grep -c`; the byte figures are rounded on purpose, because
