@@ -83,9 +83,13 @@ That gives `/usr/bin/xigmalcd`, `/usr/bin/xigmaui` and `/usr/bin/xigmalcd-reset`
 udev rule that makes the port a user-owned `/dev/xigmatek-lcd` and keeps ModemManager
 off it, and a user unit whose `ExecStart` is `--theme alpha --fps 2` with no reset
 permission. The second package is the vendor's own theme library and is optional on
-purpose. What an install does and does not do — including the udev reload above — is
-measured and written down in [docs/packaging.md](docs/packaging.md), with the
-transcripts.
+purpose. Two things about that unit are worth knowing on day one: the install enables it
+in systemd's **global user** scope (`/etc/systemd/user/default.target.wants`, so for every
+user's next login - taking that back is `sudo systemctl --global disable xigmalcd`), and an
+**upgrade** while you are logged in has been seen to start the display on its own three
+seconds after apt finished. `systemctl --user stop xigmalcd` frees the port at any point.
+Everything else an install does and does not do — including the udev reload above — is
+measured and written down in [docs/packaging.md](docs/packaging.md), with the transcripts.
 
 ### 2. Any other Linux distribution: run it from this tree
 

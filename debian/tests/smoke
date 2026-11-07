@@ -135,6 +135,22 @@ case "$exec_line" in
 esac
 say "user unit" "$unit -> $exec_line (no --allow-reset)"
 
+# Where the enablement lives, reported rather than asserted.  The package enables the
+# unit through deb-systemd-helper, whose symlink lands in
+# /etc/systemd/user/default.target.wants - what systemd calls global user scope, for
+# every user's next login - so the command that works in a checkout, `systemctl --user
+# disable --now xigmalcd`, is the one that here only prints a warning.  A reader of an
+# autopkgtest log should be able to see which scope the installed system is in;
+# docs/packaging.md explains the difference and the command that does act.
+if systemctl --user is-active --quiet xigmalcd 2>/dev/null; then
+    say "unit state" "active: the display is running, and it is the holder of the port"
+else
+    userv=$(systemctl --user is-enabled xigmalcd 2>/dev/null || echo unknown)
+    global=$(systemctl --global is-enabled xigmalcd 2>/dev/null || echo unknown)
+    printf '  %-18s %s\n' "unit state" "inactive; is-enabled --user=$userv, --global=$global"
+    printf '  %-18s %s\n' "" "global scope = /etc/systemd/user; undo with: sudo systemctl --global disable xigmalcd"
+fi
+
 desk=/usr/share/applications/xigmaui.desktop
 if command -v desktop-file-validate >/dev/null 2>&1; then
     desktop-file-validate "$desk" || { echo "  $desk: FAILED"; exit 1; }

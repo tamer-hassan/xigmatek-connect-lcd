@@ -1,0 +1,159 @@
+=== run 2026-11-07T05:21:44+00:00 on Ubuntu 26.04 LTS (x86_64), kernel 7.0.0-42-generic
+=== apt version: apt 3.2.1 (amd64)
+=== the files being installed (downloaded from the v0.2 release, and identical to
+=== this machine's own build of the tag - see docs/packaging.md):
+-rw-r--r-- 1 tamer tamer 146137362 Nov  7 07:20 /home/tamer/work/xigmatek-connect-lcd-themes_0.2_all.deb
+-rw-r--r-- 1 tamer tamer   5168602 Nov  7 07:20 /home/tamer/work/xigmatek-connect-lcd_0.2_all.deb
+f8c0cd69c07e81d706f277e6302b3be988388335973ee6eb360d6e0d283bf21c  /home/tamer/work/xigmatek-connect-lcd_0.2_all.deb
+db4362c2ce1a01717459997f8c85e70d6866f665ef7af825351b83d0c3451b19  /home/tamer/work/xigmatek-connect-lcd-themes_0.2_all.deb
+
+=== what is installed now (before):
+xigmatek-connect-lcd 0.1 all installed
+xigmatek-connect-lcd-themes 0.1 all installed
+  code package's installed files: 62
+  docs tree present before the upgrade: 0 file(s)
+
+=== apt install (both files on one command line, as README tells a user to)
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+Reading package lists...
+Building dependency tree...
+Reading state information...
+Solving dependencies...
+The following package was automatically installed and is no longer required:
+  nvidia-firmware-595-595.91.07
+Use 'sudo apt autoremove' to remove it.
+
+Upgrading:
+  xigmatek-connect-lcd  xigmatek-connect-lcd-themes
+
+Summary:
+  Upgrading: 2, Installing: 0, Removing: 0, Not Upgrading: 186
+  Download size: 0 B / 151 MB
+  Space needed: 63.5 kB / 728 GB available
+
+Get:1 /home/tamer/work/xigmatek-connect-lcd_0.2_all.deb xigmatek-connect-lcd all 0.2 [5,169 kB]
+Get:2 /home/tamer/work/xigmatek-connect-lcd-themes_0.2_all.deb xigmatek-connect-lcd-themes all 0.2 [146 MB]
+(Reading database… (Reading database… 5%(Reading database… 10%(Reading database… 15%(Reading database… 20%(Reading database… 25%(Reading database… 30%(Reading database… 35%(Reading database… 40%(Reading database… 45%(Reading database… 50%(Reading database… 55%(Reading database… 60%(Reading database… 65%(Reading database… 70%(Reading database… 75%(Reading database… 80%(Reading database… 85%(Reading database… 90%(Reading database… 95%(Reading database… 100%(Reading database… 286253 files and directories currently installed.)
+Preparing to unpack …/xigmatek-connect-lcd_0.2_all.deb…
+Unpacking xigmatek-connect-lcd (0.2) over (0.1)…
+Preparing to unpack …/xigmatek-connect-lcd-themes_0.2_all.deb…
+Unpacking xigmatek-connect-lcd-themes (0.2) over (0.1)…
+Setting up xigmatek-connect-lcd-themes (0.2)…
+Setting up xigmatek-connect-lcd (0.2)…
+Processing triggers for hicolor-icon-theme (0.18-2build1)…
+Processing triggers for desktop-file-utils (0.28-1build1)…
+apt rc=0
+
+=== what dpkg now knows
+xigmatek-connect-lcd 0.2 all installed-size 5578 KB
+xigmatek-connect-lcd-themes 0.2 all installed-size 147854 KB
+  code package's installed files: 74
+
+=== the unit the postinst left behind
+  enabled-state: enabled
+  active-state:  inactive
+  lrwxrwxrwx 1 root root 38 Nov  7 05:43 /etc/systemd/user/default.target.wants/xigmalcd.service -> /usr/lib/systemd/user/xigmalcd.service
+  who holds the port now:
+    nothing: the port is free
+
+=== the documents, as installed
+  total 116
+  -rw-r--r-- 1 root root 93190 Nov  7 06:54 PROTOCOL.md
+  -rw-r--r-- 1 root root  9082 Nov  7 06:54 README.md
+  -rw-r--r-- 1 root root  2270 Nov  7 06:54 changelog.gz
+  -rw-r--r-- 1 root root  4071 Nov  7 06:54 copyright
+  drwxr-xr-x 3 root root  4096 Nov  7 07:21 docs
+  total 172
+  -rw-r--r-- 1 root root 40103 Nov  7 06:54 gui.md
+  -rw-r--r-- 1 root root  8088 Nov  7 06:54 handoff-2026-11-05.md
+  -rw-r--r-- 1 root root  5248 Nov  7 06:54 install.md
+  -rw-r--r-- 1 root root 29416 Nov  7 06:54 limits.md
+  drwxr-xr-x 2 root root  4096 Nov  7 07:21 packaging
+  -rw-r--r-- 1 root root 21666 Nov  7 06:54 packaging.md
+  -rw-r--r-- 1 root root  2714 Nov  7 06:54 themes.md
+  -rw-r--r-- 1 root root 28358 Nov  7 06:54 tools.md
+  -rw-r--r-- 1 root root  2493 Nov  7 06:54 troubleshooting.md
+  -rw-r--r-- 1 root root 18201 Nov  7 06:54 usage.md
+  total 8
+  -rw-r--r-- 1 root root 5079 Nov  7 06:54 smoke-2026-11-07.log
+  markdown files      11 found, present and uncompressed: 11/11
+  prose links         33 checked, 0 dead; 8 image link(s) repo-only by design; 3 pointer(s) into the source tree
+  transcripts         ['smoke-2026-11-07.log']
+
+=== udev: the rule is installed by the package; applying it is this script's doing,
+=== not apt's - the 0.1 transcript recorded the un-applied state, this one applies it.
+  -rw-r--r-- 1 root root 634 Nov  7 06:54 /usr/lib/udev/rules.d/99-xigmatek-lcd.rules
+  reload rc=0
+  lrwxrwxrwx 1 root root 7 Nov  7 07:21 /dev/xigmatek-lcd -> ttyACM0
+  E: ID_MODEL=Xigmatek_USB_Device
+  E: ID_MODEL_ENC=Xigmatek\x20USB\x20Device
+  E: ID_MODEL_ID=0109
+  E: ID_USB_MODEL=Xigmatek_USB_Device
+  E: ID_USB_MODEL_ENC=Xigmatek\x20USB\x20Device
+  E: ID_USB_MODEL_ID=0109
+  E: ID_MM_DEVICE_IGNORE=1
+
+=== debian/tests/smoke, against this install (run from the checkout at HEAD)
+== the modules are where the interpreter looks
+  imports               /usr/lib/python3/dist-packages/xigmalcd (+ xigmaui)
+
+== the two commands that draw, from pyproject.toml's entry points
+  xigmalcd              /usr/bin/xigmalcd, --help 9808 B
+  xigmaui               /usr/bin/xigmaui, --help 1498 B
+
+== the clips the package installed are the ones the code finds
+  DEFAULT_MP4 /usr/share/xigmalcd/media/Theme_25.mp4
+  QUIET_MP4   /usr/share/xigmalcd/media/Theme_11.mp4
+  BRIGHT_MP4  /usr/share/xigmalcd/media/theme_48.mp4
+  roots         ('/usr/share/xigmalcd/media',)
+  vendored clips        3 clips, sizes and md5 as pinned in tools/selftest.sh
+
+== one frame, drawn with no panel in the loop
+  frame           /tmp/tmp.gcTwMU3FKR/frames/frame0000.png 480x480 P 12421 B
+  dry-run               480x480 PNG written, exit 0
+
+== what debhelper installed around it
+  udev rule             /usr/lib/udev/rules.d/99-xigmatek-lcd.rules (symlink xigmatek-lcd, TAG+=uaccess)
+  user unit             /usr/lib/systemd/user/xigmalcd.service -> /usr/bin/xigmalcd --theme alpha --fps 2 (no --allow-reset)
+  menu entry            /usr/share/applications/xigmaui.desktop, desktop-file-validate clean
+  icon            /usr/share/icons/hicolor/256x256/apps/xigmaui.png 256x256 RGBA 101506 B, corners transparent
+  Icon=xigmaui          resolves by theme name: no (informational)
+
+== the reset command, and the gate on it
+  xigmalcd-reset        /usr/bin/xigmalcd-reset; no --yes -> 355 B printed, nothing sent
+
+== what the package does NOT ship
+  tools/                not installed; only the three entry points are on PATH
+
+== the documents, and the links between them
+  documents           11 markdown files under /usr/share/doc/xigmatek-connect-lcd, none compressed
+  links               33 links inside the doc set, all resolving; 8 image link(s) repo-only by design; 3 pointer(s) into the source tree (LICENSE, debian/copyright, themes/alpha)
+  transcripts         1 kept log(s) under docs/packaging/, so a cited claim has its file offline too
+
+== the vendor library, if it is installed
+  manifest          152/152 files hashed clean under /usr/share/xigmalcd/themes/alpha
+  kinds             {'thm': 27, 'background': 27, 'foreground': 27, 'layout': 27, 'clip': 44}
+  themes                /usr/share/xigmalcd/themes/alpha, every manifest entry re-hashed
+
+all installed checks passed
+smoke rc=0
+
+=== the reset command, dry run only, nothing sent
+  frame to send (109 bytes): 5a 00 6d 50 4f 53 ... 62 6c 65 22 3a 74 72 75 65 7d b6 5a
+  body {"enable":true}  ->  POST recovery 1
+  
+  dry run: nothing sent. Re-run with --yes to reset the panel.
+  What happens: the panel drops its stored picture and the USB
+  device re-enumerates, exactly as it did when ALPHA's reset button
+  was pressed at 18:39:48 on 2026-11-05.
+  rc=0
+
+The following unit files have been enabled in global scope. This means
+they will still be started automatically after a successful disablement
+in user scope:
+xigmalcd.service
+=== not done by this script: starting the display. The unit is enabled, so the next
+=== login takes /dev/ttyACM0;  does it now, and
+===  takes the arrangement back.

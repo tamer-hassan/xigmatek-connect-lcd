@@ -59,6 +59,12 @@ immediately. Check on it with
 `systemctl --user disable --now xigmalcd`. To run it without a graphical session,
 `loginctl enable-linger $USER`.
 
+(That is the *checkout* unit, and `--user disable` is the right undo for it because
+`install.sh` enabled it in your own user directory. The `.deb` puts its enablement in
+`/etc/systemd/user/default.target.wants`, which systemd calls global scope, and there
+`systemctl --user disable` warns instead of acting - `docs/packaging.md` has both
+measured, with the command that does work.)
+
 When PyQt6 imports, it also writes the window's menu entry,
 `~/.local/share/applications/xigmaui.desktop`,
 pointed at `install/xigmaui.png` (the icon is the project's mark - the penguin at

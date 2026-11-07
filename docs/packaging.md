@@ -49,11 +49,65 @@ Four things an install does that a checkout does not:
   `debian/rules` pins it and says why, because the first two builds measured the
   difference rather than guessing it;
 * `postinst` byte-compiles with `py3compile` and then runs
-  `deb-systemd-helper --user enable xigmalcd.service`: the unit is **enabled**, not
-  started, so an install does not take `/dev/ttyACM0` in the middle of a session. It is
-  the only opener from the next login on; `systemctl --user disable --now xigmalcd`
-  takes that back, and `loginctl enable-linger $USER` is what makes it run with no
-  graphical session at all;
+  `deb-systemd-helper --user enable xigmalcd.service`. That puts the symlink in
+  **`/etc/systemd/user/default.target.wants/`** - root-owned, and systemd calls that
+  scope *global*: it applies to every user's next login, not to the one who ran `apt`.
+  The consequence is worth knowing before you try to undo it: `systemctl --user disable
+  --now xigmalcd` does **not** take it back, and systemd says so rather than failing
+  quietly -
+
+  ```
+  The following unit files have been enabled in global scope. This means
+  they will still be started automatically after a successful disablement
+  in user scope:
+  xigmalcd.service
+  ```
+
+  what takes it back is `sudo systemctl --global disable xigmalcd.service` (per
+  `man systemctl`, `--global` "operate[s] on the global user configuration directory"),
+  and `apt remove xigmatek-connect-lcd` cleans the symlink up on its own because
+  `deb-systemd-helper` recorded it in
+  `/var/lib/systemd/deb-systemd-user-helper-enabled/xigmalcd.service.dsh-also`.
+  `loginctl enable-linger $USER` is what makes the display run with no graphical
+  session at all;
+* and one thing that claim has to carry, because the bench found it the hard way: *an
+  install does not draw on the glass* was measured on the first install (0.1, 05:43 -
+  `active-state: inactive`, `fuser /dev/ttyACM0` empty). An **upgrade** on a machine that
+  is logged in is not the same event. Upgrading 0.1 to 0.2 at 07:21, the user manager
+  started the display by itself:
+
+  ```
+  07:21:44 sudo apt install -y …_0.2_all.deb …_0.2_all.deb     (closed 07:21:47)
+  07:21:50 systemd[2466]: Starting xigmalcd.service - Xigmatek Connect LCD - …
+  07:21:55 systemd[2466]: Started xigmalcd.service - …          (Main PID 639693)
+  07:21:57 xigmalcd[639693]: background Theme_25.mp4 refused (device refused the file: 400 ''); retrying once
+  07:21:58 xigmalcd[639693]: background Theme_25.mp4 214917 B -> notice 200 in 2.3 s, space 69084 -> 69104
+  ```
+
+  Seven minutes later `xigmalcd --status` over the control socket read back
+  `188/188 frames confirmed, 0 refused, session 188 uploads / 94 s`, and `fuser
+  /dev/ttyACM0` named PID 639693 as the holder. The 5 s between `Starting` and `Started`
+  is this project's own `ExecStartPre=/bin/sleep 5`, not systemd hesitating. What is
+  **not** established is who queued that start job: the generated postinst contains no
+  `systemctl` call at all (read it: lines 13-31 are `deb-systemd-helper` only), and the
+  helper's own logic - `was_enabled` at `/usr/bin/deb-systemd-helper:418` returns true
+  when its state file lists links that are all present, and `enable` at line 311 then
+  takes the "links already installed" path rather than the `systemctl --global preset`
+  one, which is what the existing
+  `/var/lib/systemd/deb-systemd-user-helper-enabled/xigmalcd.service.dsh-also` puts it on
+  - means the postinst touched the filesystem and nothing else. The user manager
+  (`systemd[2466]`) logged a `Reload requested from client PID 639694 ('systemctl')`, in
+  the terminal's own scope, five seconds *after* the start job began, so that reload is
+  not what queued it either. Two candidates were checked and ruled out as the actor: a
+  `systemctl preset` from the helper (not called, as just shown) and `udevadm trigger
+  --action=change` (which the transcript's own script ran at 07:21:47, and which re-ran
+  rules for every device - visible as KDE losing and regaining its DRM render nodes at
+  07:21:47 - but has no path to a user unit with no device dependency). Settling it needs
+  a second upgrade on a machine where the answer can be varied deliberately - with and
+  without a `systemctl --user daemon-reload` either side - and until then the honest
+  summary for a reader is the operational one: **upgrading this package on a logged-in
+  session can bring the display up on its own**, so stop it first (`systemctl --user stop
+  xigmalcd`) if something else is holding the port or you are mid-run on the glass.
 * no `.pyc` is in either `.deb` - they are written on the target, by the target's
   interpreter;
 * the udev rule lands in `/usr/lib/udev/rules.d`, the distro's own directory rather than
@@ -147,7 +201,9 @@ Created symlink '/etc/systemd/user/default.target.wants/xigmalcd.service' → '/
 
 That is the whole of its enablement. `dpkg-query` afterwards reports the unit
 *enabled*, `systemctl --user is-active` reports it *inactive*, and `fuser
-/dev/ttyACM0` says nobody is holding the port: installing draws nothing on the glass.
+/dev/ttyACM0` says nobody is holding the port: that first install draws nothing on the
+glass. (An upgrade in a live session is a different event - see the bullet above about
+the 0.2 upgrade starting the display on its own, and the transcript two files down.)
 `debian/tests/smoke` then ran against that install and said `all installed checks
 passed` - imports out of `/usr/lib/python3/dist-packages`, `xigmalcd --help` 9 808 B
 and `xigmaui --help` 1 498 B, the three clips found under `/usr/share/xigmalcd/media`
@@ -166,7 +222,49 @@ theme name **no** in that check. smoke reports it rather than asserting it - whe
 name resolves belongs to the desktop session's icon cache, and the check ran with
 `QT_QPA_PLATFORM=offscreen` - and it is exactly why `xigmaui/app.py:ICONS` tries the
 hicolor file itself before giving up: the window's icon does not depend on that lookup
-working.
+working. It said the same `no` again in the 0.2 transcript, on the same machine, forty
+minutes later.
+
+### The 0.2 upgrade on this bench, and what the doc set looks like installed
+
+The second install transcript, **`docs/packaging/smoke-2026-11-07-02.log`**, is an
+*upgrade* (0.1 → 0.2) of the two release assets, run by the same kind of script, at
+05:21:44Z: apt's own summary `Upgrading: 2, Installing: 0, Removing: 0`, `Space needed:
+63.5 kB`, both files hashed in the log (`f8c0cd69…` and `db4362c2…`, which are also this
+machine's own build of the tag - the paragraph comparing them is further down). What it
+adds to the record:
+
+* `dpkg -L xigmatek-connect-lcd | grep -c '^/usr'`: **62 paths before** (0.1), **74 after**
+  (0.2). That is the doc set arriving: the package's own non-directory entry count went
+  37 → 47 at the same time, and the difference is the ten `docs/*.md` files and the
+  transcript they cite.
+* Installed layout, read back off the filesystem: `/usr/share/doc/xigmatek-connect-lcd/`
+  holding `PROTOCOL.md` **93 190 B** and `README.md` **9 082 B** - not `.gz`, because of
+  `override_dh_compress` - plus `docs/` with `gui.md 40 103`, `handoff-2026-11-05.md
+  8 088`, `install.md 5 248`, `limits.md 29 416`, `packaging.md 21 666`, `themes.md
+  2 714`, `tools.md 28 358`, `troubleshooting.md 2 493`, `usage.md 18 201`, and
+  `docs/packaging/smoke-2026-11-07.log 5 079`. Installed-Size: 5 578 KB code, 147 854 KB
+  themes.
+* smoke's documents section on a real install: `11 markdown files … none compressed`,
+  `33 links inside the doc set, all resolving; 8 image link(s) repo-only by design; 3
+  pointer(s) into the source tree (LICENSE, debian/copyright, themes/alpha)`, `1 kept
+  log(s)`. The same accounting the CI runner printed for the tag run, on desktop hardware.
+* The rest of smoke again green: `--help 9 808 B` and `1 498 B`, the three clips with
+  `roots ('/usr/share/xigmalcd/media',)`, a dry-run frame now **12 421 B** (it was 12 652 B
+  in the 0.1 transcript: same host, different minute, the numbers on the picture change
+  what the PNG costs), the menu entry clean, `xigmalcd-reset` 355 B printed and nothing
+  sent, `manifest 152/152 files hashed clean` with `kinds {'thm': 27, 'background': 27,
+  'foreground': 27, 'layout': 27, 'clip': 44}`, and `all installed checks passed`.
+* The udev rule, this time **applied**: the script ran
+  `sudo udevadm control --reload-rules && sudo udevadm trigger --action=change` (labelled
+  in the transcript as the script's doing, not apt's), and after it `/dev/xigmatek-lcd ->
+  ttyACM0` exists and `udevadm info /dev/ttyACM0` carries `ID_MM_DEVICE_IGNORE=1`. Compare
+  the 0.1 transcript, where both were absent with the rule file present: the difference is
+  one `udevadm` command, which is exactly the point of that bullet above.
+* And the thing that was not planned: the display came up by itself during that upgrade,
+  three seconds after apt closed, and was still holding the port when the log finished -
+  `188/188 frames confirmed, 0 refused` seven minutes later. The bullet on that, including
+  what is not established about the trigger, is under "Four things an install does".
 
 CI (`.github/workflows/ci.yml`) runs the same pair on a machine that has never seen this
 tree, and that machine answers for itself. Run
