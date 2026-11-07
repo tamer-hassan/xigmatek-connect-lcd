@@ -117,10 +117,18 @@ purpose: `pip install .` gives the display loop and the `xigmalcd` command, `pip
 .[gui]` adds PyQt6 and the `xigmaui` command with it. Qt is an extra because the loop that
 holds the port runs without it - the same reason `install/install.sh` only checks
 `import PyQt6` and names `python3-pyqt6` when it is missing, rather than installing Qt for a
-headless box. Both packages are shipped (`xigmalcd` and `xigmaui`), and `tools/selftest.sh`
-reads `pyproject.toml` to keep that true: both packages listed, PyQt6 in the extra and not in
-the base dependencies, and both console-script targets resolving to something callable. Run
-from a checkout, the commands are `python3 -m xigmalcd` and `python3 -m xigmaui` either way.
+headless box. Three console scripts are declared: `xigmalcd`, `xigmaui`, and
+`xigmalcd-reset` - the vendor's panel reset, `xigmalcd/reset.py`, which exists as a command
+because a system that came from a `.deb` has no `tools/` directory to run and no other way
+back once the panel's `logo`/`mode` read `2147483647` ("If the panel goes white").
+`tools/selftest.sh` reads `pyproject.toml` to keep all of that true: both packages listed,
+PyQt6 in the extra and not in the base dependencies, all three console-script targets
+resolving to something callable, and that third one sending nothing when it is called
+without `--yes`. Run from a checkout, the first two are `python3 -m xigmalcd` and
+`python3 -m xigmaui` either way, and the third is `tools/reset_panel.py` - a wrapper over
+the same module. What `pip install .` does *not* do is install the three clips this repo
+vendors (see "Notes and known limits"), so a pip install draws from the checkout's
+`media/`; the `.deb` is what puts them in `/usr/share/xigmalcd/media`.
 
 ## Run it at login
 
@@ -445,8 +453,9 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   theme, encode/decode round-trips including the panel's malformed-reply case, the encoder
   switches read out of the PNG each dry run writes, what the indexed file gives up next to
   RGBA, the pinned-metrics promise (a pinned frame draws the far end of the ramp and sends no
-  metrics blob at all), the vendor theme library re-hashed against its own manifest (all 152
-  files, the dedup rule, the root-vendored clips, the contact sheets, and the
+  metrics blob at all), the vendor theme library re-hashed against its own manifest (152
+  entries over 125 distinct files, the dedup rule, the root-vendored clips, the contact
+  sheets, and the
   `store.json`/`.thm` pairing when the Windows volume is mounted), where the shipped clips
   are looked up (checkout, `$XIGMA_MEDIA`, `/usr/share/xigmalcd/media`, and the Windows
   partition's copies, in that order, checked against fake roots), the packaged copies of
@@ -1539,11 +1548,34 @@ an install.
   2026-11-07 the themes themselves are readable too, keys and all - the whole library is in
   `themes/alpha/`, see that directory's README. Re-derive it
   any time with `python3 tools/theme.py` and `python3 tools/vendor_log.py`.
+* **`pip install .` carries no clips, and that is a hole rather than a design.** The three
+  MP4s this repo vendors live in `media/`, which is not a Python package, and
+  `pyproject.toml` declares no package data for them — so an installed `xigmalcd` finds them
+  only where the roots say (`$XIGMA_MEDIA`, a checkout's `media/`,
+  `/usr/share/xigmalcd/media`: `xigmalcd/main.py:media_roots`), and a pip install into a
+  system Python has none of those - though `find_media`'s fallbacks can still land on a
+  copy under `/media/windows-c/...` when that volume is mounted, which is what an
+  unpacked copy of the .deb did on this bench a minute before this sentence was written.
+  What the loop does when nothing answers is say so, once per session:
+  `_upload_background`'s `except OSError` prints `  ! background <path>: [Errno 2] No such
+  file or directory: ...` to stderr, with `<path>` the `media` one level above the package
+  as `media_dir()` spells it - `..` and all, so an install into this distro's system Python
+  reports `/usr/local/lib/python3.14/dist-packages/xigmalcd/../media/Theme_25.mp4` rather
+  than a directory it never looked in. The loop then keeps drawing frames over whatever the
+  panel already has stored: a background it cannot read does not block the frames.
+  The two supported
+  answers are `apt install` of the `.deb`,
+  which puts all three in `/usr/share/xigmalcd/media` ("Install from a .deb"), or point
+  `XIGMA_MEDIA` at a directory of clips from the unit's own environment. `--no-mp4` skips the
+  question entirely.
 * **Version control: local `git` since 2026-11-06, published 2026-11-07** as
   `tamer-hassan/xigmatek-connect-lcd`, public, `main` only. Tracked: the three vendored
   clips in `media/`, the vendor's theme library in `themes/alpha/` (145 MB: 27 `.thm`
   originals as shipped, 27 decrypted layouts, 44 clips, 27 baked overlay PNGs, and a
-  `manifest.json` hashing all 152 of them), the theme contact sheets in `docs/previews/`,
+  `manifest.json` whose 152 entries hash the 125 distinct files they name — 127 files on
+  disk, the other two being that manifest and this directory's own `README.md`, and the 27
+  `background` entries naming the same bytes as 27 of the clips), the theme contact sheets
+  in `docs/previews/`,
   the project mark and the files generated from it (`install/artwork/xigma-penguin.jpg`,
   `install/xigmaui.png`, `install/xigmaui.ico`, `docs/logo.png`), and the three
   pinned-number fixtures in `tools/metrics/`. Not tracked, and said so in `.gitignore`:
@@ -1584,7 +1616,8 @@ copied byte for byte out of the vendor installation on the author's bench — fo
 record, not by permission. They are in the repo because every claim this project makes
 about the themes is a claim about those bytes, and a reader should be able to hash them.
 `themes/alpha/README.md` names the installation path they came from and the tool that
-took them out; `manifest.json` hashes all 152 files. If any of this should not be
+took them out; `manifest.json`'s 152 entries hash the 125 distinct files they name. If any
+of this should not be
 redistributed, say so to the address in the git log and it comes down.
 
 **What is on the wire is not a trade secret or a licence.** Everything in `PROTOCOL.md`

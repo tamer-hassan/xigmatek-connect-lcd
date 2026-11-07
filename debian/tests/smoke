@@ -32,7 +32,11 @@ esac
 say "imports" "$where (+ xigmaui)"
 
 echo
-echo "== the two commands pyproject.toml declares"
+echo "== the two commands that draw, from pyproject.toml's entry points"
+# `xigmalcd-reset` is the third entry point and is checked in its own section below,
+# because what matters about it is not that it exists but that it sends nothing
+# without --yes.  Both halves add up to the three scripts pyproject.toml declares;
+# the end of this file asserts that nothing else landed in /usr/bin.
 for cmd in xigmalcd xigmaui; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
         echo "  $cmd not on PATH: FAILED"; exit 1

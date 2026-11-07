@@ -25,7 +25,8 @@ say so in the changelog when one moves.
 Which bytes go in which package
 -------------------------------
 `xigmatek-connect-lcd` is the code plus what the code needs to look like the vendor
-app out of the box: the two Python packages, the two console scripts, the three
+app out of the box: the two Python packages, the three console scripts
+(`xigmalcd`, `xigmaui`, `xigmalcd-reset`), the three
 background clips this project vendors (4.8 MB), the udev rule, the user unit, the
 menu entry and the icon.
 
