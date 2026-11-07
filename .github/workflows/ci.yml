@@ -357,6 +357,25 @@ jobs:
             echo 'systemctl --user start xigmalcd.service'
             echo '```'
             echo
+            echo "Two things that install deliberately does not do. It *enables* the"
+            echo "user unit - the one line \`Setting up xigmatek-connect-lcd\` prints is"
+            echo "a symlink into \`/etc/systemd/user/default.target.wants/\` - without"
+            echo "starting it, and its \`ExecStart\` is \`/usr/bin/xigmalcd --theme alpha"
+            echo "--fps 2\`, so starting it makes that process the only holder of"
+            echo "/dev/ttyACM0. And it drops the udev rule into"
+            echo "/usr/lib/udev/rules.d without asking udev to read it, so the stable"
+            echo "\`/dev/xigmatek-lcd\` symlink and the ModemManager quieting arrive at"
+            echo "the next replug - or now, by hand:"
+            echo
+            echo '```bash'
+            echo 'sudo udevadm control --reload-rules && sudo udevadm trigger --action=change'
+            echo '```'
+            echo
+            echo "The window needs PyQt6, which the package only Suggests:"
+            echo "\`sudo apt install python3-pyqt6\`. Without it, \`xigmaui\` exits 2 with"
+            echo "two lines saying what to install and no traceback; the display loop"
+            echo "is unaffected either way, which is why it is a Suggest."
+            echo
             echo "The themes package is optional and separate on purpose: it is"
             echo "XIGMATEK's own library, copied byte for byte out of the vendor"
             echo "installation and hashed by its own \`.json\` manifest so the copy can"
@@ -369,6 +388,15 @@ jobs:
             echo "checks (\`debian/tests/smoke\`) all pass with no serial port present,"
             echo "and the suite's own reset gate check asserts that \`xigmalcd-reset\`"
             echo "without \`--yes\` prints the frame and sends nothing."
+            echo
+            echo "The same install-and-check pair has also been run on real hardware"
+            echo "that happens to be a desktop rather than a runner: the author's bench,"
+            echo "\`sudo apt install\` of both files followed by \`debian/tests/smoke\`"
+            echo "printing \`all installed checks passed\`. That transcript is tracked at"
+            echo "\`docs/packaging/smoke-2026-11-07.log\`, hashes of the files it"
+            echo "installed included. What neither the runner nor the bench judges from"
+            echo "these bytes is the glass itself - README and PROTOCOL.md carry those"
+            echo "claims, each with the bench log it was read out of."
             echo
             echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           } > "$RUNNER_TEMP/notes.md"

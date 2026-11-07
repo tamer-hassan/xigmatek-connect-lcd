@@ -244,6 +244,22 @@ Four things an install does that a checkout does not:
 And `tools/` is installed by neither package, which is the reason the reset command is a
 command of its own - see "If the panel goes white".
 
+Two of the relationship lines in `debian/control` are choices, and both show up on the
+desktop. `xigmatek-connect-lcd-themes` is a **Recommends**, so `apt install` takes the
+vendor's library by default and one `apt remove` takes it away again.
+`python3-pyqt6` is only a **Suggest**, because the loop that holds the port needs no Qt
+and a headless box should not be made to carry it - which means an install can put a
+menu entry on a machine that cannot open the window it names. What that person gets is
+measured, on this bench, by hiding PyQt6 from the installed command with an import
+blocker rather than by assuming a box without it: exit 2, two lines, no traceback -
+
+```
+xigmaui needs Qt, which the display loop does not: No module named 'PyQt6'
+  install it with `pip install .[gui]`, or from the distro: sudo apt install python3-pyqt6
+```
+
+and `tools/selftest.sh` now checks that path the same way, so it stays a sentence.
+
 What has been measured about those bytes without installing them: `lintian
 2.129.0ubuntu2.1` on the `.changes` says **0 errors, 0 warnings, 0 infos**; unpacked into
 a plain directory, with nothing of ours on the import path, the three commands answer
@@ -835,7 +851,7 @@ there is one place to change when a number is re-measured.
 | the running display | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), and the daemon's recent events. Pause, one frame, an fps spin, `Apply these settings`, upload | socket only; the port is never opened. Measured 1 ms for the six commands Apply sends |
 | preview | the stored background frame with `render.draw`'s OSD layer composited on top, refreshed at `--preview-fps` (default 2) | nothing |
 | theme | the five themes, clock size, `clear`/`black` canvas, scrim, fan figures | nothing until you press Apply (display running) or one of the send buttons (not running) |
-| clips | every MP4 it can find - 3 vendored here, 43 from the vendor's install and 69 the Windows app has pushed to this panel, the latter two read off the mounted Windows partition - with an ffmpeg thumbnail and each clip's measured mean luma | `Upload background`: `STATE all 1` twice, then the whole file as one media file |
+| clips | every MP4 the roots hold, listed once per clip - **69 rows** on this box: 3 vendored here, 40 more from the vendor's library, 26 more from the 69 files the Windows app has pushed to this panel (the rest are byte-identical re-uploads); the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. Each row gets an ffmpeg thumbnail and its measured mean luma | `Upload background`: `STATE all 1` twice, then the whole file as one media file |
 | `Send one frame` | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
 | `Send frames for 30 s` | the picture loop, so you can watch the real glass | `STATE all 1` twice, then 60 uploads at 2 fps |
 | status | the panel's `conn 1` reply: sn, versions, `space`, `brightness`, `mode`, `logo`, `osdState`, `timeout`, each annotated only where PROTOCOL.md records what it means | `conn 1`, `power resume`, `timeout 60` - and no metrics blob, because it puts no picture on the glass. With a display running there is no fresh `conn 1` to ask for, so the box shows the one that display read at its own session start, labelled as such |
@@ -1212,17 +1228,28 @@ the first five minutes of the window are the ringed theme at 1 fps, still driven
 socket, still logged.
 
 Cost, measured on this box and re-measured by `tools/selftest.sh` (it prints the
-numbers it just got, so these cannot quietly go stale). The window builds in
-**0.2-0.43 s** with all **115** clip rows up (3 vendored here, 43 from the vendor's
-install, 69 the Windows app pushed to this panel at some point); the thumbnails and
-loop lengths of the first ten rows - about what one page shows - land in **0.49 s**
-and the rest trickle in behind them: an ffmpeg seek per clip, **12.7 s for all 115**
-run alone and 15.7-18.5 s when the selftest is doing other things at the same time, with
-the window interactive throughout. One frame render measures **12.2 ms** median (11.7-22.7 ms
-over 15 draws, transparent canvas, `alpha` theme); the selftest, which times the same call
-while 115 thumbnails are being decoded around it, prints **19.5 ms** for it. Either way a 2
-fps preview is a few percent of one
-core. That is `render.draw` alone; adding the PNG encode the upload needs costs
+numbers it just got, so these cannot quietly go stale). The picker lists every clip the
+roots hold, and lists each one **once**: 69 rows here - 3 vendored in `media/`, 40 more
+from the vendor library in `themes/alpha/`, and 26 more from the 69 files the Windows
+app has pushed to this panel, the other 43 of those being byte-for-byte re-uploads of
+clips already on the list. That dedup is new, and so is the evidence for it: with the
+packages installed, roots overlap by copies rather than by links, and listing rows for
+every path gave **161 rows for 69 clips**; all 92 dropped pairs were compared by full
+sha256, and not one of them was a same-name, same-length pair that held different
+bytes. The row that survives is the file `find_media()` would have chosen anyway,
+because the roots are walked in precedence order, and `tools/selftest.sh` plants a copy
+of `Theme_25.mp4` in another root to keep that true.
+
+The window builds in **0.21-0.64 s** with those 69 rows up (the spread is the machine
+being busy, not the window: the same code prints 0.21 s in a quiet suite run and 0.64 s
+when something else is running); the thumbnails and loop lengths of the first ten rows -
+about what one page shows - land in **0.80 s**, and the rest trickle in behind them: an
+ffmpeg seek per clip, **7.2-9.7 s for all 69** (12.7 s for the 115 rows this box listed
+before the dedup), with the window interactive throughout. One frame render measures
+**12.4-14.1 ms** median (11.7-22.7 ms over 15 draws, transparent canvas, `alpha` theme);
+the selftest, which times the same call while the thumbnail pass is decoding around it,
+prints its own median in the same line. Either way a 2 fps preview is a few percent of
+one core. That is `render.draw` alone; adding the PNG encode the upload needs costs
 **10.7 ms** median (10.7-15.0 ms) - about 23 ms for a frame that actually goes up - which
 is why the preview does not encode. The gauge rings are most of that growth: the same
 draw measured 9.0 ms before the arcs went in, and the frame it produces is now 12.1-13.6 KB

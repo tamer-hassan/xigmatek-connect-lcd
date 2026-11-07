@@ -90,9 +90,10 @@ Description: ALPHA's own theme library, as shipped, for Xigmatek Connect panels
  the clips - so the copy can be checked rather than trusted.  The layouts are
  what xigmalcd/layout.py reads; the clips sit in their own tree, which
  xigmaui/clips.py scans as one optional clip root (the root constant is
- xigmalcd/main.py:SYSTEM_THEMES), so the window's background picker offers all
- 44 of them instead of only the three this project vendors itself, and removing
- this package takes them away without touching anything else.
+ xigmalcd/main.py:SYSTEM_THEMES), so the window's background picker offers the
+ 43 MP4s it carries - 40 rows more than the three this project vendors itself,
+ three of the 43 being those same clips - and removing this package takes them
+ away without touching anything else.
  .
  Install it to get the vendor's backgrounds and the evidence for every claim
  this project makes about its themes.  Remove it to take them away again:

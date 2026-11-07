@@ -389,13 +389,24 @@ sys.path.insert(0, ".")
 from xigmalcd import main as m
 
 # 1. in a checkout: the repository's own media/ is the root, and all three shipped
-#    clips resolve inside it - which is what every clip number in README reads
+#    clips resolve inside it - which is what every clip number in README reads.
+#    Order is the rule; how many roots there are belongs to the machine.  A box that
+#    has the .deb installed also has /usr/share/xigmalcd/media, and the author's bench
+#    became one of those on 2026-11-07, which is why this line used to read
+#    `media_roots() == (repo,)`: it was asserting the state of one machine instead of
+#    the rule.  It still asserts the part that matters - the checkout wins, and nothing
+#    else in the list is a root this code did not name.
 repo = os.path.abspath(m.REPO_MEDIA)
-assert m.media_roots() == (repo,), m.media_roots()
+assert not os.environ.get(m.MEDIA_ENV), \
+    f"{m.MEDIA_ENV} is set; unset it to check the checkout's own roots"
+roots = m.media_roots()
+assert roots[0] == repo, roots
+assert set(roots[1:]) <= {os.path.abspath(m.SYSTEM_MEDIA)}, roots
 for p in (m.DEFAULT_MP4, m.QUIET_MP4, m.BRIGHT_MP4):
     assert os.path.dirname(p) == repo, p
     assert os.path.exists(p), p
-print(f"  checkout           default, quiet and bright all resolve inside {repo}")
+extra = "" if len(roots) == 1 else f" (+ {roots[1]}, the installed package's copy)"
+print(f"  checkout           default, quiet and bright all resolve inside {repo}{extra}")
 
 with tempfile.TemporaryDirectory() as tmp:
     sysroot = os.path.join(tmp, "usr-share-xigmalcd-media")
@@ -813,6 +824,36 @@ assert "--no-control" not in args, "the unit must leave the window a socket"
 print(f"  unit                   ExecStart: {' '.join(args)}")
 PY
 
+# And the other half of the menu entry's program, on a box without Qt.  PyQt6 is a
+# Suggest of the .deb, not a Depends, precisely because the loop that holds the port
+# runs without it - which means an installed system can have the menu entry and no Qt,
+# and what that person gets must be a sentence, not a traceback.  The blocker below
+# makes the import look absent (a meta_path finder that raises ModuleNotFoundError for
+# PyQt6 and anything under it), because PyQt6 is installed on this machine and the
+# honest way to test its absence is to hide it rather than to assume a box like the
+# author's lacks it.
+noblock=$(mktemp -d)
+cat > "$noblock/sitecustomize.py" <<'PY'
+import sys
+
+
+class Blocker:
+    def find_spec(self, name, path=None, target=None):
+        if name == "PyQt6" or name.startswith("PyQt6."):
+            raise ModuleNotFoundError(f"No module named {name!r}", name=name)
+        return None
+
+
+sys.meta_path.insert(0, Blocker())
+PY
+out=$(PYTHONPATH="$noblock" python3 -m xigmaui --help 2>&1); rc=$?
+grep -q "Traceback" <<<"$out" && { echo "  no Qt: got a traceback"; echo "$out"; exit 1; }
+test "$rc" = 2 || { echo "  no Qt: exit $rc, expected 2"; echo "$out"; exit 1; }
+grep -q "xigmaui needs Qt" <<<"$out" || { echo "  no Qt: no plain-language reason"; exit 1; }
+grep -q "python3-pyqt6" <<<"$out" || { echo "  no Qt: does not name the package to install"; exit 1; }
+echo "  no Qt                exit $rc: $(head -1 <<<"$out")"
+echo "                         $(sed -n '2p' <<<"$out")"
+
 echo
 echo "== the .deb's unit and menu entry against the checkout's"
 # debian/xigmalcd.service and debian/xigmaui.desktop are the installed-layout twins
@@ -977,6 +1018,7 @@ echo "== the GUI, offscreen and with no panel: window, clips, and the reset gate
 QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME=$cfgtmp XIGMA_SOCKET=$cfgtmp/no-display.sock \
     python3 - <<'PY' || { echo "gui FAILED"; exit 1; }
 import inspect
+import os
 import sys
 import time
 import types
@@ -1004,6 +1046,37 @@ if missing:
 found = clipdb.list_clips()
 assert found, "no clips found at all"
 byname = {c.name: c for c in found}
+# No two rows may be the same clip.  The roots overlap on purpose: the .deb installs
+# its own copy of each vendored clip, the themes package carries clips this project
+# also vendors, and the Windows app's upload history repeats files it pushed more than
+# once.  Deduplicating by realpath does not catch separate files with the same bytes -
+# on this bench, right after both packages were installed, realpath-only dedup listed
+# 161 rows for 69 clips, and 92 of those rows were byte-identical to a row already
+# present (all 92 compared by full sha256, and not one of them a same-name,
+# same-length pair that turned out to hold different bytes).  So the rule is name plus
+# length plus content, and that is what gets pinned here.
+shapes = {}
+for cl in found:
+    k = (cl.name.casefold(), cl.bytes)
+    assert k not in shapes, (k, shapes.get(k), cl.path)
+    shapes[k] = cl.path
+# and the row that survives is the one find_media() would have chosen: a planted copy
+# of a clip the checkout already has adds no row, whichever root it sits in
+import shutil as _sh
+import tempfile as _tf
+from xigmalcd import main as _m
+with _tf.TemporaryDirectory() as _t:
+    _planted = os.path.join(_t, "Theme_25.mp4")
+    _sh.copyfile(byname["Theme_25.mp4"].path, _planted)
+    _saved, _m.SYSTEM_THEMES = _m.SYSTEM_THEMES, _t
+    try:
+        again = clipdb.list_clips()
+        got = [c for c in again if c.name == "Theme_25.mp4"]
+        assert len(got) == 1 and got[0].path == byname["Theme_25.mp4"].path, got
+    finally:
+        _m.SYSTEM_THEMES = _saved
+print(f"  clip library       {len(found)} rows, each a distinct name+length; the same "
+      f"bytes under another root add no row and do not displace the checkout's file")
 for name, size in (("Theme_25.mp4", 214_917), ("Theme_11.mp4", 3_402_098),
                    ("theme_48.mp4", 1_333_649)):
     assert byname[name].bytes == size, (name, byname[name].bytes)

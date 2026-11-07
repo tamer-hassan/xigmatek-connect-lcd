@@ -3,8 +3,11 @@
 Clip roots, in the order the app lists them.  The first three are this project's
 own clips (`xigmalcd.main.media_roots()` says which of them exist); the last two
 are the vendor's copies, reachable only from a box that has the Windows volume
-mounted or the themes package installed.  Every root that exists is scanned, and
-a clip found twice - the same file under two spellings - is listed once:
+mounted or the themes package installed.  Every root that exists is scanned, and a
+clip found twice is listed once: the same file under two spellings, or the same bytes
+under two roots - a checkout on a box that also has the .deb installed holds both
+copies of all three vendored clips.  The root that comes first in the order below is
+the row that stays, because that is the file `find_media()` would have picked:
 
   the checkout's media/    the clips vendored into this repository. `Theme_25.mp4`
                            is the one ALPHA pairs with the theme it has selected
@@ -33,6 +36,7 @@ Everything here is host-side. Nothing in this module opens a serial port.
 from __future__ import annotations
 
 import glob
+import hashlib
 import io
 import os
 import subprocess
@@ -127,15 +131,48 @@ def list_clips(extra: str = "") -> list[Clip]:
                                WIN_STATIC, WIN_UPLOADS, media_roots)
 
     found: list[Clip] = []
-    seen = set()
+    seen = set()          # realpaths: one file, several spellings
+    taken = {}            # (name, length) -> the row already standing for that shape
+
+    def edge(path: str) -> str:
+        """sha256 of the first and the last MiB.
+
+        Only consulted when a name and a length have already matched, which is a
+        handful of pairs however many roots exist.  Reading the whole file would be
+        the honest comparison; this reads 2 MB of the largest clip in the library
+        instead, which is enough to tell a copy apart from a same-named,
+        same-length neighbour - the Windows app's own upload history has 69 entries
+        on this box and repeats itself by name."""
+        h = hashlib.sha256()
+        with open(path, "rb") as fh:
+            h.update(fh.read(1 << 20))
+            try:
+                fh.seek(-(1 << 20), os.SEEK_END)
+            except OSError:             # shorter than the window: the head is all of it
+                return h.hexdigest()
+            h.update(fh.read(1 << 20))
+        return h.hexdigest()
 
     def add(path: str, origin: str, note: str = "") -> None:
         real = os.path.realpath(path)
         if real in seen:
             return
+        size = os.path.getsize(path)
+        key = (os.path.basename(path).casefold(), size)
+        prev = taken.get(key)
+        if prev is not None and edge(found[prev].path) == edge(path):
+            # The same clip sitting in two roots: the checkout's media/ and the copy
+            # the .deb put in /usr/share/xigmalcd/media, or a clip this project
+            # vendors itself and the themes package also carries.  realpath alone did
+            # not catch that - these are separate files with the same bytes - and on
+            # the author's bench, once the packages were installed, it showed as 161
+            # rows where 115 clips exist.  The roots are walked in precedence order,
+            # so the row that stays is the file find_media() would have chosen.
+            seen.add(real)
+            return
+        taken[key] = len(found)
         seen.add(real)
-        found.append(Clip(path=path, origin=origin,
-                          bytes=os.path.getsize(path), note=note))
+        found.append(Clip(path=path, origin=origin, bytes=size, note=note))
 
     # (root, pattern, origin). The root is checked with isdir rather than the
     # pattern's own dirname: for a recursive pattern that dirname is the `**`
