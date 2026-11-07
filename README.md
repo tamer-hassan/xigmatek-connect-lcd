@@ -237,14 +237,46 @@ opens no port, `xigmalcd-reset` with no `--yes` prints the 109-byte frame and se
 nothing, the themes tree re-hashes to its manifest (152 entries, 125 distinct paths, 127
 files on disk), and `desktop-file-validate` is clean on the installed menu entry.
 
-What has **not** been measured is the one thing that needs root: `apt install` of these
-files on this bench and `debian/tests/smoke` against the result - the test of the layout
-an install actually makes, rather than an unpacking of it. CI
-(`.github/workflows/ci.yml`) runs that pair on a runner that has never seen this tree:
-the seventeen-section offline suite, the build, `lintian` with warnings as failures, then
-`sudo apt install ./debs/*.deb` and `debian/tests/smoke`; on a `v*` tag the same two
-files become a GitHub Release. Until the bench install is done, that CI pair is what the
-packaging claims rest on, and it is said here rather than in the release notes.
+What an install actually does has now been measured on this bench, root and all:
+`sudo apt install` of both files (apt 3.2.1, Ubuntu 26.04, kernel 7.0.0-42-generic,
+2026-11-07 05:43) took them off one command line - the versioned `Recommends`
+satisfied by the second file rather than by any archive - unpacked 157 MB, and printed
+one thing of its own during `Setting up xigmatek-connect-lcd (0.1)`:
+
+```
+Created symlink '/etc/systemd/user/default.target.wants/xigmalcd.service' → '/usr/lib/systemd/user/xigmalcd.service'.
+```
+
+That is the whole of its enablement. `dpkg-query` afterwards reports the unit
+*enabled*, `systemctl --user is-active` reports it *inactive*, and `fuser
+/dev/ttyACM0` says nobody is holding the port: installing draws nothing on the glass.
+`debian/tests/smoke` then ran against that install and said `all installed checks
+passed` - imports out of `/usr/lib/python3/dist-packages`, `xigmalcd --help` 9 808 B
+and `xigmaui --help` 1 498 B, the three clips found under `/usr/share/xigmalcd/media`
+by the packaged code's own root rules at the sizes and md5s the suite pins, one 480×480
+PNG from a dry run with the port never opened, the udev rule, the unit's
+`ExecStart=/usr/bin/xigmalcd --theme alpha --fps 2` with no `--allow-reset`, the menu
+entry clean through `desktop-file-validate`, the icon 256×256 RGBA with transparent
+corners, `/usr/bin/xigmalcd-reset` printing 355 B - the 109-byte frame - and sending
+nothing, nothing from `tools/` on PATH, and 152/152 manifest entries re-hashed under the
+installed themes path. The transcript of that run is in this tree at
+**`docs/packaging/smoke-2026-11-07.log`**, which is what every figure in this paragraph
+was read out of, hashes of the two `.deb` files included.
+
+One line in it is worth remembering, because it is a *no*: `Icon=xigmaui` resolves by
+theme name **no** in that check. smoke reports it rather than asserting it - whether the
+name resolves belongs to the desktop session's icon cache, and the check ran with
+`QT_QPA_PLATFORM=offscreen` - and it is exactly why `xigmaui/app.py:ICONS` tries the
+hicolor file itself before giving up: the window's icon does not depend on that lookup
+working.
+
+CI (`.github/workflows/ci.yml`) runs the same pair on a machine that has never seen this
+tree: the seventeen-section offline suite, then the build, `lintian` with warnings as
+failures, then `sudo apt install ./debs/*.deb` and `debian/tests/smoke`; on a `v*` tag
+the same two files become a GitHub Release. The offline suite and the build's dependency
+step have run green there; the install job had not finished its first attempt when this
+was written, so what this section claims rests on the bench transcript above and on
+whatever that job reports from now on.
 
 ## What the panel gets
 

@@ -75,6 +75,14 @@ desktop-file-validate, the udev rule and unit present with the unit holding no
 what manifest.json recorded.  It works under autopkgtest (`Tests: smoke` in
 debian/tests/control, `Restrictions: superficial`) and by hand as above.
 
+That pair has been run, on the author's bench, on 2026-11-07: both packages from one
+`apt install` command line, `Setting up xigmatek-connect-lcd` creating
+`/etc/systemd/user/default.target.wants/xigmalcd.service` (enabled, not started - the
+port was still free afterwards, `fuser /dev/ttyACM0` empty), and then
+`all installed checks passed`.  The transcript is tracked at
+`docs/packaging/smoke-2026-11-07.log`, including the sha256 of the two .deb files it
+installed; README's "Install from a .deb" section quotes it and points there.
+
 The offline suite, tools/selftest.sh, runs before packaging in CI and is the thing
 to run after editing protocol.py, render.py or xigmaui/.  It is not run from
 debian/rules' override_dh_auto_test: two of its sections read the author's bench

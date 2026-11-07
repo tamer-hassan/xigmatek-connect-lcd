@@ -1,0 +1,90 @@
+=== run 2026-11-07T05:43:45+02:00 on Ubuntu 26.04 LTS (x86_64), kernel 7.0.0-42-generic
+=== apt version: apt 3.2.1 (amd64)
+=== the files being installed:
+-rw-r--r-- 1 tamer tamer 146136576 Nov  7 05:42 /home/tamer/work/xigmatek-connect-lcd-themes_0.1_all.deb
+-rw-r--r-- 1 tamer tamer   5213620 Nov  7 05:42 /home/tamer/work/xigmatek-connect-lcd_0.1_all.deb
+80b24945f6599ca6bb429c54f50a3153652adf9b76cafd8a758333ff6cc3aacd  /home/tamer/work/xigmatek-connect-lcd_0.1_all.deb
+13ed5c42fe47ef04da7e61048607a99283ba6f157d607f8980b936229db1b348  /home/tamer/work/xigmatek-connect-lcd-themes_0.1_all.deb
+
+=== apt install
+Reading package lists...
+Building dependency tree...
+Reading state information...
+Solving dependencies...
+The following package was automatically installed and is no longer required:
+  nvidia-firmware-595-595.91.07
+Use 'sudo apt autoremove' to remove it.
+The following NEW packages will be installed:
+  xigmatek-connect-lcd xigmatek-connect-lcd-themes
+0 upgraded, 2 newly installed, 0 to remove and 187 not upgraded.
+Need to get 0 B/151 MB of archives.
+After this operation, 157 MB of additional disk space will be used.
+Get:1 /home/tamer/work/xigmatek-connect-lcd_0.1_all.deb xigmatek-connect-lcd all 0.1 [5,214 kB]
+Get:2 /home/tamer/work/xigmatek-connect-lcd-themes_0.1_all.deb xigmatek-connect-lcd-themes all 0.1 [146 MB]
+Selecting previously unselected package xigmatek-connect-lcd.
+(Reading database… (Reading database… 5%(Reading database… 10%(Reading database… 15%(Reading database… 20%(Reading database… 25%(Reading database… 30%(Reading database… 35%(Reading database… 40%(Reading database… 45%(Reading database… 50%(Reading database… 55%(Reading database… 60%(Reading database… 65%(Reading database… 70%(Reading database… 75%(Reading database… 80%(Reading database… 85%(Reading database… 90%(Reading database… 95%(Reading database… 100%(Reading database… 286069 files and directories currently installed.)
+Preparing to unpack …/xigmatek-connect-lcd_0.1_all.deb…
+Unpacking xigmatek-connect-lcd (0.1)…
+Selecting previously unselected package xigmatek-connect-lcd-themes.
+Preparing to unpack …/xigmatek-connect-lcd-themes_0.1_all.deb…
+Unpacking xigmatek-connect-lcd-themes (0.1)…
+Setting up xigmatek-connect-lcd-themes (0.1)…
+Setting up xigmatek-connect-lcd (0.1)…
+Created symlink '/etc/systemd/user/default.target.wants/xigmalcd.service' → '/usr/lib/systemd/user/xigmalcd.service'.
+Processing triggers for hicolor-icon-theme (0.18-2build1)…
+Processing triggers for desktop-file-utils (0.28-1build1)…
+
+=== what dpkg now knows
+xigmatek-connect-lcd 0.1 all Installed-Size 5517 KB
+xigmatek-connect-lcd-themes 0.1 all Installed-Size 147853 KB
+  three commands on PATH:
+    /usr/bin/xigmalcd
+    /usr/bin/xigmaui
+    /usr/bin/xigmalcd-reset
+
+=== debian/tests/smoke, from the checkout
+== the modules are where the interpreter looks
+  imports               /usr/lib/python3/dist-packages/xigmalcd (+ xigmaui)
+
+== the two commands that draw, from pyproject.toml's entry points
+  xigmalcd              /usr/bin/xigmalcd, --help 9808 B
+  xigmaui               /usr/bin/xigmaui, --help 1498 B
+
+== the clips the package installed are the ones the code finds
+  DEFAULT_MP4 /usr/share/xigmalcd/media/Theme_25.mp4
+  QUIET_MP4   /usr/share/xigmalcd/media/Theme_11.mp4
+  BRIGHT_MP4  /usr/share/xigmalcd/media/theme_48.mp4
+  roots         ('/usr/share/xigmalcd/media',)
+  vendored clips        3 clips, sizes and md5 as pinned in tools/selftest.sh
+
+== one frame, drawn with no panel in the loop
+  frame           /tmp/tmp.O2F9E3A6q7/frames/frame0000.png 480x480 P 12652 B
+  dry-run               480x480 PNG written, exit 0
+
+== what debhelper installed around it
+  udev rule             /usr/lib/udev/rules.d/99-xigmatek-lcd.rules (symlink xigmatek-lcd, TAG+=uaccess)
+  user unit             /usr/lib/systemd/user/xigmalcd.service -> /usr/bin/xigmalcd --theme alpha --fps 2 (no --allow-reset)
+  menu entry            /usr/share/applications/xigmaui.desktop, desktop-file-validate clean
+  icon            /usr/share/icons/hicolor/256x256/apps/xigmaui.png 256x256 RGBA 101506 B, corners transparent
+  Icon=xigmaui          resolves by theme name: no (informational)
+
+== the reset command, and the gate on it
+  xigmalcd-reset        /usr/bin/xigmalcd-reset; no --yes -> 355 B printed, nothing sent
+
+== what the package does NOT ship
+  tools/                not installed; only the three entry points are on PATH
+
+== the vendor library, if it is installed
+  manifest          152/152 files hashed clean under /usr/share/xigmalcd/themes/alpha
+  kinds             {'thm': 27, 'background': 27, 'foreground': 27, 'layout': 27, 'clip': 44}
+  themes                /usr/share/xigmalcd/themes/alpha, every manifest entry re-hashed
+
+all installed checks passed
+smoke rc=0
+
+=== the user unit postinst left enabled (not started)
+  enabled-state: enabled
+  active-state:   inactive
+  to take it back: systemctl --user disable xigmalcd
+  who holds the port now:
+    nothing: the port is free
