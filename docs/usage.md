@@ -216,10 +216,13 @@ claim:
   441 whole-pixel budgets this canvas can hold and finds none that reproduces the six sizes
   the ring picks (docs/limits.md). `dual`'s middle line is a `special`, not a widget:
   `CPU 62%    4101 / 15625 GB` is a composite of three readings in one string, and
-  `alpha`'s two fan figures and its two temperature figures are the other kind - one row
-  that draws a *pair* at one shared text size, each held to a zero diff against the theme's
-  own row: 30 reading pairs for the fan pair, 36 for the temperature pair, the pair's ink
-  measured as staying clear of the ring's stroke (docs/limits.md). An export that cannot be
+  `alpha`'s three pairs of lettering - its fan figures, its temperature figures, and the two
+  labels over them - are the other kind: one row drawing a *pair* at one shared text size,
+  each held to a zero diff against the theme's own rows (30 reading pairs for the fan pair,
+  36 for the two temperature rows, whose ink is measured staying clear of the rings'
+  stroke). Between them the two temperature rows cover the rings' clear hole exactly, and
+  the labels are a row rather than two `text` widgets because the size that hole decides is
+  a face metric of the machine drawing it (docs/limits.md). An export that cannot be
   driven to a diff of 0 is not shipped, so `alpha` and `bars` stay code-drawn for now, and
   docs/theme-editor.md says what each of them is still waiting on - `bars` being the
   interesting one, because its row count depends on which sensors the machine answers.

@@ -2024,10 +2024,11 @@ ARC_PAIRS = list(itertools.product((None, 5, 22, 57, 100, 241), repeat=2))
 ARC_STRINGS = tuple(render._deg(v) for v in (None, 5, 22, 57, 100, 241))
 
 
-def _arc_fit(strings, ceiling=render.A26_TVAL_F, cx=render.A26_TCOL_X[0]):
+def _arc_fit(strings, ceiling=render.A26_TVAL_F, cx=render.A26_TCOL_X[0],
+             y=render.A26_TVAL_Y):
     img = Image.new("RGBA", (render.W * layout.SS, render.H * layout.SS), (0, 0, 0, 0))
     return render._fit_arc(img, tuple(strings), cx, render.A26_RING_Y,
-                           render.A26_TVAL_Y, render.A26_RING_R - render.A26_RING_W,
+                           y, render.A26_RING_R - render.A26_RING_W,
                            render.A26_RING_R, render.A26_ARC_START,
                            render.A26_ARC_SWEEP, ceiling)
 
@@ -2090,16 +2091,20 @@ def _temp_metrics(cpu, gpu):
             "timestamp": {}}
 
 
-def _temp_prop():
-    """The row that says what `theme_alpha`'s temperature pair is: `x` the pair's centre,
-    `width` the pitch between the two figures, `xigma.fitArc` the ring they are sized
-    against - every number read out of `render.py`'s own constants, because a number
-    written here would be a second opinion about the theme.  The angles are the app's own
-    (`layout.arc_angles` measures the rule that turns them into Pillow's)."""
-    return {"name": "temp-values",
+def _temp_prop(name="temp-values", y=None, ceiling=None):
+    """One of `alpha`'s two temperature rows - the figures, or the labels over them.  `x`
+    is the pair's centre, `width` the pitch between the two figures, `xigma.fitArc` the
+    ring they are sized against: every number read out of `render.py`'s own constants,
+    because a number written here would be a second opinion about the theme.  The angles
+    are the app's own (`layout.arc_angles` measures the rule that turns them into
+    Pillow's)."""
+    return {"name": name,
             "x": (render.A26_TCOL_X[0] + render.A26_TCOL_X[1]) // 2,
-            "y": render.A26_TVAL_Y, "width": render.A26_TCOL_X[1] - render.A26_TCOL_X[0],
-            "fontFamily": "dejavu", "fontSize": render.A26_TVAL_F, "bold": True,
+            "y": y if y is not None else render.A26_TVAL_Y,
+            "width": render.A26_TCOL_X[1] - render.A26_TCOL_X[0],
+            "fontFamily": "dejavu",
+            "fontSize": ceiling if ceiling is not None else render.A26_TVAL_F,
+            "bold": True,
             "textColor": _css(render.A26_WHITE),
             "xigma": {"anchor": "ma",
                       "fitArc": {"cy": render.A26_RING_Y, "radius": R_IN,
@@ -2110,13 +2115,13 @@ def _temp_prop():
 
 
 def _hole_px(k):
-    """Inside either ring's clear hole, at or under the row's own anchor?  The theme's
-    label line inks above the anchor, so those pixels are not this row's business, and the
-    pitch is more than twice the hole's radius, so no pixel is inside both rings."""
+    """Inside either ring's clear hole?  The pitch is more than twice the hole's radius,
+    so no pixel is inside both rings, and the hole is shared by two rows: the labels and
+    the figures under them.  Neither is answerable for the other's pixels, which is what
+    the combined check below is for."""
     x, y = k % render.W, k // render.W
-    return (y >= render.A26_TVAL_Y - 1
-            and min(((x - cx) ** 2 + (y - render.A26_RING_Y) ** 2) ** 0.5
-                    for cx in render.A26_TCOL_X) < R_IN)
+    return (min(((x - cx) ** 2 + (y - render.A26_RING_Y) ** 2) ** 0.5
+                for cx in render.A26_TCOL_X) < R_IN)
 
 
 def _hole_r(k):
@@ -2143,56 +2148,102 @@ tail = max(_hole_r(k) for k in RING_TAIL)
 # row's own ink and the coverage below could pass on a row that paints nothing
 assert tail < render.ARC_FIT_GAP, (tail, len(RING_TAIL), render.ARC_FIT_GAP)
 
-temp_rows, temp_px, row_clear = [], [], 1e9
-for cpu, gpu in ARC_PAIRS:
-    m = _temp_metrics(cpu, gpu)
+ZONE = {k for k in range(render.W * render.H) if _hole_px(k) and k not in RING_TAIL}
+LBL = _temp_prop("temp-labels", render.A26_TLBL_Y, render.A26_TLBL_F)
+VAL = _temp_prop()
+
+
+def _rows_frame(props, m):
+    """A frame carrying exactly these `special` rows, through the loop's own door.
+    `themes.SPECIALS` has to be injected: a probe that forgets it draws nothing at all and
+    reports `boxes: []`, which is how this repo's first special probe fooled itself."""
     vals, _absent = themes.values(m)
     themes.fill_lines(vals, m)
     obj = {"width": render.W, "height": render.H,
-           "osd": {"widget": [{"id": "xigma-alpha-temps", "type": "special",
-                               "property": [_temp_prop()]}]}}
-    img, notes = layout.draw_theme(obj, vals, canvas=(render.W, render.H),
-                                   specials=themes.SPECIALS)
-    flat_me = list(img.get_flattened_data())
+           "osd": {"widget": [{"id": "xigma-alpha-" + p["name"], "type": "special",
+                               "property": [p]} for p in props]}}
+    return layout.draw_theme(obj, vals, canvas=(render.W, render.H),
+                             specials=themes.SPECIALS)
+
+
+def _ink(flat):
+    """Which pixels of a flattened frame are ink: alpha, not colour.  A downscale of a
+    bright stroke against a transparent canvas leaves pixels whose colour channels are
+    non-zero and whose alpha is zero - invisible, and a residual of whatever was drawn next
+    to them rather than something this row is answerable for."""
+    return {k for k, v in enumerate(flat) if v[3]}
+
+
+temp_rows, temp_px, lbl_px = [], [], []
+lbl_sizes, val_sizes, residual = [], [], 0
+row_clear = 1e9
+for cpu, gpu in ARC_PAIRS:
+    m = _temp_metrics(cpu, gpu)
     flat_on = list(render.draw(m, "alpha").get_flattened_data())
-    painted = {k for k, v in enumerate(flat_me) if v != (0, 0, 0, 0)}
-    zone = {k for k in range(render.W * render.H)
-            if _hole_px(k) and k not in RING_TAIL}
-    theirs = {k for k in zone if flat_on[k] != (0, 0, 0, 0)}
-    # 1. the row paints where it says it paints: all of it inside the hole, and not one
-    #    pixel on the stroke or on the ring painter's own tail
-    assert painted and painted <= zone, (cpu, gpu, len(painted), len(painted - zone))
-    # 2. and it paints the whole of what is its: nothing the theme puts in that zone is
-    #    left to the theme's code
-    assert theirs <= painted, (cpu, gpu, len(theirs - painted),
+    theirs = {k for k in ZONE if flat_on[k][3]}
+    # each row on its own: it may put pixels nowhere but in the free zone, and where it
+    # puts one it puts the theme's byte there
+    for prop_, strings, y_, ceil_ in ((VAL, (render.cpu_temp_text(m),
+                                             render.gpu_temp_text(m)),
+                                       render.A26_TVAL_Y, render.A26_TVAL_F),
+                                      (LBL, render.A26_TLBL_TEXT, render.A26_TLBL_Y,
+                                       render.A26_TLBL_F)):
+        img, notes = _rows_frame([dict(prop_)], m)
+        flat = list(img.get_flattened_data())
+        painted = _ink(flat)
+        assert painted and painted <= ZONE, (prop_["name"], cpu, gpu,
+                                             len(painted - ZONE),
+                                             sorted(painted - ZONE)[:4])
+        assert all(flat_on[k] == flat[k] for k in painted), (prop_["name"], cpu, gpu)
+        assert not notes["missing"] and not notes["gaps"], (cpu, gpu, notes)
+        # the size, spelled out again from the rule: `_fit_arc`'s joint walk at either
+        # column, and the pair rule as the smaller of the two strings measured alone
+        dev = Image.new("RGBA", (render.W * layout.SS, render.H * layout.SS), (0, 0, 0, 0))
+        size, _box = layout.draw_special_values(ImageDraw.Draw(dev), prop_, strings)
+        assert size == _arc_fit(strings, ceil_, render.A26_TCOL_X[0], y_) == \
+            _arc_fit(strings, ceil_, render.A26_TCOL_X[1], y_) == \
+            min(_arc_fit((s_,), ceil_, render.A26_TCOL_X[0], y_) for s_ in strings), \
+            (prop_["name"], cpu, gpu, size, strings)
+        # the box the loop records is where the row really got painted, to within the
+        # handful of px a text metric can sit off the ink it measures
+        box = _row_box(notes)
+        ink = (min(k % render.W for k in painted), min(k // render.W for k in painted),
+               max(k % render.W for k in painted), max(k // render.W for k in painted))
+        assert all(abs(a - b) <= 4 for a, b in zip(box, ink)), (prop_["name"], cpu, gpu,
+                                                                box, ink)
+        row_clear = min(min(_hole_r(k) for k in painted), row_clear)
+        (lbl_px if prop_ is LBL else temp_px).append(len(painted))
+        (lbl_sizes if prop_ is LBL else val_sizes).append(size)
+    # and both rows in one frame: between them they own the free zone, in both directions.
+    # What they leave disagreeing there is invisible by construction - and the assembly is
+    # what answers for it: with the rings drawn as `arc` rows into the same 4x canvas, the
+    # ring's own colour residuals come out of the same single downscale
+    both, bnotes = _rows_frame([dict(LBL), dict(VAL)], m)
+    flat = list(both.get_flattened_data())
+    painted = _ink(flat)
+    assert painted == theirs, (cpu, gpu, len(painted - theirs), len(theirs - painted),
                                sorted(theirs - painted)[:4])
-    # 3. one drawing, two doors: the same pixels carry the theme's own bytes
-    assert all(flat_on[k] == flat_me[k] for k in painted), (cpu, gpu)
-    assert not notes["missing"] and not notes["gaps"], (cpu, gpu, notes)
-    # 4. the size, spelled out again from the rule: `_fit_arc`'s joint walk at either
-    #    column, and the pair rule as the smaller of the two strings measured alone
-    pair = (render.cpu_temp_text(m), render.gpu_temp_text(m))
-    dev = Image.new("RGBA", (render.W * layout.SS, render.H * layout.SS), (0, 0, 0, 0))
-    size, _box = layout.draw_special_values(ImageDraw.Draw(dev), _temp_prop(), pair)
-    assert size == _arc_fit(pair) == _arc_fit(pair, cx=render.A26_TCOL_X[1]) == \
-        min(_arc_fit((s,)) for s in pair), (cpu, gpu, size, pair)
-    # 5. the box the loop records is where the row really got painted, to within the
-    #    handful of px a text metric can sit off the ink it measures
-    box, ink = _row_box(notes), (min(k % render.W for k in painted),
-                                 min(k // render.W for k in painted),
-                                 max(k % render.W for k in painted),
-                                 max(k // render.W for k in painted))
-    assert all(abs(a - b) <= 4 for a, b in zip(box, ink)), (cpu, gpu, box, ink)
-    row_clear = min(min(_hole_r(k) for k in painted), row_clear)
-    temp_px.append(len(painted))
-    temp_rows.append((pair, size))
+    assert all(flat_on[k] == flat[k] for k in painted), (cpu, gpu)
+    off = [k for k in ZONE if flat[k] != flat_on[k]]
+    assert all(not flat_on[k][3] for k in off), (cpu, gpu, len(off),
+                                                 [(k, flat_on[k], flat[k])
+                                                  for k in off[:2]])
+    residual = max(residual, len(off))
+    assert not bnotes["missing"] and not bnotes["gaps"], (cpu, gpu, bnotes)
+    temp_rows.append(((render.cpu_temp_text(m), render.gpu_temp_text(m)),
+                      val_sizes[-1], lbl_sizes[-1]))
 
 assert len(temp_rows) == len(ARC_PAIRS), temp_rows
+# the label pair's size cannot move with a reading, because its strings never change: one
+# number across the whole walk, and that number is the ring's answer rather than a declared
+# size.  The figures' does move, which is why the two rows are not one row
+assert len(set(lbl_sizes)) == 1, lbl_sizes[:8]
+assert len(set(val_sizes)) > 1, val_sizes[:8]
 
 # a row that cannot be sized says so instead of drawing at the ceiling, where the digits
 # would sit on the gauge they belong to: `--check-theme` names the key that is missing, and
 # the loop puts down no pixels for the row at all
-_no_ring = json.loads(json.dumps(_temp_prop()))
+_no_ring = json.loads(json.dumps(VAL))
 del _no_ring["xigma"]["fitArc"]
 _bad = {"width": render.W, "height": render.H,
         "osd": {"widget": [{"id": "xigma-no-ring", "type": "special",
@@ -2207,7 +2258,7 @@ assert not any(v != (0, 0, 0, 0) for v in _img.get_flattened_data()), \
     "a row with no ring to clear drew something anyway"
 # and on a pair row `width` is the pitch, not a box: with no `width` the two figures land
 # on one point, which is a thing a file can do by accident and get no warning about today
-_no_pitch = json.loads(json.dumps(_temp_prop()))
+_no_pitch = json.loads(json.dumps(VAL))
 del _no_pitch["width"]
 hard, soft = themes.validate({"width": render.W, "height": render.H, "osd": {"widget": [
     {"id": "xigma-no-pitch", "type": "special", "property": [_no_pitch]}]}})
@@ -2226,20 +2277,27 @@ print(f"                        one row and not two, because the size is one dec
       f"px.  Those two counts follow the faces installed here, so docs/limits.md labels "
       f"them the bench's; the pair count, the zero-diff sets and the `min` rule are "
       f"checked on every machine.")
-print(f"  the value pair, drawn `alpha`'s two temperature figures as one row, against the "
-      f"frame `theme_alpha` paints: {len(temp_rows)} reading pairs, and what holds is not "
-      f"the count - it is that the row puts down {min(temp_px):,}-{max(temp_px):,} pixels "
-      f"for each of them, all of them inside the ring's clear hole, every one carrying the "
-      f"theme's own bytes, and none of what the theme paints in that hole left unpainted.")
+print(f"  the temperature rows  `alpha`'s two temperature figures and its two labels, each "
+      f"one row, against the frame `theme_alpha` paints: {len(temp_rows)} reading pairs, and "
+      f"what holds is not the count - each row alone puts down {min(temp_px):,}-"
+      f"{max(temp_px):,} pixels (figures) and {min(lbl_px):,}-{max(lbl_px):,} (labels), all "
+      f"of it inside the rings' clear hole and every byte the theme's own, and drawn "
+      f"*together* the two rows cover the hole exactly: the same set of pixels, both "
+      f"directions, no gap between what the theme paints there and what the rows paint.")
 print(f"                        The hole is measured and not assumed: the ring's painter "
-      f"reaches {len(RING_TAIL):,} px of its own ink past its declared inner edge - "
-      f"antialiasing plus the resampling tail LANCZOS leaves - and this row's ink stays "
-      f"{row_clear:.2f} px inboard of that edge, {row_clear - tail:.2f} px clear of the "
-      f"tail.  `render.ARC_FIT_GAP` is what keeps it there, and the gate holds that number "
-      f"above the measured {tail:.2f} px.  The sizes seen were "
-      f"{', '.join(str(s) for s in sorted({s for _p, s in temp_rows}))} px, which follow the "
-      f"faces installed here; the pair count, the zero-diff sets and the `_fit_arc` "
-      f"equality are what is checked on every machine (docs/limits.md).")
+      f"reaches {len(RING_TAIL):,} px of its own ink into the hole past its declared inner "
+      f"edge - antialiasing plus the resampling tail LANCZOS leaves - and the rows' ink "
+      f"stays {row_clear:.2f} px inboard of that edge, {row_clear - tail:.2f} px clear of "
+      f"the tail.  `render.ARC_FIT_GAP` is what keeps it there, and the gate holds that "
+      f"number above the measured {tail:.2f} px.  Ink means alpha: the {residual} pixels "
+      f"per frame where a text-only frame still disagrees with the theme inside the hole "
+      f"all carry alpha 0, colour residuals of the ring's own downscale, and the gate "
+      f"asserts that is *all* of them - which is the assembly's job, since a ring drawn as "
+      f"an `arc` row into the same 4x canvas leaves the same residuals.  Sizes: the labels "
+      f"come out at {lbl_sizes[0]} px in every pair, because their strings never change, "
+      f"while the figures walk {', '.join(str(v) for v in sorted(set(val_sizes)))} px - both "
+      f"follow the faces installed here, and the equality with `_fit_arc` measured at either "
+      f"column is what is checked on every machine (docs/limits.md).")
 print(f"  the value pair, apart the same question for the two temperature columns inside "
       f"the rings, which `alpha` still needs as one drawing: {len(ARC_PAIRS)} reading "
       f"pairs, and `_fit_arc`'s joint size is exactly the smaller of the two columns' own "
@@ -2296,18 +2354,18 @@ print(f"                        the same declared bar under the other two conven
 print(f"  what alpha draws      {' '.join(alpha_draws)} - taken out of `theme_alpha`'s own"
       f" body, so the plan's list of what alpha still needs is a claim about this source:"
       f" the rings and the usage bars are expressible as widgets (`arcPaint`,"
-      f" `barPaint`), and both pairs of figures are now one `special` row naming a"
-      f" code drawing (`fan-figures` and `temp-values`, each measured against"
-      f" `theme_alpha`'s own row above).  What is left in `alpha` is its two label"
-      f" lines - one size for both columns there too, because `_fit_arc` is handed"
-      f" them as a pair - and assembling the theme out of rows that each already"
-      f" reach a zero diff")
+      f" `barPaint`), and all three pairs of lettering are now one `special` row naming"
+      f" a code drawing (`fan-figures`, `temp-values` and the two label lines,"
+      f" `temp-labels`, each measured against `theme_alpha`'s own rows above).  So the"
+      f" only thing left in `alpha` is assembling the theme out of rows that each"
+      f" already reach a zero diff - and the labels are a row rather than two `text`"
+      f" widgets for the same reason the figures are: `_fit_arc` is handed them as a"
+      f" pair, and a size it decides is a face metric of the machine drawing it")
 print(f"  not exported yet      "
       f"{' '.join(sorted(set(render.THEMES) - set(themes.EXPORTS)))}, and not for the same"
       f" reason twice. `alpha`'s list is the derived one just printed: its rings and"
       f" its usage bars are widgets (`arcPaint`, `barPaint`), its fan pair is a"
-      f" `special`, and what is still missing is its two label lines and the theme"
-      f" assembled from all of it. `bars` is the second kind of answer"
+      f" `special`, and what is still missing is the theme assembled from all of it. `bars` is the second kind of answer"
       f" on its own: its row count and row pitch are functions of the machine"
       f" (`row_h = min(56, max(28, 320 // len(rows)))`, and `rows` grows by up to four"
       f" fan entries named by whatever `sensors` reports), so one fixed widget list"
@@ -2372,12 +2430,19 @@ assert _foot and _deep, (lim[lim.find("`temp-values` landed"):][:160])
 assert int(_foot[1].replace(" ", "")) == len(RING_TAIL), (_foot[1], len(RING_TAIL))
 assert abs(float(_deep[1]) - tail) < 0.005, (_deep[1], tail)
 _rg = re.search(r"puts\s+down\s+([\d ]+)\s+to\s+([\d ]+)\s+pixels", lim)
+_lb = re.search(r"and ([\d ]+) \(the labels", lim)
+_sz = re.search(r"across all (\d+) pairs.*?takes (\d+) of them", lim, re.S)
 assert _rg, "docs/limits.md does not quote the pixels this row puts down"
 for _got, _want in ((int(_rg[1].replace(" ", "")), min(temp_px)),
                     (int(_rg[2].replace(" ", "")), max(temp_px))):
     assert abs(_got - _want) <= 0.05 * _want, (_got, _want)
+assert _lb and abs(int(_lb[1].replace(" ", "")) - min(lbl_px)) <= 0.05 * min(lbl_px), \
+    (_lb[1] if _lb else None, min(lbl_px), max(lbl_px))
+assert len(set(lbl_px)) == 1, lbl_px[:6]      # the doc says so, and the gate agrees
+assert _sz and int(_sz[1]) == len(temp_rows) and int(_sz[2]) == len(set(val_sizes)), \
+    (_sz.groups() if _sz else None, len(temp_rows), len(set(val_sizes)))
 _clr = re.search(r"ink\s+stays\s+\*\*([\d.]+)\s+px\*\*\s+inboard", lim)
-_gap = re.search(r"\*\*([\d.]+)\s+px\*\*\s+clear\s+of\s+the\s+tail", lim)
+_gap = re.search(r"\*\*([\d.]+)\s+px\*\*\s+clear\s+of\s+(?:that|the)\s+tail", lim)
 assert _clr and _gap, "docs/limits.md does not quote how clear the row's ink is"
 assert abs(float(_clr[1]) - row_clear) <= 0.05 * row_clear, (_clr[1], row_clear)
 assert abs(float(_gap[1]) - (row_clear - tail)) <= 0.05 * (row_clear - tail), \

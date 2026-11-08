@@ -896,23 +896,40 @@ writes a theme today. What the model does and does not allow, all of it gated:
     reaches 5 of the 6), and the per-reading windows run from a floor of 153 px down
     to a ceiling of 148 px - an empty interval. The ring's limit is its hole, not a width,
     so `temp-values` becomes the second group special on measurement and not on taste.
-  * `temp-values` landed, and what it had to name is the ring itself: `xigma.fitArc`,
-    spelled in an `arc` row's own vocabulary (`cy`, `radius` the inner edge, `width` the
-    stroke, `angleStart`/`angleEnd` the app's degrees). Held to `theme_alpha` the same way
-    the fan row is, over the same 36 reading pairs, the row puts down 4 345 to 7 882 pixels
-    - a count that follows the faces on the bench, so the suite prints it rather than
-    pinning it - every one of them inside the ring's clear hole and carrying the theme's
-    own bytes, with nothing the theme paints in that hole left uncovered. What that hole
-    *is* was measured rather than drawn as a band: the ring's painter, on a canvas of its
-    own through the same supersampling and the same `LANCZOS` downscale the theme ends
-    with, leaves **566 px** of ink inside the declared inner edge, its deepest pixel
-    **2.77 px** past that edge - antialiasing plus the resampling tail. Those pixels belong
-    to the ring, and a row that draws text cannot answer for them. What is left of the
-    hole is the row's, and it is painted exactly. The row's own ink stays **6.66 px**
-    inboard of the inner edge, **3.89 px** clear of the tail - both measured on the bench,
-    and the reason `render.ARC_FIT_GAP` is a named constant rather than a literal at two
-    call sites: the suite holds it above the tail it measures, because a clearance below
-    that would put a reading on top of the gauge it belongs to.
+  * the temperature rows landed, and what the second one had to name is the ring itself:
+    `xigma.fitArc`, spelled in an `arc` row's own vocabulary (`cy`, `radius` the inner edge,
+    `width` the stroke, `angleStart`/`angleEnd` the app's degrees). Held to `theme_alpha` the
+    same way the fan row is, over the same 36 reading pairs: each row alone puts down 4 345
+    to 7 882 pixels (the figures) and 3 406 (the labels, the same count in every pair,
+    because those strings never change) - counts that follow the faces on the bench, so the
+    suite prints them rather than pinning them - every one inside the rings' clear hole and
+    carrying the theme's own bytes; and the **two rows in one frame** cover that hole
+    exactly, in both directions, with nothing the theme paints there left unpainted. What
+    that hole *is* was measured rather than drawn as a band: the ring's painter, on a canvas
+    of its own through the same supersampling and the same `LANCZOS` downscale the theme ends
+    with, leaves **1 016 px** of ink inside the declared inner edge, its deepest pixel
+    **2.77 px** past it - antialiasing plus the resampling tail. Those pixels are the ring's,
+    and a row that draws text cannot answer for them. What is left of the hole is the rows',
+    and it is painted exactly. Their ink stays **5.00 px** inboard of the edge the ring
+    paints up to, **2.23 px** clear of that tail - measured on the bench, and the reason
+    `render.ARC_FIT_GAP` is a named constant rather than a literal at two call sites: the
+    suite holds it above the tail it measures, because a clearance below that would put a
+    reading on top of the gauge it belongs to.
+  * **ink means alpha, and the difference bites.** A text-only frame still disagrees with the
+    theme at a couple of pixels inside that hole, and the gate asserts that *every* one of
+    those carries alpha 0: colour channels left non-zero by the downscale of a bright stroke
+    against a transparent canvas, invisible, and a residual of the ring's own drawing rather
+    than of these rows. That is the assembly's remaining job - with the rings drawn as `arc`
+    rows into the same 4x canvas and one downscale, the residuals come out of the same
+    arithmetic as the theme's.
+  * the label pair is a `special` and not two `text` widgets, which is the part a reader
+    would call redundant: "CPU TEMP" and "GPU TEMP" are constants, so a file *could* carry
+    them, at a `fontSize` this program generated. It would then bake a face metric of the
+    machine that generated it - the size the ring decides is 22 px here and is whatever the
+    installed fonts answer somewhere else - and an export that cannot be driven to a zero
+    diff on the machine drawing it is not shipped. The suite pins the shape of that
+    difference: the label row's size is a single number across all 36 pairs, while the
+    figures' takes 4 of them.
   * and a `values` row that declares no ring is not drawn at all, in words rather than by
     accident: `--check-theme` prints which `xigma.fitArc` key is missing, and the frame the
     loop paints for that row holds zero pixels - measured, since drawing at the `fontSize`

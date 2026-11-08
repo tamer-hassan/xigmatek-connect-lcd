@@ -816,6 +816,31 @@ def _sp_temp_values(draw, prop, values):
     return layout.draw_special_values(draw, prop, pair)[1]
 
 
+def _sp_temp_labels(draw, prop, values):
+    """`alpha`'s two temperature *labels*, through the same door as its two figures.
+
+    This row looks redundant and is not, so the reason goes on it: "CPU TEMP" and "GPU
+    TEMP" are constants, so a layout *could* carry them as two `text` widgets - except
+    `theme_alpha` does not size them that way.  It hands `_fit_arc` **both** strings and
+    draws both at the one size that comes out, measured against the ring's hole exactly like
+    the figures under them (`render.A26_TLBL_TEXT` names them together for that reason).
+    Two `text` rows cannot say "we are one size": the schema's only fit key is a width, and
+    the size the ring decides is a face metric of the machine drawing it - docs/limits.md
+    has the suite's exhaustive search showing no width reaches it.  Baking the size this
+    bench measured would be a layout that paints other pixels where the fonts differ, and
+    an export that cannot be driven to a zero diff is not shipped.
+
+    So it is one `special` with the `values` door, placing a pair of strings that never
+    change: `x` their centre, `width` their pitch, `fontSize` the ceiling (the vendor's own
+    32), `xigma.fitArc` the ring, `textColor`/`bold` the ink.  What the row does *not* take
+    from the file is the words themselves: a layout that could rename them would be a
+    different theme's picture, and `theme_alpha`'s words are what every parity gate here
+    compares against, so they come from `render` - one place, the same place the code theme
+    reads them.
+    """
+    return layout.draw_special_values(draw, prop, render.A26_TLBL_TEXT)[1]
+
+
 #: Which door a registered drawing goes through, marked on the drawing itself: `line` is
 #: one built string (`layout.draw_special_line`), `pair` two figures at one width-fitted
 #: size (`draw_special_pair`), `values` two figures at one ring-fitted size
@@ -826,10 +851,12 @@ _sp_clock_readings.door = "line"
 _sp_dual_status.door = "line"
 _sp_fan_figures.door = "pair"
 _sp_temp_values.door = "values"
+_sp_temp_labels.door = "values"
 
 
 SPECIALS = {"clock-readings": _sp_clock_readings, "dual-status": _sp_dual_status,
-            "fan-figures": _sp_fan_figures, "temp-values": _sp_temp_values}
+            "fan-figures": _sp_fan_figures, "temp-values": _sp_temp_values,
+            "temp-labels": _sp_temp_labels}
 
 #: A `special` that draws text this repo builds in code: name -> the (key, builder) pairs
 #: it needs.  `draw` and `parity` fill those keys from the same metrics the widgets' own
