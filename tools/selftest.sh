@@ -1422,6 +1422,18 @@ for rec in ok:
 clear = sorted(n for n, gap in need.items() if not gap)
 assert len(clear) == 14, (len(clear), clear)
 assert all(need[n] == {"Pump Speed"} for n in need if need[n]),     {n: need[n] for n in need if need[n]}
+# the plan's `bars` argument quotes this tally, so it is held to it rather than remembered
+_plan = open("docs/theme-editor.md", encoding="utf-8").read()
+assert f"**{len(used)}** `source` names" in _plan, (
+    len(used), "the plan miscounts the sources the library asks for")
+for _s in ("CPU Temperature", "Time", "Pump Speed"):
+    # the plan lists the three busiest with their counts and the rest by name, so what is
+    # checked is "this source is quoted with this count" - and the character after the
+    # number may not be a digit, or a drifted 170 would pass a plain substring test
+    _q = f"`{_s}` in {used[_s]}"
+    _i = _plan.find(_q)
+    assert _i >= 0 and not _plan[_i + len(_q)].isdigit(), (
+        _s, used[_s], "the plan's source tally drifted away from this run's")
 print(f"  library selection       {len(ok)} pickable on canvas, {len(out)} refused "
       f"(ratio field, not the path); 27 names unique case-insensitively; sources asked "
       f"for: " + ", ".join(f"{k} {v}" for k, v in sorted(used.items(), key=lambda kv: -kv[1])))
@@ -2372,12 +2384,79 @@ print(f"  not exported yet      "
       f" on its own: its row count and row pitch are functions of the machine"
       f" (`row_h = min(56, max(28, 320 // len(rows)))`, and `rows` grows by up to four"
       f" fan entries named by whatever `sensors` reports), so one fixed widget list"
-      f" cannot be its picture on every box.  The owner's decision (2026-11-08) is to"
-      f" gain that construct - a repeat group the vendor never had, naming a source list"
-      f" and a per-row pitch rule rather than frozen rows - and the cost is recorded with"
-      f" it: every figure for `bars` then has to be re-derived on the machine drawing it,"
-      f" and until a generated `bars` reaches a zero pixel diff there it stays code-drawn."
-      f" Nothing about the wire changes either way (docs/theme-editor.md, docs/limits.md)")
+      f" cannot be its picture on every box.  The owner's decision (2026-11-08) is optional"
+      f" positional fan slots - `Fan 1` through `Fan 4`, each with a `Fan N Label` source so"
+      f" the name comes from the box at run time - rather than a repeat group, because the"
+      f" library's selectable layouts ask for seven `source` names and not one of them is a"
+      f" fan: a new name in our own table invents less than a new structure in a file whose"
+      f" point is that it is a fixed list of rows.  Measuring it turned the obstacle"
+      f" somewhere else: the row list is not the problem, the compaction is (the gate below"
+      f" counts the pixels), so `theme_bars` has to let a row with no reading keep its place"
+      f" before any file can be pixel-identical to it.  Until then a generated `bars` stays"
+      f" code-drawn, and once the slots exist the pitch stops depending on this box's fan"
+      f" inventory.  Nothing about the wire changes either way"
+      f" (docs/theme-editor.md, docs/limits.md)")
+# ---- and what the one theme still waiting to be exported would have to reproduce.
+# ---- Every claim in the plan's `bars` section is read here out of `theme_bars`'s own body,
+# ---- so "its geometry is a function of the machine" stays a statement about this source,
+# ---- and so does the compaction that decided the shape - which is measured off pixels, not
+# ---- inferred from the arithmetic, because that is the half the plan says must change.
+_bars_src = inspect.getsource(render.theme_bars)
+_b_arith = "row_h = min(56, max(28, span // max(len(rows), 1)))"
+assert _b_arith in _bars_src, (_b_arith, "the pitch formula is not in `theme_bars`")
+assert "y, span = 72, 320" in _bars_src, "the block the pitch divides is not 72..390"
+assert _bars_src.count("lambda v:") == 6 + 1, (
+    "the fixed row set, or the fan slot, is no longer the six-plus-one the plan describes")
+_n_fixed = _bars_src.count("lambda v:") - 1
+for _rep in ('for fan in (m.get("fans") or [])[:4]', 'if fan.get("value"):',
+             'rows.append((str(fan.get("name") or "FAN")[:10]'):
+    assert _rep in _bars_src, (_rep, "what the fan slots repeat over is not this")
+assert '("RAM", ram, 0, 100,' in _bars_src and '("VRAM", gm, 0, 100,' in _bars_src \
+    and _bars_src.count(' GB"') == 2, (
+    "the two memory rows are no longer bars over a percentage printing gigabytes, and the "
+    "plan's fourth fact is about that")
+_head, _loop = _bars_src.split("for name, val, lo, hi, fmt in rows:", 1)
+assert _b_arith in _head, (_head[-160:], "the pitch is not chosen before the loop")
+assert _loop.index("if val is None:") < _loop.index("y += row_h"), (
+    "a row with no reading now keeps its place, and the compaction the plan measures has "
+    "stopped - the plan's `bars` section and this gate both move with it")
+_d_plan = open("docs/theme-editor.md", encoding="utf-8").read()
+_d_lim = open("docs/limits.md", encoding="utf-8").read()
+assert _b_arith in _d_plan, "the plan stopped quoting the pitch as this body writes it"
+assert "min(56, max(28, 320 // len(rows)))" in _d_lim, \
+    "docs/limits.md stopped quoting the pitch it is held to"
+
+# three answered readings out of six fixed rows: the code's rows land in the first three
+# slots of a pitch divided out of all six, and the slots it skipped stay empty.  The windows
+# are 53 px apart and +-8 px wide, so this also tells a pitch divided out of the *drawn*
+# rows (56) from the one this theme uses - at 56 the third row would land outside the third
+# window and the assert below would fail on an empty slot.
+_bars_m = {"cpu": {"temperature": 57.0, "load": 62.0, "frequency": 3.4, "power": 18.0},
+           "gpu": {"temperature": 47.0, "usage": 22.0},
+           "memory": {"used_percent": 41.0}, "timestamp": {}}
+_b_img = render.draw(_bars_m, "bars", bg=render.OVERLAY)
+_pitch = min(56, max(28, 320 // _n_fixed))
+_b_slots = []
+for _i in range(_n_fixed):
+    _ys = range(72 + _i * _pitch - 8, 72 + _i * _pitch + 9)
+    _b_slots.append(any(_b_img.getpixel((x, y))[3] for y in _ys for x in range(28, 60)))
+assert _b_slots == [True, True, True, False, False, False], (
+    _b_slots, _pitch, "the rows no longer compact into the first slots of the candidate pitch")
+_alt = min(56, max(28, 320 // 3))        # the pitch a drawn-rows division would give here
+assert _pitch == 320 // _n_fixed and _pitch != _alt, (
+    _pitch, _alt, "the pitch is no longer divided out of the candidates, not the drawn rows")
+_b_fourth = 72 + 3 * _pitch
+print(f"  what bars compacts    {_n_fixed} fixed rows, 3 of them answered at these "
+      f"readings, and the drawn rows land in the first three slots of a {_pitch} px pitch - "
+      f"y={72}, {72 + _pitch}, {72 + 2 * _pitch} - with slots four to six empty, so the "
+      f"fourth row of the code's own list is drawn in the third place where a static file "
+      f"with the same {_n_fixed} rows gives it y={_b_fourth}. Dividing the pitch out of the "
+      f"3 rows that drew instead would make it {_alt}, and that is a different picture: the "
+      f"windows above are {_pitch} apart and 17 px wide, and the third row misses its slot "
+      f"at any other pitch. No static layout - fan slots or a repeat group - can be "
+      f"pixel-identical to a drawing that compacts, which is why the decision names both a "
+      f"construct and a change to this function (docs/theme-editor.md, docs/limits.md)")
+
 print(f"  a table and its reason {' '.join(sorted(layout.BAR_PAINT))} /"
       f" {' '.join(sorted(layout.ARC_PAINT))} / {' '.join(sorted(layout.COLOUR_RAMPS))}:"
       f" every name in a table appears in the reason `--print-theme-fields` prints for it,"

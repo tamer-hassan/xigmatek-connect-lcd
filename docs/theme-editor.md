@@ -11,8 +11,9 @@ the five themes (`alpha`, `clock`, `dual` and `gauge`) generate to layouts that 
 *exactly* what `render.py` paints - zero differing pixels on every reading that answers what
 they ask, worst channel delta 0. `alpha` is the one that had to earn its keys, and what is
 left on this stage is `bars`, which is waiting on
-a construct the schema does not have: the repeat group the owner decided to build on
-2026-11-08, with its cost recorded next to it (docs/limits.md).
+one change to our own drawing and four new names in our own source table: the fan slots the
+owner chose on 2026-11-08, and the compaction in `theme_bars` that measuring them exposed
+(docs/limits.md).
 Stage 3, the file model, is in - what it measured is written out under "What building the file model measured" below. **Stage 4 is in, in the two changes the plan named**: `xigmaui/edit.py` is the editor's model, and the window's layout-editor row is a shell over it - what that half measured is under "What the editor's first half measured". Then the canvas in that same pane: press a row's ink box to select it, drag it, nudge it with the arrow keys - under "What the canvas half measured". What is still missing there is the pane drawing live readings instead of the pinned fixture, and any way to resize or reorder a row. Stage 5 (docs and census) and stage 6 (the glass pass) are not built. Every census figure below is re-derived by `tools/selftest.sh`'s vendor-library
 section, so it cannot rot in place. The decisions are
 settled with the owner; the census is measured out of the files in this tree on the same
@@ -471,7 +472,7 @@ claim about this source and not a memory of it.
 | theme | what it took, or what is missing | why it is a decision, not a lookup |
 |---|---|---|
 | `alpha` | **exported 2026-11-08:** 12 rows, 6 312 characters, **zero differing pixels** | every item on the derived list landed as a row: the two `temp_arc` rings as `arc` widgets with `xigma.arcPaint: render` and the ramp as `xigma.colourStops` (the three stops come out of `A26_ARC_LO`/`MID`/`HI`, which is the spelling the suite checks against `render.temp_colour` at all 100 sampled positions); the two usage bars as `bar` widgets with `xigma.barPaint: hbar`, the case a vendor `bar` cannot spell, since it declares one flat fill and `render.hbar` gradients per **column** - measured at 28 device-px pairs and 7 at 1x at zero pixels against `render.hbar`; the three pairs of lettering as `special` rows (`fan-figures`, `temp-values`, `temp-labels`), because each pair shares one text size that only the drawing can decide; the usage labels and percentages as `text`/`data` rows, which need nothing joint; and the clock line as a `data` row with `xigma.format` and a width to fit to. The rows were each measured against `theme_alpha`'s own drawing before any of them was assembled (docs/limits.md), which is why the assembled frame reaches zero on the first try rather than after a week of chasing seams |
-| `bars` | **a construct, decided 2026-11-08:** a repeat group the vendor never had | its row count and row pitch are functions of the machine: `row_h = min(56, max(28, 320 // len(rows)))`, and `rows` grows by up to four fan entries whose labels come from whatever `sensors` reports, truncated to 10 characters. One fixed widget list cannot be this theme's picture on every box, so the plan's earlier refusal to invent a repeat group was reversed by the owner: the schema gains the construct, with a source *list* and a per-row pitch rule rather than frozen rows. What that costs is stated before building it - every figure for `bars` then has to be re-derived per machine, because a fixed list would have described this bench's fan inventory - and until a generated `bars` reaches a zero pixel diff on the box drawing it, it stays code-drawn and is not shipped (docs/limits.md) |
+| `bars` | **the shape was found by measuring, 2026-11-08:** optional fan slots (`Fan 1` through `Fan 4`), and one change to our own drawing - written out under "The last theme, and the shape it turned out to need" |
 
 **The second schema question `alpha` raised was joint text sizing, and it was measured
 before it was decided.** Three of the theme's drawings pick one face size for two strings at
@@ -529,6 +530,59 @@ themes. That is stage 4's premise, demonstrated a stage early.
 
 The plan's rule holds while all of this happens: **an export that cannot be driven to a zero
 diff is not shipped**, and the suite prints which of the five are in and which are out.
+
+### The last theme, and the shape it turned out to need
+
+`bars` is the one theme stage 2 cannot express. An hour ago this document recorded the
+decision as "invent a repeat group"; the owner has since chosen the smaller construct, and
+the record is corrected here rather than left stacked: **optional positional slots - `Fan 1`
+to `Fan 4` - and no new structure at all.** What made that the better answer is a count, not
+a preference. The 23 library layouts this canvas can select ask for **7** `source` names
+between them - `CPU Temperature` in 17 widgets, `Time` in 11, `Pump Speed` in 9, and `CPU
+Usage`, `GPU Usage`, `GPU Temperature`, `CPU Frequency` - and not one of them is a fan. So
+the vendor schema has no fan vocabulary for us either to extend or to violate: `Fan 1` is a
+new name in our own source table, which this tree already extends, where a repeat group
+would be a new kind of structure in files whose whole point is that they are a fixed list
+of rows. And "optional" is not new machinery either: `themes.values()` already
+reports every source it cannot answer, and `layout.paint` already draws the rest and prints
+why - the same hole-that-says-what-it-is rule docs/themes.md states for the library.
+
+**What slots do not solve is the pitch, and that turns out to be the actual obstacle.**
+`render.theme_bars` divides its pitch out of the rows it *considers* -
+`row_h = min(56, max(28, span // max(len(rows), 1)))` over a block starting at y=72 - and
+then advances `y += row_h` only for a row that had a value to show. Measured off the drawn
+frame at the pinned fixture, where 3 of the 6 fixed rows answer: the label column's ink
+bands are 63-80, 116-133 and 169-186 - `LOAD`, fourth in the code's list, drawn in the
+**third** slot, at y=178. A static file cannot put it there: with those same 6 rows its
+pitch is 53 and LOAD's slot is 72 + 3x53 = 231; with this bench's 8 rows the pitch is 40 and
+the slot is 192. The gap is not cosmetic - a row is a 424x10 bar plus its two texts - so
+**no static layout of `bars` can reach a zero pixel diff while the code compacts**, repeat
+group included.
+
+So the decision has a second half, and it is a change to our drawing rather than to the
+schema: `theme_bars` is to speak the vocabulary the file will carry - six fixed rows plus
+four reserved fan slots, and **a row with no reading keeps its place** instead of pulling the
+block up. `bars` is this project's own drawing, not a reproduction of anything measured off
+the vendor's glass, so nothing measured is invalidated by changing it; what it costs is that
+a missing reading leaves a hole on the glass where today the rows close up - which is what
+the 27 library layouts already do, and what the rule in docs/themes.md says a theme should
+do. The label of a slot comes from a runtime source too (`Fan 1` is the number, `Fan 1 Label`
+is whatever this box calls that fan, cut to the same 10 characters the code cuts), so the
+file stays portable and the glass says this box's names.
+
+The order that follows, each step green on its own:
+
+1. the drawing adopts the slots and the keep-place rule, and its pitch stops depending on
+   this box's inventory;
+2. the same change regenerates `docs/videos/bars-theme_52.mp4`, because the preview gate
+   re-renders the layer from `docs/videos/readings-2026-11-08.json` and scores the tracked
+   file against it - a stale `bars` clip is not a stale picture, it is a failing gate;
+3. the sources: four `Fan N` slots, four `Fan N Label` strings, and the three the fixed rows
+   need that nobody answers today (`BOARD`, and the two memory rows, whose *text* is gigabytes
+   while their *bar* is a percentage - one row, two readings, and a fact about `bars` the
+   vendor's `bar` widget has no way to say);
+4. `bars_recipe()`, and it ships only at a zero pixel diff on the machine drawing it - the
+   rule `alpha` met by earning `xigma.fitArc` (docs/limits.md).
 
 ## The surface, and the geometry it must not break
 
