@@ -1460,7 +1460,7 @@ print(f"  faces on this machine {len(faces)} family/bold/size combinations asked
       + (f"; MISSING: {' '.join(missing_faces)}" if missing_faces else ""))
 sizes, drawn, skipped, dropped_fonts = [], 0, [], set()
 painted_total = 0
-boxes_per = {}
+boxes_per, skips_per = {}, {}
 # what this bench painted for each layout on 2026-11-08, recorded here so a machine that
 # lands somewhere else says *which layout* and by how much, instead of leaving a total to
 # be explained. This is a diagnostic print, not an assertion: the count belongs to the
@@ -1484,6 +1484,7 @@ for rec in ok:
     srcs = [m for m in notes["missing"] if not str(m).startswith("font:")]
     gone = [str(m)[5:] for m in notes["missing"] if str(m).startswith("font:")]
     dropped_fonts.update(gone)
+    skips_per[rec["name"]] = (srcs, gone)
     # the accounting identity, and it holds on every machine: every widget in the file is
     # either painted or reported as skipped, with a reason. A widget that simply vanished
     # would break this, and that is the failure worth catching - not the exact pixel total,
@@ -1560,8 +1561,10 @@ print(f"  --list-themes           {len(lines)} lines, {len(pick)} of them the ca
 off = sorted((n, b, BENCH_BOXES[n]) for n, b in boxes_per.items()
              if BENCH_BOXES.get(n) != b)
 if off:
-    print("  box counts vs the bench " + "; ".join(f"{n} {b} here, {w} there"
-                                                 for n, b, w in off))
+    det = "; ".join(f"{n} {b} here, {w} there (skipped: "
+                    f"{', '.join(skips_per[n][0] + skips_per[n][1]) or 'nothing'})"
+                    for n, b, w in off)
+    print("  box counts vs the bench " + det)
 else:
     print(f"  box counts vs the bench  identical for all {len(boxes_per)} layouts")
 print(f"  vendor pixels          {drawn} boxes, {painted_total} lit px on this machine "
