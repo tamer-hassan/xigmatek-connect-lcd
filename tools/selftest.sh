@@ -1631,10 +1631,12 @@ print(f"  export shape          {'; '.join(shapes)} - ids derived from the theme
 # last three deliberately do not, and what happens then is reported, not hidden - the
 # second-to-last one only leaves `load` out, which is the case where the two doors still
 # land on the same pixels, because the reading gates a whole widget rather than a fallback
-CASES = ({"cpu": {"temperature": 57, "load": 62}, "gpu": {"temperature": 47},
+CASES = ({"cpu": {"temperature": 57, "load": 62}, "gpu": {"temperature": 47,
+                                                     "load": 22},
           "memory": {"used": 4_200_000, "total": 16_000_000},
           "fans": [{"value": 1957}]},
-         {"cpu": {"temperature": 100, "load": 0}, "gpu": {"temperature": 100},
+         {"cpu": {"temperature": 100, "load": 0}, "gpu": {"temperature": 100,
+                                                          "load": 0},
           "memory": {"used": 0, "total": 0}, "fans": [{"value": 12345}]},
          {"cpu": {"temperature": 24}},
          {"cpu": {"temperature": 40}, "gpu": {"temperature": 55}},
@@ -1695,9 +1697,10 @@ if partial:
           f"{both}, and {len(disagree)} differ: "
           + "; ".join(f"{nm} without {', '.join(ms)}: code {c:,} px, layout {l:,} px"
                       for nm, idx, ms, d, c, l in disagree)
-          + ". The difference is a ring's track: `theme_dual`/`theme_gauge` paint the "
-            f"unfilled arc even with no reading, and a layout has no widget to paint when "
-            f"its `source` is unanswered. Both are right by their own rule, so the counts "
+          + ". In every one of those the code theme paints something for a reading it "
+            f"does not have - an unfilled ring's track, a bar's track, `--\u00b0C` or `--%` "
+            f"where a number would be - and a layout has no widget to paint when its "
+            f"`source` is unanswered. Both are right by their own rule, so the counts "
             f"stand side by side - an export translates a theme's drawing, not its "
             f"fallback behaviour (docs/limits.md)")
 
@@ -2387,6 +2390,20 @@ def _spaced(n):
 
 lim = open("docs/limits.md", encoding="utf-8").read()
 usage_txt = open("docs/usage.md", encoding="utf-8").read()
+# every export's painted count is quoted in two documents, so both are held to this run
+plan_txt = open("docs/theme-editor.md", encoding="utf-8").read()
+_gen_n, _file_n = len(themes.EXPORTS), len(themes.scan()[0])
+gui_txt = open("docs/gui.md", encoding="utf-8").read()
+for _t, _w in ((plan_txt, "docs/theme-editor.md"), (gui_txt, "docs/gui.md")):
+    assert f"{_gen_n} generated ones" in _t, (_w, _gen_n, "the document does not say how "
+                                              "many generated layouts the window opens")
+assert f"{_gen_n + _file_n} names ({_gen_n} generated + {_file_n}" in plan_txt, \
+    (_gen_n, _file_n, "docs/theme-editor.md miscounts what the layout combo offers")
+for _n, _p in rows:
+    assert _spaced(_p) in usage_txt, (_n, _p, "docs/usage.md does not quote "
+                                      f"{_n}'s painted count from this run")
+    assert _spaced(_p) in plan_txt, (_n, _p, "docs/theme-editor.md does not quote "
+                                     f"{_n}'s painted count from this run")
 assert " / ".join(_spaced(n) for _v, n, _w in conv) in lim, \
     "docs/limits.md does not quote the arc numbers this run printed"
 assert " / ".join(_spaced(n) for _v, n, _w in bars) in lim, \
@@ -4357,7 +4374,7 @@ assert ext_offered <= set(sub), sorted(ext_offered - set(sub))
 qt = [ln for ln in open("xigmaui/edit.py", encoding="utf-8").read().splitlines()
       if "PyQt" in ln]
 assert not qt, qt
-fx = generated[0].fixture_line()
+fx = next(g for g in generated if g.name == "clock").fixture_line()
 for want in ("CPU Temperature 57.0", "GPU Temperature 47.0", "2026-02-17"):
     assert want in fx, fx
 print(f"  editor model          opened {len(opened)} of the {len(pick)} layouts this "
@@ -4462,7 +4479,7 @@ assert not ok and "does not carry" in carry, carry
 ed.select(next(i2 for i2, w in enumerate(ed.widgets()) if w["type"] == "bar"))
 ok, neg = ed.set("x", -5)
 assert not ok and "canvas" in neg, neg
-sp = generated[0]                          # the clock layout's third widget
+sp = next(g for g in generated if g.name == "clock")   # its third widget is a `special`
 sp.select(next(i2 for i2, w in enumerate(sp.widgets()) if w["type"] == "special"))
 ok, nam = sp.set("name", "no-such-drawing")
 assert not ok and "takes one of" in nam, nam
@@ -4475,7 +4492,8 @@ print(f"                        a field the kind cannot carry: {clip(carry)}; an
 
 # the one field whose *absence* is a value: an extension key un-set goes back to the
 # vendor's convention, and the file must not keep an empty `xigma` object behind
-ga = generated[2]                          # the gauge layout, whose ring is an arc
+ga = next(g for g in generated if g.name == "gauge")   # its ring row is an `arc`, and
+# the key that selects the painter has a value on it, so un-setting it is the test
 ga.select(next(i2 for i2, w in enumerate(ga.widgets()) if w["type"] == "arc"))
 with_key, _ = ga.paint(*ga.fixture())
 assert ga.value("arcPaint") == "render", ga.value("arcPaint")

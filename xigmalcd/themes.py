@@ -1098,7 +1098,109 @@ def dual_recipe() -> dict:
     }
 
 
-EXPORTS = {"clock": clock_recipe, "dual": dual_recipe, "gauge": gauge_recipe}
+def alpha_recipe() -> dict:
+    """`alpha` as a layout: two rings, three pairs of lettering, two bars, four labels, a clock.
+
+    The fourth export, and the one that had to earn its keys. Everything here was measured
+    as a separate row before it was assembled - the ring against `render.temp_arc` at
+    `xigma.arcPaint: render` (docs/limits.md: 164 to 6 989 px away under the vendor's
+    rasterisation), the bars against `render.hbar` at `xigma.barPaint: hbar` (28 device-px
+    pairs and 7 at 1x, zero differing pixels), and the three pairs of lettering against
+    `theme_alpha`'s own rows as `special`s (`fan-figures` 30 reading pairs, `temp-values` and
+    `temp-labels` 36, their ink measured clear of the rings' stroke and, in both rows
+    together, covering the rings' hole exactly). The geometry below is `render.A26_*` read
+    out of the module that draws it, never retyped: the ring's bbox is `A26_RING_R` about
+    `A26_RING_Y`, its declared `radius` is the inner edge (`A26_RING_R - A26_RING_W`), and
+    the angles are the app's own - `layout.arc_angles` measures the +90 rule that turns
+    `A26_ARC_START` into them.
+
+    The ramp is data, and it is exact *because* it is the three-stop one. `temp_arc` colours
+    its fill through `render.temp_colour`, green at `A26_ARC_LO`, amber at `A26_ARC_MID`, red
+    at `A26_ARC_HI`; the stop fractions come out of those same three constants, which is the
+    spelling the suite checks against `temp_colour` at all 100 sampled segment positions
+    (docs/limits.md - `render.heat`, by contrast, is off by one unit at 8 of its own stop
+    positions, which is why `dual` names its ramp instead of copying it).
+
+    Two rows are `text`/`data` rather than `special` because nothing is joint about them:
+    "CPU USED" and "GPU USED" are drawn at their own size each, and the percentage beside
+    them is one reading in `VENDOR_FORMAT`'s spelling (`_pct`, the same function the theme
+    calls). The clock line is a `data` row with `xigma.format: "%H:%M:%S"` and
+    `autoFitMax: 452` because `theme_alpha` fits it to that width with `_fit`, and its
+    anchor is `ms` - sitting on y as its baseline - which is neither the vendor's `la` nor
+    the centred `mm` the other four exports mostly use.
+    """
+    pitch = render.A26_TCOL_X[1] - render.A26_TCOL_X[0]
+    mid = ((render.A26_ARC_MID - render.A26_ARC_LO)
+           / (render.A26_ARC_HI - render.A26_ARC_LO))
+    ramp = [[0.0, rgba_str(render.GREEN)], [mid, rgba_str(render.AMBER)],
+            [1.0, rgba_str(render.RED)]]
+    fit_arc = {"cy": render.A26_RING_Y, "radius": render.A26_RING_R - render.A26_RING_W,
+               "width": render.A26_RING_W, "angleStart": render.A26_ARC_START - 90,
+               "angleEnd": render.A26_ARC_START + render.A26_ARC_SWEEP - 90}
+    rows = []
+    for cid, cx, dev in (("cpu", render.A26_TCOL_X[0], "CPU Temperature"),
+                         ("gpu", render.A26_TCOL_X[1], "GPU Temperature")):
+        rows.append(widget(f"xigma-alpha-{cid}-ring", "arc", {
+            "x": cx - render.A26_RING_R, "y": render.A26_RING_Y - render.A26_RING_R,
+            "sizeWidth": 2 * render.A26_RING_R, "sizeHeight": 2 * render.A26_RING_R,
+            "radius": render.A26_RING_R - render.A26_RING_W,
+            "width": render.A26_RING_W,
+            "angleStart": render.A26_ARC_START - 90,
+            "angleEnd": render.A26_ARC_START + render.A26_ARC_SWEEP - 90,
+            "bgColor": rgba_str(render.A26_ARC_TRACK),
+            "startColor": rgba_str(render.GREEN), "endColor": rgba_str(render.RED),
+            "minValue": render.A26_ARC_LO, "maxValue": render.A26_ARC_HI,
+            "source": dev,
+            "xigma": {"arcPaint": "render", "colourStops": ramp}}, len(rows)))
+    rows.append(widget("xigma-alpha-temp-labels", "special", {
+        "name": "temp-labels", "x": (render.A26_TCOL_X[0] + render.A26_TCOL_X[1]) // 2,
+        "y": render.A26_TLBL_Y, "width": pitch, "fontFamily": "dejavu",
+        "fontSize": render.A26_TLBL_F, "bold": True,
+        "textColor": rgba_str(render.A26_WHITE),
+        "xigma": {"anchor": "ma", "fitArc": fit_arc}}, len(rows)))
+    rows.append(widget("xigma-alpha-temp-values", "special", {
+        "name": "temp-values", "x": (render.A26_TCOL_X[0] + render.A26_TCOL_X[1]) // 2,
+        "y": render.A26_TVAL_Y, "width": pitch, "fontFamily": "dejavu",
+        "fontSize": render.A26_TVAL_F, "bold": True,
+        "textColor": rgba_str(render.A26_WHITE),
+        "xigma": {"anchor": "ma", "fitArc": fit_arc}}, len(rows)))
+    rows.append(widget("xigma-alpha-fan-figures", "special", {
+        "name": "fan-figures", "x": (render.A26_FAN_X[0] + render.A26_FAN_X[1]) // 2,
+        "y": render.A26_FAN_Y, "width": render.A26_FAN_X[1] - render.A26_FAN_X[0],
+        "fontFamily": "dejavu", "fontSize": render.A26_FAN_F, "bold": False,
+        "textColor": rgba_str(render.A26_WHITE),
+        "xigma": {"anchor": "ma", "autoFitMax": render.A26_FAN_MAX_W}}, len(rows)))
+    for (cid, (bx, by), lx, ly, px_, py_, dev) in (
+            ("cpu", render.A26_BAR_XY[0], 100, 300, 320, 290, "CPU Usage"),
+            ("gpu", render.A26_BAR_XY[1], 100, 370, 322, 362, "GPU Usage")):
+        rows.append(widget(f"xigma-alpha-{cid}-cap", "text", {
+            "x": lx, "y": ly, "content": f"{cid.upper()} USED", "fontFamily": "dejavu",
+            "fontSize": 20, "bold": False, "textColor": rgba_str(render.A26_WHITE),
+            "xigma": {"anchor": "la"}}, len(rows)))
+        rows.append(widget(f"xigma-alpha-{cid}-pct", "data", {
+            "x": px_, "y": py_, "source": dev, "fontFamily": "dejavu", "fontSize": 32,
+            "bold": False, "textColor": rgba_str(render.A26_WHITE),
+            "xigma": {"anchor": "la"}}, len(rows)))
+        rows.append(widget(f"xigma-alpha-{cid}-bar", "bar", {
+            "x": bx, "y": by, "width": render.A26_BAR_WH[0],
+            "height": render.A26_BAR_WH[1], "cornerRadius": 0,
+            "bgColor": rgba_str(render.A26_TRACK), "startColor": rgba_str(render.A26_BAR_A),
+            "endColor": rgba_str(render.A26_BAR_B), "minValue": 0, "maxValue": 100,
+            "source": dev, "xigma": {"barPaint": "hbar"}}, len(rows)))
+    rows.append(widget("xigma-alpha-clock", "data", {
+        "x": 240, "y": 470, "source": "Time", "fontFamily": "dejavu", "fontSize": 26,
+        "bold": False, "textColor": rgba_str(render.A26_WHITE),
+        "xigma": {"anchor": "ms", "autoFitMax": 452, "format": "%H:%M:%S"}}, len(rows)))
+    return {
+        "id": "xigma-alpha", "width": render.W, "height": render.H, "ratio": "1:1",
+        "xigma": {"theme": "alpha", "generated-from": "xigmalcd/render.py",
+                  "version": __import__("xigmalcd").__version__},
+        "osd": {"widget": rows},
+    }
+
+
+EXPORTS = {"alpha": alpha_recipe, "clock": clock_recipe, "dual": dual_recipe,
+           "gauge": gauge_recipe}
 
 
 def export(name: str) -> dict:

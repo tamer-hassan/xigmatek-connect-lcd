@@ -781,9 +781,14 @@ writes a theme today. What the model does and does not allow, all of it gated:
   empty one, the code theme still paints what does not depend on a reading - it draws the
   ring's track with no fill, 17 451 lit pixels - while the exported layout paints 4 319,
   because a layout skips each widget whose `source` has no value (the same rule that makes
-  `Theme_28` draw six boxes instead of seven). Measured across the fixture readings the
-  suite keeps: `dual` without a GPU temperature is 29 228 px by code and 18 743 by layout,
-  with nothing answered at all 27 388 against 6 409, and `gauge` 17 451 against 4 319. Both
+  `Theme_28` draw six boxes instead of seven). Measured across the fixture readings
+  the suite keeps, code px against layout px: `alpha` missing `GPU Temperature` and both
+  loads is 32 106 against 22 932, missing only the two loads 40 497 against 31 323, and with
+  nothing answered at all 25 396 against 16 222; `dual` without a GPU temperature is 29 228
+  against 18 743 and with nothing answered 27 388 against 6 409; `gauge` 17 451 against
+  4 319. In each of those the code theme is drawing what it can without the reading - a
+  ring's track with no fill, a bar's track, `--°C` or `--%` - and the layout has no row to
+  draw at all. Both
   are right by their own rule, so the counts are printed side by side rather than
   reconciled: an export translates the drawing, not the theme's fallback behaviour. Where a
   code theme skips a widget too - a `dual` with no load reading draws no bar and no status

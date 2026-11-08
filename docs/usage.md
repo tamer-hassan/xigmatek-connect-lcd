@@ -91,7 +91,7 @@ Put the module in `/etc/modules-load.d/` if you want it at every boot.
 | `--allow-reset` | let the control socket reach `recovery`, which re-enumerates the USB device and drops the stored background. Off by default; `xigmalcd-reset --yes` (in a checkout, `tools/reset_panel.py --yes`) stays the deliberate way |
 | `--status` | ask the display that is already running what it is showing, print it, exit. One line on the control socket: the serial port is never opened, so this works while the loop runs. Exit 1 with "no display answering" when nothing is listening |
 | `--list` | list candidate ports with their USB descriptions |
-| `--export-theme NAME` | print the generated layout for one of the five drawn-from-code themes as JSON on stdout - sorted keys, byte-identical between runs. Three have a generator today (`clock`, `gauge`, `dual`); asking for one that does not prints which are in and what the others still need. Nothing is written to disk, and what it prints is a layout this program draws, never something sent to the panel |
+| `--export-theme NAME` | print the generated layout for one of the five drawn-from-code themes as JSON on stdout - sorted keys, byte-identical between runs. Four have a generator today (`alpha`, `clock`, `dual`, `gauge`); asking for one that does not prints which are in and what the others still need. Nothing is written to disk, and what it prints is a layout this program draws, never something sent to the panel |
 | `--check-theme NAME` | report one theme exactly as the loop will meet it: which root answered the name (ALPHA's file, or your copy of it), the file's own accounting, then what this machine's readings actually draw - boxes, lit pixels, which widgets were skipped and why, which shapes are this repo's choice rather than measured off the vendor's picture, and the sources *that theme* asks for split into answered and not. Plus the warnings worth hearing before an edit: a metric name with no entry, a font family `layout.FONTS` does not know, a `fontSize` outside the ten the shipped library uses, a colour outside `rgba()`, a widget off the canvas, an `id` repeated inside one theme, a `property` that is not the one-element list every vendor file uses. Exit 2 if the name resolves to nothing, or if the file cannot be walked at all |
 | `--print-theme-fields` | print the field census an inspector is built from: all 152 widgets of ALPHA's 27 layouts answered key by key, per kind, and for each key whether `xigmalcd/layout.py` reads it, carries it without reading it (with the reason, and how many values it is ever set to), or reads it with no vendor file to show. Counted over the vendor's own trees, so an edit of yours cannot move the numbers. No port is opened |
 | `--list-specials` | print the names a `special` widget may carry, each with the door its drawing goes through and the shape that door gives the row: `[line]` one line of code-built text, `[pair]` a **pair** of figures at one size fitted to a width, `[values]` a pair at one size fitted to a ring's hole - in both pair doors `x` is the pair's centre and `width` the distance between the two figures' centres; the parts of our own themes that stay code-drawn and take position, size and colour from a layout |
@@ -191,14 +191,15 @@ claim:
   (docs/gui.md); the CLI has no writer.  Neither writes anything to the panel: a
   layout file never goes over the wire (§11), so an edit changes what a loop *on
   this machine* draws when it names that theme.
-* **Three of the five can be exported as data, and all three are pixel-identical to the
+* **Four of the five can be exported as data, and all four are pixel-identical to the
   code.** `--export-theme clock` generates 3 widgets and 1 448 characters, `--export-theme
-  gauge` 5 and 2 314, `--export-theme dual` 10 and 4 677, each byte-identical between runs,
-  and the suite's parity gate paints each one both ways - through `render.py` and through
-  `layout.draw_theme` - on every reading that answers what the theme asks: **zero differing
-  pixels, worst channel delta 0**, at 25 548 / 25 545 / 22 944 / 21 003 lit pixels for
-  `clock`, 20 608 / 21 391 / 20 498 for `gauge` and 40 006 / 40 549 for `dual`. Getting
-  those to zero forced four keys into the schema, each with a measured reason and each
+  gauge` 5 and 2 314, `--export-theme dual` 10 and 4 677, `--export-theme alpha` 12 and
+  6 312, each byte-identical between runs, and the suite's parity gate paints each one both
+  ways - through `render.py` and through `layout.draw_theme` - on every reading that answers
+  what the theme asks: **zero differing pixels, worst channel delta 0**, at 25 548 / 25 545 /
+  22 944 / 25 010 / 21 003 lit pixels for `clock`, 20 608 / 21 391 / 20 498 / 20 743 for
+  `gauge`, 40 006 / 40 549 for `dual` and 40 874 / 40 226 for `alpha`. Getting
+  those to zero forced five keys into the schema, each with a measured reason and each
   printed by `--print-theme-fields`: `xigma.arcPaint` (our ring is 3-degree segments
   sampled at their start, ALPHA's measured ring is 1-degree segments sampled at their
   middle - 164 to 6 989 differing pixels on one arc), `xigma.barPaint` (the same argument
@@ -223,9 +224,10 @@ claim:
   stroke). Between them the two temperature rows cover the rings' clear hole exactly, and
   the labels are a row rather than two `text` widgets because the size that hole decides is
   a face metric of the machine drawing it (docs/limits.md). An export that cannot be
-  driven to a diff of 0 is not shipped, so `alpha` and `bars` stay code-drawn for now, and
-  docs/theme-editor.md says what each of them is still waiting on - `bars` being the
-  interesting one, because its row count depends on which sensors the machine answers.
+  driven to a diff of 0 is not shipped, so `bars` stays code-drawn for now and
+  docs/theme-editor.md says what it is still waiting on - the row count and row pitch of a
+  theme whose rows are named by whatever `sensors` answers, which no fixed widget list can
+  say. `alpha` cleared its list and exports today.
 * **Nothing in the CLI writes a theme today.** The writer is in the library -
   `copy_for_edit`, `save`, `delete_user_theme` - and it is gated, not shipped as a flag:
   a save is atomic (tmp then `os.replace`), keeps the previous file as `<name>.json.bak`,
