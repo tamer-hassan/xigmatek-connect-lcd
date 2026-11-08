@@ -391,8 +391,8 @@ XIGMA_KEYS = {
                   "is the budget each figure gets on its own - the pair still draws at "
                   "one size, the smaller of the two fits, which is the rule "
                   "`xigma.autoFitMax` cannot express by itself (docs/limits.md).  It is "
-                  "not read at all by `temp-values`, whose size the ring decides: see "
-                  "`xigma.fitArc`",
+                  "not read at all by the ring-fitted pair door (`temp-values`, "
+                  "`temp-labels`), whose size the ring decides: see `xigma.fitArc`",
     "fitArc": "the ring a `special` row's text is sized against, spelled in an `arc` "
               "row's own vocabulary: {cy, radius, width, angleStart, angleEnd}, `radius` "
               "the inner edge and `width` the stroke (so outer = radius + width), the "

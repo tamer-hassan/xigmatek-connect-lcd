@@ -2494,6 +2494,25 @@ for line in sp.stdout.splitlines():
 assert "ttyACM" not in sp.stdout
 print(f"  --list-specials       {' '.join(themes.special_names())}; drawn by code, "
       f"placed by the layout, no port opened")
+
+# the review door on the theme that needed the most keys: what `--check-theme` says about
+# the generated `alpha` layout, in the words it prints rather than in a summary here
+chk = subprocess.run([sys.executable, "-m", "xigmalcd", "--check-theme", "alpha"],
+                     capture_output=True, text=True, check=True)
+head_ln = chk.stdout.splitlines()[0]
+n_rows = len(themes.export("alpha")["osd"]["widget"])
+assert "generated from render.py" in head_ln and f"{n_rows} widgets" in head_ln, head_ln
+warn = [ln for ln in chk.stdout.splitlines() if ln.strip().startswith("warning:")]
+assert all("outside the ten sizes" in w for w in warn), warn
+assert f"{n_rows} boxes" in chk.stdout and "skipped: nothing" in chk.stdout, chk.stdout
+asked = themes.EXPORTS["alpha"]()["osd"]["widget"]
+sources = sorted({w["property"][0]["source"] for w in asked if w["property"][0].get("source")})
+assert all(f": {', '.join(sources)}" in chk.stdout for _ in (0, 1)), chk.stdout
+print(f"  --check-theme alpha   {head_ln.strip()}")
+print(f"                        {'; '.join(w.strip()[9:] for w in warn)} - our sizes are "
+      f"ours, not the vendor's ten, and the review door says so rather than quieting it; "
+      f"{n_rows} boxes drawn from this machine's readings, no widget skipped, and the "
+      f"sources it asks for are the ones printed above (no port opened)")
 PY
 
 # ---- the file model (stage 3 of docs/theme-editor.md): the shape the library is stored
