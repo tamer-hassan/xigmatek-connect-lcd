@@ -177,6 +177,11 @@ finding that out before an editor is built on top of it:
   through `layout.FONTS["dejavu"]`, built out of `_FONT_GLOBS` so both doors read the same
   paths, beats borrowing `Verdana`, which only lands on the same files on this box.
 
+The `special` registry is injected into `layout.draw_theme` rather than imported there,
+because `layout` already imports `render` and not the other way round; an unknown name comes
+back in `notes["missing"]` as `special:<name>`, so a typo in a layout is reported instead of
+drawn as something else.
+
 With those in place, `clock` generates to 3 widgets and 1 448 characters, byte-identical
 across runs, and parity reports the same painted count both ways on four readings - 25 548,
 25 545, 22 944 and 21 003 lit pixels - with **zero** differing pixels and a worst channel
