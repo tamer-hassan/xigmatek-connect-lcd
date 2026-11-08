@@ -545,6 +545,33 @@ What has been measured on glass, by whom, with how many frames - and what has no
     the fields draw `--`) measured one level down - and it is why `xigmalcd/sensors.py`
     wraps every section in a try/except and `render` draws `--` for what is missing
     (PROTOCOL.md §8).
+  * **What a runner's fonts answer, and the probe that could not say so.** The 23
+    pickable layouts ask for **16** family/bold/size combinations; this bench has all 16,
+    the CI runner has **15** - there is no CJK face in that image, so the one `simsun`
+    widget in `Theme_01` draws nothing there. That is the whole of the difference between
+    this bench's 114 boxes / 314 169 lit pixels and the runner's 113 / 313 249
+    (CI 42463562433 and the runs before it print the count of the machine they ran on,
+    this bench's record beside it, and the layout, widget and stored
+    `fontFamily`/`fontSize`/`bold` triple that went missing).
+    Getting to that number took four commits, because the guard was not measuring what it
+    claimed: it asked `bool(layout.font_for(prop))`, and `font_for` answers the three-tuple
+    `(face, family, path)` - truthy **even when the face is None** - so the probe reported
+    "16 of 16 installed" on a runner that then skipped a widget, and the
+    skip-because-of-fonts branch of that gate was dead code from the day it was written.
+    Asking for `font_for(...)[0] is not None` is the whole fix. It is also the second time
+    tonight that a font-independent assertion had to be pulled apart from a font-dependent
+    number: what the gate asserts on any machine is the accounting identity (boxes +
+    skipped sources + skipped faces == the widgets in the file), that every pickable layout
+    paints at least one box and more than 500 lit pixels, and that exactly 9 layouts report
+    an unanswered *source*, every one of them `Pump Speed`. The totals are printed with
+    their machine named.
+    The two machines do agree on the part that matters for the export plan: the generated
+    `clock` layout and `render.py` put down the same pixels on both - 0 differing pixels,
+    worst channel delta 0, over four readings - which is the first cross-machine evidence
+    that an export is faithful to the code rather than tuned to this bench. It holds because
+    the export names the face its own code uses (`layout.FONTS["dejavu"]`, built out of
+    `render._FONT_GLOBS`) instead of a vendor family that resolves to the same files here by
+    luck.
   * **The scrim plate, measured on the animated path.** Over the bright clip
     (`Theme_07.mp4`, luma 176.2 of 255): with no plate, glyph 244.8 against its own halo
     191.3, a gap of 53.5; with the plate the window's auto rule puts there (150/255), glyph
