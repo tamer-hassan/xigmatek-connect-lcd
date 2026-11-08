@@ -38,6 +38,13 @@ venv/
 .vscode/
 .DS_Store
 
+# One machine's own tooling config, never the project's.  The tree has never tracked
+# a `.env`, and what sits in one here is this box's - a URL, a model name, a key -
+# so the name is listed to keep a later `git add -A` from publishing it.  Anything
+# this program needs at run time is a command-line flag or a documented default
+# (docs/usage.md); nothing is read out of a file like this.
+.env
+
 # debhelper's working state, and the binary package trees it assembles from
 # debian/tmp before dpkg-deb packs them.  The .deb/.changes/.buildinfo themselves
 # are written one directory up, outside the tree, by dpkg-buildpackage.  Listed by
