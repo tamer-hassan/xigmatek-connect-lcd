@@ -4,10 +4,13 @@ The five themes this project draws, what `alpha` is a redraw *of*, and the geome
 
 ## The 27 vendor themes are not in the picker, and that is not an oversight
 
-`xigmaui`'s theme list and `xigmalcd --theme` both take `sorted(render.THEMES)`:
-`alpha`, `bars`, `clock`, `dual`, `gauge`. Those are the pictures **this program**
-renders from live readings. The vendor's 27 are files in the vendor's own format, and
-nothing in this project has ever put one on the wire or read one back:
+`xigmaui`'s theme list takes `sorted(render.THEMES)`: `alpha`, `bars`, `clock`, `dual`,
+`gauge`. Those are the pictures **this program** draws from live readings, and the window
+lists only what it can preview. `xigmalcd --theme` takes those five **and** 23 of the
+vendor's 27 layout files, by the name of the background each one declares - `Theme_07`,
+or the numeric id `1757491588804` - painted by `xigmalcd/layout.py` at the canvas the
+file itself declares and uploaded as an ordinary `.osd` frame. What has never happened,
+and still has not, is sending a theme file to the panel:
 
 * the `.thm` files (27 of them, 6.8 MB at the largest, 66 300 082 B together) are the
   panel-side theme definitions the Windows app decrypts and interprets -
@@ -68,10 +71,32 @@ nobody has looked at the glass to confirm, so the window's picker still lists MP
 only (docs/limits.md keeps that as an open item).
 
 All of that is about *this* program not sending those files, and it stays true: the panel
-is never handed a theme, and no plan here changes that. What is planned - reading those
-layouts in the display loop, and editing a copy of one under `~/.config`, with no new wire
-traffic of any kind - is written out, with the census it rests on and the parts that stay
-gaps, in [theme-editor.md](theme-editor.md). Nothing there is built yet.
+is never handed a theme, and no plan here changes that. Two things follow from drawing
+them here instead, and both are gated in `tools/selftest.sh` rather than asserted here:
+
+* **23 of the 27, on the canvas.** The gate reads each file's own `ratio` field: 23 say
+  `1:1` (480×480, the panel's size) and 4 say `4:3` (320×240). The four are refused, with
+  the reason printed by `--list-themes` and by a bad `--theme` argument: the em-box anchor
+  convention that every text widget in a layout is drawn by was measured at 480, against
+  the vendor's own baked overlay (`render.py` records it, `tools/theme_check.py` measures
+  it per theme), and scaling an unmeasured convention by 1.5 would put a guess on the
+  glass. Keying the gate on `ratio` instead of on the directory name is deliberate: a
+  future 480×480 layout must not be filtered out by a path rule.
+* **7 metric names over those 23, in 82 widgets' worth of counts**: `CPU Temperature` 17,
+  `CPU Usage` 15, `Time` 11, `Pump Speed` 9, `GPU Usage` 6, `GPU Temperature` 3,
+  `CPU Frequency` 2. 14 of the 23 need nothing this program has no reading for; 9 ask for
+  `Pump Speed`, which this box has never been scanned for. A layout whose metric has no
+  reading draws **without that widget** and prints why - a hole that says what it is,
+  rather than a zero that reads as a measurement. Faces are substituted the same way and
+  said out loud (`arial` -> Liberation Sans, `simsun` -> Noto Sans CJK), because no
+  Microsoft fonts are installed here, and the three metric shapes that are this repo's
+  choice rather than measured off the vendor's picture (`Time`, `CPU Frequency`,
+  `Pump Speed`) are named in the same note.
+
+The rest is planned and not built: reading a layout in the window, and editing a copy of
+one under `~/.config` with no new wire traffic of any kind. The plan, the census it rests
+on and the parts that stay gaps are written out in
+[theme-editor.md](theme-editor.md).
 
 ## The `alpha` theme, and its rings
 

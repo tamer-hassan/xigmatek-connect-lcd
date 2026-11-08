@@ -1,6 +1,12 @@
 # The theme editor, and the 27 vendor themes: the plan, with the numbers under it
 
-**This is a plan.** Nothing in it is implemented as of 2026-11-08. The decisions are
+**This is a plan, part of it landed.** As of 2026-11-08, stage 0's write-up (this file)
+and stage 1 are in the tree: `xigmalcd/themes.py` finds the library, `--list-themes` prints
+it with the counts, `--theme <background name>` selects a layout, the canvas refusal is a
+gate on each file's own `ratio` field, and the same names work over the control socket.
+Stages 2-6 are not built: no generated export, no file model, no inspector, no canvas, no
+glass pass. Every census figure below is re-derived by `tools/selftest.sh`'s vendor-library
+section, so it cannot rot in place. The decisions are
 settled with the owner; the census is measured out of the files in this tree on the same
 date, and each figure says where it came from, so that a reader can re-run it rather than
 take it on trust. Where a number is a computation under a stated assumption, it says so -
@@ -57,7 +63,7 @@ From `themes/alpha/layouts/**/*.json`, counted with plain `python3 -` over the t
 | widgets over all themes | **152** (min 3, max 10 per theme - a theme is a short list, not a form) |
 | kinds used | `data` 66, `text` 66, `bar` 15, `line` 4, `arc` 1 |
 | distinct property keys | **30**: x, y on all 152; `fontFamily`/`fontSize`/`bold`/`italic`/`underline`/`textColor` on 132; `source` on 82; `content` on 66; width/height/rotate on ~20; `minValue`/`maxValue`/`bgColor`/`cornerRadius`/`startColor`/`endColor` on 16; `radius`/`angleStart`/`angleEnd`/`sizeWidth`/`sizeHeight` on the one arc |
-| distinct `source` values | **12 named** over 82 widgets (`CPU Temperature` 22, `CPU Usage` 16, `Time` 13, `Pump Speed` 9, `GPU Temperature` 6, `GPU Usage` 6, `CPU Frequency` 3, `Date` 3, `CPU Power`, `GPU Power`, `Upload Speed`, `Week` one each); 70 widgets carry no source at all |
+| distinct `source` values | **12 named** over 82 widgets, across all 27 files (`CPU Temperature` 22, `CPU Usage` 16, `Time` 13, `Pump Speed` 9, `GPU Temperature` 6, `GPU Usage` 6, `CPU Frequency` 3, `Date` 3, `CPU Power`, `GPU Power`, `Upload Speed`, `Week` one each); 70 widgets carry no source at all. Across the **23 pickable** files it is **7 names** - `CPU Temperature` 17, `CPU Usage` 15, `Time` 11, `Pump Speed` 9, `GPU Usage` 6, `GPU Temperature` 3, `CPU Frequency` 2 - which is what `--list-themes` prints and what the suite gates |
 | display formats measured | **4 of the 12** - `xigmalcd/layout.py`'s `FORMATS_MEASURED` is CPU/GPU Temperature and CPU/GPU Usage. The rest are this repo's own choice and `draw_theme` reports them in `notes["gaps"]` |
 | fonts | 4 families (`Arial` 115, `simsun` 13, `Verdana` 3, `宋体` 1), 10 sizes (12, 14, 16, 20, 24, 32, 40, 70, 100, 140), `textColor` on 132 widgets in **13** distinct spellings over all 27 files - and 106 values in 9 spellings, 88 of them white, across the 23 `1:1` files alone. That narrower count is the table docs/themes.md carries, re-derived by the suite's vendor-library section, so either number has to name its scope when it is quoted |
 | widget ids | all 152 UUID-shaped but only **54 distinct**: unique inside one theme, reused across themes. The editor must key a row by (theme, id), never by id alone |
@@ -71,12 +77,16 @@ docs/limits.md: 43 clips and 28 images per install, 40 of 43 clips 480×480 and 
 
 ## What runs today, and what does not
 
+(The figures in this section are the ones `tools/selftest.sh` re-derives on every run, in
+the vendor-library section, from the shipped files - not a snapshot of a one-off pass.)
+
 - **14 of the 23 480×480 themes use only sources `sensors.collect()` already produces.**
   That figure is a computation, not an observation: it pairs the 12 named sources above
   against the groups `xigmalcd/sensors.py` documents (`network`, `memory`, `cpu`, `gpu`,
   `disk`, `fans`, `motherboard`, `timestamp`).
-- **9 of the 23 need `Pump Speed`**, and no tachometer has ever been looked for on this
-  box: `tools/fanscan.py` has never been pointed at a pump header. Finding one is a
+- **9 of the 23 need `Pump Speed`** - `Theme_28`, `Theme_29`, `Theme_34`, `theme_36`,
+  `theme_37`, `theme_41`, `theme_45`, `theme_48`, `theme_49` - and no tachometer has ever
+  been looked for on this box: `tools/fanscan.py` has never been pointed at a pump header. Finding one is a
   measurement with an unknown answer, budgeted at 2 h - the vendor's own vocabulary calls
   it `waterPumpSpeed` (PROTOCOL.md §10), so the source name is settled even if the sensor
   is not.
@@ -170,7 +180,7 @@ number gated, the docs updated in the same change.
 | stage | lands | sittings | hours |
 |---|---|---|---|
 | 0 | this document, plus the schema written out properly: the `special` list, `autoFit`, the `xigma` block, the determinism rules, and how `--theme` opens past `choices=sorted(render.THEMES)` | 1 | 3 |
-| 1 | the 23 `1:1` layouts selectable in the loop: name→layout resolver, human names from `background.mediaFile`, the 12-source → `sensors.collect()` table, `--list-themes`, `notes["missing"]` printed as "no pump tachometer here, widget 3 skipped", and the four `4:3` themes excluded by a gate on `ratio` so a future 480 layout cannot be dropped by a filter | 1-1½ | 3-4½ |
+| 1 | **landed 2026-11-08.** the 23 `1:1` layouts selectable in the loop: name→layout resolver, human names from `background.mediaFile`, the source→`sensors.collect()` table, `--list-themes`, `notes["missing"]` printed as "no pump tachometer here, widget skipped" and again over the socket's `status`, the four `4:3` themes excluded by a gate on `ratio` so a future 480 layout cannot be dropped by a filter, and a `--theme` name that is canonicalised once at parse time so the CLI, the log and the socket all spell it the same | 1-1½ | 3-4½ |
 | 2 | the export and its two gates (byte-stability, pixel parity), the three specials, `--print-theme-fields` | 2-2½ | 6-7½ |
 | 3 | the file model: atomic save plus `.bak` under `~/.config`, warnings-not-errors validation from the census above (unknown source, off-canvas x/y, a `fontSize` outside the ten measured, an unparseable `rgba()`, overlapping boxes), and the round-trip gate: an unedited vendor theme re-saves byte-identical with unknown keys preserved | 1-1½ | 3-4½ |
 | 4 | the surface: one-row inspector over the fields each kind carries, the canvas inside the existing pane, pinned fixture and still preview, keyboard nudge, undo coalescing, coarse live apply (`{"cmd":"theme","value":"user:foo"}`) | 3-3½ | 9-10½ |

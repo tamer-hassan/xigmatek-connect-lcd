@@ -218,12 +218,18 @@ class Control:
         return {"ok": False, "error": f"unknown cmd {cmd!r}"}
 
     def _set_theme(self, value) -> dict:
-        from . import render
+        """Switch the picture.  Both halves of the vocabulary: the five drawn in
+        render.py, and ALPHA's layouts as `xigmalcd/themes.py` finds them - the same
+        names `--theme` takes, because the door should not change the meaning
+        (docs/themes.md).  The window's own picker stays on the five for now: a layout
+        has no preview path there yet, and docs/theme-editor.md keeps that plan.
+        """
+        from . import render, themes
         name = str(value or "")
-        if name not in render.THEMES:
+        if name not in render.THEMES and themes.resolve(name) is None:
             return {"ok": False,
-                    "error": f"unknown theme {name!r}; "
-                             f"try {' '.join(sorted(render.THEMES))}"}
+                    "error": f"unknown theme {name!r}: {themes.why_not(name)}; "
+                             f"the five drawn here are {' '.join(sorted(render.THEMES))}"}
         with self.lock:
             self.args.theme = name
         return {"ok": True, "status": self.status()}

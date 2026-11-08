@@ -912,7 +912,7 @@ THEMES = {"gauge": theme_gauge, "dual": theme_dual, "clock": theme_clock,
           "bars": theme_bars, "alpha": theme_alpha}
 
 
-def _scrim(img: Image.Image, alpha: int, grow: int = 6) -> Image.Image:
+def scrim(img: Image.Image, alpha: int, grow: int = 6) -> Image.Image:
     """Put a translucent dark plate under everything the theme painted.
 
     Needed because the glyphs of the theme ALPHA selected are all white - 6 of 6
@@ -937,6 +937,12 @@ def _scrim(img: Image.Image, alpha: int, grow: int = 6) -> Image.Image:
     return Image.alpha_composite(plate, img)
 
 
+# `draw()` takes an argument called `scrim`, so the plate needs a module-level name the
+# argument cannot shadow: renaming the argument would break every caller that spells it
+# out (`main.paint`, `xigmaui`, the preview tools), which is a worse trade than an alias.
+_plate = scrim
+
+
 def draw(metrics, theme="gauge", scrim: int = 0, **kw) -> Image.Image:
     """Render one 480x480 frame of `theme` from a metrics dict.
 
@@ -946,7 +952,7 @@ def draw(metrics, theme="gauge", scrim: int = 0, **kw) -> Image.Image:
     """
     img = THEMES.get(theme, theme_gauge)(metrics, **kw)
     if scrim:
-        img = _scrim(img, max(1, min(255, int(scrim))))
+        img = _plate(img, max(1, min(255, int(scrim))))
     return img if img.size == (W, H) else img.resize((W, H))
 
 

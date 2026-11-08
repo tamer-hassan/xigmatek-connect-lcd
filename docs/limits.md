@@ -550,7 +550,7 @@ What has been measured on glass, by whom, with how many frames - and what has no
     191.3, a gap of 53.5; with the plate the window's auto rule puts there (150/255), glyph
     246.0 against halo 153.0, a gap of **93.0** - 1.74x. The glyphs themselves do not get
     brighter; the ring around them gets darker, which is the whole mechanism and the reason
-    `_scrim` hugs the drawn pixels instead of washing the canvas. Measured at 160 px, 8
+    `render.scrim` hugs the drawn pixels instead of washing the canvas. Measured at 160 px, 8
     frames, because that is what the check costs; comparable to itself, not to the 480 px
     table above.
   * **Loop seams, now that the previews run the clips round more than once.** The `alpha`
@@ -677,3 +677,25 @@ What has been measured on glass, by whom, with how many frames - and what has no
   bench file it was read out of, so that the run can be **repeated** rather than trusted — not
   so that it can be read here.  Those tools, and both selftest sections, print that they
   skipped instead of reporting a pass.
+
+**Drawing one of ALPHA's own layouts, and what that cannot show.** 23 of the 27 copied
+layouts are pickable (`--theme Theme_07`, and `--list-themes` prints the set); 4 are
+refused by a gate on each file's own `ratio` field, because they declare 320x240 and the
+em-box anchor convention that every text position in a layout depends on is measured at 480
+only. Among the 23, `Pump Speed` is asked for by 9 themes and there is no reading for it:
+no pump tachometer has ever been looked for on this box (`tools/fanscan.py` has never been
+pointed at one), so those 9 draw *without* that widget and print that they did - a hole
+that says what it is, rather than a zero that would read as a measurement. Of the metric
+names in the library, four have a display shape measured off the vendor's own baked overlay
+(`layout.FORMATS_MEASURED`); within the pickable set that leaves `Time`, `CPU Frequency`
+and `Pump Speed` shaped by this repo, and the per-frame note names them. Every face is a
+substitution, because no Microsoft fonts are installed here (`arial` -> Liberation Sans,
+`simsun` -> Noto Sans CJK), and the per-theme pixel difference against the vendor's own
+picture is what `tools/theme_check.py` measures, with `themes/alpha/README.md` keeping
+those figures. A layout theme ignores `--text-color`, `--cold`/`--hot`, `--label` and
+`--clock-size`: its colours, sizes and geometry are inside its file - which is the same
+reason the window's picker does not list what it cannot preview. And **none of this has
+been looked at on glass yet**: the frame byte counts in docs/usage.md (3 558 B for
+`Theme_29` up to 8 115 B for `Theme_35`, one pinned fixture, one pinned instant) are
+offline figures from `--dry-run`, and the glass pass is stage 6 of
+[theme-editor.md](theme-editor.md).

@@ -458,11 +458,13 @@ class Window(QMainWindow):
         self.theme.currentTextChanged.connect(self._changed)
         self.theme.setToolTip(
             "the drawings `xigmalcd` renders itself, from live sensor readings. "
-            "The vendor's 27 themes are not among them, and this list is not "
-            "missing them: those are files for the panel's own firmware and "
-            "nothing here sends or interprets them. docs/themes.md says what the "
-            "library is used for (its layouts are what `alpha` was measured "
-            "against) and what its clips can be used as (a background)")
+            "The vendor's layouts are not in this list on purpose: this window can "
+            "preview the five, and offering a picture it cannot preview would be a "
+            "control that lies about what it showed. The daemon does draw 23 of them "
+            "- `xigmalcd --theme Theme_07`, and `--list-themes` prints the set with "
+            "the four refused on canvas. docs/themes.md says what the library is and "
+            "is not, including that the panel is never handed a layout file "
+            "(PROTOCOL.md §11).")
         form.addRow("theme", self.theme)
         # the question this combo provokes, answered where it is asked: the
         # `xigmatek-connect-lcd-themes` package is on the machine, so why is not
@@ -476,8 +478,8 @@ class Window(QMainWindow):
         # bad trade.  The full explanation is the combo's tooltip (set just above)
         # and docs/themes.md, which is what the parenthetical points to.
         vendor = QLabel(
-            "the five are what this program draws; the package's 27 vendor themes "
-            "are the vendor's own files (docs/themes.md)")
+            "the five are what this window draws; 23 of the package's layouts reach "
+            "the daemon by name instead (docs/themes.md)")
         vendor.setWordWrap(True)
         vendor.setStyleSheet("color:#888;font-style:italic;")
         form.addRow("", vendor)

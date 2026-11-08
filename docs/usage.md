@@ -59,7 +59,7 @@ Put the module in `/etc/modules-load.d/` if you want it at every boot.
 |---|---|
 | `-d, --device PATH` | serial port; default is the first `/dev/ttyACM*` |
 | `-b, --baud N` | 115200 (the panel's only rate) |
-| `-t, --theme NAME` | `alpha` (default), `gauge`, `dual`, `clock`, `bars`. `alpha` is the theme the vendor app currently has selected (`presetTheme[26]` in its `store.json`), redrawn from that file's own widget geometry, with a GPU-temperature column matched to the CPU one, a 30-100 °C gauge arc around each temperature (green through amber to red), a seconds clock and one fan figure under each temperature |
+| `-t, --theme NAME` | `alpha` (default), `gauge`, `dual`, `clock`, `bars` - or one of ALPHA's own library themes by name (`Theme_07`, or its numeric id `1757491588804`, in any case: it is stored as the file spells it). The library themes are painted from their own copied layout files by `xigmalcd/layout.py`; see "ALPHA's layouts as a picture" below. `alpha` is the theme the vendor app currently has selected (`presetTheme[26]` in its `store.json`), redrawn from that file's own widget geometry, with a GPU-temperature column matched to the CPU one, a 30-100 °C gauge arc around each temperature (green through amber to red), a seconds clock and one fan figure under each temperature |
 | `-f, --fps N` | frames per second. 1 is the vendor app's rate and its write count. Higher rates are real, not wasted: the glass takes the newest frame it has committed, so the picture you see is up to one frame period old - the on-screen clock runs ~1 s behind at 1 fps and stops looking behind at 3 fps, and the panel accepted **361/361** frames in one 120 s window and **1173/1175** in a 400 s soak at 3 fps; the ringed `alpha` picture, which is the biggest frame this code sends (39 400-45 244 B), took 3 fps too - **91 of 91** in 30 s. Choose it for the write count you are willing to spend (86 400 uploads a day at 1 fps, 259 200 at 3) |
 | `--duration N` | stop after N seconds |
 | `--once` | push one frame and exit |
@@ -91,7 +91,52 @@ Put the module in `/etc/modules-load.d/` if you want it at every boot.
 | `--allow-reset` | let the control socket reach `recovery`, which re-enumerates the USB device and drops the stored background. Off by default; `xigmalcd-reset --yes` (in a checkout, `tools/reset_panel.py --yes`) stays the deliberate way |
 | `--status` | ask the display that is already running what it is showing, print it, exit. One line on the control socket: the serial port is never opened, so this works while the loop runs. Exit 1 with "no display answering" when nothing is listening |
 | `--list` | list candidate ports with their USB descriptions |
+| `--list-themes` | print everything `--theme` accepts: the five drawn from `render.py`, then ALPHA's 23 `1:1` layouts with their widget counts and which tree the file came from, then the four refused and the reason. No port is opened
 | `-v, --verbose` | log every frame in both directions |
+
+### ALPHA's layouts as a picture
+
+`--theme` now speaks two vocabularies, and the difference is where the pixels come from.
+The five named themes are drawn by code in `render.py`. Any other accepted name is one of
+ALPHA's copied layout files, painted by `xigmalcd/layout.py` at the canvas the file itself
+declares - and it is still one transparent `.osd` PNG per frame, because the panel is
+never handed a layout file (PROTOCOL.md §11 reads the vendor app's traffic and finds no
+such upload; docs/themes.md).
+
+`--list-themes` prints the set with the numbers behind it. All of these are re-derived by
+`tools/selftest.sh` in the vendor-library section, so the paragraph is a record, not a
+claim:
+
+* **23 pickable, 4 refused, and the refusal is on the file's own `ratio` field** - the
+  23 declare `1:1` at 480×480, the 4 declare `4:3` at 320×240. A 320×240 layout would
+  multiply the em-box anchor convention by 1.5, and that convention was measured at 480
+  only. Keying the gate on `ratio` rather than on the directory name is what stops a
+  future 480×480 file from being filtered out by a path rule.
+* **7 metric names are asked for** over those 23 files: `CPU Temperature` 17 widgets,
+  `CPU Usage` 15, `Time` 11, `Pump Speed` 9, `GPU Usage` 6, `GPU Temperature` 3,
+  `CPU Frequency` 2. **14 of the 23 need nothing this program has no reading for**; the
+  other 9 ask for `Pump Speed`, and no pump tachometer has ever been looked for on this
+  box (`tools/fanscan.py` has never been pointed at one).
+* **A widget with no reading is skipped and said so**, not drawn as a zero. Painted
+  offline from one pinned metrics dict and one pinned instant, all 23 layouts draw
+  something - 114 widget boxes between them - and 9 print
+  `skipped Pump Speed: no pump tachometer has been measured on this box`. The same notes
+  name every face substitution (`arial` -> `LiberationSans-Regular.ttf`, `simsun` ->
+  Noto Sans CJK) and every shape that is this repo's choice rather than something measured
+  off the vendor's baked overlay: `Time`, `CPU Frequency`, `Pump Speed`.
+* **What it uploads**, at that pinned fixture: the smallest library frame is `Theme_29`
+  at 3 558 B and the largest `Theme_35` at 8 115 B, the same 256-colour PNG shape `alpha`
+  uses, which README's encode A/B measured on glass at 12 169-12 401 B per frame. So a library
+  theme is cheaper on the wire than our own, and nothing about the rate changes.
+* A layout theme takes none of the render options (`--cold`, `--hot`, `--label`,
+  `--clock-size`, `--text-color`): its geometry, colours and sizes are inside its file.
+  `--scrim` is the one exception, because that plate is built from the layer's own alpha
+  and needs no per-theme geometry (docs/limits.md).
+* Over the control socket the same names work - `{"cmd":"theme","value":"Theme_07"}` -
+  because one name should mean one thing in all three doors. The **window's** picker still
+  lists the five: the window previews what it lists, and it cannot preview a layout yet.
+  That is the editor plan in [theme-editor.md](theme-editor.md), and it is the one thing
+  here that is not built.
 
 ## Two processes, one port
 

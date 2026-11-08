@@ -484,7 +484,7 @@ def main() -> int:
         # shows" has to include it.  Counted out of the encoded GIFs for the clock over
         # `Theme_07.mp4` (measured luma 176.3 of 255): glyph against its own grown halo,
         # 47.1 with `--scrim 0` and 110.3 with the plate the rule gives, the mechanism
-        # being that `_scrim` hugs what was drawn instead of washing the canvas - the
+        # being that `render.scrim` hugs what was drawn instead of washing the canvas - the
         # glyph itself stays at 241.7 either way.  The suite prints that figure for all
         # five README files, and holds it at a floor of 30.
         kw["scrim"] = SCRIM_ON_BRIGHT if lum > BRIGHT_LUMA else 0

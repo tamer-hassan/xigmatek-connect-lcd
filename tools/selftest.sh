@@ -1385,6 +1385,111 @@ else:
           f"shipped .thm layout, widget properties identical")
 PY
 
+# What `--theme` is actually allowed to be told about this library.  This is the gate that
+# lets docs/theme-editor.md state what is runnable instead of estimating it: the canvas
+# refusal is keyed on each file's own `ratio` field, not on the directory it sits in, so a
+# future 480x480 layout cannot be filtered out by a path rule, and the four 320x240 files
+# are refused with their reason rather than hidden.
+python3 - <<'PY' || { echo "library selection FAILED"; exit 1; }
+import datetime, io, json, os, subprocess, sys
+from xigmalcd import layout, render, themes
+
+ok, out = themes.scan()
+assert len(ok) == 23 and len(out) == 4, (len(ok), len(out))
+assert all(r["ratio"] == "1:1" for r in ok), [r["ratio"] for r in ok]
+assert all(r["ratio"] != "1:1" for r in out), [r["ratio"] for r in out]
+assert len({r["name"].lower() for r in ok + out}) == 27, "a name collides case-insensitively"
+assert len({r["id"] for r in ok}) == 23, "two pickable layouts share an id"
+assert {r["w"] for r in out} == {320} and {r["h"] for r in out} == {240},     [(r["w"], r["h"]) for r in out]
+# resolve by stem, by any case, and by the numeric id store.json uses; the 4:3 set answers
+# with the canvas reason instead of with silence
+assert themes.resolve("theme_07")["name"] == "Theme_07"
+assert themes.resolve("1757491588804")["name"] == "Theme_07"
+assert themes.resolve(out[0]["name"]) is None
+assert "ratio 4:3" in themes.why_not(out[0]["name"]), themes.why_not(out[0]["name"])
+assert themes.resolve("gauge") is None and "five" in themes.why_not("gauge")
+# the source tally the plan quotes, and the 14-of-23 figure computed rather than asserted
+used = themes.sources_used(ok)
+assert used == {"CPU Temperature": 17, "CPU Usage": 15, "Time": 11, "Pump Speed": 9,
+                "GPU Usage": 6, "GPU Temperature": 3, "CPU Frequency": 2}, used
+answerable = set(themes.SOURCES) | set(themes.CLOCKED)
+need = {}
+for rec in ok:
+    srcs = {p.get("source") for w in (layout and themes.load(rec["path"])
+                                      .get("osd") or {}).get("widget") or []
+            for p in w.get("property") or []}
+    need[rec["name"]] = {s for s in srcs if s} - answerable
+clear = sorted(n for n, gap in need.items() if not gap)
+assert len(clear) == 14, (len(clear), clear)
+assert all(need[n] == {"Pump Speed"} for n in need if need[n]),     {n: need[n] for n in need if need[n]}
+print(f"  library selection       {len(ok)} pickable on canvas, {len(out)} refused "
+      f"(ratio field, not the path); 27 names unique case-insensitively; sources asked "
+      f"for: " + ", ".join(f"{k} {v}" for k, v in sorted(used.items(), key=lambda kv: -kv[1])))
+print(f"                        {len(clear)}/{len(ok)} themes need nothing this program "
+      f"has no reading for; the other {len(ok) - len(clear)} ask for Pump Speed, which "
+      f"has never been measured on this box")
+
+# every pickable layout painted offline: pinned readings, one pinned instant, no port and
+# no fixtures invented - and the frame bytes each would cost on the wire, which is the
+# figure docs/usage.md quotes when it says what a library theme uploads
+PIN = {"cpu": {"temperature": 61, "load": 42, "power": 88.5, "speedAverage": 4338},
+       "gpu": {"temperature": 55, "load": 63, "power": 37.0, "speed": 1500},
+       "network": {"upload": 12.3, "download": 45.6}, "memory": {"load": 7}}
+WHEN = datetime.datetime(2026, 11, 8, 3, 40, 0)
+sizes, drawn, skipped = [], 0, []
+for rec in ok:
+    img, notes = themes.paint(rec, PIN, when=WHEN, scrim=0)
+    assert img.size == (480, 480), (rec["name"], img.size)
+    px = sum(v for v in img.getchannel("A").get_flattened_data()) if hasattr(
+        img.getchannel("A"), "get_flattened_data") else sum(img.getchannel("A").getdata())
+    assert notes["boxes"], (rec["name"], "drew nothing")
+    assert px > 2000, (rec["name"], px)
+    sizes.append((len(render.to_png(img)), rec["name"], px, len(notes["boxes"])))
+    drawn += len(notes["boxes"])
+    if notes["missing"]:
+        assert notes["missing"] == ["Pump Speed"], (rec["name"], notes["missing"])
+        assert "fanscan" in notes["absent"]["Pump Speed"], notes["absent"]
+        skipped.append(rec["name"])
+assert len(skipped) == 9, skipped
+sizes.sort()
+print(f"  drawn offline, no port  all {len(ok)} layouts painted from a pinned metrics "
+      f"dict and one pinned instant: {drawn} widget boxes, {px and ''}"
+      f"frames {sizes[0][1]} {sizes[0][0]} B .. {sizes[-1][1]} {sizes[-1][0]} B "
+      f"(the same PNG shape `alpha` uploads)")
+print(f"                        {len(skipped)} themes report a skipped widget, every one "
+      f"of them Pump Speed, with the reason in the note")
+
+# the CLI door: `--theme` takes both halves, and a refused name comes back with its reason
+import argparse
+ap = render and __import__("xigmalcd.main", fromlist=["main"]).build_parser()
+assert ap.parse_args(["--theme", "Theme_07"]).theme == "Theme_07"
+assert ap.parse_args(["--theme", "theme_07"]).theme == "Theme_07"
+for bad, want in ((out[0]["name"], "ratio 4:3"), ("Theme_99", "no layout named"),
+                  ("nonsense", "no layout named")):
+    try:
+        ap.parse_args(["--theme", bad])
+        raise AssertionError(f"{bad} parsed as a theme")
+    except SystemExit as exc:
+        assert exc.code == 2, exc.code
+import contextlib
+err = io.StringIO()
+with contextlib.redirect_stderr(err):
+    try:
+        ap.parse_args(["--theme", out[0]["name"]])
+    except SystemExit:
+        pass
+assert "ratio 4:3" in err.getvalue(), err.getvalue()
+run = subprocess.run([sys.executable, "-m", "xigmalcd", "--list-themes"],
+                     capture_output=True, text=True, check=True)
+lines = [l for l in run.stdout.splitlines() if l.strip()]
+pick = [l for l in lines if " NOT PICKABLE: " in l]
+assert len(pick) == 4, len(pick)
+assert "drawn here (render.py)" in run.stdout and "Pump Speed" in run.stdout
+assert "ttyACM" not in run.stdout, "a port was opened to list themes"
+print(f"  --list-themes           {len(lines)} lines, {len(pick)} of them the canvas "
+      f"refusals with their reason; no port is opened by the listing")
+PY
+
 echo
 echo "== decoder round-trip: encode -> decode -> re-encode"
 python3 - <<'PY' || { echo "decoder round-trip FAILED"; exit 1; }
@@ -3115,6 +3220,15 @@ rep = c.ask({"cmd": "theme", "value": "nope"})
 assert not rep["ok"] and "unknown theme" in rep["error"], rep
 assert args.theme == "alpha"
 assert c.ask({"cmd": "theme", "value": "gauge"})["ok"] and args.theme == "gauge"
+# a library layout is the same name on this door as on the CLI (one name, one meaning,
+# three doors), and the canvas refusal is quoted back rather than swallowed
+from xigmalcd import themes as _tl
+_lib = _tl.selectable()[0]["name"]
+rep = c.ask({"cmd": "theme", "value": _lib})
+assert rep["ok"] and args.theme == _lib, rep
+rep = c.ask({"cmd": "theme", "value": _tl.scan()[1][0]["name"]})
+assert not rep["ok"] and "ratio 4:3" in rep["error"], rep
+c.ask({"cmd": "theme", "value": "alpha"})
 assert c.ask({"cmd": "fps", "value": 99})["ok"] is False and args.fps == 1.0
 assert c.ask({"cmd": "fps", "value": 1.5})["ok"] and args.fps == 1.5
 assert c.ask({"cmd": "fps", "value": "hot"})["ok"] is False and args.fps == 1.5

@@ -17,7 +17,7 @@ import signal
 import sys
 import time
 
-from . import control, protocol, render, sensors
+from . import control, protocol, render, sensors, themes
 from .protocol import Link, ProtocolError, find_ports
 
 
@@ -134,12 +134,14 @@ SYSTEM_MEDIA = "/usr/share/xigmalcd/media"
 REPO_MEDIA = _repo("media")
 
 # The rest of ALPHA's theme library, as the `xigmatek-connect-lcd-themes` package
-# installs it.  It is a root of the clip *library* and nothing else: the display
-# loop never reads themes/alpha at all (its own five themes are drawn from
-# render.py; `xigmalcd/layout.py`, which does read the copied layouts, is used by
-# tools/theme_check.py, which these packages do not ship).  The package owns its
-# own directory instead of symlinking clips into media/, so removing either
-# package leaves the other's files intact.
+# installs it.  It is two things now: a root of the clip *library*, and the layout
+# library `--theme <name>` draws from - `xigmalcd/themes.py` finds the files,
+# `xigmalcd/layout.py` paints them.  What it is still *not* is anything that goes on
+# the wire as itself: the panel is never handed a layout file (PROTOCOL.md §11 reads
+# the vendor app's own traffic and finds no such upload), so a library theme is drawn
+# here and uploaded as an ordinary `.osd` frame, the same shape a frame of `alpha`
+# already is.  The package owns its own directory instead of symlinking clips into
+# media/, so removing either package leaves the other's files intact.
 SYSTEM_THEMES = "/usr/share/xigmalcd/themes/alpha"
 
 
@@ -216,7 +218,7 @@ BRIGHT_MP4 = find_media(
     # white glyphs - and a loop seam of 4.50 against 0.60 typical motion, so its
     # join is a hard cut.  Vendored so `--mp4 media/theme_48.mp4` is one flag
     # away, and measurable by the fact that the drawing puts a dark plate behind
-    # everything it paints for this file (render._scrim, --scrim N).
+    # everything it paints for this file (render.scrim, --scrim N).
     os.path.join(WIN_STATIC, "theme_48.mp4"),
     os.path.join(WIN_UPLOADS, "theme_48.mp4"),
 )
@@ -348,8 +350,69 @@ def _theme_kwargs(args):
         del kw["hot"]
     if args.title is None:
         del kw["title"]           # ditto for the heading: `alpha` has none
+    if args.theme not in render.THEMES:
+        return {}             # a library theme: its choices are all inside its own file
     params = inspect.signature(render.THEMES[args.theme]).parameters
     return {k: v for k, v in kw.items() if k in params}
+
+
+def paint(args, metrics, rec=None):
+    """One 480x480 overlay, from either half of the theme vocabulary.
+
+    A name in `render.THEMES` is drawn by `render.draw`, with whatever of the render
+    options that particular theme accepts.  Any other name is one of ALPHA's layouts,
+    painted by `xigmalcd/layout.py` at the canvas the file itself declares; it takes
+    none of those options, and `--scrim` is the single exception, because that plate is
+    built from the layer's own alpha and needs no per-theme geometry - a library theme
+    over a bright clip wants it for the same reason `alpha` does, and docs/limits.md
+    keeps the clip luma figures that decided it (`theme_48.mp4`, 227.3 of 255).
+    """
+    rec = rec if rec is not None else themes.resolve(args.theme)
+    if rec is None:
+        return render.draw(metrics, args.theme, scrim=_scrim_for(args),
+                           **_theme_kwargs(args))
+    img, notes = themes.paint(rec, metrics, scrim=_scrim_for(args))
+    report(rec, notes)
+    return img
+
+
+_REPORTED: dict = {}
+
+
+def report(rec: dict, notes: dict) -> None:
+    """Say what a library theme drew, once, and again only if it changed.
+
+    A layout names metrics this machine may not have, and a widget that draws nothing
+    looks like a broken drawing rather than a missing sensor.  So the skips are printed
+    with their reason, and so is every font substitution.  All of it comes out of
+    `layout.draw_theme`'s own notes, not out of a summary this file could get wrong.
+    """
+    faces: dict = {}
+    for key, path in (notes.get("fonts") or {}).items():
+        faces.setdefault(key.split("/", 1)[0], set()).add(os.path.basename(path))
+    here = (tuple(notes.get("missing") or ()),
+            tuple(sorted(set(notes.get("gaps") or ()))),
+            tuple(f"{fam} -> {'/'.join(sorted(v))}" for fam, v in sorted(faces.items())))
+    if _REPORTED.get(rec["name"]) == here:
+        return
+    _REPORTED[rec["name"]] = here
+    missing, gaps, subs = here
+    where = ("checkout" if rec["root"] == os.path.abspath(themes.REPO_ROOT)
+             else "installed package")
+    print(f"  theme {rec['name']} ({rec['id']}): {rec['widgets']} widgets, "
+          f"{len(notes.get('boxes') or ())} drawn, layout from the {where}")
+    absent = notes.get("absent") or {}
+    for src in missing:
+        print(f"    skipped {src}"
+              + (f" ({absent[src]})" if src in absent else ": no reading for it here"))
+    if gaps:
+        print("    shaped here, not measured off the vendor's picture: " + ", ".join(gaps))
+    if subs:
+        print("    faces: " + "; ".join(subs))
+    if rec["background"]:
+        print(f"    this theme's own background is "
+              f"{os.path.basename(rec['background'])} - name it with --mp4; nothing "
+              f"here uploads one on its own")
 
 
 def _png(args, img):
@@ -510,9 +573,7 @@ def one_frame(link, metrics, args, push_state=False) -> tuple[int, str, str]:
 
     The wait costs 30-50 ms of the frame slot, which at 1 Hz is nothing.
     """
-    png = _png(args, render.draw(metrics, args.theme,
-                         scrim=_scrim_for(args),
-                         **_theme_kwargs(args)))
+    png = _png(args, paint(args, metrics))
     name = render.frame_name()
     if push_state:
         if args.metrics_file:
@@ -528,18 +589,40 @@ def one_frame(link, metrics, args, push_state=False) -> tuple[int, str, str]:
     return len(png), name, str(out.get("notice") or "")
 
 
+def theme_name(value: str) -> str:
+    """Validate `--theme`: one of the five drawn here, or a pickable library layout.
+
+    A refused name is answered with the reason rather than with the whole vocabulary:
+    four of the 27 copied layouts are refused on canvas alone, and argparse's stock
+    "invalid choice" message would bury that under 27 spellings.  `themes.why_not()` is
+    the one place that knows why, and `--list-themes` prints it for all of them.
+    """
+    if value in render.THEMES:
+        return value
+    rec = themes.resolve(value)
+    if rec is None:
+        raise argparse.ArgumentTypeError(themes.why_not(value))
+    return rec["name"]        # the canonical spelling, so a lowercase answer on the
+    # socket, in `status`, and in a log line all read the same way (`theme_07` typed at
+    # the prompt is `Theme_07` everywhere afterwards)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """The whole command line, in one place: `--help` reads it and the
     offline checks can parse it instead of guessing at the flags."""
     ap = argparse.ArgumentParser(prog="xigmalcd", description=__doc__.split("\n")[0])
     ap.add_argument("-d", "--device", help="serial port (default: first ttyACM)")
     ap.add_argument("-b", "--baud", type=int, default=115200)
-    ap.add_argument("-t", "--theme", default="alpha",
-                    choices=sorted(render.THEMES),
-                    help="picture to draw (default: alpha, the theme the vendor "
-                         "app currently has selected, redrawn from its stored "
-                         "geometry with a second temperature inside a gauge "
-                         "arc, clock and fan figures added)")
+    ap.add_argument("-t", "--theme", default="alpha", metavar="THEME", type=theme_name,
+                    help="picture to draw: one of the five this program draws itself "
+                         "(alpha, bars, clock, dual, gauge - default alpha, the theme "
+                         "the vendor app currently has selected, redrawn from its "
+                         "stored geometry with a second temperature inside a gauge "
+                         "arc, clock and fan figures added) - or one of ALPHA's own "
+                         "library themes, named by its background (Theme_07) and "
+                         "painted by xigmalcd/layout.py from that theme's own layout "
+                         "file. --list-themes prints both sets, and why four layouts "
+                         "are refused")
     ap.add_argument("-f", "--fps", type=float, default=1.0,
                     help="frames per second (the panel takes 3 without refusing; "
                          "1 fps is what the vendor app does)")
@@ -704,6 +787,11 @@ def build_parser() -> argparse.ArgumentParser:
                          "a checkout) is the deliberate way")
     ap.add_argument("--list", action="store_true",
                     help="list candidate serial ports and exit")
+    ap.add_argument("--list-themes", action="store_true",
+                    help="list every theme `--theme` can be given: the five drawn "
+                         "from render.py, then ALPHA's 1:1 layouts with their widget "
+                         "counts and where each file came from, then the layouts "
+                         "refused and why. No port is opened")
     return ap
 
 
@@ -712,6 +800,31 @@ def main(argv=None) -> int:
 
     if args.overlay:                          # kept for old command lines
         args.bg = "clear"
+
+    if args.list_themes:
+        # read off the filesystem, not out of a table kept by hand, so the counts in
+        # this listing are the reason docs/theme-editor.md can state what is runnable
+        # instead of estimating it
+        print("  drawn here (render.py):  " + " ".join(sorted(render.THEMES)))
+        for line in themes.census():
+            print(line)
+        ok, out = themes.scan()
+        print(f"  {len(ok)} pickable, {len(out)} refused on canvas alone")
+        used = themes.sources_used(ok)
+        print("  sources the pickable set asks for: "
+              + ", ".join(f"{k} {v}" for k, v in sorted(used.items(),
+                                                        key=lambda kv: (-kv[1], kv[0]))))
+        for src, why in sorted(themes.UNMAPPED.items()):
+            if src in used:
+                print(f"    {src}: {used[src]} widget(s) ask for it and there is no "
+                      f"reading for it here - {why}")
+        unmeasured = sorted(s for s in used if s not in themes.formats_measured())
+        if unmeasured:
+            print("    formats taken from this repo, not measured off the vendor's own "
+                  "picture: " + ", ".join(unmeasured))
+        print(f"  an edited theme would be read from {themes.user_root()} - nothing is "
+              "written there yet, and docs/theme-editor.md keeps that plan")
+        return 0
 
     if args.list:
         for port, prod in find_ports():
@@ -752,9 +865,7 @@ def main(argv=None) -> int:
         n = 0
         while True:
             m = sample(args)
-            png = _png(args, render.draw(m, args.theme,
-                             scrim=_scrim_for(args),
-                             **_theme_kwargs(args)))
+            png = _png(args, paint(args, m))
             path = os.path.join(args.dry_run, f"frame{n:04d}.png")
             with open(path, "wb") as fh:
                 fh.write(png)

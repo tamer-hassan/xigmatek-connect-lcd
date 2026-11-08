@@ -70,6 +70,11 @@ has the identity claim, the geometry and why the digits are that size;
 decrypted layouts, their clips and their baked overlays, every byte hashed — and the
 contact sheet of it is
 [`docs/previews/alpha-themes-480X480.png`](docs/previews/alpha-themes-480X480.png).
+The daemon can draw 23 of those 27 layouts as they are - `xigmalcd --theme Theme_07` -
+and `xigmalcd --list-themes` prints that set, the four refused on canvas with the reason,
+and the one metric this box has no reading for. They reach the panel as ordinary
+transparent frames: a layout file is never sent, because this firmware does not read one
+(PROTOCOL.md §11).
 
 ## The window
 
