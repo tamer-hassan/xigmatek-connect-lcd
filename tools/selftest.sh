@@ -661,6 +661,7 @@ INK_VIDEO = ("docs/videos/alpha-Theme_25-amber.mp4", "media/Theme_25.mp4", (255,
 SERIES = "docs/videos/readings-2026-11-08.json"
 APART = 3.0                     # seconds apart for the does-it-actually-move check
 
+MEASURED = {}
 for where, _clip in VIDEOS.values():
     assert os.path.exists(where), f"{where} is missing: regenerate the set"
 assert os.path.exists(INK_VIDEO[0]) and os.path.exists(SERIES), "ink video or series gone"
@@ -889,6 +890,7 @@ for theme, (where, clip) in VIDEOS.items():
     assert d_ink >= 3.0 and d_ink > d_fld * 1.2, (where, d_ink, d_fld,
                                                   "the picture does not change where the "
                                                   "layer draws")
+    MEASURED[where] = (nf, dur, rate, size, src, gf, gi, gh, d_ink, d_fld)
     print(f"  {where:<38} {nf:>4} fr {dur:5.2f} s @ {rate:g} fps  {size:>9,} B")
     print(f"  {'':<38} over {os.path.basename(clip):<16} clip {src:5.1f} field {gf:5.1f} "
           f"(gap {abs(gf - src):4.1f})  glyph {gi:6.1f} halo {gh:6.1f} = {gi - gh:5.1f}")
@@ -896,6 +898,34 @@ for theme, (where, clip) in VIDEOS.items():
           f"{d_fld:5.2f} (ratio {d_ink / max(d_fld, 0.01):5.2f}); re-drawn here, "
           f"{n_changed:,} px of the layer differ by more than 8/255 "
           f"(mean {d_lyr:5.2f})")
+
+# ---- the table docs/limits.md carries is this loop's own numbers, so it is compared with
+# ---- them rather than transcribed by hand.  Every cell has to be what this run printed: a
+# ---- figure in that document this suite did not measure is an error, not a rounding.
+_lim_tab = open("docs/limits.md", encoding="utf-8").read()
+
+
+def _row_cells(name):
+    i = _lim_tab.find(f"| `{os.path.basename(name)}` |")
+    assert i >= 0, (name, "docs/limits.md has no row for this preview")
+    return [c.strip() for c in _lim_tab[i:_lim_tab.index("\n", i)].split("|")[1:-1]]
+
+
+for _where, _v in MEASURED.items():
+    _nf, _dur, _rate, _size, _src, _gf, _gi, _gh, _dink, _dfld = _v
+    _c = _row_cells(_where)
+    assert _c[1] == str(_nf), (_where, _c[1], _nf)
+    assert _c[2] == f"{_dur:.2f} s", (_where, _c[2], _dur)
+    assert _c[3] == f"{_rate:g} fps", (_where, _c[3], _rate)
+    assert _c[4].replace(" ", "") == f"{_size}", (_where, _c[4], _size)
+    assert _c[5] == f"{_src:.1f} \u2192 {_gf:.1f} ({abs(_gf - _src):.1f})", (
+        _where, _c[5], _src, _gf)
+    assert _c[6] == f"{_gi:.1f} \u2212 {_gh:.1f} = **{_gi - _gh:.1f}**", (
+        _where, _c[6], _gi, _gh)
+    assert _c[7] == (f"{_dink:.2f} / {_dfld:.2f} "
+                     f"(\u00d7{_dink / max(_dfld, 0.01):.2f})"), (_where, _c[7])
+print(f"  docs/limits.md's table  {len(MEASURED)} rows matched cell by cell against "
+      f"this run's own measurements")
 
 print(f"  README's slots      {slots_are_filled(readme, 'README', [v for v, _ in VIDEOS.values()])}"
       f" for {len(VIDEOS)} previews")
@@ -928,6 +958,8 @@ print(f"  {'':<38} {n:,} px the layer paints at exactly {want}: in the written f
 
 print(f"  docs/gui.md's slot {slots_are_filled(gui, 'docs/gui.md', [INK_VIDEO[0]])} for "
       f"the ink figure")
+assert f"**{total:,} B**".replace(",", " ") in _lim_tab, (
+    total, "docs/limits.md's total for the six files is not this run's")
 print(f"  total             {len(VIDEOS) + 1} videos, {total:,} B, "
       f"plus {os.path.getsize(SERIES):,} B of series JSON")
 
@@ -2381,81 +2413,118 @@ print(f"  not exported yet      "
       f" it is not missing a drawing. `alpha` took the derived list above and reached a zero"
       f" diff as a file, so the export machinery is not what is in the way there. `bars` is"
       f" a different kind of answer"
-      f" on its own: its row count and row pitch are functions of the machine"
-      f" (`row_h = min(56, max(28, 320 // len(rows)))`, and `rows` grows by up to four"
-      f" fan entries named by whatever `sensors` reports), so one fixed widget list"
-      f" cannot be its picture on every box.  The owner's decision (2026-11-08) is optional"
+      f" on its own: its row count and row pitch used to be functions of the machine"
+      f" (`row_h = min(56, max(28, 320 // len(rows)))`, and `rows` grew with whatever fan"
+      f" entries `sensors` reported), so one fixed widget list could not be its picture on"
+      f" every box.  The owner's decision (2026-11-08) is optional"
       f" positional fan slots - `Fan 1` through `Fan 4`, each with a `Fan N Label` source so"
       f" the name comes from the box at run time - rather than a repeat group, because the"
       f" library's selectable layouts ask for seven `source` names and not one of them is a"
       f" fan: a new name in our own table invents less than a new structure in a file whose"
-      f" point is that it is a fixed list of rows.  Measuring it turned the obstacle"
-      f" somewhere else: the row list is not the problem, the compaction is (the gate below"
-      f" counts the pixels), so `theme_bars` has to let a row with no reading keep its place"
-      f" before any file can be pixel-identical to it.  Until then a generated `bars` stays"
-      f" code-drawn, and once the slots exist the pitch stops depending on this box's fan"
-      f" inventory.  Nothing about the wire changes either way"
+      f" point is that it is a fixed list of rows.  And measuring it moved the obstacle to"
+      f" where it actually is - the compaction - and that half is now built: the function"
+      f" reserves the same four slots and lets a row with no reading keep its place, so the"
+      f" pitch no longer depends on what this box's sensors found (the gate below counts the"
+      f" ink in all ten).  What is left before `bars` can be exported is the sources and the"
+      f" recipe, and until a generated `bars` reaches a zero pixel diff on the machine"
+      f" drawing it, it stays code-drawn.  Nothing about the wire changes either way"
       f" (docs/theme-editor.md, docs/limits.md)")
-# ---- and what the one theme still waiting to be exported would have to reproduce.
-# ---- Every claim in the plan's `bars` section is read here out of `theme_bars`'s own body,
-# ---- so "its geometry is a function of the machine" stays a statement about this source,
-# ---- and so does the compaction that decided the shape - which is measured off pixels, not
-# ---- inferred from the arithmetic, because that is the half the plan says must change.
+# ---- and what the one theme still waiting to be exported is made of.  Every claim the
+# ---- plan makes about it is read here out of `theme_bars`'s own body, and the slot rule is
+# ---- measured off pixels rather than inferred: the pitch is the same whether this box
+# ---- reports six fans or none, and a row with no reading keeps its place.
 _bars_src = inspect.getsource(render.theme_bars)
-_b_arith = "row_h = min(56, max(28, span // max(len(rows), 1)))"
-assert _b_arith in _bars_src, (_b_arith, "the pitch formula is not in `theme_bars`")
-assert "y, span = 72, 320" in _bars_src, "the block the pitch divides is not 72..390"
+_b_arith = "row_h = min(BARS_ROW_MAX, max(BARS_ROW_MIN, span // max(len(rows), 1)))"
+assert _b_arith in _bars_src, (_b_arith, "the pitch rule is not in `theme_bars`")
+assert "y, span = BARS_Y0, BARS_SPAN" in _bars_src, "the block is not the named 72 + span"
+assert (render.BARS_Y0, render.BARS_SPAN, render.BARS_ROW_MIN,
+        render.BARS_ROW_MAX) == (72, 320, 28, 56), (
+    "the plan quotes y=72, a 320 px block and a 28..56 px pitch")
+assert (render.BARS_LBL_X, render.BARS_BAR_X, render.BARS_VAL_X,
+        render.BARS_BAR_DY, render.BARS_BAR_WH) == (28, 28, 452, 17, (424, 10)), (
+    "the row geometry the plan describes is not what the drawing names")
 assert _bars_src.count("lambda v:") == 6 + 1, (
     "the fixed row set, or the fan slot, is no longer the six-plus-one the plan describes")
 _n_fixed = _bars_src.count("lambda v:") - 1
-for _rep in ('for fan in (m.get("fans") or [])[:4]', 'if fan.get("value"):',
-             'rows.append((str(fan.get("name") or "FAN")[:10]'):
-    assert _rep in _bars_src, (_rep, "what the fan slots repeat over is not this")
+for _slot in ('for slot in range(BARS_SLOTS)', '(fan or {}).get("value")',
+              'str((fan or {}).get("name") or f"FAN {slot + 1}")[:10]'):
+    assert _slot in _bars_src, (_slot, "the fan rows are not reserved positional slots")
+_head, _loop = _bars_src.split("for name, val, lo, hi, fmt in rows:", 1)
+_loop = _loop.split("if clock:")[0]
+assert _b_arith in _head, (_head[-160:], "the pitch is not chosen before the loop")
+assert "continue" not in _loop, (
+    "a row with no reading skips its advance again, and the compaction the plan measured by "
+    "pixels has come back - no static file can carry that")
+assert "\n        y += row_h" in _bars_src and "\n            d.text" in _bars_src, (
+    "the advance is no longer outside the drawn-row test")
 assert '("RAM", ram, 0, 100,' in _bars_src and '("VRAM", gm, 0, 100,' in _bars_src \
     and _bars_src.count(' GB"') == 2, (
     "the two memory rows are no longer bars over a percentage printing gigabytes, and the "
     "plan's fourth fact is about that")
-_head, _loop = _bars_src.split("for name, val, lo, hi, fmt in rows:", 1)
-assert _b_arith in _head, (_head[-160:], "the pitch is not chosen before the loop")
-assert _loop.index("if val is None:") < _loop.index("y += row_h"), (
-    "a row with no reading now keeps its place, and the compaction the plan measures has "
-    "stopped - the plan's `bars` section and this gate both move with it")
+
+# Ten slots, the same on every box.  The windows are 17 px tall and sit on the right-hand
+# value column (x=440..452), where a meter only reaches if its fraction passes 0.97 - and
+# none of these readings goes near that, which is what the empty middle slot proves.
+_ALL6 = {"cpu": {"temperature": 57.0, "load": 62.0},
+         "gpu": {"temperature": 47.0, "load": 22.0, "memoryUsage": 4096,
+                 "dedicatedTotal": 8192},
+         "motherboard": {"temperature": 51.0},
+         "memory": {"used": 10240, "total": 16384}, "timestamp": {}}
+_PART = {"cpu": {"temperature": 57.0, "load": 62.0}, "gpu": {"temperature": 47.0},
+         "memory": {"used_percent": 41.0}, "timestamp": {}}
+_pitch = min(render.BARS_ROW_MAX,
+             max(render.BARS_ROW_MIN, render.BARS_SPAN // (_n_fixed + render.BARS_SLOTS)))
+
+
+def _slots(img):
+    """Which of the ten rows has value text in it, counted in the right-hand value column.
+
+    Two geometric facts decide the window, and both are stated rather than tuned away: a
+    meter is `BARS_BAR_DY` below its row's centre and its track is opaque across the whole
+    width, so at a 32 px pitch a window centred on a row is stolen by the meter of the row
+    above - the window starts 4 px above the centre, below that intrusion.  And the
+    downscale leaves a dozen faint pixels of that track in the next slot, which is why ink
+    here means 40 pixels and not one: text in this column counts 100 or more, the tail
+    never reaches 20 on the readings below.
+    """
+    out = []
+    for i in range(_n_fixed + render.BARS_SLOTS):
+        yc = render.BARS_Y0 + i * _pitch
+        out.append(sum(1 for y in range(yc - 4, yc + 10) for x in range(440, 453)
+                       if img.getpixel((x, y))[3]) >= 40)
+    return out
+
+
+_nofan, _sixfan = _slots(render.draw(_ALL6, "bars")), _slots(
+    render.draw(dict(_ALL6, fans=[{"name": f"Fan {i} on this box", "value": 900 + i,
+                                   "type": "Fan"} for i in range(6)]), "bars"))
+assert _pitch == render.BARS_SPAN // (_n_fixed + render.BARS_SLOTS) == 32, _pitch
+assert _nofan == [True] * _n_fixed + [False] * render.BARS_SLOTS, (
+    _nofan, "a box with no fans no longer reserves the slots it is not drawing")
+assert _sixfan == [True] * (_n_fixed + render.BARS_SLOTS), (
+    _sixfan, "the fifth fan onward is not being kept out of the reserved slots")
+_part = _slots(render.draw(_PART, "bars"))
+assert _part == [True, True, False, True] + [False] * (_n_fixed + render.BARS_SLOTS - 4), (
+    _part, "rows below a missing reading closed up again - that is the compaction the "
+           "decision was made to remove")
+assert _slots(render.draw({"cpu": {}, "timestamp": {}}, "bars")) == \
+    [False] * (_n_fixed + render.BARS_SLOTS), (
+    "a box that answers nothing is drawing a row somewhere - or the title and the clock "
+    "line are being counted as rows")
 _d_plan = open("docs/theme-editor.md", encoding="utf-8").read()
 _d_lim = open("docs/limits.md", encoding="utf-8").read()
 assert _b_arith in _d_plan, "the plan stopped quoting the pitch as this body writes it"
 assert "min(56, max(28, 320 // len(rows)))" in _d_lim, \
     "docs/limits.md stopped quoting the pitch it is held to"
-
-# three answered readings out of six fixed rows: the code's rows land in the first three
-# slots of a pitch divided out of all six, and the slots it skipped stay empty.  The windows
-# are 53 px apart and +-8 px wide, so this also tells a pitch divided out of the *drawn*
-# rows (56) from the one this theme uses - at 56 the third row would land outside the third
-# window and the assert below would fail on an empty slot.
-_bars_m = {"cpu": {"temperature": 57.0, "load": 62.0, "frequency": 3.4, "power": 18.0},
-           "gpu": {"temperature": 47.0, "usage": 22.0},
-           "memory": {"used_percent": 41.0}, "timestamp": {}}
-_b_img = render.draw(_bars_m, "bars", bg=render.OVERLAY)
-_pitch = min(56, max(28, 320 // _n_fixed))
-_b_slots = []
-for _i in range(_n_fixed):
-    _ys = range(72 + _i * _pitch - 8, 72 + _i * _pitch + 9)
-    _b_slots.append(any(_b_img.getpixel((x, y))[3] for y in _ys for x in range(28, 60)))
-assert _b_slots == [True, True, True, False, False, False], (
-    _b_slots, _pitch, "the rows no longer compact into the first slots of the candidate pitch")
-_alt = min(56, max(28, 320 // 3))        # the pitch a drawn-rows division would give here
-assert _pitch == 320 // _n_fixed and _pitch != _alt, (
-    _pitch, _alt, "the pitch is no longer divided out of the candidates, not the drawn rows")
-_b_fourth = 72 + 3 * _pitch
-print(f"  what bars compacts    {_n_fixed} fixed rows, 3 of them answered at these "
-      f"readings, and the drawn rows land in the first three slots of a {_pitch} px pitch - "
-      f"y={72}, {72 + _pitch}, {72 + 2 * _pitch} - with slots four to six empty, so the "
-      f"fourth row of the code's own list is drawn in the third place where a static file "
-      f"with the same {_n_fixed} rows gives it y={_b_fourth}. Dividing the pitch out of the "
-      f"3 rows that drew instead would make it {_alt}, and that is a different picture: the "
-      f"windows above are {_pitch} apart and 17 px wide, and the third row misses its slot "
-      f"at any other pitch. No static layout - fan slots or a repeat group - can be "
-      f"pixel-identical to a drawing that compacts, which is why the decision names both a "
-      f"construct and a change to this function (docs/theme-editor.md, docs/limits.md)")
+assert f"{_pitch} px" in _d_plan and f"{_pitch} px" in _d_lim, (
+    _pitch, "neither document quotes the pitch that no longer moves between boxes")
+print(f"  what bars rows are    {_n_fixed + render.BARS_SLOTS} rows on every box - "
+      f"{_n_fixed} fixed ones plus {render.BARS_SLOTS} reserved fan slots taken by position, "
+      f"which is what makes the pitch {_pitch} px here whether the box reports no fans or "
+      f"six - and a row with no reading keeps its place: at readings that answer CPU, GPU "
+      f"and LOAD the ink sits in slots 0, 1 and 3 with slot 2 empty. `bars` is this "
+      f"project's own drawing, not a reproduction of a vendor frame, so the change is ours "
+      f"to make (docs/theme-editor.md, docs/limits.md)")
 
 print(f"  a table and its reason {' '.join(sorted(layout.BAR_PAINT))} /"
       f" {' '.join(sorted(layout.ARC_PAINT))} / {' '.join(sorted(layout.COLOUR_RAMPS))}:"

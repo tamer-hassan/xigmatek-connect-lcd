@@ -987,7 +987,10 @@ window interactive throughout. One frame render measures **12.4-14.1 ms** median
 pass is decoding around it, printed **18.6-24.0 ms** in those two runs. Measured per theme
 on a quiet box, `render.draw` with the pinned fixture: `alpha` 12.7 ms, `dual` 9.5,
 `gauge` 9.0, `bars` 8.1, `clock` 8.0 (60 draws each, median; the spread is 0.2-0.3 ms
-inside that). The `clock` theme's two newly-fitted lines cost nothing measurable: the
+inside that). `bars` at 8.1 ms is the drawing from before its fan slots landed on
+2026-11-08 - its row list went from this box's eight to ten - and that row is owed a
+re-measurement on a quiet box, which is said here rather than quietly quoted from a run
+with the display daemon drawing at 2 fps in the background. The `clock` theme's two newly-fitted lines cost nothing measurable: the
 same draw with `_fit` swapped for fixed sizes is 8.23 ms off and 8.00 ms on, and fitting
 moves the other four themes by 0.02 ms or less - a `textlength` loop over a handful of
 sizes is not where a frame's time goes. Either way a 2 fps preview is a few percent of

@@ -438,10 +438,10 @@ What has been measured on glass, by whom, with how many frames - and what has no
   | `gauge-3.mp4` | 240 | 12.00 s | 20 fps | 1 930 104 | 41.2 → 38.4 (2.8) | 201.5 − 89.8 = **111.7** | 16.09 / 5.44 (×2.96) |
   | `dual-Theme_30.mp4` | 240 | 10.00 s | 24 fps | 214 113 | 3.3 → 3.2 (0.1) | 176.7 − 38.5 = **138.2** | 17.11 / 0.45 (×37.89) |
   | `clock-Theme_07.mp4` | 240 | 10.00 s | 24 fps | 278 884 | 176.2 → 162.6 (13.6) | 241.0 − 106.4 = **134.6** | 10.63 / 1.59 (×6.69) |
-  | `bars-theme_52.mp4` | 240 | 12.00 s | 20 fps | 802 310 | 11.9 → 9.8 (2.1) | 139.0 − 40.6 = **98.3** | 11.46 / 7.41 (×1.55) |
+  | `bars-theme_52.mp4` | 240 | 12.00 s | 20 fps | 779 905 | 11.9 → 9.5 (2.4) | 140.6 − 43.4 = **97.1** | 11.48 / 7.34 (×1.56) |
   | `alpha-Theme_25-amber.mp4` | 240 | 10.00 s | 24 fps | 927 752 | *(the ink figure: see below)* | | |
 
-  **5 061 583 B** for all six, the largest 1.93 MB, and 13 916 B of series JSON beside
+  **5 039 178 B** for all six, the largest 1.93 MB, and 13 916 B of series JSON beside
   them - that file grew 220 B when it gained one field, the zone it was sampled in; see the
   clock-zone bullet below. Every file stays under 2 MB: GitHub's own browser upload limit is a thing of
   GitHub's and has not been measured here, so the ceiling the suite holds is 9 MB per file,
@@ -948,28 +948,32 @@ writes a theme today. What the model does and does not allow, all of it gated:
   and every figure recorded for those three themes was read off the drawing as it is. That
   keeps the recorded evidence intact and puts the inconsistency on the record in
   `render.heat`'s docstring rather than in a doc nobody re-reads.
-* **`bars` needed a smaller construct than this document first chose, and it needs a change
-  to our own drawing as well.** Its rows are built at draw time: six fixed readings plus up
-  to four fan entries taken from whatever `sensors.collect()` reports (labels truncated to
-  10 characters), and the row pitch is `min(56, max(28, 320 // len(rows)))` - so the vertical
-  geometry of the theme changes with the machine. The owner's decision (2026-11-08) is
-  **optional positional fan slots** (`Fan 1` through `Fan 4`, each with a `Fan N Label`
-  source so the name comes from the box at run time), not a repeat group: the 23 selectable
-  library layouts ask for 7 `source` names and not one of them is a fan, so a new name in
-  our own table invents less than a new structure in a file whose whole point is that it is a
-  fixed list of rows. What the measuring turned up is that the obstacle is not the row list
-  at all: `theme_bars` divides its pitch out of the rows it *considers* and advances only for
-  rows that had a value, so three answered rows land at y=72, 125 and 178 - the fourth row in
-  its own list drawn in the third place, where a static file with those six rows puts it at
-  231 - and no static layout, slots or repeat group, can be pixel-identical to a drawing that
-  compacts. So `bars` changes as a theme too: a row with no reading keeps its place, which is
-  what the 27 library layouts already do and what docs/themes.md's hole rule says a theme
-  should do. That also shrinks the per-machine cost: once the slot count is fixed the pitch
-  stops depending on this box's fan inventory, and what still varies per box is which slots
-  draw. Until a generated `bars` reaches a zero pixel diff on the box that asks for it, it
-  stays code-drawn - the standing rule is that an export which cannot be held to zero is not
-  shipped. Nothing about the wire changes either way (docs/theme-editor.md carries the
-  decision and the order it is built in, in the plan's own table).
+* **`bars` needed a smaller construct than this document first chose, and it needed a change
+  to our own drawing more.** Its rows used to be built at draw time from whatever
+  `sensors.collect()` reported - six fixed readings plus one row per fan, up to four - and
+  the row pitch was `min(56, max(28, 320 // len(rows)))`, so the vertical geometry of the
+  theme moved with whatever the box happened to report. That is closed as of 2026-11-08. `theme_bars` now lays out **ten rows on every machine**
+  - six fixed ones plus four reserved fan slots, taken by position - which makes the pitch
+  32 px everywhere, and a row with no reading keeps its place: it is not drawn, and the
+  advance still happens. That is what the 27 library layouts do, and it is the rule
+  docs/themes.md states as "a hole that says what it is, rather than a zero that reads as a
+  measurement"; the suite holds the ten-slot layout and the keep-place behaviour by counting
+  ink in the slots, and it is what made the earlier stance - "invent a repeat group" -
+  unnecessary: the 23 selectable library layouts ask for 7 `source` names and none of them is
+  a fan, so `Fan 1` is a new name in our own table, while a repeat group would have been a
+  new structure in a file whose whole point is being a fixed list of rows.
+
+  What the change costs, stated rather than left to be noticed: on the glass a missing
+  reading now leaves a gap where the rows used to close up, and the `bars` preview clip had
+  to be re-rendered from the recorded series in the same change - not for tidiness, because
+  the preview gate re-draws the layer from `docs/videos/readings-2026-11-08.json` and scores
+  the tracked file against it, so a stale clip is a failing gate. What is still open: the
+  four `Fan N` sources and four `Fan N Label` strings (the name comes from the box at run
+  time, cut to the same 10 characters the drawing cuts), the three fixed readings nobody
+  answers today, and the recipe - and `bars` stays code-drawn until a generated file reaches
+  a zero pixel diff on the box drawing it. Nothing about the wire changes either way
+  (docs/theme-editor.md carries the decision and the order it is built in, in the plan's own
+  table).
   A related fact came out of the same work: the one colour pair with a measured ramp is
   ALPHA's *declared* pair, (0,247,255) to (0,255,113), and the plateau that curve ends at
   is (0,251,184) - which is what `render.ALPHA_HOT` is. Our theme took the far end of

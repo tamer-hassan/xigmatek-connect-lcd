@@ -534,55 +534,53 @@ diff is not shipped**, and the suite prints which of the five are in and which a
 ### The last theme, and the shape it turned out to need
 
 `bars` is the one theme stage 2 cannot express. An hour ago this document recorded the
-decision as "invent a repeat group"; the owner has since chosen the smaller construct, and
-the record is corrected here rather than left stacked: **optional positional slots - `Fan 1`
-to `Fan 4` - and no new structure at all.** What made that the better answer is a count, not
-a preference. The 23 library layouts this canvas can select ask for **7** `source` names
-between them - `CPU Temperature` in 17 widgets, `Time` in 11, `Pump Speed` in 9, and `CPU
-Usage`, `GPU Usage`, `GPU Temperature`, `CPU Frequency` - and not one of them is a fan. So
-the vendor schema has no fan vocabulary for us either to extend or to violate: `Fan 1` is a
-new name in our own source table, which this tree already extends, where a repeat group
-would be a new kind of structure in files whose whole point is that they are a fixed list
-of rows. And "optional" is not new machinery either: `themes.values()` already
-reports every source it cannot answer, and `layout.paint` already draws the rest and prints
-why - the same hole-that-says-what-it-is rule docs/themes.md states for the library.
+decision as "invent a repeat group"; the owner chose the smaller construct instead, and
+measuring what `bars` actually is justified that for a reason nobody had written down: the
+obstacle was never the row list.
 
-**What slots do not solve is the pitch, and that turns out to be the actual obstacle.**
-`render.theme_bars` divides its pitch out of the rows it *considers* -
-`row_h = min(56, max(28, span // max(len(rows), 1)))` over a block starting at y=72 - and
-then advances `y += row_h` only for a row that had a value to show. Measured off the drawn
-frame at the pinned fixture, where 3 of the 6 fixed rows answer: the label column's ink
-bands are 63-80, 116-133 and 169-186 - `LOAD`, fourth in the code's list, drawn in the
-**third** slot, at y=178. A static file cannot put it there: with those same 6 rows its
-pitch is 53 and LOAD's slot is 72 + 3x53 = 231; with this bench's 8 rows the pitch is 40 and
-the slot is 192. The gap is not cosmetic - a row is a 424x10 bar plus its two texts - so
-**no static layout of `bars` can reach a zero pixel diff while the code compacts**, repeat
-group included.
+**The construct: optional fan slots, and no new structure.** `Fan 1` through `Fan 4`, each a
+row that draws only when that slot has a reading, and each with a `Fan N Label` source so the
+name printed is the box's own. The reason that is smaller than a repeat group is a count:
+the 23 library layouts this canvas can select ask for **7** `source` names between them -
+`CPU Temperature` in 17 widgets, `Time` in 11, `Pump Speed` in 9, and then `CPU Usage`,
+`GPU Usage`, `GPU Temperature` and `CPU Frequency` - and not one of them is a fan. So a fan slot adds a name
+to our own source table, which this tree already extends, where a repeat group would have
+been a new kind of structure in files whose whole point is that they are a fixed list of rows.
+And "optional" is not new machinery either: `themes.values()` already reports every source it
+cannot answer, and `layout.paint` already leaves that row undrawn and says why.
 
-So the decision has a second half, and it is a change to our drawing rather than to the
-schema: `theme_bars` is to speak the vocabulary the file will carry - six fixed rows plus
-four reserved fan slots, and **a row with no reading keeps its place** instead of pulling the
-block up. `bars` is this project's own drawing, not a reproduction of anything measured off
-the vendor's glass, so nothing measured is invalidated by changing it; what it costs is that
-a missing reading leaves a hole on the glass where today the rows close up - which is what
-the 27 library layouts already do, and what the rule in docs/themes.md says a theme should
-do. The label of a slot comes from a runtime source too (`Fan 1` is the number, `Fan 1 Label`
-is whatever this box calls that fan, cut to the same 10 characters the code cuts), so the
-file stays portable and the glass says this box's names.
+**The obstacle was the pitch, and it was in our own drawing.** `theme_bars` divided its pitch
+out of the rows it *considered* -
+`row_h = min(BARS_ROW_MAX, max(BARS_ROW_MIN, span // max(len(rows), 1)))` over a block
+starting at `BARS_Y0` - and advanced `y` only for the rows that had a value to show. So the
+row list's length, and with it the whole theme's vertical geometry, moved with whatever
+`sensors` happened to find: a box with no fans got one pitch, this bench's two fans another.
+Measured off the drawn frame, the fourth row of the code's own list came out in the third
+place. No static file - fan slots or repeat group - can put a row where such a drawing will
+move it.
 
-The order that follows, each step green on its own:
+So the decision had a second half, and it is built now: **`theme_bars` lays out ten rows on
+every machine** - six fixed plus four reserved slots taken by position - which makes the pitch
+32 px everywhere, and **a row with no reading keeps its place**: it is not drawn, and the
+advance happens anyway. That is the rule the 27 library layouts already follow and the
+hole-that-says-what-it-is rule docs/themes.md states. `bars` is this project's own drawing
+rather than a reproduction of a vendor frame, so nothing measured off glass is invalidated by
+changing it; what it costs is a visible gap on the glass where rows used to close up, and the
+`bars` preview clip re-rendered from the recorded series in the same change (the preview gate
+re-draws the layer and scores the tracked file, so a stale clip fails rather than misleads).
+The per-machine cost this document recorded an hour ago shrinks with it: the pitch no longer
+depends on this box's fan inventory, and what still varies per box is which slots draw.
 
-1. the drawing adopts the slots and the keep-place rule, and its pitch stops depending on
-   this box's inventory;
-2. the same change regenerates `docs/videos/bars-theme_52.mp4`, because the preview gate
-   re-renders the layer from `docs/videos/readings-2026-11-08.json` and scores the tracked
-   file against it - a stale `bars` clip is not a stale picture, it is a failing gate;
-3. the sources: four `Fan N` slots, four `Fan N Label` strings, and the three the fixed rows
-   need that nobody answers today (`BOARD`, and the two memory rows, whose *text* is gigabytes
-   while their *bar* is a percentage - one row, two readings, and a fact about `bars` the
-   vendor's `bar` widget has no way to say);
-4. `bars_recipe()`, and it ships only at a zero pixel diff on the machine drawing it - the
-   rule `alpha` met by earning `xigma.fitArc` (docs/limits.md).
+The order that remains, each step green on its own:
+
+1. the sources - four `Fan N` numbers and four `Fan N Label` strings, and the three fixed
+   rows nobody answers today (`BOARD`, and the two memory rows, whose *text* is gigabytes
+   while their *bar* is a percentage - one row, two readings, and something the vendor's
+   `bar` widget has no way to say);
+2. `bars_recipe()`, reading the geometry out of the `BARS_*` constants the drawing now names
+   rather than repeating them;
+3. shipped only at a zero pixel diff on the machine drawing it - the rule `alpha` met by
+   earning `xigma.fitArc` (docs/limits.md).
 
 ## The surface, and the geometry it must not break
 

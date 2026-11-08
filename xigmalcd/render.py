@@ -625,8 +625,44 @@ def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY, ink=None):
     return img.resize((W, H), Image.LANCZOS)
 
 
+#: `bars`'s geometry, named so that a generated layout file can read these numbers instead
+#: of repeating them - the same reason `alpha`'s recipe reads the `A26_*` constants.  The
+#: block runs from `BARS_Y0` down `BARS_SPAN` px; a row is its label at `BARS_LBL_X`
+#: (left-middle), a value right-aligned at `BARS_VAL_X`, and a meter `BARS_BAR_DY` below the
+#: row's centre, `BARS_BAR_WH` in size.  `BARS_SLOTS` fan rows are reserved on every machine,
+#: and that is why the pitch no longer moves between boxes - see the docstring.
+BARS_Y0, BARS_SPAN = 72, 320
+BARS_ROW_MIN, BARS_ROW_MAX = 28, 56
+BARS_LBL_X, BARS_VAL_X = 28, 452
+BARS_BAR_X, BARS_BAR_DY, BARS_BAR_WH = 28, 17, (424, 10)
+BARS_LBL_F, BARS_VAL_F, BARS_CLOCK_F = 18, 20, 28
+BARS_SLOTS = 4
+
+
 def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
-    """Row per reading with a meter: temps, load, memory, fans."""
+    """Row per reading with a meter: temps, load, memory, and four fan slots.
+
+    Two rules here exist so this theme can be a layout file at all, and both were decided
+    2026-11-08 with the measurement written down next to them (docs/theme-editor.md,
+    docs/limits.md).
+
+    * The fan rows are four **reserved slots**, taken by position - `fans[0]` through
+      `fans[3]` - rather than one row per fan this box happens to report.  So the row list
+      has the same length on a machine with six fans and on one with none, and the pitch
+      below stops depending on what `sensors` found.
+    * A row with no reading **keeps its place**: it is not drawn, and the advance still
+      happens.  That is what the 27 library layouts do, and it is the rule docs/themes.md
+      states as "a hole that says what it is, rather than a zero that reads as a
+      measurement".
+
+    What that costs on the glass is stated rather than left to be noticed: when a reading is
+    missing, the rows under it no longer close up.  Before this, the pitch was divided out of
+    the rows the theme *considered* while `y` advanced only for the rows that drew - measured
+    at readings where 3 of the 6 fixed rows answered, the fourth row of the list was drawn in
+    the third place, y=178 - and no static file could say where such a row goes, because the
+    answer moved with the box.  A file with literal `x,y` per row needs a theme that puts a
+    row where the file says it is.
+    """
     img = Image.new("RGBA", (W * SS, H * SS), bg)
     fg, mid, acc = _skin(ink, WHITE, DIM, CYAN)
     cpu = m.get("cpu") or {}
@@ -645,25 +681,26 @@ def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
              lambda v: f"{mem.get('used', 0) // 1024} GB"),
             ("VRAM", gm, 0, 100,
              lambda v: f"{gpu.get('memoryUsage', 0) // 1024} GB")]
-    for fan in (m.get("fans") or [])[:4]:
-        if fan.get("value"):
-            rows.append((str(fan.get("name") or "FAN")[:10], fan["value"],
-                         0, 3000, lambda v: f"{round(v)}"))
+    fans = m.get("fans") or []
+    for slot in range(BARS_SLOTS):
+        fan = fans[slot] if slot < len(fans) else None
+        rows.append((str((fan or {}).get("name") or f"FAN {slot + 1}")[:10],
+                     (fan or {}).get("value"), 0, 3000, lambda v: f"{round(v)}"))
     _title(img, "SYSTEM MONITOR", y=30, colour=fg)
     d = ImageDraw.Draw(img)
-    y, span = 72, 320
-    row_h = min(56, max(28, span // max(len(rows), 1)))
+    y, span = BARS_Y0, BARS_SPAN
+    row_h = min(BARS_ROW_MAX, max(BARS_ROW_MIN, span // max(len(rows), 1)))
     for name, val, lo, hi, fmt in rows:
-        if val is None:
-            continue
-        d.text((28 * SS, y * SS), name, font=font(18), fill=mid, anchor="lm")
-        d.text((452 * SS, y * SS), fmt(val), font=font(20), fill=fg,
-               anchor="rm")
-        bar(img, 28, y + 17, 424, 10, (val - lo) / (hi - lo),
-            heat((val - lo) / (hi - lo)))
-        y += row_h
+        if val is not None:                     # a missing reading leaves its slot empty
+            d.text((BARS_LBL_X * SS, y * SS), name, font=font(BARS_LBL_F), fill=mid,
+                   anchor="lm")
+            d.text((BARS_VAL_X * SS, y * SS), fmt(val), font=font(BARS_VAL_F), fill=fg,
+                   anchor="rm")
+            bar(img, BARS_BAR_X, y + BARS_BAR_DY, BARS_BAR_WH[0], BARS_BAR_WH[1],
+                (val - lo) / (hi - lo), heat((val - lo) / (hi - lo)))
+        y += row_h                              # ...and the rest of the block stays put
     if clock:
-        _text(img, (240, 452), clock_str(), font(28), acc)
+        _text(img, (240, 452), clock_str(), font(BARS_CLOCK_F), acc)
     return img.resize((W, H), Image.LANCZOS)
 
 
