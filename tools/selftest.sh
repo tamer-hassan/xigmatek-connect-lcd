@@ -1946,9 +1946,22 @@ temp_bad = sum(1 for t, want in zip([i * 3.0 / 300.0 for i in range(100)], temp_
 heat_stops = [(0.0, render.CYAN), (0.5, render.GREEN), (0.8, render.AMBER),
               (1.0, render.RED)]
 ts = [i * 3.0 / 300.0 for i in range(100)]
-heat_bad = sum(1 for t in ts if stopcol(heat_stops, t) != render.heat(t))
+heat_off = [(t, render.heat(t), stopcol(heat_stops, t)) for t in ts
+            if render.heat(t) != stopcol(heat_stops, t)]
 assert temp_bad == 0, temp_bad
-assert heat_bad > 0, "heat() now agrees with a stop-interpolated copy - recheck the finding"
+assert heat_off, "heat() now agrees with a stop-interpolated copy - recheck the finding"
+# where it differs and by how much, derived rather than remembered
+span_of = lambda t: ("0.5-0.8, where heat divides by 0.3 and the stops give "
+                     "0.30000000000000004") if 0.5 < t < 0.8 else (
+                     "past 0.8, where heat divides by 0.2 and the stops give "
+                     "0.19999999999999996")
+by_seg = {}
+for t, _a, _b in heat_off:
+    by_seg[span_of(t)] = by_seg.get(span_of(t), 0) + 1
+units = max(max(abs(a[i] - b[i]) for i in range(4)) for _t, a, b in heat_off)
+chans = sorted({i for _t, a, b in heat_off for i in range(4) if a[i] != b[i]})
+assert units == 1 and chans == [0, 2], (units, chans)      # red and blue only
+assert sum(by_seg.values()) == len(heat_off), by_seg
 themes.delete_user_theme("fixture-ring")
 print(f"  an authored ramp      a layout nobody shipped, written by the file model and "
       f"read back from {os.path.relpath(path, themes.user_root())}, paints "
@@ -1959,13 +1972,16 @@ print(f"  an authored ramp      a layout nobody shipped, written by the file mod
 print(f"                        why the data spelling and not a named function: counted "
       f"over the segment colours the painters use, `render.temp_colour` agrees with the "
       f"stop-interpolated ramp on all {len(ts)} sampled positions ({temp_bad} differ), "
-      f"while `render.heat()` differs from its own stop copy on {heat_bad} of {len(ts)} - "
-      f"always one unit of red, because `heat` divides by the literals 0.3 and 0.2 while "
-      f"its breakpoints are 0.5 and 0.8, and `0.8 - 0.5` is 0.30000000000000004. Under "
-      f"`int()` truncation a product a hair under an integer steps down. That is our "
-      f"arithmetic, not the schema: `dual` is blocked on the question of whether to fix "
-      f"`heat` (which moves the recorded figures for dual, alpha and bars) or to name the "
-      f"ramp (docs/theme-editor.md)")
+      f"while `render.heat()` differs from its own stop copy on {len(heat_off)} of "
+      f"{len(ts)} - never by more than {units} unit, in the "
+      + " and ".join("rgb"[c] for c in chans) + " channels only, and the positions name "
+      f"the cause: " + "; ".join(f"{n} in the segment {why}"
+                                for why, n in sorted(by_seg.items()))
+      + ". Under `int()` truncation a product a hair under an integer steps down, so this "
+      "is our arithmetic and not the schema: `dual` waits on whether to fix `heat` - which "
+      "moves recorded figures for dual, alpha and bars, all three of which draw that ramp - "
+      "or to name the ramp the way a `special` drawing is named (docs/limits.md, "
+      "docs/theme-editor.md)")
 PY
 rm -rf "$AUTH_TMP"
 
