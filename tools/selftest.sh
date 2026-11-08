@@ -3596,6 +3596,166 @@ print(f"  reset: one destructive link in {len(opened)} opens, everything else "
 # sensors or its own /dev nodes - the next section starts a fresh python3 anyway
 panel.sensors = real_sensors
 panel.glob = real_glob
+
+# ---- stage 4's model (docs/theme-editor.md): what an editor may touch, what an edit does
+# ---- to the picture, and what it owes back.  No Qt here on purpose: the claim is about
+# ---- the file model and the pixels, and the window is a shell over both.  This heredoc's
+# ---- XDG_CONFIG_HOME is a temp directory, so every save and revert below happens in a
+# ---- place that cannot touch the reader's own ~/.config.  The imports are local to this
+# ---- block because nothing else in this heredoc needed the theme library.
+from xigmaui import edit as gui_edit
+
+from xigmalcd import layout, themes
+from xigmaui import edit as gui_edit
+
+pick, _rej = themes.scan()
+opened = [gui_edit.Editor.open_theme(r["name"]) for r in pick[:3]]
+generated = [gui_edit.Editor.open_theme(n) for n in sorted(themes.EXPORTS)]
+assert themes.user_copies() == [], themes.user_copies()
+assert all(e.origin == "generated from render.py" and not e.path for e in generated)
+assert all(e.origin in ("checkout", "package", "your copy") for e in opened)
+read, sub = themes.keys_read()
+inert = set(themes.field_census()["keys"]) - set(read)
+kinds = sorted({w["type"] for e in opened + generated for w in e.widgets()})
+assert set(kinds) <= set(layout.KINDS), kinds
+offered = {f for kind in kinds for f in gui_edit.field_names(kind)}
+assert offered <= set(read), sorted(offered - set(read))
+assert not offered & inert, sorted(offered & inert)
+ext_offered = {f for kind in kinds for f in gui_edit.extension_fields(kind)}
+assert ext_offered <= set(sub), sorted(ext_offered - set(sub))
+fx = generated[0].fixture_line()
+for want in ("CPU Temperature 57.0", "GPU Temperature 47.0", "2026-02-17"):
+    assert want in fx, fx
+print(f"  editor model          opened {len(opened)} of the {len(pick)} layouts this "
+      f"canvas can select, plus the {len(generated)} generated ones, and wrote nothing: "
+      f"your theme directory still holds {len(themes.user_copies())} files. The row may "
+      f"offer {len(offered)} fields across {len(kinds)} kinds ({' '.join(kinds)}), and "
+      f"every one is a key `layout.py` is proven to read - none of the {len(inert)} keys "
+      f"the vendor carries without reading is offered, so those survive a save "
+      f"untouched. The picture comes from a pinned fixture, not live sensors "
+      f"({fx[:78]}...)")
+
+# ---- a run of keystrokes, one undo, and a picture that moves by exactly the edit ----
+KEYS, NUDGE = 20, 20
+ed = gui_edit.Editor.open_theme("Theme_28")
+assert not ed.dirty, "opening a layout made it dirty: it must write nothing"
+base, notes0 = ed.paint(*ed.fixture())
+target = next(i2 for i2, w in enumerate(ed.widgets())
+              if not (w.get("property") or [{}])[0].get("source")
+              and (w.get("property") or [{}])[0].get("content"))
+ed.select(target)
+kind = ed.selected()["type"]
+x0 = int(ed.value("x"))
+for step in range(KEYS):
+    ok, msg = ed.set("x", x0 + 1 + step, commit=(step == KEYS - 1))
+    assert ok, (step, msg)
+steps, dirty_edit = ed.steps, ed.dirty
+assert steps == 1 and dirty_edit, (steps, dirty_edit)
+after, notes1 = ed.paint(*ed.fixture())
+shift = [(int(b[2][0]) - int(a[2][0]), int(b[2][1]) - int(a[2][1]))
+         for a, b in zip(notes0["boxes"], notes1["boxes"])]
+assert sum(1 for sh in shift if sh == (NUDGE, 0)) == 1, (kind, shift)
+assert sum(1 for sh in shift if sh == (0, 0)) == len(shift) - 1, shift
+moved = sum(1 for a, b in zip(base.tobytes(), after.tobytes()) if a != b) // 4
+assert moved > 200, moved
+path, warnings = ed.save()
+assert path and not warnings, (path, warnings)
+assert not ed.dirty, "save did not clear dirty"
+again = gui_edit.Editor.open_theme("Theme_28")
+assert again.origin == "your copy" and not again.dirty, again.origin
+assert int(again.widgets()[target]["property"][0]["x"]) == x0 + NUDGE
+lit, _ = again.paint(*again.fixture())
+assert lit.tobytes() == after.tobytes(), "the saved file does not draw what the editor drew"
+assert ed.undo() and not ed.undo(), (ed.steps, steps)
+back, notes2 = ed.paint(*ed.fixture())
+assert back.tobytes() == base.tobytes() and notes2["boxes"] == notes0["boxes"]
+assert ed.dirty, "undoing an edit that is saved on disk must say so"
+assert again.revert() and themes.origin(themes.resolve("Theme_28")) == "checkout"
+assert not again.dirty, "revert wrote the baseline back: nothing is outstanding"
+gone = gui_edit.Editor.open_theme("Theme_28")
+assert gone.paint(*gone.fixture())[0].tobytes() == base.tobytes()
+print(f"  an edit, measured     one literal `{kind}` in Theme_28, x nudged to {x0 + NUDGE}"
+      f" in {KEYS} spinbox keystrokes: that is {steps} undo step. Exactly one ink"
+      f" box moves - by ({NUDGE}, 0) - and the other {len(shift) - 1} stay put, so"
+      f" {moved:,} of {render.W * render.H:,} pixels change and every one of them is"
+      f" the edit. Saving puts it at {os.path.basename(path)}, and from then on"
+      f" `--theme Theme_28` reads that file (origin: your copy) and paints the same"
+      f" {moved:,}-px picture straight off disk. `dirty` tells the same story with no"
+      f" flag to keep in step: false on open, true on the edit, false on save, true"
+      f" again after one undo - which returns the first frame byte for byte - and"
+      f" false once revert removes the copy and the vendor picture is back, identical"
+      f" to this session's first frame.")
+
+# a colour typed the way a person types it, stored the way the library writes it
+gone.select(target)
+ok, note = gone.set("textColor", "#ff4040")
+assert ok and note == "stored as rgba(255, 64, 64, 1)", (ok, note)
+tinted, _ = gone.paint(*gone.fixture())
+touched = sum(1 for x, y in zip(base.tobytes(), tinted.tobytes()) if x != y) // 4
+assert touched > 100, touched
+assert layout.rgba(gone.value("textColor")) == (255, 64, 64, 255)
+assert gone.undo() and gone.paint(*gone.fixture())[0].tobytes() == base.tobytes()
+print(f"  a colour, converted   `#ff4040` typed into the row for that `{kind}` lands"
+      f" in the file as `rgba(255, 64, 64, 1)` - the spelling all 152 shipped widgets"
+      f" use, which `layout.rgba` can read and `#ff4040` cannot - and it changes"
+      f" {touched:,} pixels. The note is what the window prints, so the reader is told"
+      f" what was written instead of finding it in a diff.")
+
+def clip(text, n=58):
+    """A refusal's own words, cut at a word boundary: the whole sentence is in the model."""
+    return text if len(text) <= n else text[:n].rsplit(" ", 1)[0] + "..."
+
+
+refused = []
+for field, value in (("x", 480), ("x", "not a number"), ("textColor", "cerise"),
+                     ("bold", "yes"), ("fontSize", None)):
+    ok, msg = ed.set(field, value)
+    assert not ok and msg, (field, value, ok, msg)
+    refused.append(f"{field}={value!r} -> {clip(msg)}")
+ok, carry = ed.set("arcPaint", "vendor")   # not a field a text widget can carry
+assert not ok and "does not carry" in carry, carry
+ed.select(next(i2 for i2, w in enumerate(ed.widgets()) if w["type"] == "bar"))
+ok, neg = ed.set("x", -5)
+assert not ok and "canvas" in neg, neg
+sp = generated[0]                          # the clock layout's third widget
+sp.select(next(i2 for i2, w in enumerate(sp.widgets()) if w["type"] == "special"))
+ok, nam = sp.set("name", "no-such-drawing")
+assert not ok and "takes one of" in nam, nam
+assert not sp.dirty and not sp.steps, (sp.dirty, sp.steps)
+print(f"  what it refuses       " + "; ".join(refused))
+print(f"                        a field the kind cannot carry: {clip(carry)}; an"
+      f" off-canvas coordinate: {clip(neg)}; a drawing that does not exist:"
+      f" {clip(nam)}. And a refused write moves nothing: {sp.steps} undo steps and"
+      f" dirty={sp.dirty} after six attempts against that special widget.")
+
+# the one field whose *absence* is a value: an extension key un-set goes back to the
+# vendor's convention, and the file must not keep an empty `xigma` object behind
+ga = generated[2]                          # the gauge layout, whose ring is an arc
+ga.select(next(i2 for i2, w in enumerate(ga.widgets()) if w["type"] == "arc"))
+with_key, _ = ga.paint(*ga.fixture())
+assert ga.value("arcPaint") == "render", ga.value("arcPaint")
+ok, note = ga.set("arcPaint", None)
+assert ok, note
+assert "xigma" not in ga.prop(), ga.prop()
+without, _ = ga.paint(*ga.fixture())
+gap = sum(1 for x, y in zip(with_key.tobytes(), without.tobytes()) if x != y) // 4
+assert gap > 0, gap
+ok, note = ga.set("arcPaint", "render")
+assert ok, note
+again_ring, _ = ga.paint(*ga.fixture())
+assert again_ring.tobytes() == with_key.tobytes()
+assert ga.value("arcPaint") == "render" and ga.steps == 2, (ga.value("arcPaint"),
+                                                              ga.steps)
+# `dirty` is a state, not a counter: back at the baseline there is nothing to save, even
+# though two undo steps are still in the history.  The window says both, separately.
+assert not ga.dirty, ga.obj == ga._saved
+print(f"  an unset is a value   un-setting the ring's `arcPaint` removes the key and"
+      f" the empty `xigma` object with it, and the whole gauge frame changes by"
+      f" {gap:,} px at this reading - the two ring conventions, one key apart (the gap"
+      f" itself is counted widget by widget in the `why arcPaint` line above). Setting it to"
+      f" `render` again paints byte-identically to the start - a round trip that leaves"
+      f" {2} undo steps in the history and `dirty` false, because that flag is a state"
+      f" (does memory disagree with the file?) and not a counter of what was typed.")
 PY
 
 echo
