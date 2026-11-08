@@ -1446,17 +1446,19 @@ faces = {fam: bool(layout.font_for({"fontFamily": fam, "fontSize": 12}))
 print("  faces on this machine " + ", ".join(f"{fam} {'yes' if have else 'MISSING'}"
                                              for fam, have in sorted(faces.items())))
 sizes, drawn, skipped, dropped_fonts = [], 0, [], set()
+painted_total = 0
 for rec in ok:
     img, notes = themes.paint(rec, PIN, when=WHEN, scrim=0)
     assert img.size == (480, 480), (rec["name"], img.size)
     alpha = img.getchannel("A")
     vals = alpha.get_flattened_data() if hasattr(alpha, "get_flattened_data") \
         else alpha.getdata()
-    px = sum(vals)
+    px = sum(1 for v in vals if v)          # lit pixels, not alpha-weighted coverage
     assert notes["boxes"], (rec["name"], "drew nothing")
     assert px > 500, (rec["name"], px)
     sizes.append((len(render.to_png(img)), rec["name"], px, len(notes["boxes"])))
     drawn += len(notes["boxes"])
+    painted_total += px
     # `missing` carries two different kinds of thing: a metric this machine cannot read,
     # and a face that is not installed.  Only the first is a rule about the library.
     srcs = [m for m in notes["missing"] if not str(m).startswith("font:")]
@@ -1518,6 +1520,70 @@ assert "drawn here (render.py)" in run.stdout and "Pump Speed" in run.stdout
 assert "ttyACM" not in run.stdout, "a port was opened to list themes"
 print(f"  --list-themes           {len(lines)} lines, {len(pick)} of them the canvas "
       f"refusals with their reason; no port is opened by the listing")
+
+# The library's own numbers, as a guard on this night's additions to layout.py: the two
+# extension keys and the `special` branch must not have moved a single vendor pixel.
+# Asserted only where all four families the library names are installed, because the
+# totals count glyphs: a machine without a CJK face draws fewer of them, and that is said
+# rather than failed.
+if all(faces.values()):
+    assert (drawn, painted_total) == (114, 314169), (drawn, painted_total)
+    print(f"  vendor pixels unchanged {drawn} boxes, {painted_total} painted px across "
+          f"the {len(ok)} layouts - the anchor/autoFit keys and the `special` branch "
+          f"changed nothing about a vendor theme")
+else:
+    print(f"  vendor pixels          NOT asserted here: {len(dropped_fonts)} family(ies) "
+          f"missing, so the box and pixel totals are this machine's, not the library's")
+
+# ---- the generated export: byte-stable, and identical to the code it claims to describe
+dump_a = json.dumps(themes.export("clock"), indent=1, sort_keys=True)
+dump_b = json.dumps(themes.export("clock"), indent=1, sort_keys=True)
+assert dump_a == dump_b, "two exports of one theme differ - something non-deterministic"
+obj = json.loads(dump_a)
+assert obj["ratio"] == "1:1" and (obj["width"], obj["height"]) == (480, 480), obj
+for w in obj["osd"]["widget"]:
+    assert str(w["id"]).startswith("xigma-"), w["id"]        # never uuid4
+    assert isinstance(w["property"], list) and len(w["property"]) == 1, w["id"]
+    assert "time" not in w["property"][0], \
+        "an export carries no editor stamp: nothing generates one"
+    if w["type"] == "special":
+        assert w["property"][0]["name"] in themes.special_names(), w
+print(f"  export shape          {len(obj['osd']['widget'])} widgets, ids derived from "
+      f"the theme name, one-element `property` like every vendor file, no `time` stamp; "
+      f"{len(dump_a)} chars, byte-identical over two runs")
+
+# Parity: the generated layout painted by layout.py against the same theme painted by
+# render.py, one pinned instant and one pinned metrics dict, four different readings.
+# The diff is over all four channels - an alpha-only comparison would not see a colour
+# that had drifted, and colour is exactly what `xigma.textColor` carries.
+CASES = ({"cpu": {"temperature": 57}, "gpu": {"temperature": 47},
+          "fans": [{"value": 1957}]},
+         {"cpu": {"temperature": 100}, "gpu": {"temperature": 100},
+          "fans": [{"value": 12345}]},
+         {"cpu": {"temperature": 24}},
+         {})
+rows = []
+for name in sorted(themes.EXPORTS):
+    for m in CASES:
+        r = themes.parity(name, m, WHEN)
+        assert r["diff_px"] == 0 and r["worst_channel_delta"] == 0, (name, r)
+        assert r["code_px"] == r["layout_px"] > 4000, (name, r)
+        assert not r["missing"], (name, r["missing"])
+        rows.append((name, r["code_px"]))
+per = ", ".join(f"{n} {p} px identical" for n, p in rows)
+print(f"  export parity         {len(themes.EXPORTS)} of the five themes export today "
+      f"({' '.join(sorted(themes.EXPORTS))}); across {len(CASES)} readings each, the "
+      f"generated layout and render.py put down the same pixels: {per}")
+print(f"  not exported yet      {' '.join(sorted(set(render.THEMES) - set(themes.EXPORTS)))}"
+      f" - the ring, the gradient bars and the fan figures need their geometry written "
+      f"down before they can be generated, and an export that does not reach a zero diff "
+      f"is not shipped (docs/theme-editor.md)")
+sp = subprocess.run([sys.executable, "-m", "xigmalcd", "--list-specials"],
+                    capture_output=True, text=True, check=True)
+assert all(f"  {n}" in sp.stdout for n in themes.special_names()), sp.stdout
+assert "ttyACM" not in sp.stdout
+print(f"  --list-specials       {' '.join(themes.special_names())}; drawn by code, "
+      f"placed by the layout, no port opened")
 PY
 
 echo

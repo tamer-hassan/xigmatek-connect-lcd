@@ -27,7 +27,7 @@ import json
 
 from PIL import Image, ImageDraw, ImageFont
 
-from .render import SS
+from .render import SS, _FONT_GLOBS
 
 # Fonts the layouts name, and what this machine has.  No Microsoft fonts are
 # installed here, so every one of these is a substitution; Liberation Sans is
@@ -45,6 +45,16 @@ FONTS = {
     "simsun": {
         "regular": "/usr/share/fonts/**/NotoSansCJK-Regular.ttc",
         "bold": "/usr/share/fonts/**/NotoSansCJK-Bold.ttc",
+    },
+
+    # The face this program's own five themes are drawn with, spelled out of
+    # render._FONT_GLOBS rather than guessed at: an exported built-in layout names
+    # this family instead of borrowing a vendor one that happens to resolve to the
+    # same file on this box.  The parity gate in tools/selftest.sh is what proves
+    # the two doors put down the same glyphs at the same sizes.
+    "dejavu": {
+        "regular": _FONT_GLOBS[1],
+        "bold": _FONT_GLOBS[0],
     },
     "宋体": {
         "regular": "/usr/share/fonts/**/NotoSansCJK-Regular.ttc",
@@ -131,22 +141,84 @@ VENDOR_FORMAT = {
 FORMATS_MEASURED = ("CPU Temperature", "GPU Temperature", "CPU Usage", "GPU Usage")
 
 
-def text_for(source: str, value) -> str:
-    fmt = VENDOR_FORMAT.get(source)
-    if fmt is None:
+def text_for(source: str, value, fmt: str | None = None) -> str:
+    """The string one `data` widget shows.
+
+    `fmt` is the extension key (`xigma.format`), and it exists for one reason: an
+    exported built-in theme has to keep the shape its own drawing has today, and two of
+    those shapes are not the vendor's.  `clock` writes the date as
+    `%A %d %B %Y` (`render.date_str`), while the vendor's `Date` shape in this file is
+    `%m/%d/%Y` - neither is measured off the vendor's picture, so making the export
+    rewrite the theme to *our* vendor-shaped format would change the picture on the
+    glass for no measured reason.  Said plainly: a format on a widget is the theme's
+    business, and this key keeps both claims true at once.
+
+    A `%`-bearing string is applied with `strftime` to anything that has it (a datetime)
+    and with `format()` to a number, which is the only two kinds a `source` can be.
+    """
+    if fmt:
+        if hasattr(value, "strftime"):
+            return value.strftime(fmt)
+        return format(value, fmt)
+    fn = VENDOR_FORMAT.get(source)
+    if fn is None:
         raise KeyError(f"no format for source {source!r}")
-    return fmt(value)
+    return fn(value)
 
 
 # --------------------------------------------------------------- painting --
-def draw_text(draw: ImageDraw.ImageDraw, prop: dict, value: str, face) -> tuple:
-    """One `text` or `data` widget at its em-box top-left.  Returns the ink box
-    in device px, which is what tools/theme_check.py compares to the vendor's."""
+def draw_text(draw: ImageDraw.ImageDraw, prop: dict, value: str, face,
+              relayout=None) -> tuple:
+    """One `text` or `data` widget.  Returns the ink box in device px, which is what
+    tools/theme_check.py compares to the vendor's.
+
+    Every ALPHA file anchors at the em box's top-left (`la`), and that is the default
+    here unchanged.  Two keys under `xigma` exist because the five themes this program
+    wrote for itself are not drawn that way, and an export that pretended they were
+    would move ink on the glass:
+
+    * `anchor` - Pillow's anchor name.  `clock`, `bars` and `dual` centre their lines
+      (measured in `render._text`, whose default is `mm`), so their export says so
+      instead of shifting every centred line left by half its own width.
+    * `autoFitMax` - the widest a line may be, in panel px, and `relayout` rebuilds the
+      face at a smaller size.  `render._fit` walks the size down in steps of 2 to a floor
+      of 10 until the string fits, and the loop below is the same loop: our clock line is
+      140 px until a three-digit value forces it down, and a fixed `fontSize` cannot say
+      that.  The steps are copied from `_fit` deliberately - a different step would be a
+      different size on the glass at the same reading.
+    """
+    ext = prop.get("xigma") or {}
+    anchor = str(ext.get("anchor") or "la")
+    maxw = ext.get("autoFitMax")
     x, y = int(prop["x"]) * SS, int(prop["y"]) * SS
     fill = rgba(prop["textColor"]) if prop.get("textColor") else (255, 255, 255, 255)
-    draw.text((x, y), value, font=face, fill=fill, anchor="la")
-    box = draw.textbbox((x, y), value, font=face, anchor="la")
+    if maxw and relayout:
+        size = int(prop.get("fontSize") or 10)
+        while size > 10 and draw.textlength(value, font=face) > int(maxw) * SS:
+            size -= 2
+            face = relayout(size)
+    draw.text((x, y), value, font=face, fill=fill, anchor=anchor)
+    box = draw.textbbox((x, y), value, font=face, anchor=anchor)
     return tuple(v // SS for v in box)
+
+
+def draw_special_line(draw: ImageDraw.ImageDraw, prop: dict, text: str):
+    """A line of text built by code, placed and styled by the layout.
+
+    The `special` kind's text case: same anchor rule, same auto-fit rule, same face
+    resolution as `draw_text`.  It exists for the composite strings - the clock
+    theme's `CPU 57°C  GPU 47°C  1919 RPM` line is three readings and a fan
+    average in one string, so no single vendor `source` stands for it - so that they
+    can be moved, resized and recoloured from the layout without a baked PNG and
+    without a second drawing path that could drift.  Returns the ink box, or None
+    when the family cannot be resolved: the caller reports that rather than
+    substituting a different face.
+    """
+    face, fam, path = font_for(prop)
+    if face is None:
+        return None
+    relayout = lambda size: ImageFont.truetype(path, max(int(size), 1) * SS)
+    return draw_text(draw, prop, text, face, relayout)
 
 
 def draw_bar(draw: ImageDraw.ImageDraw, prop: dict, value) -> tuple:
@@ -329,14 +401,28 @@ def draw_line(draw: ImageDraw.ImageDraw, prop: dict, value=None) -> tuple:
 
 
 KINDS = {"text": "draw_text", "data": "draw_text", "bar": "draw_bar",
-         "arc": "draw_arc", "line": "draw_line"}
+         "arc": "draw_arc", "line": "draw_line", "special": "draw_special"}
 
 
-def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None):
+def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
+               specials: dict | None = None):
     """Paint one theme object.  `values` maps `source` -> number (or a datetime
     for Time/Date/Week).  Returns (image, notes) where notes record every font
     substitution, every source with no value, and every gap touched - so a
-    caller can print what was decided rather than trusting it."""
+    caller can print what was decided rather than trusting it.
+
+    `specials` is the registry for the one added kind, `special`: {name: callable}.  A
+    special is a picture that stays code-drawn and takes its position, size and reading
+    from the layout - the fan figures, the tick strip, the clock's readings line.  It
+    exists so those elements can *move* without being baked into PNGs, and it is
+    injected rather than imported because those drawings live in `render.py`, which
+    this module must not import (render imports this one).  A name with no drawing is
+    reported in `notes["missing"]` as `special:<name>`: an unknown name is said, not
+    guessed at.
+
+    The `xigma` extension keys a text or data widget may carry - `anchor`,
+    `autoFitMax`, `format` - are documented at `draw_text` and `text_for`, each with
+    the measured difference between our five and the vendor's files that forced it."""
     W, H = canvas or (obj["width"], obj["height"])
     img = Image.new("RGBA", (W * SS, H * SS), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
@@ -350,10 +436,11 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None):
                 if src not in values:
                     notes["missing"].append(src)
                     continue
-                if src not in FORMATS_MEASURED:
+                ext = prop.get("xigma") or {}
+                if src not in FORMATS_MEASURED and not ext.get("format"):
                     notes["gaps"].append(src)
                 try:
-                    s = text_for(src, values[src])
+                    s = text_for(src, values[src], ext.get("format"))
                 except KeyError:
                     notes["missing"].append(src)
                     continue
@@ -365,8 +452,11 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None):
                 continue
             notes["fonts"][f"{fam}/{prop.get('fontSize')}"
                            f"{'b' if prop.get('bold') else ''}"] = path
+            relayout = ((lambda size: ImageFont.truetype(path,
+                        max(int(size), 1) * SS))
+                if path else None)
             notes["boxes"].append((kind, prop.get("content") or prop.get("source"),
-                                   draw_text(draw, prop, s, face)))
+                                   draw_text(draw, prop, s, face, relayout)))
         elif kind == "bar":
             if prop["source"] not in values:
                 notes["missing"].append(prop["source"])
@@ -382,6 +472,13 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None):
             if ramp.startswith("straight"):
                 notes["gaps"].append("arc colour, " + prop["source"])
             notes["boxes"].append(("arc", prop["source"], box))
+        elif kind == "special":
+            name = str(prop.get("name") or "")
+            fn = (specials or {}).get(name)
+            if fn is None:
+                notes["missing"].append(f"special:{name}")
+                continue
+            notes["boxes"].append(("special", name, fn(draw, prop, values)))
         elif kind == "line":
             notes["gaps"].append("line colour")
             notes["boxes"].append(("line", prop.get("source") or "line",

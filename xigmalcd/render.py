@@ -507,6 +507,31 @@ def theme_dual(m, title="CPU  /  GPU", clock=True, cold=30.0, hot=90.0,
     return img.resize((W, H), Image.LANCZOS)
 
 
+def clock_readings_line(m: dict) -> str:
+    """The third line of `clock`: both temperatures and the mean of the fan rows.
+
+    The empty string is what keeps the line off the panel when this machine answers
+    none of the three, rather than drawing a row of dashes.
+
+    Named instead of inlined for the export plan (docs/theme-editor.md): this line is
+    a composite - a fan *average* of a list - so no single vendor `source` stands for
+    it, and an exported `clock` layout places it as a `special` that draws the text
+    built here.  One builder, two doors: the code theme and the layout cannot drift
+    apart in what they say, because they read the same string.
+    """
+    cpu = (m.get("cpu") or {}).get("temperature")
+    gpu = (m.get("gpu") or {}).get("temperature")
+    parts = []
+    if cpu is not None:
+        parts.append(f"CPU {round(cpu)}\u00b0C")
+    if gpu is not None:
+        parts.append(f"GPU {round(gpu)}\u00b0C")
+    fans = [f.get("value") for f in m.get("fans") or [] if f.get("value")]
+    if fans:
+        parts.append(f"{round(sum(fans) / len(fans))} RPM")
+    return "    ".join(parts) if parts else ""
+
+
 def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY, ink=None):
     """Mostly a clock: huge time, one line of readings underneath."""
     img = Image.new("RGBA", (W * SS, H * SS), bg)
@@ -522,17 +547,8 @@ def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY, ink=None):
         # with a longer month name, which is the `Week_en`/`Time_hh:mm` format gap
         # docs/limits.md still writes down as unfilled.
         _text(img, (240, 286), date_s, _fit(img, date_s, 440, 22), mid)
-    cpu = (m.get("cpu") or {}).get("temperature")
-    gpu = (m.get("gpu") or {}).get("temperature")
-    parts = []
-    if cpu is not None:
-        parts.append(f"CPU {round(cpu)}\u00b0C")
-    if gpu is not None:
-        parts.append(f"GPU {round(gpu)}\u00b0C")
-    fans = [f.get("value") for f in m.get("fans") or [] if f.get("value")]
-    if fans:
-        parts.append(f"{round(sum(fans) / len(fans))} RPM")
-    if parts:
+    line = clock_readings_line(m)
+    if line:
         # The line that used to run off the glass.  At font 26, `CPU 57°C  GPU 47°C
         # 1957 RPM` - the pinned readings every documented preview uses - measures
         # 494.2 panel px against a 480 px panel: 14.2 px over, 7.1 at each end.  The
@@ -545,7 +561,6 @@ def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY, ink=None):
         # panel.  Counted by drawing the string and reading the alpha channel's bbox,
         # 2026-11-07; the suite crops each of the theme's three lines to its own y
         # band and fails if any of them touches a panel edge.
-        line = "    ".join(parts)
         _text(img, (240, 358), line, _fit(img, line, 440, 26), acc)
     return img.resize((W, H), Image.LANCZOS)
 

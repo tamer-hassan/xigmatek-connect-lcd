@@ -91,6 +91,8 @@ Put the module in `/etc/modules-load.d/` if you want it at every boot.
 | `--allow-reset` | let the control socket reach `recovery`, which re-enumerates the USB device and drops the stored background. Off by default; `xigmalcd-reset --yes` (in a checkout, `tools/reset_panel.py --yes`) stays the deliberate way |
 | `--status` | ask the display that is already running what it is showing, print it, exit. One line on the control socket: the serial port is never opened, so this works while the loop runs. Exit 1 with "no display answering" when nothing is listening |
 | `--list` | list candidate ports with their USB descriptions |
+| `--export-theme NAME` | print the generated layout for one of the five drawn-from-code themes as JSON on stdout - sorted keys, byte-identical between runs. Nothing is written to disk, and what it prints is a layout this program draws, never something sent to the panel |
+| `--list-specials` | print the names a `special` widget may carry: the parts of our own themes that stay code-drawn and take position, size and colour from a layout |
 | `--list-themes` | print everything `--theme` accepts: the five drawn from `render.py`, then ALPHA's 23 `1:1` layouts with their widget counts and which tree the file came from, then the four refused and the reason. No port is opened
 | `-v, --verbose` | log every frame in both directions |
 

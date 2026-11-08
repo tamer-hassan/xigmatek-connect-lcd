@@ -266,7 +266,8 @@ def paint(record: dict, metrics: dict, when=None, scrim: int = 0, base=None) -> 
     """
     vals, absent = values(metrics, when)
     img, notes = layout.draw_theme(load(record["path"]), vals,
-                                   canvas=(record["w"], record["h"]))
+                                   canvas=(record["w"], record["h"]),
+                                   specials=SPECIALS)
     # `draw_theme` says which widgets it skipped; this says why, in the words this module
     # chose when it refused to invent a reading.  Both belong in the notes.
     notes["absent"] = absent
@@ -286,6 +287,133 @@ def describe(record: dict) -> str:
             f"ratio {record['ratio']}  {record['widgets']} widgets  "
             f"background {os.path.basename(record['background'])}  from "
             f"{'checkout' if record['root'] == os.path.abspath(REPO_ROOT) else 'package'}")
+
+
+# ------------------------------------------------------- the specials registry --
+#: {name: callable(draw, prop, values) -> ink box}.  A special is a picture that stays
+#: code-drawn and takes its position, size, colour and reading from the layout - the
+#: decision that keeps the fan figures, the tick strip and the clock's readings line
+#: movable without baking PNGs (docs/theme-editor.md).  Injected into
+#: `layout.draw_theme` from here, because the drawings live in `render.py` and layout
+#: already imports render, not the other way round.
+def _sp_clock_readings(draw, prop, values):
+    """The clock theme's third line: built by `render.clock_readings_line`, placed here."""
+    line = str(values.get("readings") or "")
+    if not line:
+        return None
+    return layout.draw_special_line(draw, prop, line)
+
+
+SPECIALS = {"clock-readings": _sp_clock_readings}
+
+
+def special_names() -> tuple:
+    """Every name a `special` widget may carry. `--list-specials` prints this."""
+    return tuple(sorted(SPECIALS))
+
+
+# ------------------------------------------------------------------ exports --
+def rgba_str(colour: tuple) -> str:
+    """A render colour as the `rgba(...)` spelling every vendor widget uses."""
+    r, g, b = colour[:3]
+    a = colour[3] if len(colour) > 3 else 255
+    return f"rgba({r}, {g}, {b}, {a / 255:.4g})"
+
+
+def widget(wid: str, kind: str, prop: dict, layer: int = 0) -> dict:
+    """One widget in the vendor's shape: `property` is a one-element list there, and a
+    generated file mirrors that so an editor reads one shape for every row."""
+    return {"id": wid, "layerIndex": layer, "type": kind, "property": [prop],
+            "widgetContent": ""}
+
+
+def clock_recipe() -> dict:
+    """`clock` as a layout: two readings from the clock, one code-drawn line.
+
+    Determinism, because the gate compares two runs byte for byte: ids are derived from
+    the theme name (`xigma-clock-time`), never random; the vendor's `property[].time`
+    (its editor's stamp: one epoch per theme, on 82 of the 152 widgets) is **omitted**,
+    because a generated file has no editor and a stamp with nothing behind it would be a
+    field that lies; and no rendered date or number appears anywhere - only `source`
+    names, filled in per frame.
+
+    The three `xigma` keys are each a measured difference between our five and the
+    vendor's files, not a convenience: `anchor` (ours centre, the vendor's anchor at the
+    em-box top-left), `autoFitMax` (ours walk the size down in steps of 2 to a floor of
+    10 until the line fits - the same loop as `render._fit_size`), and `format` (our date
+    line is `%A %d %B %Y`; the vendor's `Date` shape in this repo is `%m/%d/%Y`, and
+    neither is measured off the vendor's picture, so rewriting our theme to the other one
+    would change the glass for no measured reason).
+    """
+    ext = lambda anchor, maxw, fmt=None: dict({"anchor": anchor, "autoFitMax": maxw},
+                                              **({"format": fmt} if fmt else {}))
+    return {
+        "id": "xigma-clock", "width": render.W, "height": render.H, "ratio": "1:1",
+        "xigma": {"theme": "clock", "generated-from": "xigmalcd/render.py",
+                  "version": __import__("xigmalcd").__version__},
+        "osd": {"widget": [
+            widget("xigma-clock-time", "data", {
+                "x": 240, "y": 190, "source": "Time", "fontFamily": "dejavu",
+                "fontSize": 140, "bold": True, "textColor": rgba_str(render.WHITE),
+                "xigma": ext("mm", 440, "%H:%M:%S")}, 0),
+            widget("xigma-clock-date", "data", {
+                "x": 240, "y": 286, "source": "Date", "fontFamily": "dejavu",
+                "fontSize": 22, "bold": True, "textColor": rgba_str(render.DIM),
+                "xigma": ext("mm", 440, "%A %d %B %Y")}, 1),
+            widget("xigma-clock-readings", "special", {
+                "name": "clock-readings", "x": 240, "y": 358, "fontFamily": "dejavu",
+                "fontSize": 26, "bold": True, "textColor": rgba_str(render.CYAN),
+                "xigma": ext("mm", 440)}, 2),
+        ]},
+    }
+
+
+EXPORTS = {"clock": clock_recipe}
+
+
+def export(name: str) -> dict:
+    """Generate the layout for one of the five, on demand. Not written to disk here."""
+    try:
+        return EXPORTS[name]()
+    except KeyError:
+        raise KeyError(f"no export for theme {name!r} yet; exported so far: "
+                       f"{' '.join(sorted(EXPORTS)) or 'none'}")
+
+
+def parity(name: str, metrics: dict, when=None) -> dict:
+    """Code-drawn vs layout-drawn, in pixels: the gate that makes an export mean something.
+
+    Both doors get the same metrics and the same instant.  Returned numbers: painted
+    pixels each way, the count of pixels where they disagree, and the notes from
+    `draw_theme` (which is where a missing face or a missing reading would show up).
+    """
+    from PIL import ImageChops
+    # both doors have to be shown the same instant, and `_now` is the one hook this repo
+    # has for that (render.clock_str, date_str and the fan figures all read it).  Without
+    # it the code door would print the live second against a layout filled from `when`,
+    # and the difference would be a clock, not a drawing.
+    real_now = render._now
+    if when is not None:
+        render._now = lambda: when.timetuple()
+    try:
+        code = render.draw(metrics, name)
+    finally:
+        render._now = real_now
+    obj = export(name)
+    vals, absent = values(metrics, when)
+    vals["readings"] = render.clock_readings_line(metrics)
+    lay, notes = layout.draw_theme(obj, vals, canvas=(obj["width"], obj["height"]),
+                                   specials=SPECIALS)
+    a, b = code.convert("RGBA"), lay.convert("RGBA")
+    delta = ImageChops.difference(a, b)
+    flat = delta.get_flattened_data()
+    diff = sum(1 for px in flat if px != (0, 0, 0, 0))
+    worst = max((max(px) for px in flat), default=0)
+    paint = lambda im: sum(1 for v in im.getchannel("A").get_flattened_data() if v)
+    return {"name": name, "code_px": paint(a), "layout_px": paint(b), "diff_px": diff,
+            "worst_channel_delta": worst, "boxes": len(notes["boxes"]),
+            "missing": notes["missing"], "gaps": sorted(set(notes["gaps"])),
+            "absent": sorted(absent)}
 
 
 def census(limit: int = 0) -> list:

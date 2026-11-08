@@ -787,6 +787,18 @@ def build_parser() -> argparse.ArgumentParser:
                          "a checkout) is the deliberate way")
     ap.add_argument("--list", action="store_true",
                     help="list candidate serial ports and exit")
+    ap.add_argument("--export-theme", metavar="NAME",
+                    help="print the generated layout for one of the five themes this "
+                         "program draws itself, as JSON on stdout: the same file shape "
+                         "ALPHA's library uses, so it can be read back, edited, and "
+                         "drawn by the same code. Generated on demand and never "
+                         "committed - a committed gauge.json goes stale the first time "
+                         "anyone edits theme_gauge. Nothing is written to disk and "
+                         "nothing here goes near the panel")
+    ap.add_argument("--list-specials", action="store_true",
+                    help="print the names a `special` widget may carry: the parts of "
+                         "our own themes that stay code-drawn and take their position, "
+                         "size and colour from a layout")
     ap.add_argument("--list-themes", action="store_true",
                     help="list every theme `--theme` can be given: the five drawn "
                          "from render.py, then ALPHA's 1:1 layouts with their widget "
@@ -800,6 +812,24 @@ def main(argv=None) -> int:
 
     if args.overlay:                          # kept for old command lines
         args.bg = "clear"
+
+    if args.list_specials:
+        for name in themes.special_names():
+            print(f"  {name}")
+        print("  A special is drawn by code and placed by the layout: see "
+              "xigmalcd/themes.SPECIALS and docs/theme-editor.md.")
+        return 0
+
+    if args.export_theme:
+        try:
+            obj = themes.export(args.export_theme)
+        except KeyError as exc:
+            print(f"  {exc.args[0]}", file=sys.stderr)
+            return 2
+        # sorted keys and no generated-at-run-time values: two runs of this command are
+        # byte-identical, which is what the suite gate compares
+        print(json.dumps(obj, indent=1, sort_keys=True))
+        return 0
 
     if args.list_themes:
         # read off the filesystem, not out of a table kept by hand, so the counts in

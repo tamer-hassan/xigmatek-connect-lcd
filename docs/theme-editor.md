@@ -4,8 +4,11 @@
 and stage 1 are in the tree: `xigmalcd/themes.py` finds the library, `--list-themes` prints
 it with the counts, `--theme <background name>` selects a layout, the canvas refusal is a
 gate on each file's own `ratio` field, and the same names work over the control socket.
-Stages 2-6 are not built: no generated export, no file model, no inspector, no canvas, no
-glass pass. Every census figure below is re-derived by `tools/selftest.sh`'s vendor-library
+Stage 2 is **partly** built: the export machinery, the `special` kind, the extension keys
+it needed, the determinism rules and both gates are in the tree, and one of the five themes
+(`clock`) generates to a layout that paints *exactly* what `render.py` paints - zero
+differing pixels across four different readings. The other four do not generate yet.
+Stages 3-6 (file model, inspector, canvas, glass pass) are not built. Every census figure below is re-derived by `tools/selftest.sh`'s vendor-library
 section, so it cannot rot in place. The decisions are
 settled with the owner; the census is measured out of the files in this tree on the same
 date, and each figure says where it came from, so that a reader can re-run it rather than
@@ -126,18 +129,69 @@ the vendor-library section, from the shipped files - not a snapshot of a one-off
   fixed `fontSize` with no such key; and one top-level `xigma` block for theme-level
   properties - ink halo, cold/hot scale, gauge source, scrim mode. The round-trip gate
   below is what makes extra keys safe: unknown keys survive a save.
-- **The export is byte-stable or the gate is noise**, so: derive ids
-  (`xigma-<theme>-<n>`, never `uuid4()`), derive `property[].time` from the changelog date
-  and put one value on every widget of a theme the way the vendor's files do, never emit a
-  rendered date or number - only `source` rows, which is the same rule `render.py`'s
-  `_now()`/`date_str()` learned for frames and previews - and emit `ratio: "1:1"`, the key
-  the exclusion gate reads.
+- **The export is byte-stable or the gate is noise**, and building it settled three of
+  those rules: ids are derived from the theme name (`xigma-clock-time`), never `uuid4()`;
+  `property[].time` is **omitted** rather than derived - it is the vendor editor's stamp,
+  nothing in a drawing depends on it, and a stamp with nothing behind it would be a field
+  that lies, so the gate asserts no export carries one; and an export never contains a
+  rendered date or number, only `source` rows - the same rule `render.py`'s `_now()` and
+  `date_str()` learned for frames and previews. `ratio: "1:1"` is emitted, the key the
+  exclusion gate reads.
 - Two gates on the export, both printed: **byte-stability** over two runs, and **pixel
   parity** - the generated JSON rendered by `layout.draw_theme` against the code drawing,
   with the painted-pixel difference printed per theme. Parity is what proves completeness:
   if an export forgets the gauge ring, the diff shows the hole rather than hiding it. A
   theme whose parity cannot be driven to a printed small number does not get exported, and
   the doc says which five are in and which are not.
+
+## What generating an export actually found
+
+The plan assumed our five would fit the vendor's shape with one added kind and two
+extension keys. Building the first export (`clock`) turned up three, each because of a
+measured difference between our drawing and the vendor's files - which is the point of
+finding that out before an editor is built on top of it:
+
+* **`special`**, the added kind. The clock theme's third line is
+  `CPU 57°C  GPU 47°C  1919 RPM`: three readings and a fan *average* in one string, so no
+  single vendor `source` stands for it. `render.clock_readings_line` builds the text once
+  and both doors draw it - one builder, two doors, so what the code theme says and what the
+  generated layout says cannot drift apart.
+* **`xigma.anchor`**. Every vendor widget anchors at the em box's top-left (`la`, measured
+  off the vendor's own baked overlay); `clock`, `bars` and `dual` centre their lines
+  (`render._text`'s default is `mm`). Exporting a centred theme without saying so slides
+  every line left by half its own width - and that is not a theory: the first export run
+  here drew the big time line from x -108 to 588, because the fit rule and the anchor had
+  not both been carried across.
+* **`xigma.autoFitMax`**. `render._fit_size` walks a size down in steps of 2 to a floor of
+  10 until a line fits a width budget; a vendor file declares one fixed `fontSize` and has
+  no such rule. The generated file carries the same loop, with the same step and the same
+  floor, because a different step is a different glyph size on the glass at the same
+  reading.
+* **`xigma.format`**. Our date line is `%A %d %B %Y` (`render.date_str`); this repo's
+  vendor `Date` shape is `%m/%d/%Y`; and *neither* is measured off the vendor's picture.
+  Rewriting our theme into the other shape would change the glass for no measured reason,
+  so the export states its own format - and `draw_theme` stops calling that a gap, because
+  a stated format is not a guess.
+* **the `dejavu` family key.** Our five are drawn with DejaVu Sans and DejaVu Sans Bold
+  (`render._FONT_GLOBS`). That is not one of the vendor's four names, and resolving it
+  through `layout.FONTS["dejavu"]`, built out of `_FONT_GLOBS` so both doors read the same
+  paths, beats borrowing `Verdana`, which only lands on the same files on this box.
+
+With those in place, `clock` generates to 3 widgets and 1 448 characters, byte-identical
+across runs, and parity reports the same painted count both ways on four readings - 25 548,
+25 545, 22 944 and 21 003 lit pixels - with **zero** differing pixels and a worst channel
+delta of 0. The diff is taken over all four channels on purpose: an alpha-only comparison
+would not see a colour that had drifted, and colour is exactly what a layout carries in
+`textColor`. The same gate watches the vendor side from the other direction: all 23
+pickable layouts still paint **114 boxes and 314 169 lit pixels**, which is what proves the
+anchor/autoFit keys and the `special` branch changed nothing about a vendor theme.
+
+What the remaining four need before they can be generated is their geometry written down:
+the gauge ring (our 260° sweep and 30-100 °C scale, not the vendor's measured 269°/91°
+mouth), the gradient bars (`render.hbar` ramps a colour per column; `layout.draw_bar`
+fills with `startColor` alone), the two fan figures, and the tick strip. The plan's rule
+holds while that happens: **an export that cannot be driven to a zero diff is not
+shipped**, and the suite prints which of the five are in and which are out.
 
 ## The surface, and the geometry it must not break
 
@@ -181,7 +235,7 @@ number gated, the docs updated in the same change.
 |---|---|---|---|
 | 0 | this document, plus the schema written out properly: the `special` list, `autoFit`, the `xigma` block, the determinism rules, and how `--theme` opens past `choices=sorted(render.THEMES)` | 1 | 3 |
 | 1 | **landed 2026-11-08.** the 23 `1:1` layouts selectable in the loop: name→layout resolver, human names from `background.mediaFile`, the source→`sensors.collect()` table, `--list-themes`, `notes["missing"]` printed as "no pump tachometer here, widget skipped" and again over the socket's `status`, the four `4:3` themes excluded by a gate on `ratio` so a future 480 layout cannot be dropped by a filter, and a `--theme` name that is canonicalised once at parse time so the CLI, the log and the socket all spell it the same | 1-1½ | 3-4½ |
-| 2 | the export and its two gates (byte-stability, pixel parity), the three specials, `--print-theme-fields` | 2-2½ | 6-7½ |
+| 2 | **machinery landed 2026-11-08.** `--export-theme NAME`, `--list-specials`, the `special` kind and its injected registry, the `xigma` extension keys, byte-stability and parity gates over four readings; `clock` generates at a zero-pixel diff; `alpha`/`bars`/`dual`/`gauge` do not generate yet, and `--print-theme-fields` is not built | 2-2½ | 6-7½ |
 | 3 | the file model: atomic save plus `.bak` under `~/.config`, warnings-not-errors validation from the census above (unknown source, off-canvas x/y, a `fontSize` outside the ten measured, an unparseable `rgba()`, overlapping boxes), and the round-trip gate: an unedited vendor theme re-saves byte-identical with unknown keys preserved | 1-1½ | 3-4½ |
 | 4 | the surface: one-row inspector over the fields each kind carries, the canvas inside the existing pane, pinned fixture and still preview, keyboard nudge, undo coalescing, coarse live apply (`{"cmd":"theme","value":"user:foo"}`) | 3-3½ | 9-10½ |
 | 5 | docs and gates: docs/themes.md's "not in the picker, and that is not an oversight" section brought up to date, docs/usage.md's CLI table, docs/gui.md's window census, README's five-theme claims, the window's own theme tooltip (it still says the vendor files are for the panel's firmware, which §11 contradicts), `smoke` rendering every installed layout offline against a pinned values dict. The suite grows by at least one section - stage 1's gates belong in the vendor-library section that already re-derives docs/themes.md's colour census, not in a new one - and then every place `twenty` is a gate moves with it: README, docs/tools.md, docs/packaging.md, the top changelog stanza, and the count `.github/workflows/ci.yml` compares against | 1 | 3 |
