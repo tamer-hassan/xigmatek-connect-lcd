@@ -2355,20 +2355,20 @@ print(f"                        the same declared bar under the other two conven
       + " -> ".join(f"{a:,} at {v}%" for v, a, _b in walked)
       + f" in both drawings (docs/limits.md, docs/theme-editor.md)")
 print(f"  what alpha draws      {' '.join(alpha_draws)} - taken out of `theme_alpha`'s own"
-      f" body, so the plan's list of what alpha still needs is a claim about this source:"
-      f" the rings and the usage bars are expressible as widgets (`arcPaint`,"
-      f" `barPaint`), and all three pairs of lettering are now one `special` row naming"
-      f" a code drawing (`fan-figures`, `temp-values` and the two label lines,"
-      f" `temp-labels`, each measured against `theme_alpha`'s own rows above).  So the"
-      f" only thing left in `alpha` is assembling the theme out of rows that each"
-      f" already reach a zero diff - and the labels are a row rather than two `text`"
-      f" widgets for the same reason the figures are: `_fit_arc` is handed them as a"
-      f" pair, and a size it decides is a face metric of the machine drawing it")
+      f" body, so the row list in `alpha_recipe()` is a claim about this source and not a"
+      f" memory of it: two rings and two usage bars as `arc`/`bar` widgets naming a painter"
+      f" (`arcPaint: render`, `barPaint: hbar`), three pairs of lettering as one `special`"
+      f" row each (`fan-figures`, `temp-values`, `temp-labels` - the labels a row and not"
+      f" two `text` widgets because `_fit_arc` is handed them as a pair, and a size it"
+      f" decides is a face metric of the machine drawing it), four rows that need nothing"
+      f" joint, and the clock line with a format and a width to fit to.  Every one of them"
+      f" was measured against `theme_alpha`'s own drawing above before the parity line"
+      f" counted the assembled frame")
 print(f"  not exported yet      "
-      f"{' '.join(sorted(set(render.THEMES) - set(themes.EXPORTS)))}, and not for the same"
-      f" reason twice. `alpha`'s list is the derived one just printed: its rings and"
-      f" its usage bars are widgets (`arcPaint`, `barPaint`), its fan pair is a"
-      f" `special`, and what is still missing is the theme assembled from all of it. `bars` is the second kind of answer"
+      f"{' '.join(sorted(set(render.THEMES) - set(themes.EXPORTS)))} - one theme left, and"
+      f" it is not missing a drawing. `alpha` took the derived list above and reached a zero"
+      f" diff as a file, so the export machinery is not what is in the way there. `bars` is"
+      f" a different kind of answer"
       f" on its own: its row count and row pitch are functions of the machine"
       f" (`row_h = min(56, max(28, 320 // len(rows)))`, and `rows` grows by up to four"
       f" fan entries named by whatever `sensors` reports), so one fixed widget list"
@@ -2496,23 +2496,41 @@ print(f"  --list-specials       {' '.join(themes.special_names())}; drawn by cod
       f"placed by the layout, no port opened")
 
 # the review door on the theme that needed the most keys: what `--check-theme` says about
-# the generated `alpha` layout, in the words it prints rather than in a summary here
+# the generated `alpha` layout.  What is pinned here is the report's internal agreement -
+# which rows a missing reading costs, and that the two halves of the report say the same
+# thing about it - because how many readings a box answers is a fact about the machine, not
+# about this file: the runner that answers only `CPU Usage` and `Time` draws 8 of the 12
+# boxes, and that is the door working, not a defect.
 chk = subprocess.run([sys.executable, "-m", "xigmalcd", "--check-theme", "alpha"],
                      capture_output=True, text=True, check=True)
-head_ln = chk.stdout.splitlines()[0]
+lines = chk.stdout.splitlines()
 n_rows = len(themes.export("alpha")["osd"]["widget"])
-assert "generated from render.py" in head_ln and f"{n_rows} widgets" in head_ln, head_ln
-warn = [ln for ln in chk.stdout.splitlines() if ln.strip().startswith("warning:")]
+assert "generated from render.py" in lines[0] and f"{n_rows} widgets" in lines[0], lines[0]
+warn = [ln for ln in lines if ln.strip().startswith("warning:")]
 assert all("outside the ten sizes" in w for w in warn), warn
-assert f"{n_rows} boxes" in chk.stdout and "skipped: nothing" in chk.stdout, chk.stdout
-asked = themes.EXPORTS["alpha"]()["osd"]["widget"]
-sources = sorted({w["property"][0]["source"] for w in asked if w["property"][0].get("source")})
-assert all(f": {', '.join(sources)}" in chk.stdout for _ in (0, 1)), chk.stdout
-print(f"  --check-theme alpha   {head_ln.strip()}")
+_sources = sorted({w["property"][0]["source"]
+                   for w in themes.EXPORTS["alpha"]()["osd"]["widget"]
+                   if w["property"][0].get("source")})
+ask_line = next(ln for ln in lines if "asks for:" in ln)
+can_line = next((ln for ln in lines if "cannot:" in ln), "")
+can_set = ({s.strip() for s in can_line.split("cannot:", 1)[1].split(",") if s.strip()}
+           if "cannot:" in can_line else set())      # a box that answers everything: empty
+assert ", ".join(_sources) in ask_line, (ask_line, _sources)
+drawn = next(ln for ln in lines if " boxes," in ln)
+_box = re.search(r"(\d+) boxes, [\d, ]+ lit px, skipped: (.*)$", drawn)
+assert _box, drawn
+n_boxes, skipped = int(_box[1]), _box[2].strip()
+skip_set = set() if skipped == "nothing" else {s.strip() for s in skipped.split(",")}
+assert skip_set == can_set, (skip_set, can_set, drawn)
+_dropped = sum(1 for w in themes.EXPORTS["alpha"]()["osd"]["widget"]
+               if w["property"][0].get("source") in can_set)
+assert n_boxes == n_rows - _dropped, (n_boxes, n_rows, _dropped, can_set)
+print(f"  --check-theme alpha   {lines[0].strip()}")
 print(f"                        {'; '.join(w.strip()[9:] for w in warn)} - our sizes are "
-      f"ours, not the vendor's ten, and the review door says so rather than quieting it; "
-      f"{n_rows} boxes drawn from this machine's readings, no widget skipped, and the "
-      f"sources it asks for are the ones printed above (no port opened)")
+      f"ours, not the vendor's ten, and the review door says so rather than quieting it. "
+      f"{n_rows} rows ask for {', '.join(_sources)}; this machine cannot answer "
+      f"{', '.join(sorted(can_set)) or 'any of them'}, so the report draws {n_boxes} boxes "
+      f"and says which rows that costs - the two halves agreeing, no port opened")
 PY
 
 # ---- the file model (stage 3 of docs/theme-editor.md): the shape the library is stored
