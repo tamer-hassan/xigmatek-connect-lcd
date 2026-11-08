@@ -384,19 +384,53 @@ def draw_arc(draw: ImageDraw.ImageDraw, prop: dict, value) -> tuple:
     return (x // SS, y // SS, x // SS + sw, y // SS + sh), ramp_note
 
 
-def draw_line(draw: ImageDraw.ImageDraw, prop: dict, value=None) -> tuple:
-    """One `line` (`line-node`, a sparkline).  The layouts carry x, y, width,
-    height, rotate and **no colour at all**, so this is the one thing a copied
-    layout cannot tell us.  The app's own default for the shape is in its
-    renderer bundle - `lineColor: "rgba(19, 206, 102, 1)"`, `lineWidth: 2`,
-    `maxTickCount: 10`, `showGrid: true`, `maxValue: 100` - and that default is
-    used here, flagged, rather than a colour invented from nothing."""
+#: The only two layouts in this library that carry a `line` widget - `Theme_14` and
+#: `theme_46`, four widgets between them - declare no colour for it.  Their own baked
+#: overlays (`themes/alpha/foreground/1757491588481.png`, the picture the vendor app drew
+#: for its own sample values) say what it is: a solid bar at **rgba(240, 255, 255, 255)**,
+#: every one of the 796 pixels of it the same, alpha 255 and hard-edged - no antialiasing
+#: anywhere along it.  The renderer bundle's own default for the shape is
+#: `lineColor: "rgba(19, 206, 102, 1)"`, a green that no shipped theme is observed to
+#: draw, so the measured ink is used and the bundle default stays a comment.
+MEASURED_LINE_INK = (240, 255, 255, 255)
+
+
+def line_rect(prop: dict) -> tuple:
+    """The rect a `line` fills, in the two conventions the vendor's picture shows.
+
+    Measured off `foreground/1757491588481.png`, pixel by pixel: the stroke is the declared
+    rect `[x, x+width) x [y, y+height)` - the horizontal widget there lights exactly
+    x 115..364 (250 px, the declared `width`) by y 230..231 (2 px, the declared `height`),
+    and nothing at y 229 or y 232 - so `height` *is* the thickness, not `lineWidth`.
+    And `rotate` turns that rect about the rect's own centre: the second widget declares
+    x165 y305 width150 height2 at `rotate: 90`, and the picture puts it at x 239..240,
+    y 231..380 - which is centre (240, 306), not the top-left corner (a corner pivot would
+    have left it at x=165, and a pixel-centre pivot would have lit x=238 as well, which it
+    does not).
+    """
     x, y = int(prop["x"]), int(prop["y"])
     w, h = int(prop["width"]), int(prop.get("height") or 2)
-    colour = rgba(prop["lineColor"]) if prop.get("lineColor") else (19, 206, 102, 255)
-    thick = int(prop.get("lineWidth") or 2)
-    draw.line((x * SS, (y + h // 2) * SS, (x + w) * SS, (y + h // 2) * SS),
-              fill=colour, width=thick * SS)
+    if int(prop.get("rotate") or 0) % 180 == 90:      # 90 and 270 across the centre
+        cx, cy = x + w / 2.0, y + h / 2.0
+        x, y = int(round(cx - h / 2.0)), int(round(cy - w / 2.0))
+        x, y, w, h = x, y, h, w
+    thick = int(prop.get("lineWidth") or 0)
+    if thick and thick != h:
+        # an edited file that sets `lineWidth` differently from the declared thickness gets
+        # it centred on the rect's own middle line, and the returned box says so rather
+        # than quietly keeping the two in agreement
+        y, h = y + h // 2 - thick // 2, thick
+    return x, y, w, h
+
+
+def draw_line(draw: ImageDraw.ImageDraw, prop: dict, value=None) -> tuple:
+    """One `line`.  All four in this library are decoration: none of them carries a
+    `source`, so there is no series to plot, nothing to skip and nothing to flag as a
+    missing reading.  What is flagged is the colour: it is not in the file, and what we
+    draw is the ink measured off the two vendor overlays that have one."""
+    x, y, w, h = line_rect(prop)
+    colour = rgba(prop["lineColor"]) if prop.get("lineColor") else MEASURED_LINE_INK
+    draw.rectangle((x * SS, y * SS, (x + w) * SS - 1, (y + h) * SS - 1), fill=colour)
     return (x, y, x + w, y + h)
 
 

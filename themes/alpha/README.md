@@ -404,10 +404,21 @@ Three holes in the schema are still open, and each says what it is waiting for:
   formats live in the app's V8 bytecode — reachable through the `d8` + View8 route of
   PROTOCOL.md §10 but not yet read out of it.  `layout.FORMATS_MEASURED` carries what has
   been read off the vendor's own baked overlays and marks the rest as a choice made here.
-* **a `line` widget's colour and thickness** — none of the four carries either.  What is
-  used is the app's own renderer default, read out of its bundle
-  (`lineColor: "rgba(19, 206, 102, 1)"`, `lineWidth: 2`, `maxTickCount: 10`), and
-  `draw_theme` records `"line colour"` as a gap every time it paints one.
+* **a `line` widget's colour and thickness** — still not in the JSON, so the answer came
+  from the pictures instead.  The four live in two themes (`Theme_14`, `theme_46`), and
+  their own baked overlays (`foreground/1757491588481.png`, `foreground/1757491589608.png`)
+  show the stroke as **rgba(240, 255, 255, 255)** — alpha 255 on all 798 pixels of the pair,
+  hard-edged, no antialiasing.  The renderer bundle's default (`lineColor:
+  "rgba(19, 206, 102, 1)"`, `lineWidth: 2`, `maxTickCount: 10`) is a green no shipped theme
+  is observed to draw, so `layout.MEASURED_LINE_INK` carries the measured ink and the green
+  stays in the comment.  The thickness turned out to be `height` itself, not `lineWidth`:
+  the horizontal widget lights exactly x 115..364 (its declared `width`, 250 px) by
+  y 230..231 (its declared `height`) and nothing at y 229 or 232.  And `rotate` turns the
+  rect **about its own centre** — x165 y305 width150 height2 at `rotate: 90` lands at
+  x 239..240, y 231..380, while a top-left corner pivot would have left it at x=165 and the
+  overlay lights 29 pixels there that the centre rects do not explain.  `draw_theme` still
+  records `"line colour"` as a gap, because for a `line` in some file nobody has a picture
+  of, the ink is still this program's choice.
 * **`arc` colour past 165° of the sweep**, and for any `startColor`/`endColor` pair other
   than the one measured above: there it falls back to a straight lerp and says so.
 

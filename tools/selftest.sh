@@ -1558,7 +1558,7 @@ print(f"  --list-themes           {len(lines)} lines, {len(pick)} of them the ca
 # Asserted only where all four families the library names are installed, because the
 # totals count glyphs: a machine without a CJK face draws fewer of them, and that is said
 # rather than failed.
-# 114 boxes / 314 169 lit px is this bench's figure, with this box's fonts; the same 23
+# 114 boxes / 315 287 lit px is this bench's figure, with this box's fonts; the same 23
 # layouts land 1 box and 920 px lower on a runner that has no CJK faces and one that
 # substitutes a narrower DejaVu. What is asserted is machine-independent: the accounting
 # identity above, one box and >500 lit px per layout, and the exact set of layouts whose
@@ -1598,7 +1598,7 @@ if off:
 else:
     print(f"  box counts vs the bench  identical for all {len(boxes_per)} layouts")
 print(f"  vendor pixels          {drawn} boxes, {painted_total} lit px on this machine "
-      f"(the bench of 2026-11-08 records 114 / 314169 with all 16 face combinations "
+      f"(the bench of 2026-11-08 records 114 / 315287 with all 16 face combinations "
       f"installed); every layout paints, and every widget is either drawn or reported")
 
 # ---- the generated export: byte-stable, and identical to the code it claims to describe
@@ -1822,6 +1822,73 @@ print(f"  validate            {hit}/{len(named)} named in one fixture "
       f"back off disk, so an editor's preview and the loop's frame are one code path")
 PY
 rm -rf "$EDIT_TMP"
+
+# ---- the four `line` widgets, measured against the vendor's own baked picture.  The
+# ---- first time a copied layout is compared with pixels the vendor itself drew.
+python3 - <<'PY' || { echo "line vs its own picture FAILED"; exit 1; }
+import json, os
+from PIL import Image, ImageDraw
+from xigmalcd import layout, render, themes
+man = json.load(open(os.path.join(themes.REPO_ROOT, "manifest.json")))
+by_layout = {t["layout"].split("/")[-1][:-5]: t for t in man["themes"]}
+LINE_THEMES = ("1757491588497", "1757491589611")          # Theme_14 and theme_46
+report = []
+for lay in LINE_THEMES:
+    ent = by_layout[lay]
+    obj = json.load(open(os.path.join(themes.REPO_ROOT, ent["layout"])))
+    name = obj["background"]["mediaFile"].rsplit("/", 1)[-1].split(".")[0]
+    props = [w["property"][0] for w in obj["osd"]["widget"] if w["type"] == "line"]
+    assert len(props) == 2, (lay, len(props))
+    assert all(not p.get("source") for p in props), "a line widget with a metric behind it"
+    fg = Image.open(os.path.join(themes.REPO_ROOT, ent["foregroundFile"])).convert("RGBA")
+    va = fg.getchannel("A")
+    pred = set()
+    for pr in props:
+        lx, ly, lw, lh = layout.line_rect(pr)
+        pred |= {(px, py) for py in range(ly, ly + lh) for px in range(lx, lx + lw)}
+    outside = [q for q in pred if not va.getpixel(q)]         # we draw where it draws
+    inks = {fg.getpixel(q) for q in pred}                     # its ink, from those pixels
+    img = Image.new("RGBA", (render.W * layout.SS, render.H * layout.SS), (0, 0, 0, 0))
+    dr = ImageDraw.Draw(img)
+    boxes = [layout.draw_line(dr, pr) for pr in props]
+    img = img.resize((render.W, render.H), Image.LANCZOS)
+    oa = img.getchannel("A")
+    ours = {(x, y) for y in range(render.H) for x in range(render.W)
+            if oa.getpixel((x, y)) >= 128}
+    diff = ours ^ pred
+    # anything the supersampled paint-and-shrink path puts outside the rect must be one of
+    # its edge pixels: a real offset would show up several pixels away, and would be a bug
+    strays = [q for q in diff
+              if not any(abs(q[0] - r[0]) <= 1 and abs(q[1] - r[1]) <= 1 for r in pred)]
+    p90 = next(pr for pr in props if int(pr.get("rotate") or 0) % 180 == 90)
+    lx, ly, lw, lh = layout.line_rect(p90)
+    band = {(bx, by) for by in range(ly + 1, ly + lh) for bx in range(lx - 7, lx + lw + 7)
+            if va.getpixel((bx, by))}
+    unexplained = [q for q in band if q not in pred]
+    corner_lit = sum(1 for q in {(165 + i, 305 + j) for i in range(2)
+                                for j in range(150)}
+                     if va.getpixel(q) and q not in pred)
+    assert not outside, (lay, outside[:8])
+    assert inks == {layout.MEASURED_LINE_INK}, (lay, inks)
+    assert not strays, (lay, sorted(strays)[:8])
+    assert len(band) > 200 and not unexplained, (lay, len(band), unexplained[:8])
+    report.append((name, len(pred), len(ours), len(diff), len(band), corner_lit,
+                   boxes[1]))
+per = "; ".join(f"{n}: the two rects cover {np} px and the vendor's own overlay lights "
+                f"every one of them; our painter puts down {nu} px, {nd} of them outside "
+                f"those rects; in the band around the rotated stroke the overlay lights "
+                f"{nb} px and none is unexplained"
+                for n, np, nu, nd, nb, cl, bx in report)
+print(f"  line vs its own picture {per}")
+print(f"                        ink: all of it is rgba{layout.MEASURED_LINE_INK} "
+      f"in the picture, alpha 255, hard-edged - the renderer bundle's default "
+      f"rgba(19, 206, 102, 1) is a green no shipped theme is observed to draw, so it is "
+      f"recorded in layout.py's comment and not used")
+print(f"                        rotate: the 90-degree widget draws at {report[0][6]}, the "
+      f"rect turned about its own centre; a top-left corner pivot would have left it at "
+      f"x=165, and the overlay lights {report[0][5]} pixels there that the rects do not "
+      f"explain - so the centre rule is the measured one")
+PY
 
 echo
 echo "== decoder round-trip: encode -> decode -> re-encode"

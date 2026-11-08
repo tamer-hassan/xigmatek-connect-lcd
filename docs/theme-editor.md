@@ -99,11 +99,28 @@ the vendor-library section, from the shipped files - not a snapshot of a one-off
   `memory` and `timestamp` on 2026-11-07. The loop must therefore degrade by *skipping the
   widget and saying so* - which is exactly what `draw_theme`'s `notes["missing"]` already
   records; the work is to surface it, not to invent it.
-- Open gaps that stay gaps until measured: the `line` colour (4 widgets; the layouts carry
-  no colour and `draw_line` uses the vendor app's own default, flagged), the arc colour
-  ramp (`arc_colour` lerps `startColor`→`endColor` for any pair it has never seen on
-  glass), and the 8 unmeasured display formats - which is where the existing roadmap items
-  `Time_hh:mm`, `Week_en` and `kb/s` live.
+- Open gaps that stay gaps until measured: the arc colour ramp (`arc_colour` lerps
+  `startColor`→`endColor` for any pair it has never seen on glass) and the 8 unmeasured
+  display formats - which is where the existing roadmap items `Time_hh:mm`, `Week_en` and
+  `kb/s` live.
+- **The `line` gap closed on 2026-11-08, and closed by the vendor's own pixels rather than
+  by a guess.** The four `line` widgets live in two themes (`Theme_14`, `theme_46`) and
+  carry no colour, no thickness of their own and no `source` at all - they are decoration,
+  not a series. Their baked overlays say what the app drew: a hard-edged
+  **rgba(240, 255, 255, 255)** bar; the stroke is the declared rect `[x, x+width) ×
+  [y, y+height)`, so `height` *is* the thickness; and `rotate` turns that rect about its
+  own centre (the 90° widget at x165 y305 width150 height2 lands at x 239..240,
+  y 231..380). Measured both ways: our painter's 798 pixels are the overlay's 798 pixels,
+  0 differ, and a top-left corner pivot - the other plausible rule - would light 29
+  overlay pixels that the centre rects do not explain, so the corner rule is refuted
+  rather than preferred. `layout.MEASURED_LINE_INK` is now the default ink; the renderer
+  bundle's green `rgba(19, 206, 102, 1)` is recorded and not used, because no shipped
+  theme is observed to draw it.
+- The same files carry a `rotate` on **two `bar` widgets** as well (both in the 320×240
+  set, at 270°), and `draw_bar` does not read it. Nothing pickable needs it today, so it is
+  not a bug on the glass - but the inspector cannot offer a rotation control for a `bar`
+  until the rule is measured, and the same overlay trick that settled the `line` will
+  settle it: the 4:3 themes have baked pictures too.
 - The degrade-and-print behaviour stage 1 needs is already half-built: `xigmalcd/layout.py`
   records every skipped source in `notes["missing"]` and every unmeasured format in
   `notes["gaps"]`, and the suite already has a vendor-library section that re-derives the
@@ -231,7 +248,9 @@ across runs, and parity reports the same painted count both ways on four reading
 delta of 0. The diff is taken over all four channels on purpose: an alpha-only comparison
 would not see a colour that had drifted, and colour is exactly what a layout carries in
 `textColor`. The same gate watches the vendor side from the other direction: all 23
-pickable layouts still paint **114 boxes and 314 169 lit pixels**, which is what proves the
+pickable layouts still paint **114 boxes and 315 287 lit pixels** (the total moved by
+1 118 px when the `line` measurement landed, and the suite's bench record moved with it),
+which is what proves the
 anchor/autoFit keys and the `special` branch changed nothing about a vendor theme.
 
 What the remaining four need before they can be generated is their geometry written down:
