@@ -2460,6 +2460,13 @@ assert _lb and abs(int(_lb[1].replace(" ", "")) - min(lbl_px)) <= 0.05 * min(lbl
 assert len(set(lbl_px)) == 1, lbl_px[:6]      # the doc says so, and the gate agrees
 assert _sz and int(_sz[1]) == len(temp_rows) and int(_sz[2]) == len(set(val_sizes)), \
     (_sz.groups() if _sz else None, len(temp_rows), len(set(val_sizes)))
+# and the one face-dependent number that sentence quotes - "the size the ring decides is
+# 22 px here" - held to the print above rather than remembered, same 5 % rule as the rest
+_bench = re.search(r"the size the ring decides is (\d+) px here", lim)
+assert _bench and abs(int(_bench[1]) - lbl_sizes[0]) <= max(1, 0.05 * lbl_sizes[0]), \
+    (_bench[1] if _bench else None, lbl_sizes[0],
+     "docs/limits.md quotes a size this run did not measure - the tolerance is 5 % with a "
+     "floor of one pixel, because a font size is a small integer")
 _clr = re.search(r"ink\s+stays\s+\*\*([\d.]+)\s+px\*\*\s+inboard", lim)
 _gap = re.search(r"\*\*([\d.]+)\s+px\*\*\s+clear\s+of\s+(?:that|the)\s+tail", lim)
 assert _clr and _gap, "docs/limits.md does not quote how clear the row's ink is"
@@ -4685,6 +4692,85 @@ print(f"                        who needs that sentence is not remembered either
       f" which is why `fontSize` gets two different sentences, checked on the window's own"
       f" note line below")
 
+# ---- and the canvas door on that model: pointing at a row, and moving it.  No display
+# ---- is needed for either half: `hit` reads the boxes `paint` reported, and `move` is what
+# ---- a drag and an arrow key both end in.  What is pinned below is the shape of the answer,
+# ---- not one window's pixels.
+cv = gui_edit.Editor.open_theme("alpha")
+_cv_img, cv_notes = cv.paint(*cv.fixture())
+drawn = cv_notes["boxes"]
+skipped = sorted(set(cv_notes["missing"]))
+assert skipped, ("this gate needs a layout with rows the fixture cannot answer, so that "
+                 "`boxes` is provably not a list of rows", skipped)
+row_of = {b[3]: b for b in drawn}
+clock_row = next(b for b in drawn if b[0] == "data" and b[1] == "Time")
+cx = (clock_row[2][0] + clock_row[2][2]) // 2
+cy = (clock_row[2][1] + clock_row[2][3]) // 2
+assert cv.hit(cv_notes, cx, cy) == clock_row[3], (clock_row, cx, cy)
+assert clock_row[3] != drawn.index(clock_row), (
+    clock_row[3], drawn.index(clock_row), "the file's row index and the position in the "
+    "drawn-box list have to differ here, or this gate proves nothing about a layout with "
+    "rows that were skipped")
+
+# where two rows overlap, the later-drawn one is the one under the cursor.  `alpha`'s
+# temperature figures stand inside its gauge rings: a ring that took every press inside its
+# own bounding box would leave the reading inside it impossible to grab.
+ring = next(b for b in drawn if b[0] == "arc")
+rx, ry = (ring[2][0] + ring[2][2]) // 2, (ring[2][1] + ring[2][3]) // 2
+covering = [b[3] for b in drawn if b[2]
+            and b[2][0] <= rx <= b[2][2] and b[2][1] <= ry <= b[2][3]]
+assert len(covering) > 1, (ring, covering)
+assert cv.hit(cv_notes, rx, ry) == max(covering), (cv.hit(cv_notes, rx, ry), covering)
+# a row that drew nothing has no box, so it can never be pointed at - which is the same
+# rule the report already states, applied to the pane
+_nobox = [i for i in range(len(cv.widgets())) if i not in row_of]
+assert _nobox, row_of
+assert all(cv.hit(cv_notes, x, y) not in _nobox for x, y in ((340, 372), (110, 405))), _nobox
+_free = [(x, y) for y in range(0, render.H, 9) for x in range(0, render.W, 9)
+         if cv.hit(cv_notes, x, y) is None]
+assert _free, "every point on the glass belongs to a row: nothing would be left to click on"
+
+cv.select(clock_row[3])
+x0, y0 = int(cv.prop()["x"]), int(cv.prop()["y"])
+base, _bn = cv.paint(*cv.fixture())
+ok, note = cv.move(12, -5)
+assert ok and not note, (ok, note)
+assert (int(cv.prop()["x"]), int(cv.prop()["y"])) == (x0 + 12, y0 - 5), cv.prop()
+# one drag is one undo step, not one per field: the unit a reader wants back is the drag
+assert cv.steps == 1, cv.steps
+assert cv.dirty and themes.user_copies() == [], (cv.dirty, themes.user_copies())
+assert cv.undo() and (int(cv.prop()["x"]), int(cv.prop()["y"])) == (x0, y0), cv.prop()
+after, _an = cv.paint(*cv.fixture())
+assert after.tobytes() == base.tobytes(), "undo did not put every pixel back"
+# a move that would put the anchor off the canvas is refused whole - both fields checked
+# before either is written - and it leaves no undo step behind
+refused = cv.move(0, -10_000)
+assert not refused[0] and "must stay inside" in refused[1], refused
+assert (int(cv.prop()["x"]), int(cv.prop()["y"])) == (x0, y0), cv.prop()
+assert cv.steps == 0, (cv.steps, "a refused move wrote an undo step")
+assert cv.move(0, 0)[0] and cv.steps == 0, cv.steps
+
+# and the fact the pane has to say for itself: the model refuses an anchor off the canvas
+# and says nothing about ink that hangs off it, because that is how the vendor's files are
+# checked too (`validate` looks at x,y).  A row dragged to the last legal column draws
+# pixels the glass will not show, and only the window admits it.
+assert cv.set("x", int(cv.obj["width"]) - 1)[0]
+_h_img, h_notes = cv.paint(*cv.fixture())
+_hang = [b for b in h_notes["boxes"] if b[3] == clock_row[3]][0][2]
+assert _hang[2] >= int(cv.obj["width"]), (_hang, "the claim below depends on this")
+hard, soft = themes.validate(cv.obj)
+assert not hard and not any("canvas" in w for w in soft), (hard, soft)
+print(f"  pointing at a row      `hit` answers the file's row index, not a position: "
+      f"{len(drawn)} boxes for {len(cv.widgets())} rows ({', '.join(skipped)} unanswered "
+      f"at the fixture), and the clock line's index is {clock_row[3]} while it sits "
+      f"{drawn.index(clock_row)} boxes in.  Overlaps resolve to the later row: "
+      f"{len(covering)} boxes cover the CPU ring's centre and the figure inside it wins. "
+      f"A move is one step and returns every pixel on undo; a move off the canvas is "
+      f"refused whole, in the model's words, and writes no step.  And an anchor at x="
+      f"{int(cv.obj['width']) - 1} is legal while its ink runs to x={_hang[2]} - validate "
+      f"is silent about that, so the pane says it ({_free[0]} is one point with no row "
+      f"under it)")
+
 # ---- the same model, behind the window's own controls ----
 # Not a second set of claims: the checks that the shell does not lie about the model.
 # The fields it lists are the model's list; the picture in the pane is `themes.draw`'s
@@ -4978,6 +5064,233 @@ print(f"  the window's row        offers {win.ed_name.count() - 1} layouts "
       + f". Save wrote Theme_28.json and that file redraws the frame that was on screen;"
       f" undo brought the first frame back; revert removed the copy. The pane is still"
       f" capped at {win.preview.pixmap().width()} px for a {render.W} px glass.")
+# ---- the canvas door in the window: presses, one drag and two arrow keys, delivered as
+# ---- the same QMouseEvent/QKeyEvent objects Qt would hand the pane.  There is no QTest in
+# ---- this environment, so the handlers receive real event objects rather than a helper, and
+# ---- the pane - not this gate - is what turns a point under the cursor into panel px.
+import tempfile
+
+from PyQt6.QtCore import QEvent as _QEv, QPoint as _QPt, QPointF as _QP, Qt as _QQt
+from PyQt6.QtGui import QKeyEvent as _QKey, QMouseEvent as _QMouse
+
+win.ed_name.setCurrentText("alpha")
+for _ in range(8):
+    appq.processEvents()
+assert win.ed is not None and win.ed.name == "alpha", win.ed_name.currentText()
+
+# The mapping first, at a size this gate chooses for itself, so the claim does not depend on
+# how wide this machine's columns happened to end up: 240 widget px for a 480 px glass.  The
+# centred case is what the black bands produce - `_fit` never scales above 1:1 and the label
+# keeps the slack around the picture - so a point in a band belongs to no row.
+_half = app.Canvas(win)
+_half.resize(240, 240)
+_half.set_side(240)
+assert _half.to_panel(_QPt(0, 0)) == (0, 0), _half.to_panel(_QPt(0, 0))
+assert _half.to_panel(_QPt(120, 120)) == (render.W // 2, render.H // 2)
+assert _half.to_panel(_QPt(239, 239)) == (render.W - 2, render.H - 2), \
+    "a pane half the glass' size has no widget pixel of its own for the glass' last column"
+_half.resize(400, 400)
+_half.set_side(240)
+assert _half.to_panel(_QPt(40, 40)) is None, "the black band beside the picture is somebody's row"
+assert _half.to_panel(_QPt(200, 200)) == (render.W // 2, render.H // 2)
+_half.set_side(0)                       # nothing drawn yet: nothing to point at
+assert _half.to_panel(_QPt(200, 200)) is None
+
+_side = win.preview.pixmap().width()
+assert _side == min(win.preview.width(), win.preview.height(), render.W), \
+    (_side, win.preview.size(), "the marks have to line up with what `_fit` drew")
+assert win.preview.side == _side, (win.preview.side, _side)
+_k = _side / render.W
+
+
+def _wpoint(px, py):
+    """A point on the glass, in the widget px a real cursor would carry here."""
+    ox, oy = win.preview._origin()
+    return int(round(ox + px * _k)), int(round(oy + py * _k))
+
+
+def _ev(kind, x=0, y=0, mods=_QQt.KeyboardModifier.NoModifier, key=None):
+    if kind == _QEv.Type.KeyPress:
+        return _QKey(kind, key, mods)
+    pos = _QP(x, y)
+    return _QMouse(kind, pos, pos, _QQt.MouseButton.LeftButton,
+                   _QQt.MouseButton.LeftButton, mods)
+
+
+def _press(px, py):
+    wx, wy = _wpoint(px, py)
+    win.preview.mousePressEvent(_ev(_QEv.Type.MouseButtonPress, wx, wy))
+    appq.processEvents()
+
+
+def _move_to(px, py):
+    wx, wy = _wpoint(px, py)
+    win.preview.mouseMoveEvent(_ev(_QEv.Type.MouseMove, wx, wy))
+    appq.processEvents()
+
+
+def _release(px, py):
+    wx, wy = _wpoint(px, py)
+    win.preview.mouseReleaseEvent(_ev(_QEv.Type.MouseButtonRelease, wx, wy))
+    appq.processEvents()
+
+
+def _drag_to(px, py):
+    _move_to(px, py)
+    _release(px, py)
+
+
+_tmpc = tempfile.mkdtemp(prefix="xigma-canvas-")
+
+
+def _pane_png():
+    """The picture the pane was told to show, as bytes nobody can fudge."""
+    p = os.path.join(_tmpc, "pane.png")
+    assert win.preview.pixmap().save(p, "PNG")
+    return open(p, "rb").read()
+
+
+_clock = next(b for b in win._ed_notes["boxes"] if b[1] == "Time")
+_cx, _cy = (_clock[2][0] + _clock[2][2]) // 2, (_clock[2][1] + _clock[2][3]) // 2
+_press(_cx, _cy)
+assert win.ed.index == _clock[3], (_clock, win.ed.index)
+assert win.ed_widget.currentIndex() == _clock[3]
+assert win.preview.marks and win.preview.marks[0] == _clock[2], win.preview.marks
+assert _clock[3] == len(win.ed.widgets()) - 1, (_clock, len(win.ed.widgets()))
+assert win.ed.label().startswith("data"), win.ed.label()
+
+# chrome is chrome: rebuild the pane's picture while a mark is showing and the picture that
+# comes out is the same bytes, and the layer the caption counts stays what the painter
+# returned - the dashed rectangle never reaches the frame the panel would be given
+_osd_marked = win._osd.tobytes()
+shown_on = _pane_png()
+win.preview.set_marks(None)
+win._repaint()
+win._fit()
+shown_off = _pane_png()
+assert shown_on == shown_off, \
+    (len(shown_on), len(shown_off), "the mark is painted over the picture, not into it")
+assert win._osd.tobytes() == _osd_marked
+
+# a press and a release on the same point: nothing moved, so nothing to undo
+_drag_to(_cx, _cy)
+assert win.ed.steps == 0, (win.ed.steps, "a drag that went nowhere wrote an undo step")
+assert "ended where it began" in win.ed_note.text(), win.ed_note.text()
+
+# one drag, 30 panel px.  The endpoints go through a scaled pane and are rounded to whole
+# widget pixels, so what is pinned is the row's distance and the sentence's own number, not
+# the mouse's: a claim about the picture, not about the cursor
+# the pane is the file as the model draws it, before anything is moved: the same door
+# `--check-theme` uses, at the same pinned fixture
+_fresh = gui_edit.Editor.open_theme("alpha")
+base, _b = _fresh.paint(*_fresh.fixture())
+assert win._osd.tobytes() == base.tobytes(), "the pane is not showing the file's frame"
+
+_press(_cx, _cy)
+_x0, _y0 = int(win.ed.prop()["x"]), int(win.ed.prop()["y"])
+_drag_to(_cx + 30, _cy)
+_x1, _y1 = int(win.ed.prop()["x"]), int(win.ed.prop()["y"])
+# ±1 px: at a pane scaled below 1:1 the endpoints are rounded to whole widget pixels, so
+# the cursor cannot address every column of the glass.  On this run's pane that arithmetic
+# is exact; the tolerance is what keeps the claim machine-independent.
+assert abs(_x1 - _x0 - 30) <= 1 and abs(_y1 - _y0) <= 1, ((_x1 - _x0, _y1 - _y0), _k)
+assert win.ed.steps == 1, (win.ed.steps, "one drag, one undo step - not one per field")
+assert win.ed.dirty and themes.user_copies() == [], themes.user_copies()
+_said = _re.search(r"dragged \(([+-]\d+), ([+-]\d+)\)", win.ed_note.text())
+assert _said and int(_said.group(1)) == _x1 - _x0 and int(_said.group(2)) == _y1 - _y0, \
+    (win.ed_note.text(), _x1 - _x0, _y1 - _y0)
+moved_now, _mn = win.ed.paint(*win.ed.fixture())
+assert win._osd.tobytes() == moved_now.tobytes(), "the pane did not follow the drag"
+win.ed_undo.click()
+for _ in range(6):
+    appq.processEvents()
+assert (int(win.ed.prop()["x"]), int(win.ed.prop()["y"])) == (_x0, _y0), win.ed.prop()
+win._repaint()
+assert win._osd.tobytes() == base.tobytes(), "undo did not put every pixel back in the pane"
+
+# a drag that wanders out and back inside one press is not a change anybody can undo: the
+# run is dropped, exactly as a spinbox typed `3` -> `30` -> `3` is.  This is the window's
+# own behaviour (a cursor that overshoots and comes back), and the model's rule is what
+# makes it true, so the two rows below are the claim, not the frame
+_press(_cx, _cy)
+_move_to(_cx + 40, _cy)
+assert int(win.ed.prop()["x"]) == _x0 + 40 and win.ed.steps == 0, (win.ed.prop(), win.ed.steps)
+assert win.ed.dirty, "the row is 40 px away and the window does not say so"
+_move_to(_cx - 40, _cy)
+_move_to(_cx, _cy)
+_release(_cx, _cy)
+assert int(win.ed.prop()["x"]) == _x0, win.ed.prop()
+assert win.ed.steps == 0, (win.ed.steps, "a run that ended where it began wrote an undo step")
+assert "ended where it began" in win.ed_note.text(), win.ed_note.text()
+assert not win.ed.dirty, "undoing nothing left the file claimed as changed"
+
+# the arrow keys, through the pane's own keyPressEvent: 1 px, 10 px with Shift, and each
+# press is a step the window's undo button takes back
+win.preview.setFocus()
+_total = 0
+for mods, step in ((_QQt.KeyboardModifier.NoModifier, 1),
+                   (_QQt.KeyboardModifier.ShiftModifier, 10)):
+    _total += step
+    win.preview.keyPressEvent(_ev(_QEv.Type.KeyPress, mods=mods,
+                                  key=_QQt.Key.Key_Right))
+    appq.processEvents()
+    assert int(win.ed.prop()["x"]) == _x0 + _total, (mods, win.ed.prop()["x"], _total)
+assert win.ed.steps == 2, win.ed.steps
+for _ in range(2):
+    win.ed_undo.click()
+    for _ in range(6):
+        appq.processEvents()
+assert (int(win.ed.prop()["x"]), int(win.ed.prop()["y"])) == (_x0, _y0), win.ed.prop()
+
+# the sentence only the window can say: the model bounds a row's anchor, not its ink, so a
+# legal drag can draw pixels the glass will never show - and `validate` is silent about it
+_max_x = int(win.ed.obj["width"]) - 1
+_press(_cx, _cy)
+_drag_to(_cx + (_max_x - _x0), _cy)
+assert int(win.ed.prop()["x"]) == _max_x, (win.ed.prop()["x"], _max_x)
+_hang = next(b for b in win._ed_notes["boxes"] if b[1] == "Time")[2]
+assert _hang[2] >= int(win.ed.obj["width"]), _hang
+assert "off the" in win.ed_note.text(), win.ed_note.text()
+assert win.preview.marks and "off the" in win.preview.marks[1], win.preview.marks
+hard, soft = themes.validate(win.ed.obj)
+assert not hard and not any("canvas" in w for w in soft), (hard, soft)
+win.ed_undo.click()
+for _ in range(6):
+    appq.processEvents()
+assert int(win.ed.prop()["x"]) == _x0, win.ed.prop()
+
+# a press on empty glass names the point and selects nothing, and closing the layout takes
+# the mark with it - the pane goes back to a live preview, with nothing drawn on it
+_free_pt = next((x, y) for y in range(0, render.H, 7) for x in range(0, render.W, 7)
+                if win.ed.hit(win._ed_notes, x, y) is None)
+_press(*_free_pt)
+assert "selects no row" in win.ed_note.text(), win.ed_note.text()
+assert win.preview.marks is None, win.preview.marks
+win.ed_name.setCurrentText(app.NO_EDITOR)
+for _ in range(8):
+    appq.processEvents()
+assert win.ed is None and win.preview.marks is None, win.preview.marks
+assert themes.user_copies() == [], themes.user_copies()
+shutil.rmtree(_tmpc, ignore_errors=True)
+print(f"  pointing inside the pane  the same door through the window: row {_clock[3]} is "
+      f"the clock line and it is the row a press at its ink box selects - at "
+      f"{win.preview.side} px of picture for a {render.W} px glass, so panel {_cx},{_cy} "
+      f"is cursor {_wpoint(_cx, _cy)[0]},{_wpoint(_cx, _cy)[1]}. A press and release on "
+      f"one point wrote no undo step; a 30 px drag wrote exactly one, and the sentence "
+      f"named the row's distance ({_said.group(1)}, {_said.group(2)}) rather than the "
+      f"mouse's; undo put every pixel back. Arrows moved 1 px and 10 px. A mark is "
+      f"painted over the picture, never into it: the pane's own PNG is byte-identical "
+      f"with one showing and without. And x={_max_x} is a legal anchor while that row's "
+      f"ink runs to x={_hang[2]}, which `validate` does not mention, so the pane says it "
+      f"- while {_free_pt[0]},{_free_pt[1]} is a point on the glass with no row under it")
+
+# The pane's rules are only worth having if the documents state them, and the one that is
+# easiest to lose is the sentence about ink hanging off the glass.
+_gui_doc = open("docs/gui.md", encoding="utf-8").read()
+for _claim in ("can be pointed at", "arrow keys move the selected row",
+               "off the 480x480 canvas", "never drawn into the frame the caption counts",
+               "**later** row wins"):
+    assert _claim in _gui_doc, (_claim, "docs/gui.md does not say what the window does")
 # Two documents quote a figure for this same edit, and they had drifted apart: gui.md still
 # carried 905 - a byte count divided by four, a fifth under - while theme-editor.md had been
 # corrected to the pixel count.  The figure itself follows the face that resolves the label,

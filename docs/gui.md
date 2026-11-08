@@ -245,10 +245,12 @@ white (docs/troubleshooting.md).
 One group box, folded away by default, that opens a layout as data: the three
 generated themes (`clock`, `dual`, `gauge` - JSON written out of `render.py` on demand)
 and the 23 layout files this canvas can select, the same set `--list-themes` prints.
-A row picks a widget, a field, and a value; a second row says what happened.
+A row picks a widget, a field, and a value; a second row says what happened. And the
+picture itself can be pointed at: press a row to select it, drag it to move it, nudge it
+with the arrow keys.
 
-Four things about it are measured by the suite rather than assumed, and all four are
-things an editor commonly gets wrong:
+What the suite holds this to, rather than assumes - every one of these is something an
+editor commonly gets wrong:
 
 * **Opening writes nothing.** The file appears at `save`, because your copy of a name is
   what `--theme` and the control socket find first, and that shadowing is a fact about
@@ -285,6 +287,25 @@ things an editor commonly gets wrong:
   09:30:12). The line under the picture says so (`pane: pinned fixture | this machine: …`)
   because a preview that moved with the sensors would make it impossible to tell an edit
   from a temperature.
+* **The picture can be pointed at, and what a point means is the paint's answer.** The
+  ink box `themes.draw` records for the selected row is marked on the pane. Press inside a
+  box and that row is selected; where two boxes overlap the **later** row wins, because
+  that is the one drawn on top - which is what makes the temperature figure standing inside
+  a gauge ring grabbable, instead of leaving the ring under the cursor steal the press.
+  Hold the button and drag: the row follows the cursor through the same model the spinbox
+  writes to, one drag is one undo step, a run that ends where it began writes none, and the
+  pane repaints as you go. The arrow keys move the selected row 1 px, or 10 px with Shift.
+  A press on empty glass says that point is no row's, and a row the readings could not draw
+  has no box to press - so the pane never invents a position for something it did not paint.
+* **The mark is chrome, and the pane admits one thing the model cannot.** The dashed
+  rectangle and its label are painted over the picture in the pane's own paint event, and
+  never drawn into the frame the caption counts; the gate re-shows the pane with a mark up
+  and without one and compares the bytes it was handed. And a row's *anchor* is bounded by
+  the canvas while its ink is not, which is how the vendor's own files are checked - `x` at
+  the last legal column is legal and the row still draws pixels the glass will never show.
+  `validate` says nothing about that, so the sentence sits beside the mark ("its ink runs
+  to x,y - off the 480x480 canvas") rather than leaving a clipped row as the reader's
+  discovery.
 * **A refused value changes nothing at all.** Type 9999 into `x` and the spinbox holds it,
   the note prints the model's sentence ("must stay inside the 480x480 canvas this layout
   declares"), and the picture, the dirty flag and the undo history do not move. Six
@@ -315,8 +336,8 @@ display.
 
 What it does **not** do, said plainly: nothing is sent to the panel (PROTOCOL.md §11 - the
 panel is never handed a layout file), so what a save changes is what *this machine's*
-daemon draws next time it names that theme; there is no dragging the picture yet (that is
-the other half of stage 4, docs/theme-editor.md); no widget is added, removed or
+daemon draws next time it names that theme; no row is resized by dragging an edge, and
+nothing about a layout's *shape* changes by hand - no widget is added, removed or
 reordered; the editor draws from the pinned fixture and not live readings; and the theme
 combo above still lists only the five, because that combo picks what the loop draws from
 this machine's sensors.
@@ -515,11 +536,14 @@ Five things it deliberately does not pretend to be:
   So the window draws the two layers itself, the way `tools/previews.py`
   composites the README pictures, and says so under the pane: *"this panel has no
   readback, so it is not a picture of the glass."*
-* **A picker, not the vendor's theme editor.** Dragging widgets around would be
-  weeks rather than days, because the panel renders nothing itself (§11): the
-  theme JSON declares widgets and the firmware ignores them, so an editor means
-  drawing every widget in Python and shipping the result as frames. The theme
-  pane offers the five themes this repo draws, with the daemon's own options.
+* **A picker plus an editor, not the vendor's theme editor.** The panel renders
+  nothing itself (§11): the theme JSON declares widgets and the firmware ignores
+  them, so editing a layout means drawing every widget in Python and shipping the
+  result as frames - which is what this does, and it is what makes a row's
+  position draggable on screen at all. What it is *not* is the vendor's app: no
+  widget is added, removed or reordered, nothing about a layout is ever sent to
+  the panel, and the theme pane offers the five themes this repo draws, with the
+  daemon's own options.
 * **No storage gauge.** The status pane prints `space` as a number with a note
   that it is not a size ledger: across four accepted uploads it moved a few KB
   in either direction and never resembled the file's size (§9).

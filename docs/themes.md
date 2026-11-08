@@ -93,8 +93,9 @@ them here instead, and both are gated in `tools/selftest.sh` rather than asserte
   choice rather than measured off the vendor's picture (`Time`, `CPU Frequency`,
   `Pump Speed`) are named in the same note.
 
-What is **not** built is the canvas: no dragging widgets around inside the preview,
-no keyboard nudge, and no editor drawn from live readings. What **is** built, since
+What is **not** built is an editor drawn from live readings, and any way to change a
+layout's *shape* by hand: rows are moved one at a time, never resized by their edge, added,
+removed or reordered. What **is** built, since
 2026-11-08, is the window's `Layout` box - one layout, one widget, one field at a
 time, over the same model the suite drives headless: a layout file under
 `~/.config/xigmalcd/themes` is read before the vendor's copy of the same name, a copy

@@ -315,6 +315,83 @@ class Editor:
             raise IndexError(f"widget {index}: this layout has {len(self.widgets())}")
         self.index = index
 
+    # ---------------------------------------------------------- the canvas --
+    def hit(self, notes: dict, x: int, y: int):
+        """Which row's ink box covers this panel px, or None if nothing is there.
+
+        The boxes are the ones `paint` records - the same boxes `--check-theme` prints -
+        so the pane and the report agree about where a row sits without either keeping a
+        copy of the answer.  Each record carries the row's own index in `osd.widget`, and
+        that is what comes back: a list of *drawn* boxes is not a list of rows, because a
+        row whose source has no reading contributes nothing to it, and a window that
+        answered "row 3" from a position in that list would select the wrong entry in a
+        file with anything skipped.  Where two boxes overlap, the **later** row wins,
+        because that is the one drawn on top: `alpha`'s temperature figures sit inside its
+        gauge rings, and "last one wins" is what makes a reading inside a dial grabbable at
+        all instead of leaving the ring under the cursor steal the click.
+        """
+        found = None
+        for rec in notes.get("boxes") or []:
+            box, wi = rec[2], rec[3]
+            if not box:
+                continue
+            if box[0] <= x <= box[2] and box[1] <= y <= box[3]:
+                found = wi
+        return found
+
+    def move_to(self, nx: int, ny: int, commit: bool = True) -> tuple:
+        """Put the selected row's anchor at (nx, ny) panel px, as **one** undo step.
+
+        This is what a drag and what an arrow key both end up calling, and the two rules
+        in it are the ones a reader would otherwise be surprised by.  Both fields are
+        checked before either is written: a move that would leave the anchor off the
+        canvas is refused whole, in `_check`'s own words, because moving `x` and not `y`
+        would put the row somewhere nobody dragged it to.  And a move to where the row
+        already is writes nothing at all - no run in progress, no undo step - so a click
+        that turns out not to be a drag does not leave a press of undo doing nothing.
+        """
+        pr = self.prop()
+        kind = str(self.selected().get("type") or "")
+        x, y = int(pr.get("x") or 0), int(pr.get("y") or 0)
+        nx, ny = int(nx), int(ny)
+        if (nx, ny) == (x, y):
+            return True, ""
+        ext = set(extension_fields(kind))
+        for field, val in (("x", nx), ("y", ny)):
+            bad = self._check(kind, field, val, ext)
+            if bad:
+                return False, bad
+        ok_x, note_x = self.set("x", nx, commit=False)
+        ok_y, note_y = self.set("y", ny, commit=False)
+        if not (ok_x and ok_y):
+            self.undo()                       # drop the run: one field refused the other
+            return False, note_x or note_y or "the row refused the move"
+        if commit:
+            self.commit()
+        return True, ""
+
+    def move(self, dx: int, dy: int, commit: bool = True) -> tuple:
+        """The same door measured as a distance: see `move_to` for what it guarantees."""
+        pr = self.prop()
+        return self.move_to(int(pr.get("x") or 0) + int(dx),
+                            int(pr.get("y") or 0) + int(dy), commit=commit)
+
+    def commit(self) -> None:
+        """End a coalesced run of writes: a spinbox settling, one drag, one nudge.
+
+        `set(commit=False)` applies a change without promising an undo step for it, and
+        this is where the promise is made - once for the run, not once per keystroke.  A
+        run that ends where it began writes no step: a row dragged out and back, or a
+        spinbox typed `3` -> `30` -> `3`, is not a change anyone can undo, and the history
+        would otherwise hold a press of undo that visibly does nothing.
+        """
+        if self._pending is not None:
+            if self._pending != self.obj:
+                self.history.append(self._pending)
+                if len(self.history) > 60:
+                    del self.history[0]
+            self._pending = None
+
     # -------------------------------------------------------------- values --
     def value(self, field: str):
         """What one field currently holds (extension keys included, `None` if unset)."""
@@ -373,10 +450,7 @@ class Editor:
         else:
             holder[field] = value
         if commit:
-            self.history.append(self._pending)
-            self._pending = None
-            if len(self.history) > 60:
-                del self.history[0]
+            self.commit()
         return True, note
 
     def _check(self, kind: str, field: str, value, ext: set) -> str:

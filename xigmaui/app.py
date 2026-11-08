@@ -63,8 +63,8 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from PIL import Image                                            # noqa: E402
 from PyQt6.QtCore import QEvent, QSize, Qt, QTimer        # noqa: E402
-from PyQt6.QtGui import (QAction, QBrush, QColor, QIcon, QImage,
-                         QKeySequence, QPixmap)                    # noqa: E402
+from PyQt6.QtGui import (QAction, QBrush, QColor, QIcon, QImage, QKeySequence,
+                         QPainter, QPen, QPixmap)                  # noqa: E402
 from PyQt6.QtWidgets import (QApplication, QCheckBox, QColorDialog, QComboBox,
                              QDoubleSpinBox, QFormLayout, QGroupBox,
                              QHBoxLayout, QLabel, QLineEdit, QListWidget,
@@ -162,6 +162,117 @@ def _scroll(widget: QWidget) -> QScrollArea:
     area.setWidget(widget)
     area.setFrameShape(QScrollArea.Shape.NoFrame)
     return area
+
+
+class Canvas(QLabel):
+    """The preview pane, with the editor's marks painted **over** the picture.
+
+    Two rules decide this class, and both are claims the documents already make about the
+    pane.  First, the image handed to it is the composite the panel would get - our layer
+    over the background - so nothing that says "this row is selected" is ever drawn *into*
+    that image: the marks are painted in `paintEvent`, over the pixmap, and what the window
+    keeps and the caption describes stays byte for byte what the painter returned.  Second,
+    the widget knows points and distances and no thing about layouts: every press, drag and
+    arrow is turned into panel px and handed to the window, which hands it to
+    `xigmaui/edit.py`, so a dragged row and a typed one go through the same `set`/`move` and
+    land on one undo stack.
+
+    The coordinate mapping is whatever `_fit` chose, not a second decision: the picture is
+    centred in the label and never scaled above 1:1, so `side` is the pixmap's own width and
+    the slack on either side is the offset.  A point outside the picture is no row's.
+    """
+
+    def __init__(self, window):
+        super().__init__()
+        self.win = window
+        self.side = 0                     # the pixmap's width, in widget px
+        self.marks = None                 # (box in panel px, one line of text)
+        self.setMouseTracking(False)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    # ------------------------------------------------------------------ marks --
+    def set_marks(self, marks) -> None:
+        """What to draw over the picture: None, or a panel-px box and one line."""
+        if marks != self.marks:
+            self.marks = marks
+            self.update()
+
+    def set_side(self, side: int) -> None:
+        """The size `_fit` actually drew the picture at, so marks line up with it."""
+        self.side = int(side)
+        self.update()
+
+    def _origin(self) -> tuple:
+        return ((self.width() - self.side) // 2, (self.height() - self.side) // 2)
+
+    def to_panel(self, pos):
+        """Widget px -> panel px, or None when the point is not on the picture."""
+        if self.side <= 0:
+            return None
+        ox, oy = self._origin()
+        k = self.side / render.W
+        x, y = (pos.x() - ox) / k, (pos.y() - oy) / k
+        if not (0 <= x < render.W and 0 <= y < render.H):
+            return None
+        return int(round(x)), int(round(y))
+
+    def paintEvent(self, event):          # noqa: N802
+        super().paintEvent(event)
+        if not self.marks or self.side <= 0:
+            return
+        box, text = self.marks
+        ox, oy = self._origin()
+        k = self.side / render.W
+        x0, y0 = ox + box[0] * k, oy + box[1] * k
+        w = max(1.0, (box[2] - box[0]) * k)
+        h = max(1.0, (box[3] - box[1]) * k)
+        p = QPainter(self)
+        pen = QPen(QColor("#7fd0ff"))
+        pen.setStyle(Qt.PenStyle.DashLine)
+        p.setPen(pen)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRect(int(round(x0)), int(round(y0)), int(round(w)), int(round(h)))
+        p.setPen(QColor("#000000"))
+        p.drawText(int(round(x0)), max(11, int(round(y0)) - 3), text)
+        p.setPen(QColor("#7fd0ff"))
+        p.drawText(int(round(x0)), max(10, int(round(y0)) - 4), text)
+        p.end()
+
+    # ---------------------------------------------------------------- events --
+    def mousePressEvent(self, event):     # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            pt = self.to_panel(event.position().toPoint())
+            if pt is not None:
+                self.win._canvas_press(*pt)
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):      # noqa: N802
+        if event.buttons() & Qt.MouseButton.LeftButton:
+            pt = self.to_panel(event.position().toPoint())
+            if pt is not None:
+                self.win._canvas_move(*pt)
+                event.accept()
+                return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):   # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton and self.win._drag:
+            self.win._canvas_release()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event):       # noqa: N802
+        step = 10 if event.modifiers() & Qt.KeyboardModifier.ShiftModifier else 1
+        delta = {Qt.Key.Key_Left: (-step, 0), Qt.Key.Key_Right: (step, 0),
+                 Qt.Key.Key_Up: (0, -step), Qt.Key.Key_Down: (0, step)}.get(event.key())
+        if delta is not None and self.win.ed is not None:
+            self.win._canvas_nudge(*delta)
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
 
 class Window(QMainWindow):
@@ -290,7 +401,11 @@ class Window(QMainWindow):
         self.anim_note.setWordWrap(True)
         arow.addWidget(self.anim_note, 1)
         lay.addLayout(arow)
-        self.preview = QLabel()
+        # The pane is the one widget that both *shows* the frame and can be pointed
+        # at: `Canvas` paints the editor's marks over the picture without ever
+        # drawing them into it (see its docstring), and it turns presses into panel
+        # px for the callbacks further down this class.
+        self.preview = Canvas(self)
         self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         # small minima: a preview pane that cannot shrink drags a horizontal
         # scrollbar onto the whole column, and the frame is scaled to fit anyway
@@ -699,6 +814,10 @@ class Window(QMainWindow):
         col.addWidget(editor)
         self.ed = None                        # nothing open until a name is picked
         self._ed_notes = {}                   # what the last editor frame reported
+        self._drag = None                     # (px, py, row x, row y) while dragging
+        self._drag_refused = False            # a drag that ran into the canvas edge
+        self._drag_note = ""                  # and the sentence it was refused with
+        self._off_glass = ""                    # what the last marks said about ink
         # nothing to edit until a layout is open: a row that offers fields before there
         # is a file behind it is a row that will write to nothing
         for wid in (self.ed_widget, self.ed_field, self.ed_stack, self.ed_undo,
@@ -1030,6 +1149,9 @@ class Window(QMainWindow):
                 comp.alpha_composite(img)
             self._show(comp)
         self._captions()
+        # the pane's marks follow the picture: the box of the row being edited, as this
+        # paint reported it, or none at all when no layout is open
+        self._canvas_marks()
 
     def _play_tick(self, redraw: bool = True) -> None:
         """One frame of the background, shown.  This is the animation's clock.
@@ -1138,6 +1260,7 @@ class Window(QMainWindow):
         pm = self._pix.scaled(side, side, Qt.AspectRatioMode.KeepAspectRatio,
                               Qt.TransformationMode.SmoothTransformation)
         self.preview.setPixmap(pm)
+        self.preview.set_side(pm.width())   # marks line up with what was drawn
         # and the dark card hugs the picture.  An Expanding label in a tall
         # column keeps the slack *inside itself*, so a 1 055 px window drew the
         # 480 px frame with ~130 px of black above and below it, framed by the
@@ -1724,6 +1847,125 @@ class Window(QMainWindow):
         self.ed_note.setText("your copy is gone: the loop reads the vendor's file "
                              "again. What you typed is still here, unsaved.")
         self._editor_state()
+
+    # ------------------------------------------------------- the canvas door --
+    # Pointing at the picture is the other half of the editor: a row's ink box is where
+    # that row is on the glass, so a press can select it and a drag can move it.  Nothing
+    # in these four methods decides anything about a layout - a distance goes to
+    # `edit.Editor`, the same door the field spinbox uses, with the same refusals and the
+    # same undo stack - and the pane's marks are chrome painted by `Canvas`, never pixels
+    # added to the composite.
+    def _canvas_marks(self) -> None:
+        """Mark the box the selected row actually put ink in, as the last paint reported."""
+        self._off_glass = ""
+        if self.ed is None:
+            self.preview.set_marks(None)
+            return
+        for _kind, _what, box, wi in (self._ed_notes.get("boxes") or []):
+            if wi == self.ed.index and box:
+                text = self.ed.label(wi)
+                w = int(self.ed.obj.get("width") or render.W)
+                h = int(self.ed.obj.get("height") or render.H)
+                if box[0] < 0 or box[1] < 0 or box[2] >= w or box[3] >= h:
+                    # the model refuses an *anchor* off the canvas and says nothing about
+                    # ink that hangs off it, because that is the vendor's rule too (a
+                    # `property` is checked by x,y).  So the pane says it out loud: a row
+                    # dragged to the edge is drawing pixels the glass will not show.
+                    self._off_glass = (f"its ink runs to {box[2]},{box[3]} - off the "
+                                       f"{w}x{h} canvas")
+                    text = f"{text}  [{self._off_glass}]"
+                self.preview.set_marks((box, text))
+                return
+        # a row the machine could not draw has no box, and a rectangle around nothing
+        # would be the pane inventing a position for it
+        self.preview.set_marks(None)
+
+    def _canvas_press(self, px: int, py: int) -> None:
+        if self.ed is None:
+            return                        # the pane is a live preview: nothing to move
+        idx = self.ed.hit(self._ed_notes, px, py)
+        if idx is None:
+            self.preview.set_marks(None)
+            self.ed_note.setText(f"nothing is drawn at {px},{py}: that press selects no "
+                                 "row and moves nothing")
+            return
+        if self.ed_widget.currentIndex() == idx:
+            self._editor_pick_widget(idx)     # same row: bring its fields up to date
+        else:
+            self.ed_widget.setCurrentIndex(idx)   # the signal selects it
+        pr = self.ed.prop()
+        self._drag = [px, py, int(pr.get("x") or 0), int(pr.get("y") or 0)]
+        self._drag_refused, self._drag_note = False, ""
+        self._canvas_marks()
+
+    def _canvas_move(self, px: int, py: int) -> None:
+        """Live apply, coarse on purpose: the row follows the cursor through the model.
+
+        `commit=False` is the spinbox's own coalescing - the picture moves, no undo step
+        is written yet - and the canvas edge is a refusal rather than a wall: once the
+        model says the anchor would leave the canvas, the sentence is printed and the row
+        stays at the last position it was allowed to hold.
+        """
+        if self.ed is None or not self._drag:
+            return
+        x0, y0, ax, ay = self._drag
+        ok, note = self.ed.move_to(ax + px - x0, ay + py - y0, commit=False)
+        if not ok and not self._drag_refused:
+            self.ed_note.setText(note)
+            self._drag_note = note
+            self._drag_refused = True
+        self._repaint()
+        self._canvas_marks()
+
+    def _canvas_release(self) -> None:
+        if not self._drag:
+            return
+        if self.ed is None:
+            self._drag = None
+            return
+        pr = self.ed.prop()
+        dx = int(pr.get("x") or 0) - self._drag[2]
+        dy = int(pr.get("y") or 0) - self._drag[3]
+        self._drag = None
+        self.ed.commit()                    # one drag, one undo step
+        self._editor_pick_field(self.ed_field.currentText())
+        self._repaint()
+        self._canvas_marks()
+        self._editor_state()
+        pr_x, pr_y = int(pr.get("x") or 0), int(pr.get("y") or 0)
+        if dx or dy:
+            # a drag that was part-refused moved what it was allowed to: say both, because
+            # a sentence about a distance the cursor travelled would be a claim about the
+            # mouse, not about the row
+            said = f"dragged ({dx:+d}, {dy:+d}) px: one undo step, no file until you save"
+            self.ed_note.setText(said if not self._drag_refused else
+                                 f"{said}. {self._drag_note}, so the row ended at "
+                                 f"{pr_x},{pr_y}")
+        else:
+            self.ed_note.setText(
+                "the drag ended where it began: nothing moved, so nothing to undo"
+                if not self._drag_refused else
+                f"nothing moved: {self._drag_note}")
+        if self._off_glass:
+            self.ed_note.setText(f"{self.ed_note.text()}. {self._off_glass}")
+        if dx or dy:
+            self._log(f"canvas drag: {self.ed.name} row {self.ed.index} by "
+                      f"({dx:+d}, {dy:+d})")
+
+    def _canvas_nudge(self, dx: int, dy: int) -> None:
+        """Arrow keys move the selected row: 1 px, 10 with Shift, one step per press."""
+        if self.ed is None:
+            return
+        ok, note = self.ed.move(dx, dy)
+        if not ok:
+            self.ed_note.setText(note)
+            return
+        self._editor_pick_field(self.ed_field.currentText())
+        self._repaint()
+        self._canvas_marks()
+        self._editor_state()
+        if self._off_glass:
+            self.ed_note.setText(f"nudged ({dx:+d}, {dy:+d}) px: {self._off_glass}")
     # ---- what the panel actually holds ----------------------------------
     def _read_ring(self, events: list) -> None:
         """Learn from the display's record which background it put on the panel.

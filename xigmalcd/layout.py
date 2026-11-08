@@ -840,6 +840,13 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
     substitution, every source with no value, and every gap touched - so a
     caller can print what was decided rather than trusting it.
 
+    `notes["boxes"]` is one entry per row that got drawn: `(kind, what it shows,
+    box in panel px, the row's index in `osd.widget`)`.  The index is there because a
+    list of *drawn* boxes is not a list of rows - a row whose source has no reading
+    contributes nothing to it - and a caller that wants to know which row a point on
+    the glass belongs to (the window's canvas, `xigmaui/edit.py:Editor.hit`) has to
+    name the file's row, not a position in this list.
+
     `specials` is the registry for the one added kind, `special`: {name: callable}.  A
     special is a picture that stays code-drawn and takes its position, size and reading
     from the layout - today the clock's readings line, `dual`'s status line and `alpha`'s
@@ -858,7 +865,7 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
     img = Image.new("RGBA", (W * SS, H * SS), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     notes = {"fonts": {}, "missing": [], "gaps": [], "boxes": []}
-    for w in obj["osd"]["widget"]:
+    for wi, w in enumerate(obj["osd"]["widget"]):
         prop = w["property"][0]
         kind = w["type"]
         if kind in ("text", "data"):
@@ -886,8 +893,9 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
             relayout = ((lambda size: ImageFont.truetype(path,
                         max(int(size), 1) * SS))
                 if path else None)
-            notes["boxes"].append((kind, prop.get("content") or prop.get("source"),
-                                   draw_text(draw, prop, s, face, relayout)))
+            notes["boxes"].append((kind, prop.get("content") or prop["source"]
+                                   if kind == "data" else prop.get("content"),
+                                   draw_text(draw, prop, s, face, relayout), wi))
         elif kind == "bar":
             if prop["source"] not in values:
                 notes["missing"].append(prop["source"])
@@ -895,7 +903,7 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
             bar_box, bar_bad = draw_bar(draw, prop, values[prop["source"]])
             if bar_bad:
                 notes["missing"].append(bar_bad.split(":", 1)[0])
-            notes["boxes"].append(("bar", prop["source"], bar_box))
+            notes["boxes"].append(("bar", prop["source"], bar_box, wi))
         elif kind == "arc":
             if prop["source"] not in values:
                 notes["missing"].append(prop["source"])
@@ -906,7 +914,7 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
                 notes["missing"].append(ramp[len("unknown "):].split(":")[0])
             if ramp.startswith("straight"):
                 notes["gaps"].append("arc colour, " + prop["source"])
-            notes["boxes"].append(("arc", prop["source"], box))
+            notes["boxes"].append(("arc", prop["source"], box, wi))
         elif kind == "special":
             name = str(prop.get("name") or "")
             fn = (specials or {}).get(name)
@@ -922,11 +930,11 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
             if face is None:
                 notes["missing"].append(f"font:{fam or 'default'}")
                 continue
-            notes["boxes"].append(("special", name, fn(draw, prop, values)))
+            notes["boxes"].append(("special", name, fn(draw, prop, values), wi))
         elif kind == "line":
             notes["gaps"].append("line colour")
             notes["boxes"].append(("line", prop.get("source") or "line",
-                                   draw_line(draw, prop)))
+                                   draw_line(draw, prop), wi))
     return img.resize((W, H), Image.LANCZOS), notes
 
 

@@ -13,7 +13,7 @@ they ask, worst channel delta 0. `alpha` is the one that had to earn its keys, a
 left on this stage is `bars`, which is waiting on
 a construct the schema does not have: the repeat group the owner decided to build on
 2026-11-08, with its cost recorded next to it (docs/limits.md).
-Stage 3, the file model, is in - what it measured is written out under "What building the file model measured" below. **Stage 4's first half is in as well**: `xigmaui/edit.py` is the editor's model, and the window's layout-editor row is a shell over it - what that half measured is under "What the editor's first half measured". Its other half, the canvas you drag widgets around inside the existing pane, is not built. Stage 5 (docs and census) and stage 6 (the glass pass) are not built. Every census figure below is re-derived by `tools/selftest.sh`'s vendor-library
+Stage 3, the file model, is in - what it measured is written out under "What building the file model measured" below. **Stage 4 is in, in the two changes the plan named**: `xigmaui/edit.py` is the editor's model, and the window's layout-editor row is a shell over it - what that half measured is under "What the editor's first half measured". Then the canvas in that same pane: press a row's ink box to select it, drag it, nudge it with the arrow keys - under "What the canvas half measured". What is still missing there is the pane drawing live readings instead of the pinned fixture, and any way to resize or reorder a row. Stage 5 (docs and census) and stage 6 (the glass pass) are not built. Every census figure below is re-derived by `tools/selftest.sh`'s vendor-library
 section, so it cannot rot in place. The decisions are
 settled with the owner; the census is measured out of the files in this tree on the same
 date, and each figure says where it came from, so that a reader can re-run it rather than
@@ -278,10 +278,70 @@ shell over that model, and the gates say so in counts.
   count by four, which printed 905 where the honest number is 1 163 - a fifth out, in the
   direction that flatters the edit.
 
-Not built, and not claimed: dragging widgets inside the pane, keyboard nudge, coarse live
-apply, adding or removing widgets, renaming a copy, drawing the editor from live readings.
-The window's theme combo still lists the five, because that combo picks what the loop
-draws from this machine's sensors.
+Not built, and not claimed: adding or removing or reordering widgets, resizing a row by
+dragging an edge, renaming a copy, drawing the editor from live readings. The window's
+theme combo still lists the five, because that combo picks what the loop draws from this
+machine's sensors.
+
+### What the canvas half measured (stage 4, 2026-11-08)
+
+Pointing at the picture is the same model with a different input device, and the gates are
+in that order: one block drives `xigmaui/edit.py` with no Qt at all, the next one hands the
+pane real `QMouseEvent`/`QKeyEvent` objects and asserts the same outcomes. (There is no
+`QTest` in this environment, so the events are constructed and delivered to the widget
+rather than synthesised by the toolkit - which is also what the plan expected.)
+
+* **A point belongs to the row that put ink there, and the answer is the file's row, not a
+  position.** `hit` reads the boxes `themes.draw` reported - the same boxes `--check-theme`
+  prints - and returns the row's index in `osd.widget`. That is not pedantry on this
+  layout: the clock line is row 11 and sits ninth in the drawn-box list, because rows whose
+  source the fixture cannot answer draw nothing and contribute no box. A row with no box
+  cannot be pointed at, and the gate finds a point on the glass with no row under it, so
+  the pane can say "that press selects no row" instead of selecting whatever is nearest.
+* **Overlaps resolve to the later row, because that is the one on top.** More than one box
+  covers the CPU ring's centre, and the temperature figure standing inside it is what a
+  press there selects. A ring that claimed every press inside its own bounding box would
+  leave the reading inside it ungrabbable.
+* **One drag is one undo step, and a drag that ends where it began is none.** The pane
+  repaints while the button is down - that is the coarse live apply the plan put second,
+  and it is deliberately coarse: every intermediate position goes through `move_to` with
+  the run uncommitted, and one step is written at the release. Both fields are checked
+  before either is written, so a drag that would put the anchor off the canvas is refused
+  whole, in the model's words, and leaves the row at the last position it was allowed to
+  hold; a drag that wanders out and back inside one press writes no step and clears
+  `dirty`, exactly as a spinbox typed `3` -> `30` -> `3` does.
+* **The sentence names the row's distance, not the cursor's.** The pane is scaled and
+  centred, so a press at widget pixel *p* is a panel point that `_fit` chose, and the marks
+  line up with what was drawn rather than with a second copy of the arithmetic. At a pane
+  half the glass' size the glass' last column has no pixel of its own to press, and a
+  scaled drag can land one panel px short of the cursor - which is why the note reports
+  what the row moved by, measured from the model.
+* **The marks never reach the frame.** The dashed box and its label are painted in the
+  pane's own paint event, over the picture. The gate re-shows the pane with a mark up and
+  without one and compares the PNG bytes the label was given - identical - and the layer
+  the caption counts stays byte for byte what `themes.draw` returned. The plan asked for
+  this specifically, and it is the claim that keeps "our composite ... not a picture of the
+  glass" true with a selection on it.
+* **The one thing the model cannot say, the pane does.** A row's *anchor* is bounded by the
+  canvas; its ink is not - that is how the vendor's files are checked too, by `x,y`, and
+  `validate` is silent about a row parked at the last legal column whose box runs past the
+  edge. Only the window admits it, beside the mark: the corner the ink reaches and the
+  canvas it is off.
+* **Keys are the same door.** The arrow keys nudge the selected row 1 px, 10 px with Shift,
+  one undo step each, refused in the model's words at the canvas edge.
+
+What the plan predicted, and what did not match: the boxes were already there
+(`notes["boxes"]`) and adding the row's index to them was indeed a few lines and one
+caller; the pinned fixture and the still preview were what made a drag readable; the marks
+going on an overlay rather than into the composite was the right call and is now gated. The
+plan expected editing **only at 1:1** - it is offered at any scale instead, because
+`to_panel` derives the mapping from the size `_fit` drew at, and the cost of that choice is
+the rounding above, said out loud rather than hidden behind a mode.
+
+Not built, and not claimed: live readings under the editor (the pane still draws the pinned
+fixture, so an edit is judged against the picture the documents describe), resizing a row
+by dragging an edge, widget add/remove/reorder, snapping to a grid or to another row, and
+anything at all to the panel.
 
 ## What generating an export actually found
 
@@ -482,17 +542,21 @@ diff is not shipped**, and the suite prints which of the five are in and which a
   log floor, the controls column needing 742 of its 744 px. Keeping the canvas *inside*
   that pane keeps every one of those claims true; moving it into a pane of its own
   invalidates all of them and they all have to be re-measured.
-- **Nothing in this repo has ever delivered a pointer event to this window.** There is no
-  `mousePressEvent`, no `setMouseTracking`, no `QTest`/`sendEvent` in `xigmaui/` or in any
-  of the suite's sections; the offscreen tests call methods. That, not the drawing, is the
-  new surface: synthetic press/move/release against an offscreen window, asserting the
-  saved JSON's `x`/`y` moved by the right number of panel pixels.
+- **Nothing in this repo had ever delivered a pointer event to this window** when this was
+  written: no `mousePressEvent`, no `setMouseTracking`, no `QTest`/`sendEvent` anywhere.
+  That, not the drawing, was the new surface - and it is what the canvas gate is: real
+  press/move/release and key events handed to the offscreen pane, asserting the model's
+  `x`/`y` moved by the right number of panel pixels. There is still no `QTest` in this
+  environment, so the gate constructs the `QMouseEvent`/`QKeyEvent` objects itself.
 - Mapping is small arithmetic once it is written down: `_fit()` computes
   `side = max(16, min(pane.w, pane.h, 480))` and centres the scaled pixmap, so the panel
-  coordinate under a pointer is `(label - offset) * 480 / pm.width()`. Below 1:1 the
-  pointer lands on interpolated pixels, so **editing is offered only at 1:1** and the
-  canvas says so otherwise - the same stance `_fit()` already takes about scaling up, and
-  it is testable against the cap the suite asserts.
+  coordinate under a pointer is `(label - offset) * 480 / pm.width()`. The plan expected
+  **editing only at 1:1**, because below that the pointer lands on interpolated pixels; what
+  landed instead maps at whatever scale `_fit` chose - `Canvas.to_panel` reads the size that
+  was actually drawn, so the marks and the press agree with the picture and not with a
+  second copy of the arithmetic - and the cost is stated in the section above: at a scaled
+  pane the glass' last column has no pixel of its own, and the note reports the row's
+  distance rather than the cursor's.
 - Hit-testing is nearly free: `draw_theme()` already returns `notes["boxes"]`, one ink box
   in device pixels per widget it paints. Adding the widget id to that record is ~10 lines
   and one caller to keep happy (`tools/theme_check.py:789`).
@@ -501,7 +565,9 @@ diff is not shipped**, and the suite prints which of the five are in and which a
   metrics fixture and a still preview. And selection chrome must not be painted into the
   composite the caption describes ("our composite of the background clip playing under the
   OSD layer we would send... not a picture of the glass") - it goes on an overlay, so that
-  claim keeps its meaning.
+  claim keeps its meaning. Both predictions held: an open layout is drawn from the fixture,
+  and the marks live in the pane's paint event, gated by comparing what it was shown with a
+  mark up and with none.
 
 ## Stages, and what each one costs
 
@@ -514,7 +580,7 @@ number gated, the docs updated in the same change.
 | 1 | **landed 2026-11-08.** the 23 `1:1` layouts selectable in the loop: name→layout resolver, human names from `background.mediaFile`, the source→`sensors.collect()` table, `--list-themes`, `notes["missing"]` printed as "no pump tachometer here, widget skipped" and again over the socket's `status`, the four `4:3` themes excluded by a gate on `ratio` so a future 480 layout cannot be dropped by a filter, and a `--theme` name that is canonicalised once at parse time so the CLI, the log and the socket all spell it the same | 1-1½ | 3-4½ |
 | 2 | **machinery landed 2026-11-08,** `--export-theme NAME`, `--list-specials`, the `special` kind and its injected registry, the `xigma` extension keys, byte-stability and parity gates over four readings; four of five generate today: `alpha` (12 widgets, 6 312 chars), `clock` (3, 1 448), `gauge` (5, 2 314) and `dual` (10, 4 677) each reach a **zero-pixel diff** on every reading that answers what they ask; `bars` does not, and the table under "What settled the ring and the bar" says what it still needs - including that `bars` may not be expressible as one file at all. (`--print-theme-fields`, listed here as unbuilt, landed with stage 3.) | 2-2½ | 6-7½ |
 | 3 | **landed 2026-11-08.** the file model: the user root `~/.config/xigmalcd/themes` read before the checkout and before `/usr/share`, so an edited copy shadows the vendor's by file operation alone and deleting it puts the vendor's back; `canonical()`/`shape_of()`, `validate()` split into hard (will not draw) and soft (worth saying), `save()` (atomic tmp + `os.replace`, `.bak`, trailing newline, user root only, the five code names refused, traversal names refused), `copy_for_edit()`, `delete_user_theme()`, `user_copies()`, `themes.draw()` for an object that never touched a disk, and `--check-theme NAME` as the review door. The round-trip gate is in: **27/27 layouts reproduce byte for byte** and **23/23 copies are byte-identical to their source**. Not built: the window that drives it | 1-1½ | 3-4½ |
-| 4 | **first half landed 2026-11-08**: the model (`xigmaui/edit.py`, no Qt, driven headless by the suite) and the window's layout-editor row over it - one layout combo (3 generated + 23 files), one widget, one field, one value; opening writes nothing; the field list is derived from `themes.keys_read()`; colours are stored in the vendor's `rgba()` spelling; refusals move nothing; 20 keystrokes are 1 undo step; the saved file redraws byte-identically what was on screen (1 163 px for the `(20, 0)` nudge, through both doors). Still to build: the canvas inside the existing pane, keyboard nudge, and coarse live apply (a name that resolves to your copy, since `--theme`/`status`/the socket already spell one name one way) | 3-3½ | 9-10½ |
+| 4 | **landed 2026-11-08, in the two changes the plan named.** First the model (`xigmaui/edit.py`, no Qt, driven headless by the suite) and the window's layout-editor row over it: one layout combo (3 generated + 23 files), one widget, one field, one value; opening writes nothing; the field list is derived from `themes.keys_read()`; colours are stored in the vendor's `rgba()` spelling; refusals move nothing; 20 keystrokes are 1 undo step; the saved file redraws byte-identically what was on screen (1 163 px for the `(20, 0)` nudge, through both doors). Then the canvas inside that same pane: press a row's ink box to select it (the file's row index, later row wins an overlap), drag to move it - one drag, one undo step, the row follows the cursor and the pane repaints as it goes - and the arrow keys nudge 1 px / 10 px. Still to build: drawing the editor from live readings, and resizing or reordering rows | 3-3½ | 9-10½ |
 | 5 | docs and gates: docs/themes.md's "not in the picker, and that is not an oversight" section brought up to date, docs/usage.md's CLI table, docs/gui.md's window census, README's five-theme claims, the window's own theme tooltip (it still says the vendor files are for the panel's firmware, which §11 contradicts), `smoke` rendering every installed layout offline against a pinned values dict. The suite grows by at least one section - stage 1's gates belong in the vendor-library section that already re-derives docs/themes.md's colour census, not in a new one - and then every place `twenty` is a gate moves with it: README, docs/tools.md, docs/packaging.md, the top changelog stanza, and the count `.github/workflows/ci.yml` compares against | 1 | 3 |
 | 6 | on glass, with the panel attached and the owner watching: the runnable set at 1 and 2 fps, achieved fps, loop seams for the vendor clips, the dark-ink-over-bright question that docs/limits.md still carries, and the transcript kept the way docs/packaging/ keeps installs | 1 | 3 |
 | | **total** | **10-12** | **30-36 h** |
@@ -543,14 +609,15 @@ PROTOCOL.md §10 - so this needs the installed app off the Windows machine again
 ## What this document does not claim
 
 This document was written before any of it existed, and it is now part record, part plan.
-What does **not** exist in this tree: the canvas half of stage 4 (widgets cannot be dragged
-or nudged, and the inspector edits one field at a time from the pinned fixture rather than
-from live readings); the layout export for `bars` - `alpha` assembled 2026-11-08 into 12 rows
+What does **not** exist in this tree: live readings under the editor (the pane draws the
+pinned fixture, and rows are moved one at a time - no resizing a row by its edge, no
+add/remove/reorder); the layout export for `bars` - `alpha` assembled 2026-11-08 into 12 rows
 at a zero pixel diff, its three pairs of lettering as `special`s (`fan-figures`,
 `temp-values`, `temp-labels`), its rings and usage bars as `arc`/`bar` rows naming a painter
 convention; any
 unit for the `space` the panel reports. What does: stages
-1-3 as their rows say, stage 4's model and the window's row over it, and
+1-3 as their rows say, stage 4's model with the window's row over it and the canvas in the
+pane over that, and
 `--export-theme`, `--list-specials`, `--check-theme` and `--print-theme-fields`, each gated
 in `tools/selftest.sh`.
 
