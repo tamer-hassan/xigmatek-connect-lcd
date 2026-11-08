@@ -36,15 +36,14 @@ build stopping at "PEP517 plugin dependencies are not available" without it.
 | `xigmatek-connect-lcd_0.2_all.deb` | the three commands in `/usr/bin`, `xigmalcd/` and `xigmaui/` in `/usr/lib/python3/dist-packages`, the three vendored clips in `/usr/share/xigmalcd/media`, the udev rule in `/usr/lib/udev/rules.d`, the user unit in `/usr/lib/systemd/user`, the menu entry in `/usr/share/applications`, the icon in `/usr/share/icons/hicolor/256x256/apps`, and the documentation: `README.md`, `PROTOCOL.md` and the ten `docs/*.md` files they link, under `/usr/share/doc/xigmatek-connect-lcd` | 5.2 MB | 47 files |
 | `xigmatek-connect-lcd-themes_0.2_all.deb` | ALPHA's own library under `/usr/share/xigmalcd/themes/alpha`: 27 `.thm` files, their decrypted layouts, 44 background clips (43 MP4 and one PNG), 27 baked overlay PNGs, and `manifest.json`, which hashes all 152 entries of the 125 distinct files | 146 MB | 129 files |
 
-Both rows are one build on the author's bench, 2026-11-07, of the tree at the `v0.2`
-tag - a build of the tree as it stands now names the files `_0.3_` instead, because the
-(the 0.3 build is measured in its own section below, "What the 0.3 tree packages",
-because the themes package changed shape there: the vendor's `.thm` containers are no
-longer packaged, and the file is 79 839 522 B rather than 146 137 362 B)
-top `debian/changelog` stanza has moved to `0.3 UNRELEASED` and `pyproject.toml` /
-`xigmalcd.__version__` moved with it; `0.3` has been released nowhere, and the two
-published releases stay 0.1 and 0.2 (the CI job that builds the packages fails if those
-three spellings of the number ever part company, and `debian/README.source` says why).
+Both rows are one build on the author's bench, 2026-11-07, of the tree at the `v0.2` tag.
+A build of this tree names the files `_0.3_` instead, and that build is measured in its own
+section below, "What the 0.3 tree packages, measured" - the themes package changed shape on
+the way here, because the vendor's `.thm` containers are no longer packaged, so that file is
+a good deal smaller than the 146 137 362 B above while holding the same library. The version
+number is spelled the same in three places - the top `debian/changelog` stanza,
+`pyproject.toml` and `xigmalcd.__version__` - and the CI job that builds the packages fails
+if those spellings ever part company (`debian/README.source` says why).
 The build quoted here ran on Ubuntu 26.04 "resolute",
 debhelper 13.31ubuntu1, dh-python 7.20260309, python3-all 3.14.3-0ubuntu2,
 python3-setuptools 78.1.1-0.1build1, `dpkg-buildpackage -us -uc -b` exit 0. The file
@@ -396,8 +395,8 @@ which answers `46fb6f2da1effd1b4e82522df530cbef7bc08016ee0f9e15a44fa864f88a0b17`
 **100 files** and **85 034 557 B** - computed independently out of two separately built
 packages an hour of editing apart, and identical.  The **container** - the `.deb` itself, `dpkg -c` output, byte
 count and all - is deliberately *not* hashed here, and that
-is not modesty: `changelog.gz` ships inside the themes package, the 0.3 stanza is still
-`UNRELEASED`, and every note written into it changes the container.  One earlier build of
+is not modesty: `changelog.gz` ships inside the themes package, and while the 0.3 stanza
+was `UNRELEASED` every note written into it moved the container.  One earlier build of
 this same library measured `4ce88e6d22b19a1c2ee7648da2c3677957d4b261750f8130d24d39dbb91980ee`
 and 79 841 286 B; the run above, eight changelog edits later, is 79 844 056 B - the library
 identical, `46fb6f2d…` in all four: four builds this sitting, four identical digests.  That
@@ -405,9 +404,11 @@ is the trap two paragraphs below records, met here
 rather than in a reader's bug report.  Once the stanza is stamped and tagged, the container
 hash belongs in the release body, computed from the uploaded files by the release job, where
 it cannot drift: see `## The release` below for exactly that shape of record at 0.1 and 0.2.
-What has *not* been re-measured for 0.3 is the bench-versus-runner half, because 0.3 has
-no tag and the runner has only ever built the `v0.2` one; that stays unclaimed until the
-tag exists.
+What 0.3 does not claim yet is the bench-versus-runner half: the pair of builds above were
+compared with each other, on one machine, and a build of the same tree made elsewhere has
+only ever been compared for the `v0.2` tag. A tag is what makes that comparison possible -
+two machines pointed at one commit - and the measurement lands here as soon as the release
+job has run against `v0.3`.
 
 An earlier pair of builds of this tree did *not* compare clean, and the cause is worth
 recording because it is the trap in this kind of check: `debian/changelog` had been

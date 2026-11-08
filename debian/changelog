@@ -1,8 +1,4 @@
-xigmatek-connect-lcd (0.3) UNRELEASED; urgency=medium
-
-  * NOT RELEASED.  This stanza describes the tree since the v0.2 tag.  The
-    version and the date stamp get settled when 0.3 is cut; until then a build
-    of this tree produces a 0.3 package that has not been published anywhere.
+xigmatek-connect-lcd (0.3) resolute; urgency=medium
 
   * xigmaui in three columns instead of one long scroll, at the author's own
     1 919x1 055: the clip list had a 190 px viewport with 114 px rows, which is
@@ -249,7 +245,7 @@ xigmatek-connect-lcd (0.3) UNRELEASED; urgency=medium
     tools/selftest.sh asserts there is no .thm anywhere in the tree, that the
     27 recorded hashes agree with the per-theme rows, and the 100-file layout.
 
- -- Tamer Hassan <thameruddin@gmail.com>  Sat, 07 Nov 2026 09:45:00 +0200
+ -- Tamer Hassan <thameruddin@gmail.com>  Sun, 08 Nov 2026 01:57:03 +0200
 xigmatek-connect-lcd (0.2) resolute; urgency=medium
 
   * README.md is the overview and the detail lives in docs/ - install.md,

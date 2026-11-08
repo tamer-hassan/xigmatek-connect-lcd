@@ -454,7 +454,6 @@ jobs:
             echo "these bytes is the glass itself - README, its docs/ set and"
             echo "PROTOCOL.md carry those claims, each with the bench log it was read"
             echo "out of."
-            echo "claims, each with the bench log it was read out of."
             echo
             echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           } > "$RUNNER_TEMP/notes.md"
