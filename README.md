@@ -90,6 +90,12 @@ the display's status, the theme picker and the text-colour row in the middle, an
 background clip library on the right listing this machine's clips once per distinct
 file - 40 of them, from 161 mp4 files in the roots it walks](docs/screenshot-xigmaui.png)
 
+And these are real captures from live system (simple vs advanced mode):
+
+![xigmaui, simple mode](docs/xigmaui1.png)
+
+![xigmaui, advanced mode](docs/xigmaui2.png)
+
 It talks to a display loop that is already running when one is running, and drives the
 port itself when nothing is — which is the part that needs care, because the panel
 allows exactly one opener. [docs/gui.md](docs/gui.md) is the whole write-up: what every
