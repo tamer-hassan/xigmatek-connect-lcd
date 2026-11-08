@@ -181,7 +181,11 @@ claim:
   installed `/usr/share` tree is ever written: the first is where every number in these
   docs was read from, the second is dpkg-owned and re-hashed by the install test. The five
   drawn-from-code names are refused as file names too, so there cannot be a second
-  `gauge` that disagrees with `render.theme_gauge`.
+  `gauge` that disagrees with `render.theme_gauge`. A file you write by hand in that
+  directory may carry this program's own extension keys - `--print-theme-fields` lists
+  them, five today, each with the reason it had to be added - and the suite holds one such
+  hand-authored file to the same standard as our own exports: its ring paints
+  `render.temp_arc`'s ring with **zero differing pixels** at six readings.
 * **Two of the five can be exported as data, and both are pixel-identical to the code.**
   `--export-theme clock` generates 3 widgets and 1 448 characters, `--export-theme gauge`
   5 widgets and 2 314, each byte-identical between runs, and the suite's parity gate paints

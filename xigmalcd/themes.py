@@ -392,6 +392,15 @@ XIGMA_KEYS = {
               "`%A %d %B %Y`); the vendor `Date` shape in this repo is `%m/%d/%Y`; neither "
               "has been measured off the vendor's picture, so rewriting our theme to the "
               "other one would change the glass for no measured reason",
+    "colourStops": "a ramp written as data: [fraction, rgba()] pairs, interpolated "
+                   "piecewise-linearly. Measured against both ramps this repo draws, at "
+                   "every position its ring steps through: `render.temp_colour` agrees "
+                   "at all 100 of them, `render.heat()` disagrees at 8, never by more "
+                   "than one unit and only in red and blue, all 8 in the two segments "
+                   "where `heat` divides by the literals 0.3 and 0.2 while its own "
+                   "breakpoints give 0.30000000000000004 and 0.19999999999999996. So a "
+                   "three-stop value-keyed ring is data here, and `heat` is an open "
+                   "question about our arithmetic - which is what blocks `dual`",
     "arcPaint": "which painter's ring convention this widget was authored for: `vendor` "
                 "(1-degree segments, colour sampled at each segment's middle - measured "
                 "off ALPHA's frames) or `render` (3-degree segments, 0.4 degrees of "
@@ -555,6 +564,9 @@ def validate(obj: dict) -> tuple:
         if src and src not in SOURCES and src not in CLOCKED and src not in UNMAPPED:
             soft.append(f"widget {i} ({kind}): source {src!r} has no entry in "
                         "themes.SOURCES - it will be reported as unanswered")
+        stops, why = layout.colour_stops(pr)
+        if why:
+            soft.append(f"widget {i} ({kind}): xigma.colourStops is malformed - {why}")
         if kind == "arc" and layout.arc_paint(pr)[0] is None:
             soft.append(f"widget {i} (arc): xigma.arcPaint {layout.arc_paint(pr)[1]!r} "
                         f"is not one of {' '.join(sorted(layout.ARC_PAINT))} - the ring "

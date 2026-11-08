@@ -1881,6 +1881,94 @@ print(f"  validate            {hit}/{len(named)} named in one fixture "
 PY
 rm -rf "$EDIT_TMP"
 
+
+# ---- an *authored* layout (not an export of our code): a ramp written as data, saved
+# ---- through the file model, read back, and painted against the code it describes.
+AUTH_TMP="$(mktemp -d)"
+XDG_CONFIG_HOME="$AUTH_TMP" python3 - <<'PY' || { echo "authored ramp FAILED"; exit 1; }
+import os
+from PIL import Image, ImageChops
+from xigmalcd import layout, render, themes
+LO, MID, HI = 30.0, 62.0, 100.0           # render.A26_ARC_* : green / amber at 62 / red
+CX, CY, R, TH = 240, 240, 110, 18
+stops = [[0.0, themes.rgba_str(render.GREEN)],
+         [(MID - LO) / (HI - LO), themes.rgba_str(render.AMBER)],
+         [1.0, themes.rgba_str(render.RED)]]
+obj = {"id": "fixture-ring", "width": render.W, "height": render.H, "ratio": "1:1",
+       "osd": {"widget": [themes.widget("xigma-fixture-ring", "arc", {
+           "x": CX - R, "y": CY - R, "sizeWidth": 2 * R, "sizeHeight": 2 * R,
+           "radius": R - TH, "width": TH, "angleStart": 30, "angleEnd": 330,
+           "bgColor": themes.rgba_str(render.TRACK),
+           "startColor": themes.rgba_str(render.GREEN),
+           "endColor": themes.rgba_str(render.RED),
+           "minValue": LO, "maxValue": HI, "source": "CPU Temperature",
+           "xigma": {"arcPaint": "render", "colourStops": stops}})]}}
+hard, soft = themes.validate(obj)
+assert not hard and not soft, (hard, soft)
+path, soft = themes.save(obj, "fixture-ring")
+assert not soft and os.path.exists(path), soft
+back = themes.resolve("fixture-ring")
+assert back and back.get("edited"), back
+rows, absent = [], 0
+for v in (12.0, 31.0, 52.0, 62.0, 88.0, 100.0):
+    img = Image.new("RGBA", (render.W * render.SS, render.H * render.SS), (0, 0, 0, 0))
+    render.temp_arc(img, CX, CY, v, LO, MID, HI, R, TH, render.TRACK)
+    code = img.resize((render.W, render.H), Image.LANCZOS).convert("RGBA")
+    lay, notes = themes.draw(themes.load(back["path"]), {"cpu": {"temperature": v}})
+    flat = ImageChops.difference(code, lay.convert("RGBA")).get_flattened_data()
+    diff = sum(1 for q in flat if q != (0, 0, 0, 0))
+    worst = max((max(q) for q in flat), default=0)
+    painted = sum(1 for q in code.getchannel("A").get_flattened_data() if q)
+    assert diff == 0 and worst == 0, (v, diff, worst, notes["arc_colour"])
+    rows.append((v, painted, notes["arc_colour"]))
+assert "no fill" in [r[2] for r in rows[:1]], rows[0]
+
+# how exact the data spelling is against each ramp this repo draws, counted on the
+# segment colours the painters actually use (3 degrees, sampled at the segment start)
+def segcols(fn, sweep, n=92):
+    out, acc = [], 0.0
+    while acc < sweep * n / 100.0 - 0.001:
+        out.append(fn(acc / sweep))
+        acc += 3.0
+    return out
+
+
+def stopcol(stops, t):
+    return layout.ramp_at(list(stops), t, "trunc")       # stops are (frac, rgba tuple)
+
+
+temp_stops = [(0.0, render.GREEN), ((MID - LO) / (HI - LO), render.AMBER),
+              (1.0, render.RED)]
+temp_code = [render.temp_colour(LO + t * (HI - LO), LO, MID, HI)
+             for t in [i * 3.0 / 300.0 for i in range(100)]]
+temp_bad = sum(1 for t, want in zip([i * 3.0 / 300.0 for i in range(100)], temp_code)
+               if stopcol(temp_stops, t) != want)
+heat_stops = [(0.0, render.CYAN), (0.5, render.GREEN), (0.8, render.AMBER),
+              (1.0, render.RED)]
+ts = [i * 3.0 / 300.0 for i in range(100)]
+heat_bad = sum(1 for t in ts if stopcol(heat_stops, t) != render.heat(t))
+assert temp_bad == 0, temp_bad
+assert heat_bad > 0, "heat() now agrees with a stop-interpolated copy - recheck the finding"
+themes.delete_user_theme("fixture-ring")
+print(f"  an authored ramp      a layout nobody shipped, written by the file model and "
+      f"read back from {os.path.relpath(path, themes.user_root())}, paints "
+      f"`render.temp_arc`'s ring with **0 differing pixels and worst channel 0** at all "
+      f"six values (12 / 31 / 52 / 62 / 88 / 100 C, {rows[1][1]:,} lit px, the first "
+      f"below the declared scale drawing `no fill` both ways) - the ramp is "
+      f"`xigma.colourStops`, three pairs, and the convention is `xigma.arcPaint: render`")
+print(f"                        why the data spelling and not a named function: counted "
+      f"over the segment colours the painters use, `render.temp_colour` agrees with the "
+      f"stop-interpolated ramp on all {len(ts)} sampled positions ({temp_bad} differ), "
+      f"while `render.heat()` differs from its own stop copy on {heat_bad} of {len(ts)} - "
+      f"always one unit of red, because `heat` divides by the literals 0.3 and 0.2 while "
+      f"its breakpoints are 0.5 and 0.8, and `0.8 - 0.5` is 0.30000000000000004. Under "
+      f"`int()` truncation a product a hair under an integer steps down. That is our "
+      f"arithmetic, not the schema: `dual` is blocked on the question of whether to fix "
+      f"`heat` (which moves the recorded figures for dual, alpha and bars) or to name the "
+      f"ramp (docs/theme-editor.md)")
+PY
+rm -rf "$AUTH_TMP"
+
 # ---- the four `line` widgets, measured against the vendor's own baked picture.  The
 # ---- first time a copied layout is compared with pixels the vendor itself drew.
 python3 - <<'PY' || { echo "line vs its own picture FAILED"; exit 1; }
@@ -1963,7 +2051,7 @@ assert sorted(set(read) - set(cen["keys"])) == ["lineColor", "lineWidth", "name"
     sorted(set(read) - set(cen["keys"]))
 assert sorted(set(cen["keys"]) - set(read)) == sorted(themes.UNREAD_WHY), \
     sorted(set(cen["keys"]) - set(read))
-assert set(sub) == {"anchor", "arcPaint", "autoFitMax", "format"}, sub
+assert set(sub) == {"anchor", "arcPaint", "autoFitMax", "colourStops", "format"}, sub
 assert set(sub) == set(themes.XIGMA_KEYS), (sorted(set(sub) - set(themes.XIGMA_KEYS)),
                                             sorted(set(themes.XIGMA_KEYS) - set(sub)))
 assert cen["values"]["enableMove"] == {"False": 152}

@@ -292,11 +292,25 @@ What the remaining three need, each with the reason it is not yet answerable:
 | theme | what is missing | why it is a decision, not a lookup |
 |---|---|---|
 | `bars` | `render.hbar`'s per-column gradient | a vendor `bar` declares `startColor` and `endColor`, and `draw_bar` fills flat from `startColor`; a per-column ramp has no spelling in the vendor schema. Either a `xigma` ramp key names a code-drawn gradient, or the bar becomes a `special`. Both are on the table, neither is measured |
-| `dual` | the same again, two rings on `heat()`, a `render.bar` whose fill radius is a function of the value (`min(h/2, w*max(frac,0.02)/2)`, so its corners change with the reading), and `_fit_arc` | `heat()` is a four-stop ramp and `temp_colour()` three: functions, not colour pairs, so the ramp question recurs; and `_fit_arc` picks **one** text size jointly for two columns so a three-digit reading takes both down together - a relationship between widgets, which a per-widget schema cannot hold without a group key |
+| `dual` | two rings on `heat()`, a `render.bar` whose fill radius is a function of the value (`min(h/2, w*max(frac,0.02)/2)`, so its corners change with the reading), and `_fit_arc` | **ramps are settled as data** - `xigma.colourStops`, measured exact against `temp_colour` at all 100 sampled positions and off by one unit at 8 of them against `heat`, because `heat` divides by the literals 0.3 and 0.2 while its breakpoints are 0.5 and 0.8 (docs/limits.md, printed by the suite) - so `dual` waits on a decision about *our* arithmetic, not on the schema. `_fit_arc` picks **one** text size jointly for two columns so a three-digit reading takes both down together: a relationship between widgets, which a per-widget schema cannot hold without a group key |
 | `alpha` | the two fan figures, the tick strip, and its rings' `temp_colour` ramp | the fan figures and the tick strip stay code-drawn by decision (no PNG assets), so each needs a `special` drawing in `themes.SPECIALS` first - `clock-readings` is the pattern, and it reached a zero diff |
 
-The plan's rule holds while that happens: **an export that cannot be driven to a zero diff
-is not shipped**, and the suite prints which of the five are in and which are out.
+Two things that landing the ramp key made possible, before any theme needed it. A ramp is
+now data (`xigma.colourStops`), and it was tested against both ramps this repo draws rather
+than assumed: exact for `temp_colour` at all 100 sampled segment positions, off by one unit
+at 8 of them for `heat` - which is the last obstacle to `dual`, and it is an obstacle inside
+our own code (`heat` divides by the literals 0.3 and 0.2 where its breakpoints would give
+0.30000000000000004 and 0.19999999999999996).
+
+And the **first authored layout reaches a zero diff**: the suite writes a one-widget ring
+with that ramp through the file model, saves it into the user directory, resolves it back and
+draws it through the loop's own door - 0 differing pixels and worst channel 0 against
+`render.temp_arc` at six values including one below the declared scale. No export, no
+generator, nothing shipped: a file somebody edited, held to the same standard as our own
+themes. That is stage 4's premise, demonstrated a stage early.
+
+The plan's rule holds while all of this happens: **an export that cannot be driven to a zero
+diff is not shipped**, and the suite prints which of the five are in and which are out.
 
 ## The surface, and the geometry it must not break
 

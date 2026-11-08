@@ -772,6 +772,30 @@ writes a theme today. What the model does and does not allow, all of it gated:
   `Theme_28` draw six boxes instead of seven). Both are right by their own rule, so the two
   counts are printed side by side rather than reconciled: an export translates the drawing,
   not the theme's fallback behaviour.
+* **A ramp can be written as data, and this was measured rather than assumed.**
+  `xigma.colourStops` holds `[fraction, rgba()]` pairs interpolated piecewise-linearly,
+  and at every position a ring actually steps through (3 degrees along a 300-degree sweep,
+  100 positions) `render.temp_colour`'s three-stop ramp agrees with it at **all 100** -
+  the amber's fraction (62-30)/(100-30) round-trips through JSON to the same double - while
+  `render.heat()` disagrees with its own stop copy at **8 of 100**, never by more than one
+  unit and only in the red and blue channels. The eight land in exactly two segments: seven
+  between the 0.5 and 0.8 stops, where `heat` divides by the literal `0.3` while
+  `0.8 - 0.5` is `0.30000000000000004`, and one past 0.8, where it divides by `0.2` while
+  `1 - 0.8` is `0.19999999999999996`. Under `int()` truncation a product a hair under an
+  integer steps down. So the data spelling is exact for a value-keyed three-stop ramp and
+  inexact for `heat`, and what that blocks is `dual`, not the schema: the options are to
+  fix `heat`'s divisors to agree with its own breakpoints - which moves the recorded
+  figures for `dual`, `alpha` and `bars`, since that ramp is in all three - or to name the
+  ramp the way a `special` drawing is named. The suite prints the counts, so the choice
+  can be made against numbers.
+* **A layout that was never shipped, written and read back through the file model, paints
+  with zero difference.** The suite authors a one-widget ring (`colourStops` plus
+  `xigma.arcPaint: render`, 30..100 C with amber at 62), saves it with `themes.save`,
+  resolves it back out of the user directory and draws it through the same door the loop
+  uses: against `render.temp_arc` it is **0 differing pixels and worst channel 0** at six
+  values - 12, 31, 52, 62, 88, 100 C, 11 411 lit pixels, the 12 reading drawing "no fill"
+  both ways. That is stage 4's premise demonstrated before stage 4 exists: an edited file,
+  not an export of our code, can be held to the same zero-diff standard.
 * **Two ways to rasterise the same ring, and the difference is not rounding.** Our gauge
   ring segments a fill into 3-degree arcs, each drawn 0.4 degrees past its end so the
   joints do not show, colour sampled at the segment's *start* and mixed by truncation

@@ -350,6 +350,60 @@ def arc_paint(prop: dict) -> tuple:
     return ARC_PAINT[name], name
 
 
+def colour_stops(prop: dict) -> tuple:
+    """The `xigma.colourStops` ramp of a widget, as [(fraction, rgba)], or (None, why).
+
+    A ramp written as data: pairs of (position along the widget's own scale, colour),
+    interpolated piecewise-linearly - the same idea as the vendor's measured ring ramp in
+    `ARC_COLOUR_MEASURED`, in fraction space instead of degrees.
+
+    Why this spelling was tested against our own ramps rather than assumed - sampled at
+    every position `render.gauge` actually steps through (3 degrees along a 300-degree
+    sweep, 100 positions): `render.temp_colour`'s three-stop ramp, amber at 62 C in a
+    30..100 C scale, agrees with this interpolation at **all 100**, because the amber's
+    fraction (62-30)/(100-30) round-trips through JSON to the same double.  `render.heat()`
+    disagrees with its own stop copy at **8 of the 100**, never by more than one unit and
+    only in the red and blue channels, and the eight land in exactly two places: seven
+    between the 0.5 and 0.8 stops, where `heat` divides by the literal 0.3 while
+    `0.8 - 0.5` is 0.30000000000000004, and one past 0.8, where it divides by 0.2 while
+    `1 - 0.8` is 0.19999999999999996.  Under `int()` truncation a product a hair under an
+    integer steps down.  That is our arithmetic rather than the schema, and it is what
+    still blocks `dual` (docs/theme-editor.md, docs/limits.md).
+    """
+    ext = prop.get("xigma") or {}
+    raw = ext.get("colourStops")
+    if raw is None:
+        return None, None
+    if not isinstance(raw, list) or len(raw) < 2:
+        return None, "colourStops needs at least two [fraction, colour] pairs"
+    stops = []
+    for pair in raw:
+        if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+            return None, "each colourStops entry is [fraction, rgba(...)]"
+        try:
+            stops.append((float(pair[0]), rgba(pair[1])))
+        except (TypeError, ValueError, KeyError, IndexError):
+            return None, f"colourStops entry {pair!r} is not a fraction plus an rgba() colour"
+    fr = [f for f, _c in stops]
+    if fr != sorted(fr) or fr[0] != 0.0 or fr[-1] != 1.0:
+        return None, (f"colourStops must run from 0 to 1 in order; this one runs "
+                      f"{fr[0]} to {fr[-1]}")
+    return stops, None
+
+
+def ramp_at(stops: list, t: float, rounding: str = "nearest") -> tuple:
+    """Piecewise-linear colour at fraction `t`, rounded the convention's way."""
+    t = min(max(t, 0.0), 1.0)
+    mix = (lambda a, b, u: tuple(int(a[i] + (b[i] - a[i]) * u) for i in range(4))
+           if rounding == "trunc" else
+           tuple(round(a[i] + (b[i] - a[i]) * u) for i in range(4)))
+    for (f0, c0), (f1, c1) in zip(stops, stops[1:]):
+        if t <= f1:
+            span = f1 - f0
+            return mix(c0, c1, 0.0 if span <= 0 else (t - f0) / span)
+    return stops[-1][1]
+
+
 def arc_colour(prop: dict, deg: float, sweep: float, conv: dict | None = None) -> tuple:
     """(colour, how it was chosen) at `deg` degrees from the sweep's start."""
     conv = conv or ARC_PAINT["vendor"]
@@ -357,6 +411,15 @@ def arc_colour(prop: dict, deg: float, sweep: float, conv: dict | None = None) -
     mix = (lambda a, b, t: tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(4))
            if conv["round"] == "trunc" else
            tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(4)))
+    stops, _bad = colour_stops(prop)
+    if stops is not None:
+        # a ramp declared in the file beats a profile looked up by colour pair: one is
+        # what this theme says it wants, the other is what some other theme was measured
+        # doing with colours that happen to match
+        t = max(0.0, min(1.0, deg / sweep))
+        return ramp_at(stops, t, conv["round"]), (
+            f"`xigma.colourStops`, {len(stops)} stops, sampled at the "
+            + conv["sample"] + " of each segment")
     tab = ARC_COLOUR_MEASURED.get((start[:3], end[:3])) if conv["profile"] else None
     if tab is None:
         t = max(0.0, min(1.0, deg / sweep))
