@@ -339,9 +339,11 @@ have a reason rather than a shrug:
 
 ### What the 0.3 tree packages, measured
 
-The 0.2 numbers above are the published ones.  This tree at `0.3 UNRELEASED` packages
-something smaller, because it no longer carries the vendor's `.thm` containers
-(docs/themes.md, `themes/alpha/README.md`):
+The 0.2 numbers above are the published ones.  The 0.3 tree packages something smaller,
+because it no longer carries the vendor's `.thm` containers (docs/themes.md,
+`themes/alpha/README.md`).  The pair below was built while the stanza still said
+`0.3 UNRELEASED`; the stamped builds, and the runner's build of the same commit, are in the
+section further down:
 
 ```
   dpkg-buildpackage -us -uc -b          exit 0, twice, 2026-11-08: 01:25:18-01:25:28
@@ -380,8 +382,9 @@ Two builds of this tree, twenty seconds apart on this bench, came out byte-ident
 both packages - and the second run really is a run rather than a re-use of the first
 stash: `dh_auto_configure`, `dh_auto_build`, the `override_dh_auto_install` recipe (its
 `install -m 644 media/...` line is in both logs), `dh_install`, `dh_missing`,
-`dh_compress` and both `dh_builddeb` steps appear in each: the same clock pin `debian/rules` documents above, doing the same job on the
-smaller tree.
+`dh_compress` and both `dh_builddeb` steps appear in each, and each `dh_builddeb` names the
+same two packages at the same sizes: the clock pin `debian/rules` documents above is doing
+its job on this smaller tree too.
 
 Two hashes are worth writing down, because only one of them survives an edit to this file.
 The **payload** is the claim about the vendor's library, and a reader can take it from any
@@ -405,11 +408,9 @@ is the trap two paragraphs below records, met here
 rather than in a reader's bug report.  Once the stanza is stamped and tagged, the container
 hash belongs in the release body, computed from the uploaded files by the release job, where
 it cannot drift: see `## The release` below for exactly that shape of record at 0.1 and 0.2.
-What 0.3 does not claim yet is the bench-versus-runner half: the pair of builds above were
-compared with each other, on one machine, and a build of the same tree made elsewhere has
-only ever been compared for the `v0.2` tag. A tag is what makes that comparison possible -
-two machines pointed at one commit - and the measurement lands here as soon as the release
-job has run against `v0.3`.
+The bench-versus-runner half was still open when that was written, and is closed now:
+`v0.3` is tagged, the runner built it, and the comparison - one commit, two machines, both
+packages, including the new smaller themes one - is the next section but one.
 
 An earlier pair of builds of this tree did *not* compare clean, and the cause is worth
 recording because it is the trap in this kind of check: `debian/changelog` had been
@@ -573,3 +574,111 @@ that file's own bytes: this table was committed *after* `v0.2`, so the published
 `.deb` carries a version of this page without the table. The comparison above is between
 builds of `f627491`, the tagged tree, which is the tree the release job built - and it is
 why the size of each `.deb` in the table at the top of this file stays rounded.
+
+### The 0.3 tag, built here and built by the runner: the same bytes, both packages
+
+```
+tag v0.3               annotated tag object `fd2a2ce…`, on commit `954d14d…` - the
+                       `main` tip at the moment of tagging
+stanza                 `xigmatek-connect-lcd (0.3) resolute; urgency=medium`, stamped
+                       `Sun, 08 Nov 2026 01:57:03 +0200`; it becomes
+                       `/usr/share/doc/xigmatek-connect-lcd/changelog.gz` in the code package,
+                       and that file is what stopped drifting once the tag existed
+runner                 one job per ref: `CI: push [v0.3]`, suite, doc/manifest/link gates,
+                       build, lintian, install + `debian/tests/smoke`, then release.
+                       4 jobs green, published 2026-11-08T00:07:11Z, run 42427996701
+bench, same commit     two `dpkg-buildpackage -us -uc -b` in separate build areas, so neither
+                       run re-uses the other's stash: 01:58:24-01:58:42 and 01:58:42-01:58:59
+```
+
+Then the comparison the 0.2 section describes, done again with the tag pointing at one
+commit both machines could check out:
+
+```
+xigmatek-connect-lcd_0.3_all.deb
+  runner     5 230 088 B  sha256 d6fcc19cb89b9dfb67e00e6cd86616f281a412526662dad1c612adcad96cf668
+  bench      5 230 088 B  same digest, and `cmp` against either of the two bench builds: clean
+xigmatek-connect-lcd-themes_0.3_all.deb
+  runner    79 843 948 B  sha256 1c217e3143e118456f9f75f0b7f51c0cce841a6f8f8ce46bddf5dce7070ca2c2
+  bench     79 843 948 B  same digest, and `cmp` clean
+payload digest, read out of `dpkg -x` of any of them:
+  46fb6f2da1effd1b4e82522df530cbef7bc08016ee0f9e15a44fa864f88a0b17   over 100 files / 85 034 557 B
+```
+
+The payload digest is the same one the `0.3 UNRELEASED` pair two sections above printed, so
+four builds - two here before the stanza was stamped, two here after, and the runner's -
+all carry an identical vendor library.
+
+Two things make this pair more interesting than the 0.2 one, and both are about the themes
+package rather than the code:
+
+* Its payload changed by 66 MB on the way here: `146 137 362 B` to `79 843 948 B`, installed
+  size `147 854 KiB` to `83 111 KiB`, because the 27 `.thm` containers are no longer shipped
+  and their decrypted content is.  A clock pin that survived a documentation edit at 0.2 has
+  to survive a payload swap too, and the byte-for-byte agreement between a 4-core runner and
+  a 24-core bench is what says it did.
+* The runner's install job read that package back and printed the census this file's
+  "documentation, as an installed thing" section asks for, for 0.3 rather than 0.2:
+  `xigmatek-connect-lcd-themes 0.3 all installed-size 83111 KB`, `11 markdown files … none
+  compressed`, `43 links inside the doc set, all resolving; 3 image link(s) repo-only by
+  design; 3 pointer(s) into the source`, `2 kept log(s)`, `manifest 125/125 files hashed
+  clean under /usr/share/xigmalcd/themes/alpha`, `all installed checks passed`, and
+  `Need to get 14.7 MB … 58.1 MB of additional disk space`.  Against 0.2's numbers: links up
+  from 33 as the doc set grew, repo-only image links down from 8 to 3 because the GIFs went
+  and the previews README links are now GitHub CDN URLs rather than paths, kept logs up from
+  1 to 2, and hashed files down from 152 to 125 - exactly the 27 `.thm` rows, which are
+  `notRedistributed` entries in the manifest now instead of files on disk.
+* The panel was absent again, which the install job says out loud: `the panel is not
+  present: everything that can be checked without talking to it is checked`.  Same sentence
+  as 0.1 and 0.2, same meaning: the CI box has no such device, and no test pretends to
+  judge the glass from a build.
+
+The recipe, so it can be repeated rather than taken on trust - and note that
+`gh release download` has no `--dest`; it writes into the current directory:
+
+```
+mkdir -p /tmp/verify && cd /tmp/verify
+gh release download v0.3 --repo tamer-hassan/xigmatek-connect-lcd --pattern '*.deb' --clobber
+sha256sum *.deb
+
+git clone https://github.com/tamer-hassan/xigmatek-connect-lcd src && cd src
+git worktree add --detach /tmp/b1 v0.3 && git worktree add --detach /tmp/b2 v0.3
+(cd /tmp/b1 && dpkg-buildpackage -us -uc -d -i -I)     # -d: this bench is not a clean chroot
+(cd /tmp/b2 && dpkg-buildpackage -us -uc -d -i -I)     # (docs/packaging.md above)
+cmp /tmp/b1/*.deb /tmp/verify/*.deb && cmp /tmp/b1/*.deb /tmp/b2/*.deb
+```
+
+The same caveat as at 0.2, stated before it bites anyone: this section was committed
+*after* `v0.3`, so the published code `.deb` carries an earlier copy of this file.  The
+byte counts in the table below are read off the published assets, not off a build of
+`HEAD`, and a build of any later commit differs by exactly this page.  The payload digest
+is the number that survives an edit here.
+
+### The published v0.3 release
+
+* **v0.3**: <https://github.com/tamer-hassan/xigmatek-connect-lcd/releases/tag/v0.3>,
+  published 2026-11-08T00:07:11Z by run 42427996701, and it is the release GitHub marks
+  **Latest** - so `gh release download --latest` now answers 0.3, which is what the Quick
+  start in README runs.
+
+| file | B | sha256 |
+|---|---|---|
+| `xigmatek-connect-lcd_0.3_all.deb` | 5 230 088 | `d6fcc19cb89b9dfb67e00e6cd86616f281a412526662dad1c612adcad96cf668` |
+| `xigmatek-connect-lcd-themes_0.3_all.deb` | 79 843 948 | `1c217e3143e118456f9f75f0b7f51c0cce841a6f8f8ce46bddf5dce7070ca2c2` |
+| `xigmatek-connect-lcd_0.3_amd64.changes` | 19 692 | `dbd659cc8f87afbb762036a15cfdaeb65903ab7804e8b5a677171654d12d5184` |
+| `xigmatek-connect-lcd_0.3_amd64.buildinfo` | 8 633 | `b18b2b3e07b1d131135cf759d7cf7aa77d4153d75682a5ed0648d4ce52593e2f` |
+
+The body the job wrote for the release quotes the two `.deb` digests, the lintian summary,
+and the sentence the section above proves: that a build of this tag on the same distro and
+dpkg version gives those same bytes.  Comparing the two published bodies, `v0.2` and `v0.3`,
+says exactly what changed between them and no more: the two asset rows, the two run links,
+and one deleted line.  That line is the bug the tag commit fixed - the notes step is a
+chain of `echo` lines, and one of them was the tail of an older wording of the closing
+paragraph, so the v0.2 body ended with `carry those bench-log-backed claims.` followed by a
+stray `claims, each with the bench log it was read out of.`  The v0.3 body's tail is clean.
+The published v0.2 body is left as published: the body is the record of what that job did,
+and rewriting it after the fact would make the release stop matching its own run.  The
+repair would be one line - `gh release edit v0.2 --notes-file <(gh release view v0.2 --json
+body --jq .body | grep -v '^claims, each with the bench log')` - and it was tried as a dry
+run before writing this sentence: that pipeline differs from the published body by exactly
+that one line and nothing else.
