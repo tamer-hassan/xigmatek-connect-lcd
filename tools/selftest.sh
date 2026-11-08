@@ -1460,6 +1460,12 @@ print(f"  faces on this machine {len(faces)} family/bold/size combinations asked
       + (f"; MISSING: {' '.join(missing_faces)}" if missing_faces else ""))
 sizes, drawn, skipped, dropped_fonts = [], 0, [], set()
 painted_total = 0
+boxes_per = {}
+# what this bench painted for each layout on 2026-11-08, recorded here so a machine that
+# lands somewhere else says *which layout* and by how much, instead of leaving a total to
+# be explained. This is a diagnostic print, not an assertion: the count belongs to the
+# fonts installed, the accounting identity above does not.
+BENCH_BOXES = {'Theme_01': 8, 'Theme_07': 8, 'Theme_14': 7, 'Theme_25': 5, 'Theme_27': 3, 'Theme_28': 6, 'Theme_29': 2, 'Theme_30': 8, 'Theme_33': 3, 'Theme_34': 3, 'Theme_35': 5, 'theme_36': 3, 'theme_37': 5, 'theme_39': 3, 'theme_40': 8, 'theme_41': 5, 'theme_45': 2, 'theme_46': 7, 'theme_47': 3, 'theme_48': 6, 'theme_49': 3, 'theme_50': 8, 'theme_52': 3}
 for rec in ok:
     img, notes = themes.paint(rec, PIN, when=WHEN, scrim=0)
     assert img.size == (480, 480), (rec["name"], img.size)
@@ -1472,6 +1478,7 @@ for rec in ok:
     sizes.append((len(render.to_png(img)), rec["name"], px, len(notes["boxes"])))
     drawn += len(notes["boxes"])
     painted_total += px
+    boxes_per[rec["name"]] = len(notes["boxes"])
     # `missing` carries two different kinds of thing: a metric this machine cannot read,
     # and a face that is not installed.  Only the first is a rule about the library.
     srcs = [m for m in notes["missing"] if not str(m).startswith("font:")]
@@ -1550,6 +1557,13 @@ print(f"  --list-themes           {len(lines)} lines, {len(pick)} of them the ca
 # substitutes a narrower DejaVu. What is asserted is machine-independent: the accounting
 # identity above, one box and >500 lit px per layout, and the exact set of layouts whose
 # *sources* are unanswered.
+off = sorted((n, b, BENCH_BOXES[n]) for n, b in boxes_per.items()
+             if BENCH_BOXES.get(n) != b)
+if off:
+    print("  box counts vs the bench " + "; ".join(f"{n} {b} here, {w} there"
+                                                 for n, b, w in off))
+else:
+    print(f"  box counts vs the bench  identical for all {len(boxes_per)} layouts")
 print(f"  vendor pixels          {drawn} boxes, {painted_total} lit px on this machine "
       f"(the bench of 2026-11-08 records 114 / 314169 with all 16 face combinations "
       f"installed); every layout paints, and every widget is either drawn or reported")
