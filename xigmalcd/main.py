@@ -848,9 +848,13 @@ def main(argv=None) -> int:
               " - `name` picks a drawing out of --list-specials, `xigma` is our own "
               "theme-level block, and lineColor/lineWidth are the line ink measured off "
               "the two overlays that have a line rather than out of a file")
-        print("  our own keys inside `xigma`: " + ", ".join(sub) +
-              " (an anchor, a format, a fit ceiling - docs/theme-editor.md says why each "
-              "one had to be added)")
+        print(f"  our own keys inside `xigma` ({len(sub)}), each with the reason it had "
+              f"to be added:")
+        for k in sub:
+            print(f"    {k:<14} {themes.XIGMA_KEYS[k]}")
+        print(f"                        that list is read out of `layout.py` with `ast`: "
+              f"a key nobody wrote a reason for still shows up here, and the suite fails "
+              f"when the two sets disagree")
         unread = sorted(set(cen["keys"]) - set(read))
         print(f"  carried by vendor files, never read here ({len(unread)}), with what the "
               f"value would have done:")

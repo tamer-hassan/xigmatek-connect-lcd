@@ -377,6 +377,31 @@ def field_census() -> dict:
             "values": values, "time_per_file": time_per_file}
 
 
+#: The `xigma` sub-keys this program reads, each with the reason it had to be added.  The
+#: list is *derived* - `keys_read()` finds them by reading `layout.py`'s source - so this
+#: table cannot grow silently: a new extension key appears in the census whether or not it
+#: has a reason written here, and the suite asserts the two agree.  That is the whole
+#: mechanism for "every schema addition has a stated reason, or it does not go in".
+XIGMA_KEYS = {
+    "anchor": "our five draw text centred (`render._text` anchors on \"mm\"); the vendor's "
+              "files anchor on the em box's top-left, so an export has to say which",
+    "autoFitMax": "our five shrink a face until the line fits (`render._fit_size` walks "
+                  "down in steps of 2 to a floor of 10); the vendor schema has a fixed "
+                  "`fontSize` and no such rule",
+    "format": "our date and time shapes are ours (`render.date_str` writes "
+              "`%A %d %B %Y`); the vendor `Date` shape in this repo is `%m/%d/%Y`; neither "
+              "has been measured off the vendor's picture, so rewriting our theme to the "
+              "other one would change the glass for no measured reason",
+    "arcPaint": "which painter's ring convention this widget was authored for: `vendor` "
+                "(1-degree segments, colour sampled at each segment's middle - measured "
+                "off ALPHA's frames) or `render` (3-degree segments, 0.4 degrees of "
+                "overlap, colour at the segment start, truncating lerp - what "
+                "`render.gauge` does). On one arc with two unchanged colours that is "
+                "164 / 3 366 / 3 889 / 6 989 differing pixels at four readings: the "
+                "difference is a drawing, not a rounding, so an export that claims to "
+                "describe our ring has to name it",
+}
+
 #: Why each key we do not read is safe to leave unread.  The *counts* are deliberately not
 #: written here: `--print-theme-fields` prints them out of the census, so a claim like
 #: "nothing is lost by dropping this one" is re-measured on every run instead of aging.
@@ -530,6 +555,10 @@ def validate(obj: dict) -> tuple:
         if src and src not in SOURCES and src not in CLOCKED and src not in UNMAPPED:
             soft.append(f"widget {i} ({kind}): source {src!r} has no entry in "
                         "themes.SOURCES - it will be reported as unanswered")
+        if kind == "arc" and layout.arc_paint(pr)[0] is None:
+            soft.append(f"widget {i} (arc): xigma.arcPaint {layout.arc_paint(pr)[1]!r} "
+                        f"is not one of {' '.join(sorted(layout.ARC_PAINT))} - the ring "
+                        f"will be reported as unwritten rather than drawn by guesswork")
         if kind == "special" and str(pr.get("name") or "") not in SPECIALS:
             soft.append(f"widget {i}: special name {pr.get('name')!r} has no drawing "
                         f"(--list-specials prints {' '.join(special_names())})")
@@ -727,7 +756,72 @@ def clock_recipe() -> dict:
     }
 
 
-EXPORTS = {"clock": clock_recipe}
+def gauge_recipe() -> dict:
+    """`gauge` as a layout: the ring, the reading, the label, the clock.
+
+    The ring is where an export has to say which painter it means, and it is the one place
+    in the schema where that is unavoidable.  `render.gauge` rasterises a fill as 3-degree
+    arcs, each drawn 0.4 degrees past its end so the joints do not show, colour taken at the
+    segment's *start* and mixed by truncation; the vendor's ring, measured off ALPHA's
+    captured frames, is 1-degree arcs with the colour at each segment's middle and butt
+    ends.  Same geometry, same two colours, different raster: the suite paints one arc both
+    ways and prints the count - 164 / 3 366 / 3 889 / 6 989 differing pixels at four
+    readings, worst channel delta 255.  So the widget says `xigma.arcPaint: "render"`, no
+    copied layout says anything, and the default stays the measured vendor convention
+    (`layout.ARC_PAINT` carries both, and `--check-theme` refuses an unknown name).
+
+    One colour detail worth writing down while it is in front of us: the pair that has a
+    measured ramp in `ARC_COLOUR_MEASURED` is ALPHA's *declared* one, (0,247,255) to
+    (0,255,113), and what that curve was measured to end at is (0,251,184) - which is
+    precisely `render.ALPHA_HOT`.  Our theme took the plateau of the vendor's curve as its
+    end colour and then drew a straight line to it.  Both conventions therefore fall back
+    to a lerp for this widget, and the pixel difference above is stepping and sampling
+    alone, not the profile.
+
+    The geometry comes straight out of what was measured off those frames (docs/limits.md,
+    `render.ALPHA_*`): centre (236, 236), stroke centre-line at radius 127, 22 px thick,
+    open at the bottom, 260 degrees from 140 deg clockwise in Pillow's angles - which in
+    the app's own angles, `arc_angles` says, is 50 to 310.  Pillow's arc stroke lies
+    *inside* the bbox ellipse, so the bbox is 254 across, the outer edge at 127 and the
+    declared inner `radius` 105.  The scale is the app's own 30..75 C, which is what
+    `minValue`/`maxValue` are for.
+    """
+    ext = lambda anchor, maxw=None: dict({"anchor": anchor},
+                                         **({"autoFitMax": maxw} if maxw else {}))
+    return {
+        "id": "xigma-gauge", "width": render.W, "height": render.H, "ratio": "1:1",
+        "xigma": {"theme": "gauge", "generated-from": "xigmalcd/render.py",
+                  "version": __import__("xigmalcd").__version__},
+        "osd": {"widget": [
+            widget("xigma-gauge-ring", "arc", {
+                "x": 236 - 127, "y": 236 - 127, "sizeWidth": 254, "sizeHeight": 254,
+                "radius": 105, "width": 22, "angleStart": 50, "angleEnd": 310,
+                "bgColor": rgba_str(render.ALPHA_TRACK),
+                "startColor": rgba_str(render.ALPHA_COLD),
+                "endColor": rgba_str(render.ALPHA_HOT),
+                "minValue": 30, "maxValue": 75, "source": "CPU Temperature",
+                "xigma": {"arcPaint": "render"}}, 0),
+            widget("xigma-gauge-title", "text", {
+                "x": 240, "y": 19, "content": "Smart Display", "fontFamily": "dejavu",
+                "fontSize": 20, "bold": True, "textColor": rgba_str(render.WHITE),
+                "xigma": ext("mm", 440)}, 1),
+            widget("xigma-gauge-value", "data", {
+                "x": 236, "y": 236, "source": "CPU Temperature", "fontFamily": "dejavu",
+                "fontSize": 52, "bold": True, "textColor": rgba_str(render.WHITE),
+                "xigma": ext("mm", 165)}, 2),
+            widget("xigma-gauge-label", "text", {
+                "x": 236, "y": 318, "content": "CPU TEMP", "fontFamily": "dejavu",
+                "fontSize": 14, "bold": True, "textColor": rgba_str(render.ALPHA_LABEL),
+                "xigma": ext("mm")}, 3),
+            widget("xigma-gauge-clock", "data", {
+                "x": 236, "y": 458, "source": "Time", "fontFamily": "dejavu",
+                "fontSize": 22, "bold": True, "textColor": rgba_str(render.ALPHA_MINT),
+                "xigma": ext("mm")}, 4),
+        ]},
+    }
+
+
+EXPORTS = {"clock": clock_recipe, "gauge": gauge_recipe}
 
 
 def export(name: str) -> dict:

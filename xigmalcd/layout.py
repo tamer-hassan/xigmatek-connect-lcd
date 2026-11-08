@@ -304,15 +304,70 @@ ARC_COLOUR_MEASURED = {
 }
 
 
-def arc_colour(prop: dict, deg: float, sweep: float) -> tuple:
+#: How a ring's fill is rasterised.  There are two conventions in this repo's evidence,
+#: they belong to different painters, and on the same declared geometry they are *not* the
+#: same picture - the suite paints one arc both ways and prints the pixel count between
+#: them (164 / 3 366 / 3 889 / 6 989 differing pixels at four values, worst channel
+#: delta 255), which is the whole reason this key exists.
+#:
+#:   `vendor` - ALPHA's own ring, as measured off its captured frames: one degree per
+#:              segment, colour sampled at the middle of each segment, butt caps, and
+#:              `ARC_COLOUR_MEASURED` consulted for the one pair that has been measured.
+#:   `render` - this program's ring, exactly as `render.gauge` draws it: 3 degrees per
+#:              segment, each segment drawn 0.4 degrees past its end so the joints do not
+#:              show, colour sampled at the *start* of the segment, and the lerp truncates
+#:              (`render._lerp`) instead of rounding.
+#:
+#: Both conventions fall back to a straight lerp for the exported built-ins, because the
+#: pair in `ARC_COLOUR_MEASURED` is the vendor's *declared* one - (0,247,255) to
+#: (0,255,113) - while `render.ALPHA_HOT` is the plateau that curve was measured to *end*
+#: at, (0,251,184).  So the difference printed above is stepping, sampling and rounding
+#: alone: same two colours, different raster.
+#:
+#: `xigma.arcPaint` selects one by name; no key means `vendor`, which is what every copied
+#: layout is.  The exported built-ins say `render`, because the claim of an export is that
+#: the layout paints what the code paints - a diff of zero, not a close match.
+ARC_PAINT = {
+    "vendor": {"name": "vendor", "step": max(1, int(round(1 * SS / 2))),
+               "sample": "middle", "overlap": 0.0, "round": "nearest",
+               "profile": True, "epsilon": 0.0},
+    "render": {"name": "render", "step": 3.0, "sample": "start", "overlap": 0.4,
+               "round": "trunc", "profile": False, "epsilon": 0.001},
+}
+
+
+def arc_paint(prop: dict) -> tuple:
+    """(the convention table for one arc, or None, and the name that was asked for).
+
+    The local is named `ext` because `themes.keys_read()` reads this module's source to
+    find which extension keys exist, and that is how a new `xigma` key cannot be added
+    without the census noticing it.
+    """
+    ext = prop.get("xigma") or {}
+    name = str(ext.get("arcPaint") or "vendor")
+    if name not in ARC_PAINT:
+        return None, name
+    return ARC_PAINT[name], name
+
+
+def arc_colour(prop: dict, deg: float, sweep: float, conv: dict | None = None) -> tuple:
     """(colour, how it was chosen) at `deg` degrees from the sweep's start."""
+    conv = conv or ARC_PAINT["vendor"]
     start, end = rgba(prop["startColor"]), rgba(prop["endColor"])
-    tab = ARC_COLOUR_MEASURED.get((start[:3], end[:3]))
+    mix = (lambda a, b, t: tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(4))
+           if conv["round"] == "trunc" else
+           tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(4)))
+    tab = ARC_COLOUR_MEASURED.get((start[:3], end[:3])) if conv["profile"] else None
     if tab is None:
         t = max(0.0, min(1.0, deg / sweep))
-        col = tuple(round(start[i] + (end[i] - start[i]) * t) for i in range(4))
-        return col, ("straight lerp startColor->endColor over the whole sweep "
-                     "(this colour pair was never measured on the glass)")
+        col = mix(start, end, t)
+        if conv["profile"]:
+            return col, ("straight lerp startColor->endColor over the whole sweep "
+                         "(this colour pair was never measured on the glass)")
+        return col, ("`xigma.arcPaint: " + conv["name"] + "` - straight lerp, sampled at "
+                     "the " + conv["sample"] + " of each segment, "
+                     + ("truncating" if conv["round"] == "trunc" else "rounding") +
+                     ": this program's own ring, not the vendor's measured ramp")
     ks = sorted(tab)
     if deg >= ks[-1]:                    # past the last measured sample: the
         rgb = tab[ks[-1]]                # plateau continues, and that is a gap
@@ -365,23 +420,25 @@ def draw_arc(draw: ImageDraw.ImageDraw, prop: dict, value) -> tuple:
     f = frac_of(prop, value)
     if f <= 0:
         return (x // SS, y // SS, x // SS + sw, y // SS + sh), "no fill"
-    # The vendor's fill is not one flat colour, and it is not a straight line
-    # between the two colours the layout declares either - see
-    # ARC_COLOUR_MEASURED.  Each degree is its own colour, so the fill is drawn
-    # as a run of one-degree arcs (half a degree at SS, so the segment ends land
-    # on whole degrees of the sweep).
-    start_c, end_c = rgba(prop["startColor"]), rgba(prop["endColor"])
-    ramp_note = "measured profile" if (start_c[:3], end_c[:3]) in \
-        ARC_COLOUR_MEASURED else "straight lerp (unmeasured colour pair)"
+    # The fill is not one flat colour, and for the vendor's ring it is not a straight line
+    # between the two colours the layout declares either - see ARC_COLOUR_MEASURED.  Which
+    # of the two conventions runs here is decided by `xigma.arcPaint`: a copied layout gets
+    # the vendor's (measured off ALPHA's frames), an exported built-in gets this program's
+    # (what `render.gauge` does), and the difference between them on identical geometry is
+    # printed by the suite rather than argued about.
+    conv, conv_name = arc_paint(prop)
+    if conv is None:
+        return (x // SS, y // SS, x // SS + sw, y // SS + sh), \
+            f"unknown xigma.arcPaint {conv_name!r}: {' '.join(sorted(ARC_PAINT))}"
     stop = a0 + f * (a1 - a0)
-    step = max(1, int(round(1 * SS / 2)))          # ~1 deg at SS
-    a = a0
-    while a < stop:
-        b = min(a + step, stop)
-        col, _ = arc_colour(prop, (a + b) / 2 - a0, a1 - a0)
-        draw.arc(box, a, b, fill=col, width=thick * SS)
+    a, col, ramp_note = a0, None, None
+    while a < stop - conv["epsilon"]:
+        b = min(a + conv["step"], stop)
+        deg = (a + b) / 2 - a0 if conv["sample"] == "middle" else a - a0
+        col, ramp_note = arc_colour(prop, deg, a1 - a0, conv)
+        draw.arc(box, a, b + conv["overlap"], fill=col, width=thick * SS)
         a = b
-    return (x // SS, y // SS, x // SS + sw, y // SS + sh), ramp_note
+    return (x // SS, y // SS, x // SS + sw, y // SS + sh), ramp_note or "no sweep to fill"
 
 
 #: The only two layouts in this library that carry a `line` widget - `Theme_14` and
@@ -503,6 +560,8 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
                 continue
             box, ramp = draw_arc(draw, prop, values[prop["source"]])
             notes["arc_colour"] = ramp
+            if ramp.startswith("unknown "):
+                notes["missing"].append("arcPaint name")
             if ramp.startswith("straight"):
                 notes["gaps"].append("arc colour, " + prop["source"])
             notes["boxes"].append(("arc", prop["source"], box))

@@ -763,6 +763,30 @@ writes a theme today. What the model does and does not allow, all of it gated:
   the drawing that reads it. The plan said derive it; building it showed there is nothing
   to derive it *from*, so our exports omit it and a gate asserts that none carries one.
   Export ids are `xigma-*`, never a random uuid, so a generated file is byte-stable.
+* **An exported layout is a picture of the theme *with its readings*, and the two doors
+  differ where a reading is missing.** `gauge` reaches a zero-pixel diff on every metrics
+  dict that answers `CPU Temperature`, and the suite's parity gate asserts that. Handed an
+  empty one, the code theme still paints what does not depend on a reading - it draws the
+  ring's track with no fill, 17 451 lit pixels - while the exported layout paints 4 319,
+  because a layout skips each widget whose `source` has no value (the same rule that makes
+  `Theme_28` draw six boxes instead of seven). Both are right by their own rule, so the two
+  counts are printed side by side rather than reconciled: an export translates the drawing,
+  not the theme's fallback behaviour.
+* **Two ways to rasterise the same ring, and the difference is not rounding.** Our gauge
+  ring segments a fill into 3-degree arcs, each drawn 0.4 degrees past its end so the
+  joints do not show, colour sampled at the segment's *start* and mixed by truncation
+  (`render.gauge`). ALPHA's own ring, measured off its captured frames, is 1-degree arcs
+  sampled at the middle, butt caps, with `ARC_COLOUR_MEASURED` consulted for its declared
+  colour pair. Same geometry, same two declared colours: **164 / 3 366 / 3 889 / 6 989
+  differing pixels** at four readings, worst channel delta 255 - the suite paints one arc
+  both ways and prints it. That is why `xigma.arcPaint` exists as an enumerated key instead
+  of being left to the painter's mood, and why the copied library, which carries no such
+  key, keeps drawing exactly as stage 1 measured it: 114 boxes, 315 287 lit pixels here.
+  A related fact came out of the same work: the one colour pair with a measured ramp is
+  ALPHA's *declared* pair, (0,247,255) to (0,255,113), and the plateau that curve ends at
+  is (0,251,184) - which is what `render.ALPHA_HOT` is. Our theme took the far end of
+  ALPHA's curve and drew a straight line to it, so for our pair the two conventions differ
+  by stepping alone and neither has a profile to use.
 * **Sizes outside the ten the library ships are allowed and said, not repaired.** Those
   ten are 12 14 16 20 24 32 40 70 100 140, counted out of the 27 files; our own generated
   `clock` export uses 22 and 26, and `--check-theme clock` warns about both. That is

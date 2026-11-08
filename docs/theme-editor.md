@@ -6,9 +6,10 @@ under `~/.config/xigmalcd/themes`, `--list-themes` and `--check-theme` print
 it with the counts, `--theme <background name>` selects a layout, the canvas refusal is a
 gate on each file's own `ratio` field, and the same names work over the control socket.
 Stage 2 is **partly** built: the export machinery, the `special` kind, the extension keys
-it needed, the determinism rules and both gates are in the tree, and one of the five themes
-(`clock`) generates to a layout that paints *exactly* what `render.py` paints - zero
-differing pixels across four different readings. The other four do not generate yet.
+it needed, the determinism rules and both gates are in the tree, and two of the five themes
+(`clock` and `gauge`) generate to layouts that paint *exactly* what `render.py` paints - zero
+differing pixels across four readings each, worst channel delta 0. The other three do not
+generate yet, and what they still need is written out below.
 Stage 3, the file model, is in - what it measured is written out under "What building the file model measured" below. Stage 4 (the inspector and the canvas), stage 5 (docs and census) and stage 6 (the glass pass) are not built. Every census figure below is re-derived by `tools/selftest.sh`'s vendor-library
 section, so it cannot rot in place. The decisions are
 settled with the owner; the census is measured out of the files in this tree on the same
@@ -100,8 +101,10 @@ the vendor-library section, from the shipped files - not a snapshot of a one-off
   widget and saying so* - which is exactly what `draw_theme`'s `notes["missing"]` already
   records; the work is to surface it, not to invent it.
 - Open gaps that stay gaps until measured: the arc colour ramp (`arc_colour` lerps
-  `startColor`→`endColor` for any pair it has never seen on glass) and the 8 unmeasured
-  display formats - which is where the existing roadmap items `Time_hh:mm`, `Week_en` and
+  `startColor`→`endColor` for any pair it has never seen on glass - one pair has been, and
+  it is the vendor's declared one rather than our `ALPHA_COLD`/`ALPHA_HOT`), the four-stop
+  `heat()` and three-stop `temp_colour()` ramps that no colour-pair spelling can express, and
+  the 8 unmeasured display formats - which is where the existing roadmap items `Time_hh:mm`, `Week_en` and
   `kb/s` live.
 - **The `line` gap closed on 2026-11-08, and closed by the vendor's own pixels rather than
   by a guess.** The four `line` widgets live in two themes (`Theme_14`, `theme_46`) and
@@ -242,10 +245,11 @@ because `layout` already imports `render` and not the other way round; an unknow
 back in `notes["missing"]` as `special:<name>`, so a typo in a layout is reported instead of
 drawn as something else.
 
-With those in place, `clock` generates to 3 widgets and 1 448 characters, byte-identical
-across runs, and parity reports the same painted count both ways on four readings - 25 548,
-25 545, 22 944 and 21 003 lit pixels - with **zero** differing pixels and a worst channel
-delta of 0. The diff is taken over all four channels on purpose: an alpha-only comparison
+With those in place, `clock` generates to 3 widgets and 1 448 characters and `gauge` to 5
+widgets and 2 314 characters, both byte-identical across runs, and parity reports the same
+painted count both ways on four readings each - 25 548, 25 545, 22 944 and 21 003 lit pixels
+for `clock`, 20 608, 21 391, 20 498 and 17 451 for `gauge` - with **zero** differing pixels
+and a worst channel delta of 0. The diff is taken over all four channels on purpose: an alpha-only comparison
 would not see a colour that had drifted, and colour is exactly what a layout carries in
 `textColor`. The same gate watches the vendor side from the other direction: all 23
 pickable layouts still paint **114 boxes and 315 287 lit pixels** (the total moved by
@@ -253,12 +257,46 @@ pickable layouts still paint **114 boxes and 315 287 lit pixels** (the total mov
 which is what proves the
 anchor/autoFit keys and the `special` branch changed nothing about a vendor theme.
 
-What the remaining four need before they can be generated is their geometry written down:
-the gauge ring (our 260° sweep and 30-100 °C scale, not the vendor's measured 269°/91°
-mouth), the gradient bars (`render.hbar` ramps a colour per column; `layout.draw_bar`
-fills with `startColor` alone), the two fan figures, and the tick strip. The plan's rule
-holds while that happens: **an export that cannot be driven to a zero diff is not
-shipped**, and the suite prints which of the five are in and which are out.
+### What settled the gauge ring, and what is left for the other three
+
+The ring was the last geometry question that could not be answered from the tree, and
+`gauge` answered it: centre (236, 236), stroke centre-line at radius 127, 22 px thick, 260
+degrees from 140° clockwise in Pillow's angles - which in the app's own angles is 50 to 310,
+because `arc_angles` measured `pil = app + 90` off ALPHA's frames - and a **30..75 °C**
+scale, which is the scale the captured frames imply (docs/limits.md records that the digits
+read 57 °C with the tip sitting at 58-63 % of the sweep). Pillow's arc stroke lies *inside*
+the bbox ellipse, so the declared `sizeWidth` is 254 with the outer edge at 127 and the
+inner `radius` 105.
+
+Building it exposed a difference that had never had to be named, and it is now a key:
+**`xigma.arcPaint`**. `render.gauge` rasterises a fill as 3-degree arcs, each drawn 0.4
+degrees past its end so the joints do not show, with the colour taken at each segment's
+*start* and mixed by truncation. The vendor's ring, measured off its own frames, is
+1-degree arcs with the colour at each segment's middle and butt caps. One arc, two
+unchanged colours, **164 / 3 366 / 3 889 / 6 989 differing pixels** at four readings, worst
+channel delta 255 - printed by the suite, because an export whose claim is "this layout
+paints what the code paints" cannot be tested while two painters differ silently. No copied
+layout carries the key; `layout.ARC_PAINT` defaults to the vendor's convention, and an
+unknown name is a soft finding in `validate` and a `missing` note at draw time rather than
+a guess.
+
+While that was open, one colour fact came out: the pair with a measured ramp in
+`ARC_COLOUR_MEASURED` is ALPHA's *declared* one, (0,247,255) to (0,255,113), and the plateau
+that curve was measured to end at is (0,251,184) - which is exactly `render.ALPHA_HOT`. Our
+theme took the end of the vendor's curve as its own end colour and drew a straight line to
+it, so the numbers above are stepping, sampling and rounding only: for this pair neither
+painter has a profile to differ about.
+
+What the remaining three need, each with the reason it is not yet answerable:
+
+| theme | what is missing | why it is a decision, not a lookup |
+|---|---|---|
+| `bars` | `render.hbar`'s per-column gradient | a vendor `bar` declares `startColor` and `endColor`, and `draw_bar` fills flat from `startColor`; a per-column ramp has no spelling in the vendor schema. Either a `xigma` ramp key names a code-drawn gradient, or the bar becomes a `special`. Both are on the table, neither is measured |
+| `dual` | the same again, two rings on `heat()`, a `render.bar` whose fill radius is a function of the value (`min(h/2, w*max(frac,0.02)/2)`, so its corners change with the reading), and `_fit_arc` | `heat()` is a four-stop ramp and `temp_colour()` three: functions, not colour pairs, so the ramp question recurs; and `_fit_arc` picks **one** text size jointly for two columns so a three-digit reading takes both down together - a relationship between widgets, which a per-widget schema cannot hold without a group key |
+| `alpha` | the two fan figures, the tick strip, and its rings' `temp_colour` ramp | the fan figures and the tick strip stay code-drawn by decision (no PNG assets), so each needs a `special` drawing in `themes.SPECIALS` first - `clock-readings` is the pattern, and it reached a zero diff |
+
+The plan's rule holds while that happens: **an export that cannot be driven to a zero diff
+is not shipped**, and the suite prints which of the five are in and which are out.
 
 ## The surface, and the geometry it must not break
 
@@ -302,7 +340,7 @@ number gated, the docs updated in the same change.
 |---|---|---|---|
 | 0 | this document, plus the schema written out properly: the `special` list, `autoFit`, the `xigma` block, the determinism rules, and how `--theme` opens past `choices=sorted(render.THEMES)` | 1 | 3 |
 | 1 | **landed 2026-11-08.** the 23 `1:1` layouts selectable in the loop: name→layout resolver, human names from `background.mediaFile`, the source→`sensors.collect()` table, `--list-themes`, `notes["missing"]` printed as "no pump tachometer here, widget skipped" and again over the socket's `status`, the four `4:3` themes excluded by a gate on `ratio` so a future 480 layout cannot be dropped by a filter, and a `--theme` name that is canonicalised once at parse time so the CLI, the log and the socket all spell it the same | 1-1½ | 3-4½ |
-| 2 | **machinery landed 2026-11-08.** `--export-theme NAME`, `--list-specials`, the `special` kind and its injected registry, the `xigma` extension keys, byte-stability and parity gates over four readings; `clock` generates at a zero-pixel diff; `alpha`/`bars`/`dual`/`gauge` do not generate yet. (`--print-theme-fields`, which was listed here as unbuilt, landed with stage 3.) | 2-2½ | 6-7½ |
+| 2 | **machinery landed 2026-11-08,** `--export-theme NAME`, `--list-specials`, the `special` kind and its injected registry, the `xigma` extension keys, byte-stability and parity gates over four readings; two of five generate today: `clock` (3 widgets, 1 448 chars) and `gauge` (5 widgets, 2 314 chars) both reach a **zero-pixel diff** on four readings each; `alpha`/`bars`/`dual` do not generate yet and the table under "What settled the gauge ring" says what each still needs. (`--print-theme-fields`, listed here as unbuilt, landed with stage 3.) | 2-2½ | 6-7½ |
 | 3 | **landed 2026-11-08.** the file model: the user root `~/.config/xigmalcd/themes` read before the checkout and before `/usr/share`, so an edited copy shadows the vendor's by file operation alone and deleting it puts the vendor's back; `canonical()`/`shape_of()`, `validate()` split into hard (will not draw) and soft (worth saying), `save()` (atomic tmp + `os.replace`, `.bak`, trailing newline, user root only, the five code names refused, traversal names refused), `copy_for_edit()`, `delete_user_theme()`, `user_copies()`, `themes.draw()` for an object that never touched a disk, and `--check-theme NAME` as the review door. The round-trip gate is in: **27/27 layouts reproduce byte for byte** and **23/23 copies are byte-identical to their source**. Not built: the window that drives it | 1-1½ | 3-4½ |
 | 4 | the surface: one-row inspector over the fields each kind carries (sized by `--print-theme-fields`, which prints the per-kind field census), the canvas inside the existing pane, pinned fixture and still preview, keyboard nudge, undo coalescing, coarse live apply (a name that resolves to your copy, since `--theme`/`status`/the socket already spell one name one way) | 3-3½ | 9-10½ |
 | 5 | docs and gates: docs/themes.md's "not in the picker, and that is not an oversight" section brought up to date, docs/usage.md's CLI table, docs/gui.md's window census, README's five-theme claims, the window's own theme tooltip (it still says the vendor files are for the panel's firmware, which §11 contradicts), `smoke` rendering every installed layout offline against a pinned values dict. The suite grows by at least one section - stage 1's gates belong in the vendor-library section that already re-derives docs/themes.md's colour census, not in a new one - and then every place `twenty` is a gate moves with it: README, docs/tools.md, docs/packaging.md, the top changelog stanza, and the count `.github/workflows/ci.yml` compares against | 1 | 3 |

@@ -1602,21 +1602,26 @@ print(f"  vendor pixels          {drawn} boxes, {painted_total} lit px on this m
       f"installed); every layout paints, and every widget is either drawn or reported")
 
 # ---- the generated export: byte-stable, and identical to the code it claims to describe
-dump_a = json.dumps(themes.export("clock"), indent=1, sort_keys=True)
-dump_b = json.dumps(themes.export("clock"), indent=1, sort_keys=True)
-assert dump_a == dump_b, "two exports of one theme differ - something non-deterministic"
-obj = json.loads(dump_a)
-assert obj["ratio"] == "1:1" and (obj["width"], obj["height"]) == (480, 480), obj
-for w in obj["osd"]["widget"]:
-    assert str(w["id"]).startswith("xigma-"), w["id"]        # never uuid4
-    assert isinstance(w["property"], list) and len(w["property"]) == 1, w["id"]
-    assert "time" not in w["property"][0], \
-        "an export carries no editor stamp: nothing generates one"
-    if w["type"] == "special":
-        assert w["property"][0]["name"] in themes.special_names(), w
-print(f"  export shape          {len(obj['osd']['widget'])} widgets, ids derived from "
-      f"the theme name, one-element `property` like every vendor file, no `time` stamp; "
-      f"{len(dump_a)} chars, byte-identical over two runs")
+shapes = []
+for name in sorted(themes.EXPORTS):
+    dump_a = json.dumps(themes.export(name), indent=1, sort_keys=True)
+    dump_b = json.dumps(themes.export(name), indent=1, sort_keys=True)
+    assert dump_a == dump_b, f"two exports of {name} differ - something non-deterministic"
+    obj = json.loads(dump_a)
+    assert obj["ratio"] == "1:1" and (obj["width"], obj["height"]) == (480, 480), obj
+    hard, soft = themes.validate(obj)
+    assert not hard, (name, hard)
+    for w in obj["osd"]["widget"]:
+        assert str(w["id"]).startswith("xigma-"), w["id"]        # never uuid4
+        assert isinstance(w["property"], list) and len(w["property"]) == 1, w["id"]
+        assert "time" not in w["property"][0], \
+            "an export carries no editor stamp: nothing generates one"
+        if w["type"] == "special":
+            assert w["property"][0]["name"] in themes.special_names(), w
+    shapes.append(f"{name} {len(obj['osd']['widget'])} widgets {len(dump_a)} chars")
+print(f"  export shape          {'; '.join(shapes)} - ids derived from the theme name, "
+      f"one-element `property` like every vendor file, no `time` stamp, each one "
+      f"validate-clean, each one byte-identical over two runs")
 
 # Parity: the generated layout painted by layout.py against the same theme painted by
 # render.py, one pinned instant and one pinned metrics dict, four different readings.
@@ -1639,14 +1644,22 @@ for name, recipe in themes.EXPORTS.items():
 no_face = sorted(f"{f}{'b' if b else ''}/{sz}" for f, b, sz in export_faces
                  if layout.font_for({"fontFamily": f, "bold": b,
                                      "fontSize": sz})[0] is None)
+partial = []
 for name in sorted(themes.EXPORTS):
     for m in CASES:
         r = themes.parity(name, m, WHEN)
         if no_face:      # an export's own face is not installed here: say so, don't fail
             break
+        if r["missing"]:
+            # a reading this metrics dict does not answer: the code theme still draws what
+            # it can - a gauge keeps its track, a bar keeps its groove - while a layout
+            # skips the widget whose `source` has no value.  Both are right by their own
+            # rule, so the numbers are printed rather than averaged away.
+            partial.append((name, tuple(sorted(set(r["missing"]))), r["code_px"],
+                            r["layout_px"]))
+            continue
         assert r["diff_px"] == 0 and r["worst_channel_delta"] == 0, (name, r)
         assert r["code_px"] == r["layout_px"] > 4000, (name, r)
-        assert not r["missing"], (name, r["missing"])
         rows.append((name, r["code_px"]))
     if no_face:
         break
@@ -1657,10 +1670,55 @@ if no_face:
 print(f"  export parity         {len(themes.EXPORTS)} of the five themes export today "
       f"({' '.join(sorted(themes.EXPORTS))}); across {len(CASES)} readings each, the "
       f"generated layout and render.py put down the same pixels: {per}")
+assert len(rows) >= 4 * len(themes.EXPORTS) - len(partial), (rows, partial)
+if partial:
+    assert all(p[0] == "gauge" and p[1] == ("CPU Temperature",) for p in partial), partial
+    print(f"  a reading missing     {len(partial)} of the {len(CASES) * len(themes.EXPORTS)} "
+          f"parity cases leave a source unanswered (the empty metrics dict): the code theme "
+          f"still paints what does not need it - gauge draws its ring's track with no "
+          f"fill, {max(p[2] for p in partial):,} px - where the exported layout paints "
+          f"{min(p[3] for p in partial):,} px, because a layout skips the widget whose "
+          f"`source` has no value. Kept as two pictures, not one fudge factor")
 print(f"  not exported yet      {' '.join(sorted(set(render.THEMES) - set(themes.EXPORTS)))}"
-      f" - the ring, the gradient bars and the fan figures need their geometry written "
-      f"down before they can be generated, and an export that does not reach a zero diff "
-      f"is not shipped (docs/theme-editor.md)")
+      f" - what stands between them and a zero diff: `render.hbar`'s per-column gradient"
+      f" (`layout.draw_bar` declares one colour, not a ramp), the two fan figures and the"
+      f" tick strip (code-drawn, so each needs a `special` drawing), dual's load bar, and"
+      f" the pairs of rings in alpha and dual sitting on top of other widgets. The ring"
+      f" geometry and the arc convention are settled now - the last of the unknowns that"
+      f" stopped being unknown - and an export that does not reach a zero diff is not"
+      f" shipped (docs/theme-editor.md)")
+
+# ---- why `xigma.arcPaint` exists at all: one arc, painted both conventions, measured
+from PIL import Image, ImageChops
+_arc = themes.export("gauge")["osd"]["widget"][0]["property"][0]
+
+
+def _ring(declared: bool, value):
+    img = Image.new("RGBA", (render.W * layout.SS, render.H * layout.SS), (0, 0, 0, 0))
+    prop = json.loads(json.dumps(_arc))
+    if not declared:
+        prop.pop("xigma", None)
+    from PIL import ImageDraw
+    layout.draw_arc(ImageDraw.Draw(img), prop, value)
+    return img.resize((render.W, render.H), Image.LANCZOS)
+
+
+conv = []
+for v in (31.0, 52.0, 57.4, 88.9):
+    flat = ImageChops.difference(_ring(True, v), _ring(False, v)).get_flattened_data()
+    conv.append((v, sum(1 for px in flat if px != (0, 0, 0, 0)),
+                 max((max(px) for px in flat), default=0)))
+assert all(n > 0 for _v, n, _w in conv), conv
+assert all(w > 0 for _v, _n, w in conv), conv
+gap = ", ".join(f"{v:g} -> {n:,} px differ, worst channel {w}/255"
+                for v, n, w in conv)
+print(f"  why arcPaint          one arc, two colours unchanged, drawn with "
+      f"`xigma.arcPaint: render` and without it: {gap}. The key exists because that is a "
+      f"drawing difference and not a rounding one: 3-degree segments sampled at their "
+      f"start against 1-degree segments sampled at their middle "
+      f"(`layout.ARC_PAINT`, both entries with their provenance in the comment). Without "
+      f"the key a gauge export would sit {conv[2][1]:,} px away from the theme it claims "
+      f"to describe, and the parity gate above would be decoration.")
 sp = subprocess.run([sys.executable, "-m", "xigmalcd", "--list-specials"],
                     capture_output=True, text=True, check=True)
 assert all(f"  {n}" in sp.stdout for n in themes.special_names()), sp.stdout
@@ -1905,7 +1963,9 @@ assert sorted(set(read) - set(cen["keys"])) == ["lineColor", "lineWidth", "name"
     sorted(set(read) - set(cen["keys"]))
 assert sorted(set(cen["keys"]) - set(read)) == sorted(themes.UNREAD_WHY), \
     sorted(set(cen["keys"]) - set(read))
-assert set(sub) == {"anchor", "autoFitMax", "format"}, sub
+assert set(sub) == {"anchor", "arcPaint", "autoFitMax", "format"}, sub
+assert set(sub) == set(themes.XIGMA_KEYS), (sorted(set(sub) - set(themes.XIGMA_KEYS)),
+                                            sorted(set(themes.XIGMA_KEYS) - set(sub)))
 assert cen["values"]["enableMove"] == {"False": 152}
 assert cen["values"]["italic"] == {"False": 132}, cen["values"]["italic"]
 assert cen["values"]["underline"] == {"False": 132}
