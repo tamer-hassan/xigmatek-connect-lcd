@@ -1436,26 +1436,47 @@ PIN = {"cpu": {"temperature": 61, "load": 42, "power": 88.5, "speedAverage": 433
        "gpu": {"temperature": 55, "load": 63, "power": 37.0, "speed": 1500},
        "network": {"upload": 12.3, "download": 45.6}, "memory": {"load": 7}}
 WHEN = datetime.datetime(2026, 11, 8, 3, 40, 0)
-sizes, drawn, skipped = [], 0, []
+# which of the four families the library names are actually installed here.  This is a
+# machine fact, not a library fact: the bench has Noto Sans CJK and a CI runner may not,
+# and a font that cannot be resolved drops its widget - so the boxes drawn and the frame
+# bytes below are "on this machine", and the gate is a floor with the font situation
+# printed rather than an exact count that would fail on another image.
+faces = {fam: bool(layout.font_for({"fontFamily": fam, "fontSize": 12}))
+         for fam in layout.FONTS}
+print("  faces on this machine " + ", ".join(f"{fam} {'yes' if have else 'MISSING'}"
+                                             for fam, have in sorted(faces.items())))
+sizes, drawn, skipped, dropped_fonts = [], 0, [], set()
 for rec in ok:
     img, notes = themes.paint(rec, PIN, when=WHEN, scrim=0)
     assert img.size == (480, 480), (rec["name"], img.size)
-    px = sum(v for v in img.getchannel("A").get_flattened_data()) if hasattr(
-        img.getchannel("A"), "get_flattened_data") else sum(img.getchannel("A").getdata())
+    alpha = img.getchannel("A")
+    vals = alpha.get_flattened_data() if hasattr(alpha, "get_flattened_data") \
+        else alpha.getdata()
+    px = sum(vals)
     assert notes["boxes"], (rec["name"], "drew nothing")
-    assert px > 2000, (rec["name"], px)
+    assert px > 500, (rec["name"], px)
     sizes.append((len(render.to_png(img)), rec["name"], px, len(notes["boxes"])))
     drawn += len(notes["boxes"])
-    if notes["missing"]:
-        assert notes["missing"] == ["Pump Speed"], (rec["name"], notes["missing"])
+    # `missing` carries two different kinds of thing: a metric this machine cannot read,
+    # and a face that is not installed.  Only the first is a rule about the library.
+    srcs = [m for m in notes["missing"] if not str(m).startswith("font:")]
+    gone = [str(m)[5:] for m in notes["missing"] if str(m).startswith("font:")]
+    dropped_fonts.update(gone)
+    if srcs:
+        assert srcs == ["Pump Speed"], (rec["name"], srcs)
         assert "fanscan" in notes["absent"]["Pump Speed"], notes["absent"]
         skipped.append(rec["name"])
 assert len(skipped) == 9, skipped
+assert [r["name"] for r in ok if r["name"] in
+        {n for n in need if need[n]}] and set(skipped) == {n for n in need if need[n]}, \
+    (skipped, sorted(n for n in need if need[n]))
 sizes.sort()
 print(f"  drawn offline, no port  all {len(ok)} layouts painted from a pinned metrics "
-      f"dict and one pinned instant: {drawn} widget boxes, {px and ''}"
+      f"dict and one pinned instant, on this machine's faces: {drawn} widget boxes, "
       f"frames {sizes[0][1]} {sizes[0][0]} B .. {sizes[-1][1]} {sizes[-1][0]} B "
-      f"(the same PNG shape `alpha` uploads)")
+      f"(the same PNG shape `alpha` uploads)"
+      + (f"; {len(dropped_fonts)} family(ies) not installed here, widgets using them "
+         f"skipped: {' '.join(sorted(dropped_fonts))}" if dropped_fonts else ""))
 print(f"                        {len(skipped)} themes report a skipped widget, every one "
       f"of them Pump Speed, with the reason in the note")
 

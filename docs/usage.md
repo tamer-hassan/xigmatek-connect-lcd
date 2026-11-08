@@ -119,7 +119,10 @@ claim:
   box (`tools/fanscan.py` has never been pointed at one).
 * **A widget with no reading is skipped and said so**, not drawn as a zero. Painted
   offline from one pinned metrics dict and one pinned instant, all 23 layouts draw
-  something - 114 widget boxes between them - and 9 print
+  something - 114 widget boxes between them on this bench, whose fonts resolve all four
+  families the library names; the suite prints the face situation per machine, because a
+  box with no CJK face installed drops those widgets and lands under that count - and 9
+  print
   `skipped Pump Speed: no pump tachometer has been measured on this box`. The same notes
   name every face substitution (`arial` -> `LiberationSans-Regular.ttf`, `simsun` ->
   Noto Sans CJK) and every shape that is this repo's choice rather than something measured
