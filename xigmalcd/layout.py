@@ -27,8 +27,8 @@ import json
 
 from PIL import Image, ImageDraw, ImageFont
 
-from .render import (A26_FAN_F, A26_FAN_MAX_W, SS, _FONT_GLOBS, fan_figures,
-                      heat)
+from .render import (A26_FAN_F, A26_FAN_MAX_W, A26_TVAL_F, SS, _FONT_GLOBS,
+                     fan_figures, heat, value_pair)
 
 # Fonts the layouts name, and what this machine has.  No Microsoft fonts are
 # installed here, so every one of these is a substitution; Liberation Sans is
@@ -201,6 +201,79 @@ def draw_text(draw: ImageDraw.ImageDraw, prop: dict, value: str, face,
     draw.text((x, y), value, font=face, fill=fill, anchor=anchor)
     box = draw.textbbox((x, y), value, font=face, anchor=anchor)
     return tuple(v // SS for v in box)
+
+
+def fit_ring(prop: dict) -> tuple:
+    """The ring a text row is sized against, as the six numbers `render.value_pair` needs:
+    `(cx, cy, inner, outer, start, sweep)`, panel px and Pillow degrees.
+
+    `xigma.fitArc` spells the ring in the vocabulary an `arc` row already uses - `radius` is
+    the **inner** edge and `width` the stroke, so outer is `radius + width`, and
+    `angleStart`/`angleEnd` are the app's own degrees where 0 is the bottom of the circle
+    (`arc_angles` measures the rule).  It describes **one** of the pair's two rings, because
+    the fit only ever needs one: the two rings are congruent, so measuring the first
+    column's - at `x - width/2`, the row being symmetric about its own `x` - answers both,
+    which is exactly what `render.theme_alpha` does by passing `A26_TCOL_X[0]`.
+
+    Returns `(ring, why_not)`.  `why_not` names the key that is missing or impossible, in
+    words a checker can print: a row that declares no ring cannot be sized, and drawing it
+    at the ceiling instead would put the figures over the gauge they stand inside.
+    """
+    ext = prop.get("xigma") or {}
+    arc = ext.get("fitArc")
+    if not isinstance(arc, dict):
+        return None, "xigma.fitArc is missing, or is not an object"
+    absent = [k for k in ("cy", "radius", "width", "angleStart", "angleEnd")
+              if k not in arc]
+    if absent:
+        return None, f"xigma.fitArc carries no {' '.join(absent)}"
+    inner, stroke = int(arc["radius"]), int(arc["width"])
+    if inner <= 0 or stroke <= 0:
+        return None, (f"xigma.fitArc radius {inner} / width {stroke} draws no ring for "
+                      f"text to clear")
+    start, end = arc_angles(arc)                 # the app's angles, the `arc` row's rule
+    if end <= start:
+        return None, (f"xigma.fitArc angleEnd {arc['angleEnd']} does not sweep past "
+                      f"angleStart {arc['angleStart']}")
+    cx = int(prop["x"]) - int(prop.get("width") or 0) // 2
+    return (cx, int(arc["cy"]), inner, inner + stroke, start, end - start), ""
+
+
+def draw_special_values(draw: ImageDraw.ImageDraw, prop: dict, strings) -> tuple:
+    """A `special` row that draws a *pair* of readings inside two rings, at one shared size.
+
+    The placement vocabulary is `draw_special_pair`'s - `x` is the pair's centre, `width`
+    the distance between the two figures' centres, `fontSize` the size ceiling,
+    `textColor`/`bold` the ink, `xigma.anchor` says what an `x` means - and what differs is
+    how the size is found: against the ring in `xigma.fitArc` rather than a width, because
+    that is the rule this drawing uses.  It is not a gap in the design that the row has to
+    name a ring: `xigma.autoFitMax` is a width, and the suite searches every whole-pixel
+    budget this canvas can hold and finds none that reproduces what the ring decides
+    (docs/limits.md, printed by the `the value pair, apart` line).
+
+    Returns `(size, union ink box in panel px)`, or `(None, None)` when the family cannot be
+    resolved or the row declares no ring to clear.  `draw_theme` reports the first, and
+    `--check-theme` says which key of the second is missing, so a file is not left guessing
+    which of its two problems it has.
+    """
+    face, fam, path = font_for(prop)
+    if face is None:
+        return None, None
+    ring, _why = fit_ring(prop)
+    if ring is None:
+        return None, None
+    ext = prop.get("xigma") or {}
+    half = int(prop.get("width") or 0) // 2
+    x = int(prop["x"])
+    colour = rgba(prop["textColor"]) if prop.get("textColor") else (255, 255, 255, 255)
+    size, boxes = value_pair(draw, tuple(strings), (x - half, x + half), int(prop["y"]),
+                             ring, colour, bold=bool(prop.get("bold")),
+                             ceiling=int(prop.get("fontSize") or A26_TVAL_F),
+                             anchor=str(ext.get("anchor") or "ma"),
+                             face=(lambda px: ImageFont.truetype(
+                                 path, max(int(px), 1) * SS)) if path else None)
+    return size, (min(b[0] for b in boxes), min(b[1] for b in boxes),
+                  max(b[2] for b in boxes), max(b[3] for b in boxes))
 
 
 def draw_special_pair(draw: ImageDraw.ImageDraw, prop: dict, figures) -> tuple:
@@ -769,8 +842,8 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
 
     `specials` is the registry for the one added kind, `special`: {name: callable}.  A
     special is a picture that stays code-drawn and takes its position, size and reading
-    from the layout - today the clock's readings line, `dual`'s status line and
-    `alpha`'s two fan figures.  It
+    from the layout - today the clock's readings line, `dual`'s status line and `alpha`'s
+    two fan figures and two temperature figures.  It
     exists so those elements can *move* without being baked into PNGs, and the table is
     injected rather than imported here because it is the one place that joins a layout
     kind to a theme drawing, and `themes` is the module that knows both sides.  A name with

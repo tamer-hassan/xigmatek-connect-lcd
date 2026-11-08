@@ -893,9 +893,30 @@ writes a theme today. What the model does and does not allow, all of it gated:
     So it *could* have been a group key. What it cannot be is `xigma.autoFitMax`, which is
     a width: of the 441 whole-pixel budgets this canvas can hold, not one reproduces the
     sizes the ring picks for `--`, 5, 22, 57, 100 and 241 °C all together (the best
-    reaches five of the six), and the per-reading windows run from a floor of 153 px down
+    reaches 5 of the 6), and the per-reading windows run from a floor of 153 px down
     to a ceiling of 148 px - an empty interval. The ring's limit is its hole, not a width,
     so `temp-values` becomes the second group special on measurement and not on taste.
+  * `temp-values` landed, and what it had to name is the ring itself: `xigma.fitArc`,
+    spelled in an `arc` row's own vocabulary (`cy`, `radius` the inner edge, `width` the
+    stroke, `angleStart`/`angleEnd` the app's degrees). Held to `theme_alpha` the same way
+    the fan row is, over the same 36 reading pairs, the row puts down 4 345 to 7 882 pixels
+    - a count that follows the faces on the bench, so the suite prints it rather than
+    pinning it - every one of them inside the ring's clear hole and carrying the theme's
+    own bytes, with nothing the theme paints in that hole left uncovered. What that hole
+    *is* was measured rather than drawn as a band: the ring's painter, on a canvas of its
+    own through the same supersampling and the same `LANCZOS` downscale the theme ends
+    with, leaves **566 px** of ink inside the declared inner edge, its deepest pixel
+    **2.77 px** past that edge - antialiasing plus the resampling tail. Those pixels belong
+    to the ring, and a row that draws text cannot answer for them. What is left of the
+    hole is the row's, and it is painted exactly. The row's own ink stays **6.66 px**
+    inboard of the inner edge, **3.89 px** clear of the tail - both measured on the bench,
+    and the reason `render.ARC_FIT_GAP` is a named constant rather than a literal at two
+    call sites: the suite holds it above the tail it measures, because a clearance below
+    that would put a reading on top of the gauge it belongs to.
+  * and a `values` row that declares no ring is not drawn at all, in words rather than by
+    accident: `--check-theme` prints which `xigma.fitArc` key is missing, and the frame the
+    loop paints for that row holds zero pixels - measured, since drawing at the `fontSize`
+    ceiling instead would put both figures on the stroke.
 * **A ramp can be data, or it can be named - and both are now spelled, because they are
   not equally exact.** See the `xigma.colourStops` and `xigma.colourRamp` entries printed
   by `--print-theme-fields`: three stops reproduce `render.temp_colour` at all 100 sampled

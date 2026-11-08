@@ -268,9 +268,14 @@ things an editor commonly gets wrong:
   reads `width` not at all. The field list cannot show that difference - both rows are
   `special` - so the note line says it in both directions rather than leaving a reader to
   set a number that does nothing. Which shape a name has is read out of the registry:
-  `themes.special_is_pair` is checked against the door each drawing function actually
-  calls (`layout.draw_special_pair` or `draw_special_line`), found in its own source, so
-  the window keeps no list of which drawings are pairs. The gate also measures the claim
+  `themes.special_door` and `themes.special_is_pair` are checked against the door each
+  drawing function actually calls (`layout.draw_special_line`, `draw_special_pair` or
+  `draw_special_values`), found in its own source, so the window keeps no list of which
+  drawings are pairs. Inside the two pair doors the sentence still splits, and the gate
+  checks that too: a width-fitted row is told its `fontSize` is a ceiling over
+  `xigma.autoFitMax`, a ring-fitted row is told that key is the one its drawing never
+  reads and that its size walks down against `xigma.fitArc` instead. The gate also
+  measures the claim
   instead of trusting the prose: a declared pitch and the two figures' ink-box centres
   agree to within 2 px on the painted frame, and narrowing the pitch moves each figure
   half the difference inboard.

@@ -390,7 +390,22 @@ XIGMA_KEYS = {
                   "`fontSize` and no such rule.  On a `special` row that draws a pair it "
                   "is the budget each figure gets on its own - the pair still draws at "
                   "one size, the smaller of the two fits, which is the rule "
-                  "`xigma.autoFitMax` cannot express by itself (docs/limits.md)",
+                  "`xigma.autoFitMax` cannot express by itself (docs/limits.md).  It is "
+                  "not read at all by `temp-values`, whose size the ring decides: see "
+                  "`xigma.fitArc`",
+    "fitArc": "the ring a `special` row's text is sized against, spelled in an `arc` "
+              "row's own vocabulary: {cy, radius, width, angleStart, angleEnd}, `radius` "
+              "the inner edge and `width` the stroke (so outer = radius + width), the "
+              "angles the app's own degrees where 0 is the bottom of the circle - the "
+              "same rule `layout.arc_angles` measures off the vendor's ring.  One ring is "
+              "enough: the pair's two are congruent, and the row is symmetric about its "
+              "own x.  The key exists because our `_fit_arc` picks one size for the two "
+              "temperature columns by measuring their ink against this hole, and no width "
+              "can do that job: the suite searches every whole-pixel budget this canvas "
+              "can hold and none reproduces the six sizes it picks (docs/limits.md). "
+              "A `values` row that declares no ring cannot be sized, and `--check-theme` "
+              "says which of its keys is missing rather than drawing at the ceiling and "
+              "letting a reader find the overlap on the glass",
     "format": "our date and time shapes are ours (`render.date_str` writes "
               "`%A %d %B %Y`); the vendor `Date` shape in this repo is `%m/%d/%Y`; neither "
               "has been measured off the vendor's picture, so rewriting our theme to the "
@@ -598,6 +613,21 @@ def validate(obj: dict) -> tuple:
         if kind == "special" and str(pr.get("name") or "") not in SPECIALS:
             soft.append(f"widget {i}: special name {pr.get('name')!r} has no drawing "
                         f"(--list-specials prints {' '.join(special_names())})")
+        # ...and a name that does have one can still be missing what that drawing needs to
+        # size itself with.  A `values` row without a ring cannot be fitted at all - it is
+        # not drawn, and the reason is said here rather than left for a reader to find as
+        # text sitting on top of a gauge.
+        if kind == "special":
+            door = special_door(str(pr.get("name") or ""))
+            if door == "values":
+                _ring, why = layout.fit_ring(pr)
+                if _ring is None:
+                    soft.append(f"widget {i} (special {pr['name']}): {why} - the row has "
+                                f"no ring to size its text against, so it is not drawn")
+            if door in ("pair", "values") and not pr.get("width"):
+                soft.append(f"widget {i} (special {pr['name']}): no `width`, so both "
+                            f"figures land on one point - on a pair row `width` is the "
+                            f"distance between their centres, not a box width")
         if kind in ("text",) and pr.get("content") is None:
             soft.append(f"widget {i} (text): no `content` string to draw")
     return hard, soft
@@ -716,11 +746,12 @@ def delete_user_theme(name: str) -> str:
 # ------------------------------------------------------- the specials registry --
 #: {name: callable(draw, prop, values) -> ink box}.  A special is a picture that stays
 #: code-drawn and takes its position, size, colour and reading from the layout - the
-#: decision that keeps `alpha`'s two fan figures and the two composite readings lines
-#: movable without baking PNGs (docs/theme-editor.md).  Two doors, and the door is what
-#: decides what a row's fields mean: `layout.draw_special_line` for one line of built
-#: text, `layout.draw_special_pair` for two figures at one shared size.  Which one a name
-#: goes through is read out of the drawing (`themes.special_is_pair`), not kept in a table
+#: decision that keeps `alpha`'s fan figures and temperature pair, and the two composite
+#: readings lines, movable without baking PNGs (docs/theme-editor.md).  Three doors, and the
+#: door is what decides what a row's fields mean: `layout.draw_special_line` for one line of
+#: built text, `draw_special_pair` for two figures at one width-fitted size, and
+#: `draw_special_values` for two figures at one size fitted to a ring's hole.  Which door a
+#: name goes through is read out of the drawing (`themes.special_door`), not kept in a table
 #: here.  Injected into `layout.draw_theme` from here, because the drawings live in
 #: `render.py` and layout already imports render, not the other way round.
 def _sp_clock_readings(draw, prop, values):
@@ -760,13 +791,45 @@ def _sp_fan_figures(draw, prop, values):
     return layout.draw_special_pair(draw, prop, pair)[1]
 
 
-#: The door decides the meaning of the row's fields, so the marker lives on the drawing
-#: (`themes.special_is_pair` reads it) and not in a table beside it.
-_sp_fan_figures.pair = True
+def _sp_temp_values(draw, prop, values):
+    """`alpha`'s two temperature figures: one row, **one size**, fitted to the rings.
+
+    The second group special the owner's decision (2026-11-08) calls for, and the one that
+    could not have been a key on the existing `xigma.autoFitMax`: the size here is decided
+    by how the two strings sit inside the ring's hole, jointly, and a width cannot express
+    that.  The suite searched every whole-pixel budget this canvas can hold - none
+    reproduces the sizes `_fit_arc` picks for `--`, 5, 22, 57, 100 and 241 degrees; the best
+    reaches five of the six, and the windows ask for at least 153 px and less than 148 px
+    (docs/limits.md).
+
+    So the row names the ring it has to clear (`xigma.fitArc`, spelled in an `arc` row's
+    own vocabulary) and the size comes from `render.value_pair` - the same function
+    `theme_alpha` draws its own values through, so a file and the theme cannot reach two
+    different sizes for the same pair of readings.  What the row can change is where the
+    pair sits, how far apart the two figures are, the ceiling, the ink and the weight; the
+    3 px clearance and the walk's floor of 10 stay with the drawing, because they are what
+    keeps the digits off the gauge.
+    """
+    pair = (str(values.get("temp-cpu") or ""), str(values.get("temp-gpu") or ""))
+    if not any(pair):
+        return None
+    return layout.draw_special_values(draw, prop, pair)[1]
+
+
+#: Which door a registered drawing goes through, marked on the drawing itself: `line` is
+#: one built string (`layout.draw_special_line`), `pair` two figures at one width-fitted
+#: size (`draw_special_pair`), `values` two figures at one ring-fitted size
+#: (`draw_special_values`).  The door is what decides what the row's fields mean, so the
+#: marker lives here rather than in a table beside the registry - and the suite reads each
+#: function's own source to check the marker agrees with the call it makes.
+_sp_clock_readings.door = "line"
+_sp_dual_status.door = "line"
+_sp_fan_figures.door = "pair"
+_sp_temp_values.door = "values"
 
 
 SPECIALS = {"clock-readings": _sp_clock_readings, "dual-status": _sp_dual_status,
-            "fan-figures": _sp_fan_figures}
+            "fan-figures": _sp_fan_figures, "temp-values": _sp_temp_values}
 
 #: A `special` that draws text this repo builds in code: name -> the (key, builder) pairs
 #: it needs.  `draw` and `parity` fill those keys from the same metrics the widgets' own
@@ -776,7 +839,9 @@ SPECIALS = {"clock-readings": _sp_clock_readings, "dual-status": _sp_dual_status
 SPECIAL_LINES = {"clock-readings": (("readings", render.clock_readings_line),),
                  "dual-status": (("status", render.dual_status_line),),
                  "fan-figures": (("fan-cpu", render.cpu_fan_figure),
-                                 ("fan-gpu", render.gpu_fan_figure))}
+                                 ("fan-gpu", render.gpu_fan_figure)),
+                 "temp-values": (("temp-cpu", render.cpu_temp_text),
+                                 ("temp-gpu", render.gpu_temp_text))}
 
 
 def fill_lines(vals: dict, metrics: dict) -> dict:
@@ -792,17 +857,27 @@ def special_names() -> tuple:
     return tuple(sorted(SPECIALS))
 
 
-def special_is_pair(name: str) -> bool:
-    """Does this `special` draw a pair of figures rather than one line?
+def special_door(name: str) -> str:
+    """Which door this `special` drawing goes through: `line`, `pair`, `values`, or `""`
+    when the name is not registered.
 
-    Asked of the registry entry itself: the drawing function carries the marker, because
-    the function is the thing that decides it - `_sp_fan_figures` places its two figures
-    from the row's `x` and `width` (`layout.draw_special_pair`), so those two fields mean
-    something else there than they do on a box, and the editor says so
-    (`xigmaui/edit.py:field_note`).  A table kept here would be a second opinion about
-    someone else's drawing, and this repo's rule is that it has no second opinions.
+    Read off the drawing function itself, because the door is what gives the row's fields
+    their meaning - and a table kept beside the registry would be a second opinion about
+    someone else's drawing.  The suite reads each function's own source and fails if the
+    marker and the `layout.draw_special_*` call disagree.
     """
-    return bool(getattr(SPECIALS.get(str(name)), "pair", False))
+    return str(getattr(SPECIALS.get(str(name)), "door", ""))
+
+
+def special_is_pair(name: str) -> bool:
+    """Does this row place **two** figures, by its `x` (their shared centre) and its
+    `width` (the pitch between them)?
+
+    Both pair-shaped doors do; `special_door` says what differs between them - a width
+    budget sizes `fan-figures`, the ring named in `xigma.fitArc` sizes `temp-values`
+    (docs/limits.md has the measurement for why a width cannot do that second job).
+    """
+    return special_door(name) in ("pair", "values")
 
 
 # ------------------------------------------------------------------ exports --

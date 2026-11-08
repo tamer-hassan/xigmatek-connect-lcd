@@ -70,8 +70,11 @@ def field_note(kind: str, field: str, name: str = "") -> str:
     all.  A field list cannot show that difference - both rows are `special` - so the note
     line says it in both directions, rather than leaving a reader to set a number that
     does nothing.  Which shape a name has is asked of the registry, whose entry knows the
-    door it draws through (`themes.special_is_pair`), because the door is what decides the
-    meaning: `layout.draw_special_pair` reads `width`, `draw_special_line` does not.
+    door it draws through (`themes.special_is_pair`, and `themes.special_door` for which of
+    the two pair doors it is), because the door is what decides the meaning:
+    `layout.draw_special_pair` reads `width` and `xigma.autoFitMax`, `draw_special_line`
+    reads neither, and `draw_special_values` reads `width` but sizes itself against
+    `xigma.fitArc`.
     """
     if kind != "special":
         return ""
@@ -88,9 +91,15 @@ def field_note(kind: str, field: str, name: str = "") -> str:
     if field in ("x", "y"):
         return "the pair's own anchor point, not one figure's corner"
     if field == "fontSize":
-        # a ceiling, not the size: the drawing walks down until both figures fit
+        # a ceiling, not the size: the drawing walks down until both figures fit.  What
+        # they are fitted *against* is the difference between the two pair doors, and a
+        # note that said "autoFitMax" for a row that never reads it would be the kind of
+        # sentence this repo keeps having to take back
         return ("a ceiling. Both figures are fitted to `xigma.autoFitMax`, and the pair "
-                "draws at the smaller of the two fits, at or below this size")
+                "draws at the smaller of the two fits, at or below this size"
+                if themes.special_door(name) == "pair" else
+                "a ceiling this pair never reaches: the size walks down until both figures "
+                "clear the ring named in `xigma.fitArc`, and both draw at that one size")
     return ""
 
 
@@ -103,7 +112,7 @@ def extension_fields(kind: str) -> tuple:
         "bar": ("barPaint", "colourRamp", "colourStops"),
         "arc": ("arcPaint", "colourRamp", "colourStops"),
         "line": (),
-        "special": ("anchor", "autoFitMax"),
+        "special": ("anchor", "autoFitMax", "fitArc"),
     }
     return tuple(k for k in applies.get(kind, ()) if k in sub)
 

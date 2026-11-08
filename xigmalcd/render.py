@@ -252,19 +252,19 @@ def _text(img, xy, s, fnt, fill, anchor="mm"):
 
 
 def _fit_size(draw_or_img, s, max_w, size, bold=True):
-    """The largest size <= `size` at which `s` fits in `max_w` panel px.
-
-    Accepts an `ImageDraw` as well as an image: a probe that walks the sizes one at a
-    time should not have to allocate a canvas per string, and both doors have to walk
-    the same loop whatever they are handed."""
+    """`_fit_draw` handed an image instead of an `ImageDraw` - the door the five themes
+    call.  Accepts either: a probe that walks sizes one string at a time should not have to
+    allocate a canvas per call, and both doors have to walk the same loop whatever they are
+    handed."""
     d = draw_or_img if hasattr(draw_or_img, "textlength") else ImageDraw.Draw(draw_or_img)
     return _fit_draw(d, s, max_w, size, bold)
 
 
 def _fit_draw(draw, s, max_w, size, bold=True, mk=None):
-    """The same walk, on a caller's `ImageDraw`: the loop, the step of 2 and the floor of
-    10 are one function, so a picture drawn through a `special` and a picture drawn by a
-    theme cannot end up at two different sizes for one string.
+    """The largest size <= `size` at which `s` fits in `max_w` panel px, walked on the
+    caller's `ImageDraw`: the loop, the step of 2 and the floor of 10 are one function, so
+    a picture drawn through a `special` and a picture drawn by a theme cannot end up at two
+    different sizes for one string.
 
     `mk(size)` builds the face for one step of the walk; it defaults to this module's
     `font(size, bold)` so a caller that passes a face factory measures with exactly the
@@ -311,6 +311,13 @@ def gauge(img, cx, cy, radius, frac, width=26, track=TRACK, cold=CYAN,
         acc += seg
 
 
+def _ink_box_draw(draw, s, f, cx, y, anchor="ma"):
+    """`ink_box` on a caller's `ImageDraw`, so a probe and a theme measure the same ink
+    without one of them allocating a canvas."""
+    box = draw.textbbox((0, 0), s, font=f, anchor=anchor)
+    return [box[0] / SS + cx, box[1] / SS + y, box[2] / SS + cx, box[3] / SS + y]
+
+
 def ink_box(img, s, f, cx, y, anchor="ma"):
     """Where a string's pixels land, in panel px, drawn at (cx, y).
 
@@ -318,8 +325,7 @@ def ink_box(img, s, f, cx, y, anchor="ma"):
     bearings, so this is the ink - what shows on the glass - not the em box
     `_fit` measures against.
     """
-    box = ImageDraw.Draw(img).textbbox((0, 0), s, font=f, anchor=anchor)
-    return [box[0] / SS + cx, box[1] / SS + y, box[2] / SS + cx, box[3] / SS + y]
+    return _ink_box_draw(ImageDraw.Draw(img), s, f, cx, y, anchor)
 
 
 def arc_clear(box, cx, cy, r_in, r_out, start, sweep):
@@ -345,8 +351,28 @@ def arc_clear(box, cx, cy, r_in, r_out, start, sweep):
     return worst
 
 
+#: How far the arc fit keeps a figure's ink out of the stroke band, panel px.  Named
+#: rather than written at the two call sites because the suite measures the ring painter's
+#: own resampling tail - the faint pixels LANCZOS leaves past the stroke's edge, inside the
+#: hole - and holds this number above it: below that, a reading sized by the rule could sit
+#: on top of the gauge it belongs to (`the value pair, drawn` in tools/selftest.sh).
+ARC_FIT_GAP = 3.0
+
+
+def _fit_arc_draw(draw, strings, cx, cy, y, r_in, r_out, start, sweep, size,
+                  bold=True, gap=ARC_FIT_GAP, mk=None):
+    """`_fit_arc`'s walk on a caller's `ImageDraw`, so a theme and a `special` row
+    measuring the same strings against the same ring cannot land on two sizes."""
+    mk = mk or (lambda px: font(px, bold))
+    while size > 10 and max(
+            arc_clear(_ink_box_draw(draw, s, mk(size), cx, y),
+                      cx, cy, r_in, r_out, start, sweep) for s in strings) > -gap:
+        size -= 2
+    return size
+
+
 def _fit_arc(img, strings, cx, cy, y, r_in, r_out, start, sweep, size,
-             bold=True, gap=3.0):
+             bold=True, gap=ARC_FIT_GAP):
     """Largest size <= `size` where every string keeps `gap` px off the arc.
 
     A joint rule: every string in the set is measured and one size comes out,
@@ -355,11 +381,8 @@ def _fit_arc(img, strings, cx, cy, y, r_in, r_out, start, sweep, size,
     than the other.  The limit is the ring's hole rather than a width, and it
     is measured as ink at the anchor the theme actually draws at.
     """
-    while size > 10 and max(
-            arc_clear(ink_box(img, s, font(size, bold), cx, y),
-                      cx, cy, r_in, r_out, start, sweep) for s in strings) > -gap:
-        size -= 2
-    return size
+    return _fit_arc_draw(ImageDraw.Draw(img), strings, cx, cy, y, r_in, r_out,
+                         start, sweep, size, bold, gap)
 
 
 def temp_colour(t, lo, mid, hi, cold=GREEN, warm=AMBER, hot=RED):
@@ -746,6 +769,24 @@ def _deg(value):
     return "--\u00b0C" if value is None else f"{round(value)}\u00b0C"
 
 
+def cpu_temp_text(m) -> str:
+    """The CPU column's figure as `alpha` draws it: `57\u00b0C`, or `--\u00b0C` when this
+    machine has no reading.
+
+    Named for the export plan (docs/theme-editor.md), with the reason `clock_readings_line`
+    already carries: the two columns are one drawing sized jointly against the rings, so a
+    layout places them as a `special` and draws the strings built here.  One builder, two
+    doors, so the code theme and the file cannot say two different things about the same
+    reading.
+    """
+    return _deg((m.get("cpu") or {}).get("temperature"))
+
+
+def gpu_temp_text(m) -> str:
+    """The GPU column's figure: the same shape, read off the card's temperature."""
+    return _deg((m.get("gpu") or {}).get("temperature"))
+
+
 # The temperature pair: two equal columns, each a label over its value, each
 # inside a gauge arc of its own.
 #
@@ -788,6 +829,11 @@ def _deg(value):
 #           108-124).
 #   fan     one figure per column, sitting in the ring's open mouth: ink y
 #           250-265 at font 20, which is 29 px clear of `CPU USED`'s ink at 294.
+A26_TLBL_TEXT = ("CPU TEMP", "GPU TEMP")   # the two labels, in column order.  Named
+                                           # because both are joint-sized against the
+                                           # ring: two strings measured together, one
+                                           # size out, so a file or a theme that said
+                                           # them separately could land on two sizes
 A26_TLBL_F = 32                      # label size ceiling: the vendor's own
 A26_TVAL_F = 74                      # value size ceiling: what the pair used
                                      # before the rings went in
@@ -867,6 +913,44 @@ def fan_figures(draw, figures, xs, y, colour=A26_WHITE, bold=False,
     return size, boxes
 
 
+def value_pair(draw, strings, xs, y, ring, colour=A26_WHITE, bold=True,
+               ceiling=A26_TVAL_F, anchor="ma", gap=ARC_FIT_GAP, face=None):
+    """Two figures, one under each of two columns, at one size fitted to a **ring's hole**.
+
+    This is `alpha`'s temperature row, and it is a drawing rather than two text rows
+    because of how its size is chosen: both strings are measured and one size comes out
+    (`_fit_arc`'s joint rule), and what they are measured against is the ring's clear
+    radius, not a width.  The schema's only fit key is a width, and the suite searches every
+    whole-pixel budget this canvas can hold and finds none that reproduces the six sizes
+    this rule picks for `--`, 5, 22, 57, 100 and 241 degrees (docs/limits.md).
+
+    `ring` is the six numbers `arc_clear` works from - `(cx, cy, inner, outer, start,
+    sweep)`, panel px and Pillow degrees - and it describes **one** of the two rings: they
+    are congruent, so measuring one column answers both, which is what `theme_alpha` has
+    always done by passing `A26_TCOL_X[0]`.  A layout row gets the same shape for free when
+    its `x` is the pair's centre and its `width` the pitch between the two figures: the
+    first column sits at `x - width/2`.
+
+    `gap` (the clearance `ARC_FIT_GAP` states) and the walk's floor of 10 stay here with
+    the rule.  They are what keeps the figure off the ring, so a file that could set them
+    could draw the text over the gauge it is standing in.
+
+    Returns the size it chose and the two ink boxes, in panel px.
+    """
+    cx, cy, r_in, r_out, start, sweep = ring
+    mk = face or (lambda px: font(px, bold))
+    size = _fit_arc_draw(draw, tuple(strings), cx, cy, y, r_in, r_out, start,
+                         sweep, ceiling, bold, gap, mk)
+    fnt = mk(size)
+    boxes = []
+    for x, s in zip(xs, strings):
+        draw.text((x * SS, y * SS), s, font=fnt, fill=colour, anchor=anchor)
+        boxes.append(tuple(v // SS for v in
+                           draw.textbbox((x * SS, y * SS), s, font=fnt,
+                                         anchor=anchor)))
+    return size, boxes
+
+
 def theme_alpha(m, title=None, clock=True, clock_size=26, fan=True,
                 bg=OVERLAY, ink=None):
     """The theme ALPHA has selected, plus GPU temp, clock and fan figures."""
@@ -889,17 +973,18 @@ def theme_alpha(m, title=None, clock=True, clock_size=26, fan=True,
         temp_arc(img, x, A26_RING_Y, reading, A26_ARC_LO, A26_ARC_MID,
                  A26_ARC_HI, A26_RING_R, A26_RING_W, A26_ARC_TRACK,
                  A26_ARC_START, A26_ARC_SWEEP)
-    temps = (_deg(cpu.get("temperature")), _deg(gpu.get("temperature")))
-    tlbl = font(_fit_arc(img, ("CPU TEMP", "GPU TEMP"), A26_TCOL_X[0],
-                         A26_RING_Y, A26_TLBL_Y, r_in, A26_RING_R,
-                         A26_ARC_START, A26_ARC_SWEEP, A26_TLBL_F))
-    tval = font(_fit_arc(img, temps, A26_TCOL_X[0], A26_RING_Y, A26_TVAL_Y,
-                         r_in, A26_RING_R, A26_ARC_START, A26_ARC_SWEEP,
-                         A26_TVAL_F))
-    for x, label in zip(A26_TCOL_X, ("CPU TEMP", "GPU TEMP")):
+    temps = (cpu_temp_text(m), gpu_temp_text(m))
+    ring = (A26_TCOL_X[0], A26_RING_Y, r_in, A26_RING_R, A26_ARC_START,
+            A26_ARC_SWEEP)
+    tlbl = font(_fit_arc(img, A26_TLBL_TEXT, A26_TCOL_X[0], A26_RING_Y,
+                         A26_TLBL_Y, r_in, A26_RING_R, A26_ARC_START,
+                         A26_ARC_SWEEP, A26_TLBL_F))
+    for x, label in zip(A26_TCOL_X, A26_TLBL_TEXT):
         _text(img, (x, A26_TLBL_Y), label, tlbl, fg, anchor="ma")
-    for x, temp in zip(A26_TCOL_X, temps):
-        _text(img, (x, A26_TVAL_Y), temp, tval, fg, anchor="ma")
+    # the values go through `value_pair`, which is also the door a `special` row draws
+    # through: one size for both columns, fitted to the ring's hole.  One drawing, two
+    # doors, so a layout cannot reach a different size than the theme does.
+    value_pair(ImageDraw.Draw(img), temps, A26_TCOL_X, A26_TVAL_Y, ring, fg)
 
     # fans: this theme has no fan widget, so there is no geometry to copy.  One
     # figure per column, sitting in the ring's open mouth, so each one is under

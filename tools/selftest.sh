@@ -1861,8 +1861,12 @@ alpha_draws = sorted({c for c in dir(render)
                       == render.__name__ and c != alpha_fn
                       and re.search(r"\b%s\(" % re.escape(c), alpha_src)})
 assert {"hbar", "temp_arc", "_fit_arc", "fan_figures", "cpu_fan_figure",
-        "gpu_fan_figure", "_title", "clock_str"} <= set(alpha_draws), \
-    alpha_draws
+        "gpu_fan_figure", "_title", "clock_str", "value_pair", "cpu_temp_text",
+        "gpu_temp_text"} <= set(alpha_draws), alpha_draws
+# `value_pair` and the two temperature builders are in that set on purpose: the theme
+# draws its figures through the same function a `temp-values` row draws through, so the
+# two doors cannot reach two different sizes for one pair of readings.  The coverage
+# gate below is what counts the pixels that claim proves.
 
 # the enumerated tables and the reasons `--print-theme-fields` prints for them cannot
 # drift: every name in a table has to be named in that key's stated reason
@@ -1934,8 +1938,9 @@ def _fan_frame(metrics):
     return img, notes, vals
 
 
-def _fan_row_box(notes):
-    """The box the loop records for the pair row, in panel px."""
+def _row_box(notes):
+    """The box the loop records for a pair row, in panel px: whichever `special` it is, the
+    frame holds one row and the box is what the door reports for it."""
     rows = [b for b in notes["boxes"] if b[0] == "special"]
     assert len(rows) == 1, notes["boxes"]
     return rows[0][2]
@@ -1979,7 +1984,7 @@ try:
             assert size == max(render.A26_FAN_MIN, min(fits)), (cpu, gpu, size, fits)
             # the box the loop reports is where the row actually got painted, to within
             # the handful of px a text metric can sit off the ink it measures
-            box = _fan_row_box(notes)
+            box = _row_box(notes)
             w = render.W
             ink = (min(k % w for k in theme_px), min(k // w for k in theme_px),
                    max(k % w for k in theme_px), max(k // w for k in theme_px))
@@ -2019,9 +2024,9 @@ ARC_PAIRS = list(itertools.product((None, 5, 22, 57, 100, 241), repeat=2))
 ARC_STRINGS = tuple(render._deg(v) for v in (None, 5, 22, 57, 100, 241))
 
 
-def _arc_fit(strings, ceiling=render.A26_TVAL_F):
+def _arc_fit(strings, ceiling=render.A26_TVAL_F, cx=render.A26_TCOL_X[0]):
     img = Image.new("RGBA", (render.W * layout.SS, render.H * layout.SS), (0, 0, 0, 0))
-    return render._fit_arc(img, tuple(strings), render.A26_TCOL_X[0], render.A26_RING_Y,
+    return render._fit_arc(img, tuple(strings), cx, render.A26_RING_Y,
                            render.A26_TVAL_Y, render.A26_RING_R - render.A26_RING_W,
                            render.A26_RING_R, render.A26_ARC_START,
                            render.A26_ARC_SWEEP, ceiling)
@@ -2059,6 +2064,155 @@ best_n = sum(best in windows[s] for s in ARC_STRINGS)
 span = {s: (min(w), max(w)) for s, w in windows.items() if w}
 lo, hi = max(v[0] for v in span.values()), min(v[1] for v in span.values())
 
+# ...and the row itself, held to the theme the way the fan pair is: one `temp-values`
+# `special`, compared with the two temperature figures `theme_alpha` paints inside its
+# rings.  The isolation cannot be the fan pair's `fan=True`/`fan=False` trick - the theme
+# has no switch for these two figures, and they sit inside a ring this frame does not
+# draw.  So the ring's own ink is measured rather than a band guessed: `temp_arc` on a bare
+# canvas, the same supersampling and the same LANCZOS downscale `theme_alpha` ends with,
+# over the readings this walk uses.  Every pixel it leaves inside the declared hole - the
+# stroke's antialiasing, plus the resampling tail that reaches past the stroke's edge -
+# belongs to the ring's painter; what is left of the hole belongs to this row, and the row
+# has to paint exactly that.  The zone comes out of the ring drawing itself, which is why
+# the check below is not a rectangle somebody picked.
+TEMP_VALS = (None, 5, 22, 57, 100, 241)
+R_IN = render.A26_RING_R - render.A26_RING_W
+
+
+def _temp_metrics(cpu, gpu):
+    c, g = {}, {}
+    if cpu is not None:
+        c["temperature"] = float(cpu)
+    if gpu is not None:
+        g["temperature"] = float(gpu)
+    return {"cpu": c, "gpu": g, "memory": {"used_percent": 41.0},
+            "fans": [{"name": "Fan CPU", "value": 1016, "type": "Fan"}],
+            "timestamp": {}}
+
+
+def _temp_prop():
+    """The row that says what `theme_alpha`'s temperature pair is: `x` the pair's centre,
+    `width` the pitch between the two figures, `xigma.fitArc` the ring they are sized
+    against - every number read out of `render.py`'s own constants, because a number
+    written here would be a second opinion about the theme.  The angles are the app's own
+    (`layout.arc_angles` measures the rule that turns them into Pillow's)."""
+    return {"name": "temp-values",
+            "x": (render.A26_TCOL_X[0] + render.A26_TCOL_X[1]) // 2,
+            "y": render.A26_TVAL_Y, "width": render.A26_TCOL_X[1] - render.A26_TCOL_X[0],
+            "fontFamily": "dejavu", "fontSize": render.A26_TVAL_F, "bold": True,
+            "textColor": _css(render.A26_WHITE),
+            "xigma": {"anchor": "ma",
+                      "fitArc": {"cy": render.A26_RING_Y, "radius": R_IN,
+                                 "width": render.A26_RING_W,
+                                 "angleStart": render.A26_ARC_START - 90,
+                                 "angleEnd": render.A26_ARC_START + render.A26_ARC_SWEEP
+                                 - 90}}}
+
+
+def _hole_px(k):
+    """Inside either ring's clear hole, at or under the row's own anchor?  The theme's
+    label line inks above the anchor, so those pixels are not this row's business, and the
+    pitch is more than twice the hole's radius, so no pixel is inside both rings."""
+    x, y = k % render.W, k // render.W
+    return (y >= render.A26_TVAL_Y - 1
+            and min(((x - cx) ** 2 + (y - render.A26_RING_Y) ** 2) ** 0.5
+                    for cx in render.A26_TCOL_X) < R_IN)
+
+
+def _hole_r(k):
+    """How far inside the declared inner edge this panel pixel is, in panel px."""
+    x, y = k % render.W, k // render.W
+    return R_IN - min(((x - cx) ** 2 + (y - render.A26_RING_Y) ** 2) ** 0.5
+                      for cx in render.A26_TCOL_X)
+
+
+RING_TAIL = set()
+for _v in TEMP_VALS[1:]:
+    _bare = Image.new("RGBA", (render.W * layout.SS, render.H * layout.SS),
+                      render.OVERLAY)
+    for _cx in render.A26_TCOL_X:
+        render.temp_arc(_bare, _cx, render.A26_RING_Y, float(_v), render.A26_ARC_LO,
+                        render.A26_ARC_MID, render.A26_ARC_HI, render.A26_RING_R,
+                        render.A26_RING_W, render.A26_ARC_TRACK, render.A26_ARC_START,
+                        render.A26_ARC_SWEEP)
+    _bare = _bare.resize((render.W, render.H), Image.LANCZOS)   # what theme_alpha returns
+    RING_TAIL |= {k for k, c in enumerate(_bare.get_flattened_data())
+                  if c[3] and _hole_px(k)}
+tail = max(_hole_r(k) for k in RING_TAIL)
+# the shrink has to stay under the clearance the fit enforces, or the zone would eat this
+# row's own ink and the coverage below could pass on a row that paints nothing
+assert tail < render.ARC_FIT_GAP, (tail, len(RING_TAIL), render.ARC_FIT_GAP)
+
+temp_rows, temp_px, row_clear = [], [], 1e9
+for cpu, gpu in ARC_PAIRS:
+    m = _temp_metrics(cpu, gpu)
+    vals, _absent = themes.values(m)
+    themes.fill_lines(vals, m)
+    obj = {"width": render.W, "height": render.H,
+           "osd": {"widget": [{"id": "xigma-alpha-temps", "type": "special",
+                               "property": [_temp_prop()]}]}}
+    img, notes = layout.draw_theme(obj, vals, canvas=(render.W, render.H),
+                                   specials=themes.SPECIALS)
+    flat_me = list(img.get_flattened_data())
+    flat_on = list(render.draw(m, "alpha").get_flattened_data())
+    painted = {k for k, v in enumerate(flat_me) if v != (0, 0, 0, 0)}
+    zone = {k for k in range(render.W * render.H)
+            if _hole_px(k) and k not in RING_TAIL}
+    theirs = {k for k in zone if flat_on[k] != (0, 0, 0, 0)}
+    # 1. the row paints where it says it paints: all of it inside the hole, and not one
+    #    pixel on the stroke or on the ring painter's own tail
+    assert painted and painted <= zone, (cpu, gpu, len(painted), len(painted - zone))
+    # 2. and it paints the whole of what is its: nothing the theme puts in that zone is
+    #    left to the theme's code
+    assert theirs <= painted, (cpu, gpu, len(theirs - painted),
+                               sorted(theirs - painted)[:4])
+    # 3. one drawing, two doors: the same pixels carry the theme's own bytes
+    assert all(flat_on[k] == flat_me[k] for k in painted), (cpu, gpu)
+    assert not notes["missing"] and not notes["gaps"], (cpu, gpu, notes)
+    # 4. the size, spelled out again from the rule: `_fit_arc`'s joint walk at either
+    #    column, and the pair rule as the smaller of the two strings measured alone
+    pair = (render.cpu_temp_text(m), render.gpu_temp_text(m))
+    dev = Image.new("RGBA", (render.W * layout.SS, render.H * layout.SS), (0, 0, 0, 0))
+    size, _box = layout.draw_special_values(ImageDraw.Draw(dev), _temp_prop(), pair)
+    assert size == _arc_fit(pair) == _arc_fit(pair, cx=render.A26_TCOL_X[1]) == \
+        min(_arc_fit((s,)) for s in pair), (cpu, gpu, size, pair)
+    # 5. the box the loop records is where the row really got painted, to within the
+    #    handful of px a text metric can sit off the ink it measures
+    box, ink = _row_box(notes), (min(k % render.W for k in painted),
+                                 min(k // render.W for k in painted),
+                                 max(k % render.W for k in painted),
+                                 max(k // render.W for k in painted))
+    assert all(abs(a - b) <= 4 for a, b in zip(box, ink)), (cpu, gpu, box, ink)
+    row_clear = min(min(_hole_r(k) for k in painted), row_clear)
+    temp_px.append(len(painted))
+    temp_rows.append((pair, size))
+
+assert len(temp_rows) == len(ARC_PAIRS), temp_rows
+
+# a row that cannot be sized says so instead of drawing at the ceiling, where the digits
+# would sit on the gauge they belong to: `--check-theme` names the key that is missing, and
+# the loop puts down no pixels for the row at all
+_no_ring = json.loads(json.dumps(_temp_prop()))
+del _no_ring["xigma"]["fitArc"]
+_bad = {"width": render.W, "height": render.H,
+        "osd": {"widget": [{"id": "xigma-no-ring", "type": "special",
+                            "property": [_no_ring]}]}}
+hard, soft = themes.validate(_bad)
+assert not hard and any("fitArc" in s and "not drawn" in s for s in soft), (hard, soft)
+_vals, _a = themes.values(_temp_metrics(57, 61))
+themes.fill_lines(_vals, _temp_metrics(57, 61))
+_img, _notes = layout.draw_theme(_bad, _vals, canvas=(render.W, render.H),
+                                 specials=themes.SPECIALS)
+assert not any(v != (0, 0, 0, 0) for v in _img.get_flattened_data()), \
+    "a row with no ring to clear drew something anyway"
+# and on a pair row `width` is the pitch, not a box: with no `width` the two figures land
+# on one point, which is a thing a file can do by accident and get no warning about today
+_no_pitch = json.loads(json.dumps(_temp_prop()))
+del _no_pitch["width"]
+hard, soft = themes.validate({"width": render.W, "height": render.H, "osd": {"widget": [
+    {"id": "xigma-no-pitch", "type": "special", "property": [_no_pitch]}]}})
+assert not hard and any("centres" in s for s in soft), (hard, soft)
+
 print(f"  the fan pair, apart   `alpha`'s two figures as one row, against the same row "
       f"drawn by `theme_alpha`: {len(fan_pairs)} reading pairs, every one painting "
       f"{min(fan_px):,}-{max(fan_px):,} pixels that are the same set as the theme's "
@@ -2072,6 +2226,20 @@ print(f"                        one row and not two, because the size is one dec
       f"px.  Those two counts follow the faces installed here, so docs/limits.md labels "
       f"them the bench's; the pair count, the zero-diff sets and the `min` rule are "
       f"checked on every machine.")
+print(f"  the value pair, drawn `alpha`'s two temperature figures as one row, against the "
+      f"frame `theme_alpha` paints: {len(temp_rows)} reading pairs, and what holds is not "
+      f"the count - it is that the row puts down {min(temp_px):,}-{max(temp_px):,} pixels "
+      f"for each of them, all of them inside the ring's clear hole, every one carrying the "
+      f"theme's own bytes, and none of what the theme paints in that hole left unpainted.")
+print(f"                        The hole is measured and not assumed: the ring's painter "
+      f"reaches {len(RING_TAIL):,} px of its own ink past its declared inner edge - "
+      f"antialiasing plus the resampling tail LANCZOS leaves - and this row's ink stays "
+      f"{row_clear:.2f} px inboard of that edge, {row_clear - tail:.2f} px clear of the "
+      f"tail.  `render.ARC_FIT_GAP` is what keeps it there, and the gate holds that number "
+      f"above the measured {tail:.2f} px.  The sizes seen were "
+      f"{', '.join(str(s) for s in sorted({s for _p, s in temp_rows}))} px, which follow the "
+      f"faces installed here; the pair count, the zero-diff sets and the `_fit_arc` "
+      f"equality are what is checked on every machine (docs/limits.md).")
 print(f"  the value pair, apart the same question for the two temperature columns inside "
       f"the rings, which `alpha` still needs as one drawing: {len(ARC_PAIRS)} reading "
       f"pairs, and `_fit_arc`'s joint size is exactly the smaller of the two columns' own "
@@ -2128,17 +2296,18 @@ print(f"                        the same declared bar under the other two conven
 print(f"  what alpha draws      {' '.join(alpha_draws)} - taken out of `theme_alpha`'s own"
       f" body, so the plan's list of what alpha still needs is a claim about this source:"
       f" the rings and the usage bars are expressible as widgets (`arcPaint`,"
-      f" `barPaint`), and the two fan figures are now one `special` row that names a"
-      f" code drawing (`fan-figures`, measured against `theme_alpha`'s own row above)."
-      f" What is left in `alpha` is the temperature pair's one size - `_fit_arc` takes"
-      f" both strings at once, so it goes in as one `special` too, for the reason the"
-      f" two prints above give")
+      f" `barPaint`), and both pairs of figures are now one `special` row naming a"
+      f" code drawing (`fan-figures` and `temp-values`, each measured against"
+      f" `theme_alpha`'s own row above).  What is left in `alpha` is its two label"
+      f" lines - one size for both columns there too, because `_fit_arc` is handed"
+      f" them as a pair - and assembling the theme out of rows that each already"
+      f" reach a zero diff")
 print(f"  not exported yet      "
       f"{' '.join(sorted(set(render.THEMES) - set(themes.EXPORTS)))}, and not for the same"
       f" reason twice. `alpha`'s list is the derived one just printed: its rings and"
       f" its usage bars are widgets (`arcPaint`, `barPaint`), its fan pair is a"
-      f" `special`, and what is still missing is the temperature pair as one drawing"
-      f" and the theme assembled from all of it. `bars` is the second kind of answer"
+      f" `special`, and what is still missing is its two label lines and the theme"
+      f" assembled from all of it. `bars` is the second kind of answer"
       f" on its own: its row count and row pitch are functions of the machine"
       f" (`row_h = min(56, max(28, 320 // len(rows)))`, and `rows` grows by up to four"
       f" fan entries named by whatever `sensors` reports), so one fixed widget list"
@@ -2186,6 +2355,35 @@ assert f"{len(fan_pairs)} reading pairs" in lim and f"{len(ARC_PAIRS)} reading p
      "docs/limits.md does not quote the two joint-sizing walks this gate ran")
 assert f"{len(BUDGETS)} whole-pixel budgets" in lim, \
     f"docs/limits.md does not quote the {len(BUDGETS)} budgets searched for autoFitMax"
+_iv = re.search("a floor of %d px down\\s+to a ceiling of %d px" % (lo, hi), lim)
+_bt = re.search("the best\\s+reaches %d of the %d" % (best_n, len(ARC_STRINGS)), lim)
+assert _iv and _bt, \
+    (lo, hi, best, best_n, "docs/limits.md misquotes the empty interval the width "
+     "search leaves, or how close the best budget gets")
+# theme-editor.md quotes the same interval in its own words, so it is held to the same run
+assert f"at least {lo} px and less than {hi} px" in plan, \
+    (lo, hi, "docs/theme-editor.md misquotes the interval the width search leaves")
+# the value row's own numbers, same rule: the font-free ones are pinned exactly, the
+# face-dependent ones to within 5 %, because a label of "the bench's" is not a licence for
+# a doc to drift - that is how this repo's figures have gone stale before
+_foot = re.search(r"leaves\s+\*\*(\d[\d ]*)\s+px\*\*\s+of\s+ink", lim)
+_deep = re.search(r"deepest\s+pixel\s+\*\*([\d.]+)\s+px\*\*", lim)
+assert _foot and _deep, (lim[lim.find("`temp-values` landed"):][:160])
+assert int(_foot[1].replace(" ", "")) == len(RING_TAIL), (_foot[1], len(RING_TAIL))
+assert abs(float(_deep[1]) - tail) < 0.005, (_deep[1], tail)
+_rg = re.search(r"puts\s+down\s+([\d ]+)\s+to\s+([\d ]+)\s+pixels", lim)
+assert _rg, "docs/limits.md does not quote the pixels this row puts down"
+for _got, _want in ((int(_rg[1].replace(" ", "")), min(temp_px)),
+                    (int(_rg[2].replace(" ", "")), max(temp_px))):
+    assert abs(_got - _want) <= 0.05 * _want, (_got, _want)
+_clr = re.search(r"ink\s+stays\s+\*\*([\d.]+)\s+px\*\*\s+inboard", lim)
+_gap = re.search(r"\*\*([\d.]+)\s+px\*\*\s+clear\s+of\s+the\s+tail", lim)
+assert _clr and _gap, "docs/limits.md does not quote how clear the row's ink is"
+assert abs(float(_clr[1]) - row_clear) <= 0.05 * row_clear, (_clr[1], row_clear)
+assert abs(float(_gap[1]) - (row_clear - tail)) <= 0.05 * (row_clear - tail), \
+    (_gap[1], row_clear - tail)
+assert "`xigma.fitArc`" in usage_txt, \
+    "docs/usage.md does not list the `fitArc` key the value row sizes itself against"
 assert "one `special` named `fan-figures`" in plan, \
     "docs/theme-editor.md does not say the fan pair is a special today"
 # the two docs quote the pair counts this gate walks, and both have to mark the
@@ -2202,9 +2400,15 @@ sp = subprocess.run([sys.executable, "-m", "xigmalcd", "--list-specials"],
 assert all(f"  {n}" in sp.stdout for n in themes.special_names()), sp.stdout
 # each line says the shape the row will edit, and that sentence follows the door
 for line in sp.stdout.splitlines():
-    name = line.strip().split("  - ")[0].strip()
+    name = line.strip().split("  [")[0].strip()
     if name in themes.special_names():
-        assert ("pair" in line) == themes.special_is_pair(name), line
+        # the door in brackets is what the shape sentence describes, and the
+        # sentence has to name the key a row of that door sizes itself with
+        door = line.split("[", 1)[1].split("]", 1)[0]
+        assert door == themes.special_door(name), line
+        assert ("`xigma.fitArc`" in line) == (door == "values"), line
+        assert ("`xigma.autoFitMax`" in line) == (door == "pair"), line
+        assert ("one line" in line) == (door == "line"), line
 assert "ttyACM" not in sp.stdout
 print(f"  --list-specials       {' '.join(themes.special_names())}; drawn by code, "
       f"placed by the layout, no port opened")
@@ -2340,14 +2544,28 @@ bad = {"width": 480, "height": 480, "osd": {"widget": [
         {"x": 5, "y": 5, "source": "CPU Usage"}]},
     {"type": "special", "id": "xigma-b", "property": [
         {"x": 10, "y": 10, "name": "mystery-thing", "fontSize": 26}]},
+    # the two doors that place a pair, each missing the one key that makes its placement
+    # mean something: `temp-values` has a pitch and no ring to size against, `fan-figures`
+    # has a ring key it never reads and no pitch, so both figures would land on one point
+    {"type": "special", "id": "xigma-d", "property": [
+        {"x": 240, "y": 128, "width": 232, "name": "temp-values", "fontSize": 70}]},
+    {"type": "special", "id": "xigma-e", "property": [
+        {"x": 240, "y": 300, "name": "fan-figures", "fontSize": 20,
+         "xigma": {"fitArc": {"cy": 158, "radius": 85, "width": 12,
+                              "angleStart": 45, "angleEnd": 315}}}]},
     {"type": "text", "id": "xigma-c", "property": [{"x": 10, "y": 10}]}]}}
 hard, soft = themes.validate(bad)
 named = ["outside the 480x480 canvas", "has no entry in", "is not in layout.FONTS",
          "is outside the ten sizes", "rgba(r, g, b, a)", "repeats inside this theme",
-         "has no drawing", "no `content`", "one-element list"]
+         "has no drawing", "no `content`", "one-element list",
+         "no ring to size its text against", "distance between their centres"]
 hit = sum(1 for n in named if any(n in s for s in soft + hard))
-assert hit == len(named) and len(soft) == 9 and len(hard) == 1, (hit, soft, hard)
+assert hit == len(named) and len(soft) == 11 and len(hard) == 1, (hit, soft, hard)
 n_soft, n_hard = len(soft), len(hard)
+# the doc counts these findings, so the count is re-derived here rather than remembered
+_plan_txt = open("docs/theme-editor.md", encoding="utf-8").read()
+assert f"covering all {n_soft}:" in _plan_txt, \
+    (n_soft, "docs/theme-editor.md miscounts the soft findings one fixture covers")
 
 # and why every comparison above carries `WHEN`: a layout with a clock in it is not a
 # function of its file alone, it is a function of the instant too.  Measured on the way
@@ -2379,12 +2597,11 @@ assert img_mem.tobytes() == img_file.tobytes(), (notes_mem["boxes"], notes_file[
 assert notes_mem["boxes"] == notes_file["boxes"], (notes_mem["boxes"], notes_file["boxes"])
 lit = sum(1 for v in img_mem.getchannel("A").get_flattened_data() if v)
 print(f"  validate            {hit}/{len(named)} named in one fixture "
-      f"({n_soft} soft warnings + {n_hard} hard refusal on one fixture): an unknown "
-      f"metric name, "
-      f"a font family outside layout.FONTS, a size outside the ten the library ships, a "
-      f"colour outside rgba(), a widget off the canvas, an id repeated inside one theme, "
-      f"a special with no drawing, a text with no content, and a `property` that is not "
-      f"the one-element list every vendor file uses. A layout held in memory paints the "
+      f"({n_soft} soft warnings + {n_hard} hard refusal on one fixture). What the fixture "
+      f"has to be seen to say, in the words it prints: {', '.join(named)} - a list read "
+      f"from the checks themselves rather than written out below them, which is how this "
+      f"sentence was nine findings long while the fixture held eleven. A layout held in "
+      f"memory paints the "
       f"same {len(notes_mem['boxes'])} boxes and {lit} lit pixels as the same layout read "
       f"back off disk, so an editor's preview and the loop's frame are one code path")
 PY
@@ -2577,7 +2794,7 @@ assert sorted(set(read) - set(cen["keys"])) == ["lineColor", "lineWidth", "name"
 assert sorted(set(cen["keys"]) - set(read)) == sorted(themes.UNREAD_WHY), \
     sorted(set(cen["keys"]) - set(read))
 assert set(sub) == {"anchor", "arcPaint", "autoFitMax", "barPaint", "colourRamp",
-                    "colourStops", "format"}, sub
+                    "colourStops", "fitArc", "format"}, sub
 assert set(sub) == set(themes.XIGMA_KEYS), (sorted(set(sub) - set(themes.XIGMA_KEYS)),
                                             sorted(set(themes.XIGMA_KEYS) - set(sub)))
 assert cen["values"]["enableMove"] == {"False": 152}
@@ -4236,17 +4453,22 @@ pair_obj = {"width": render.W, "height": render.H,
 pair_ed = gui_edit.Editor(pair_obj, origin="suite probe")
 
 # which door each registered drawing draws through, read out of its own source: the marker
-# `themes.special_is_pair` reports has to agree with the call the function makes, because
-# that call is what gives the row's `width` its meaning
+# `themes.special_door` reports has to agree with the call the function makes, because that
+# call is what gives the row's `width`, its `fontSize` and its fit key their meaning.  The
+# third door (`draw_special_values`) is the one a reader would otherwise guess at: it
+# places a pair like `draw_special_pair` does and sizes it like nothing else does
 import inspect, re                                   # noqa: E402
+DOOR_CALL = {"draw_special_line": "line", "draw_special_pair": "pair",
+             "draw_special_values": "values"}
 doors = {}
 for nm in themes.special_names():
     body = inspect.getsource(themes.SPECIALS[nm])
-    called = {m for m in ("draw_special_pair", "draw_special_line")
-              if re.search(r"\b%s\(" % m, body)}
+    called = {m for m in DOOR_CALL if re.search(r"\b%s\(" % m, body)}
     assert len(called) == 1, (nm, sorted(called))
     doors[nm] = called.pop()
-assert {n for n, d in doors.items() if d == "draw_special_pair"} == \
+assert {n: DOOR_CALL[d] for n, d in doors.items()} == \
+    {n: themes.special_door(n) for n in themes.special_names()}, doors
+assert {n for n, d in doors.items() if DOOR_CALL[d] in ("pair", "values")} == \
     {n for n in themes.special_names() if themes.special_is_pair(n)}, doors
 sf = gui_edit.field_names("special")
 assert "width" in sf, sf
@@ -4263,6 +4485,21 @@ assert "not a box width" in pitch_note, pitch_note
 assert "does not read `width`" in notes_by_name["dual-status"], notes_by_name
 assert gui_edit.field_note("special", "fontSize", "dual-status") == ""
 assert gui_edit.field_note("bar", "width") == ""
+# the ceiling sentence has to change with the door, or the editor tells a `temp-values` row
+# to fit itself to a key that drawing never reads
+wide = gui_edit.field_note("special", "fontSize", "fan-figures")
+round_ = gui_edit.field_note("special", "fontSize", "temp-values")
+assert "autoFitMax" in wide and "fitArc" not in wide, (wide, round_)
+assert "fitArc" in round_ and "autoFitMax" not in round_, (wide, round_)
+assert gui_edit.field_note("special", "x", "temp-values") == \
+    "the pair's own anchor point, not one figure's corner"
+# and the key each door sizes with is the one the row is shown: `--check-theme` says a
+# `values` row without `xigma.fitArc` is not drawn at all
+hard, soft = themes.validate({"width": render.W, "height": render.H, "osd": {"widget": [
+    {"id": "xigma-no-ring", "type": "special",
+     "property": [dict(pair_prop, name="temp-values",
+                        xigma={"anchor": "ma"})]}]}})
+assert not hard and any("fitArc" in s_ and "not drawn" in s_ for s_ in soft), (soft,)
 
 
 def _figure_centres(img, mid):
@@ -4312,13 +4549,19 @@ print(f"  a pair row, and what  `fan-figures`: the inspector offers {len(sf)} fi
       f" gap to {gap1:.1f} and moved each figure 16 px inboard, and {moved_px:,} pixels of"
       f" the frame changed - one undo put every one of them back. The row says what the"
       f" field means: {pitch_note[:88]}...")
-pair_names = sorted(n for n, d in doors.items() if d == "draw_special_pair")
+pair_names = sorted(n for n, d in doors.items() if DOOR_CALL[d] in ("pair", "values"))
+wide_names = sorted(n for n, d in doors.items() if d == "draw_special_pair")
+v_names = sorted(n for n, d in doors.items() if d == "draw_special_values")
 line_names = sorted(n for n, d in doors.items() if d == "draw_special_line")
-print(f"                        who needs that sentence is not remembered either: the"
-      f" pair door is used by {len(pair_names)} of the {len(doors)} registered drawings"
-      f" ({' '.join(pair_names)} go through `layout.draw_special_pair`), found in their"
-      f" own source with `inspect`, and only those rows are told about a pitch:"
-      f" {' '.join(line_names)} read `width` not at all")
+print(f"                        who needs that sentence is not remembered either: a pair"
+      f" door is used by {len(pair_names)} of the {len(doors)} registered drawings"
+      f" ({' '.join(f'{n}:{DOOR_CALL[c]}' for n, c in sorted(doors.items()))}),"
+      f" found in their own source with `inspect`, and only those rows are told about a"
+      f" pitch: {' '.join(line_names)} read `width` not at all.  Inside the pair doors the"
+      f" sentence still splits: {' '.join(wide_names)} size the pair to a width"
+      f" (`xigma.autoFitMax`) and {' '.join(v_names)} size it to a ring (`xigma.fitArc`) -"
+      f" which is why `fontSize` gets two different sentences, checked on the window's own"
+      f" note line below")
 
 # ---- the same model, behind the window's own controls ----
 # Not a second set of claims: the checks that the shell does not lie about the model.
@@ -4387,7 +4630,7 @@ for _ in range(4):
 sp_rows = [win.ed_field.itemText(i) for i in range(win.ed_field.count())]
 assert sp_rows == (list(gui_edit.field_names("special"))
                    + list(gui_edit.extension_fields("special"))), sp_rows
-assert "width" in sp_rows and "autoFitMax" in sp_rows, sp_rows
+assert "width" in sp_rows and "autoFitMax" in sp_rows and "fitArc" in sp_rows, sp_rows
 # a menu has to show the value the row holds, not the first choice it *could* hold:
 # `name` is the field where the two differ, because the vocabulary is sorted and this
 # row's value is `dual-status`, second of the three
@@ -4451,14 +4694,56 @@ assert win.ed.prop().get("name") == "dual-status", win.ed.prop()
 assert "does not read `width`" in win.ed_note.text(), win.ed_note.text()
 assert win.ed_undo.text() == "undo", win.ed_undo.text()
 assert themes.user_copies() == [], "an in-memory edit wrote a file"
+# the third door, through the same menu.  A `values` row reads `width` as a pitch like any
+# other pair row, but its ceiling sentence must name the ring and not the width key that
+# drawing never reads: an editor that explained the wrong fit key would be the same mistake
+# as a menu showing the wrong value, one screen later
+win.ed_field.setCurrentText("name")
+for _ in range(4):
+    appq.processEvents()
+win.ed_menu.setCurrentText("temp-values")
+for _ in range(6):
+    appq.processEvents()
+assert win.ed.prop().get("name") == "temp-values", win.ed.prop()
+win.ed_field.setCurrentText("fontSize")
+for _ in range(4):
+    appq.processEvents()
+ring_note = win.ed_note.text()
+assert "fitArc" in ring_note and "autoFitMax" not in ring_note, ring_note
+win.ed_field.setCurrentText("width")
+for _ in range(4):
+    appq.processEvents()
+assert "not a box width" in win.ed_note.text(), win.ed_note.text()
+# a key the drawing does not read is still on the field list, because fields are per kind
+# and the vocabulary is the vendor's, so the reason beside it is what has to say what it
+# does *not* do on this row
+win.ed_field.setCurrentText("autoFitMax")
+for _ in range(4):
+    appq.processEvents()
+why_note = win.ed_note.text()
+assert why_note.startswith("xigma.autoFitMax:") and "temp-values" in why_note, why_note
+win.ed_undo.click()
+for _ in range(4):
+    appq.processEvents()
+assert win.ed.prop().get("name") == "dual-status", win.ed.prop()
+# the field the reader was last on stays selected across an undo, so the sentence that
+# comes back is asked for on purpose: back on `width`, a `line` row says it reads none
+win.ed_field.setCurrentText("width")
+for _ in range(4):
+    appq.processEvents()
+assert "does not read `width`" in win.ed_note.text(), win.ed_note.text()
+assert win.ed_undo.text() == "undo", win.ed_undo.text()
+assert themes.user_copies() == [], "an in-memory edit through the third door wrote a file"
 print(f"  a special in the row  `dual`'s one `special` widget: {len(sp_rows)} fields "
       f"({' '.join(sp_rows)}), and the drawing menu is exactly the "
       f"{len(themes.special_names())} names in `themes.SPECIALS` "
       f"({' '.join(themes.special_names())}). That row's note says its drawing does not "
       f"read `width` at all; switch it to `fan-figures` through the same menu and the "
-      f"pitch sentence appears, and one undo through the window's own button takes both "
-      f"the row and the sentence back. The pair's pitch itself is measured through the "
-      f"Qt-free model above")
+      f"pitch sentence appears; switch it to `temp-values` and the pitch stays while the "
+      f"ceiling sentence changes to the ring ({ring_note[:70]}...), with the key that "
+      f"drawing never reads labelled as such beside it. Two undos through the window's own "
+      f"button took both the rows and their sentences back. The pair's pitch itself is "
+      f"measured through the Qt-free model above")
 print(f"  a menu shows the value  every value menu selects what the row holds, not the "
       f"first choice it could: that `special` displays `dual-status` in a menu starting "
       f"`clock-readings`, and the `data` row picked here displays `{menu_shown}` in a "

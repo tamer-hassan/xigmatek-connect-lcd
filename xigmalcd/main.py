@@ -929,15 +929,16 @@ def main(argv=None) -> int:
 
 
     if args.list_specials:
+        # each name says the door it goes through, in the words the registry itself uses
+        # (`themes.special_door`): the door is what decides what the row's `x`, `width` and
+        # fit key mean, and a reader authoring a file has to know which of the three they
+        # are writing before they pick numbers
+        shapes = {"line": "one line of text built by code",
+                  "pair": "two figures at one size, fitted to `xigma.autoFitMax`",
+                  "values": "two figures at one size, fitted to `xigma.fitArc`"}
         for name in themes.special_names():
-            # which shape a row of this name will edit: read off the door the drawing goes
-            # through (`themes.special_is_pair`), because that call is what decides whether
-            # the row's `width` is a pitch or nothing at all
-            shape = ("draws a *pair* of figures at one shared size: `x` is their centre, "
-                     "`width` the distance between them"
-                     if themes.special_is_pair(name)
-                     else "draws one line of text built by code")
-            print(f"  {name}  - {shape}")
+            door = themes.special_door(name)
+            print(f"  {name}  [{door}] {shapes[door]}")
         print("  A special is drawn by code and placed by the layout: see "
               "xigmalcd/themes.SPECIALS and docs/theme-editor.md.")
         return 0
