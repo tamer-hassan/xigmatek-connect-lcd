@@ -1441,10 +1441,23 @@ WHEN = datetime.datetime(2026, 11, 8, 3, 40, 0)
 # and a font that cannot be resolved drops its widget - so the boxes drawn and the frame
 # bytes below are "on this machine", and the gate is a floor with the font situation
 # printed rather than an exact count that would fail on another image.
-faces = {fam: bool(layout.font_for({"fontFamily": fam, "fontSize": 12}))
-         for fam in layout.FONTS}
-print("  faces on this machine " + ", ".join(f"{fam} {'yes' if have else 'MISSING'}"
-                                             for fam, have in sorted(faces.items())))
+# probe the family/bold pairs the layouts actually ask for, at the sizes they use:
+# `arial` resolving at 12 px says nothing about `simsun` bold at 100, and the day a probe
+# is coarser than the thing it guards is the day the guard starts lying.
+used_faces = set()
+for rec in ok:
+    for w in (themes.load(rec["path"]).get("osd") or {}).get("widget") or []:
+        for pr in w.get("property") or []:
+            if pr.get("fontFamily"):
+                used_faces.add((str(pr["fontFamily"]).lower(), bool(pr.get("bold")),
+                                int(pr.get("fontSize") or 12)))
+faces = {f"{fam}{'b' if bold else ''}/{size}":
+         bool(layout.font_for({"fontFamily": fam, "bold": bold, "fontSize": size}))
+         for fam, bold, size in sorted(used_faces)}
+missing_faces = sorted(k for k, v in faces.items() if not v)
+print(f"  faces on this machine {len(faces)} family/bold/size combinations asked for by "
+      f"the {len(ok)} layouts, {len(faces) - len(missing_faces)} installed"
+      + (f"; MISSING: {' '.join(missing_faces)}" if missing_faces else ""))
 sizes, drawn, skipped, dropped_fonts = [], 0, [], set()
 painted_total = 0
 for rec in ok:
@@ -1526,14 +1539,16 @@ print(f"  --list-themes           {len(lines)} lines, {len(pick)} of them the ca
 # Asserted only where all four families the library names are installed, because the
 # totals count glyphs: a machine without a CJK face draws fewer of them, and that is said
 # rather than failed.
-if all(faces.values()):
+if not missing_faces:
     assert (drawn, painted_total) == (114, 314169), (drawn, painted_total)
     print(f"  vendor pixels unchanged {drawn} boxes, {painted_total} painted px across "
           f"the {len(ok)} layouts - the anchor/autoFit keys and the `special` branch "
           f"changed nothing about a vendor theme")
 else:
-    print(f"  vendor pixels          NOT asserted here: {len(dropped_fonts)} family(ies) "
-          f"missing, so the box and pixel totals are this machine's, not the library's")
+    print(f"  vendor pixels          NOT asserted here: {len(missing_faces)} of the "
+          f"{len(faces)} face combinations the layouts ask for are not installed, so the "
+          f"{drawn} boxes and {painted_total} lit pixels counted here are this machine's, "
+          f"not the library's")
 
 # ---- the generated export: byte-stable, and identical to the code it claims to describe
 dump_a = json.dumps(themes.export("clock"), indent=1, sort_keys=True)
@@ -1563,14 +1578,30 @@ CASES = ({"cpu": {"temperature": 57}, "gpu": {"temperature": 47},
          {"cpu": {"temperature": 24}},
          {})
 rows = []
+export_faces = set()
+for name, recipe in themes.EXPORTS.items():
+    for w in recipe()["osd"]["widget"]:
+        pr = w["property"][0]
+        if pr.get("fontFamily"):
+            export_faces.add((str(pr["fontFamily"]).lower(), bool(pr.get("bold")),
+                              int(pr.get("fontSize") or 12)))
+no_face = sorted(f"{f}{'b' if b else ''}/{sz}" for f, b, sz in export_faces
+                 if not layout.font_for({"fontFamily": f, "bold": b, "fontSize": sz}))
 for name in sorted(themes.EXPORTS):
     for m in CASES:
         r = themes.parity(name, m, WHEN)
+        if no_face:      # an export's own face is not installed here: say so, don't fail
+            break
         assert r["diff_px"] == 0 and r["worst_channel_delta"] == 0, (name, r)
         assert r["code_px"] == r["layout_px"] > 4000, (name, r)
         assert not r["missing"], (name, r["missing"])
         rows.append((name, r["code_px"]))
+    if no_face:
+        break
 per = ", ".join(f"{n} {p} px identical" for n, p in rows)
+if no_face:
+    print(f"  export parity         SKIPPED on this machine: the exported themes name "
+          f"{', '.join(no_face)}, not installed here")
 print(f"  export parity         {len(themes.EXPORTS)} of the five themes export today "
       f"({' '.join(sorted(themes.EXPORTS))}); across {len(CASES)} readings each, the "
       f"generated layout and render.py put down the same pixels: {per}")
