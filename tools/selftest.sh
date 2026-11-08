@@ -1571,6 +1571,19 @@ if off:
                                     "widget") or []
                                 for pr in wd.get("property") or [] if pr.get("fontFamily")}
                                ) for rec in ok}
+    for rec in ok:                       # decisive: the prop as stored, and what
+        if rec["name"] not in {o[0] for o in off}:   # font_for made of it
+            continue
+        for wd in (themes.load(rec["path"]).get("osd") or {}).get("widget") or []:
+            for pr in wd.get("property") or []:
+                if not pr.get("fontFamily"):
+                    continue
+                face, fam, path = layout.font_for(pr)
+                print(f"      {rec['name']} {wd['type']:<5} "
+                      f"stored={pr.get('fontFamily')!r}/{pr.get('fontSize')!r}/"
+                      f"bold={pr.get('bold')!r} -> fam={fam!r} "
+                      f"face={'yes' if face else 'NONE'} "
+                      f"file={os.path.basename(path) if path else '-'}")
     det = "; ".join(
         f"{n} {b} here, {w} there (skipped: "
         f"{', '.join(skips_per[n][0] + skips_per[n][1]) or 'nothing'}; probe for this "
