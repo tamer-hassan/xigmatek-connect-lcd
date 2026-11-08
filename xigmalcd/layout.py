@@ -237,9 +237,9 @@ def colour_ramp(prop: dict) -> tuple:
     and 0.2, and `0.8 - 0.5` is 0.30000000000000004, so a copy spelled in stops differs at
     8 of 100 sampled positions, by one unit, in the red and blue channels.  The owner's
     decision (docs/theme-editor.md) is to *name* such a ramp rather than change the drawing:
-    a named ramp is the same rule the fan figures and the tick strip follow - geometry and
-    colour position come from the file, the picture stays code - and it keeps every figure
-    that was read off those themes valid.
+    a named ramp is the same rule the fan figures and the two composite lines follow -
+    geometry and colour position come from the file, the picture stays code - and it keeps
+    every figure that was read off those themes valid.
 
     Where the name is applied: on an `arc` it is sampled along the sweep, on a `bar` at the
     value's fraction of the bar's own range.  An unknown name is reported, not guessed at.
@@ -264,17 +264,41 @@ def colour_ramp(prop: dict) -> tuple:
 #:             pixels (a different rounding: 360 px wide at 63.5 % is 457 device px here
 #:             against 456 the other way), the track's corners are `height/2`, the fill's
 #:             corners are `min(height/2, int(width x max(fraction, 0.02))/2)` - so the
-#:             roundness *changes with the reading* - and the fill is drawn when the
-#:             fraction itself is above 0.01.
+#:             roundness *changes with the reading* - and a fill is drawn only when the
+#:             fraction is above 0.01.  Those are two different numbers in the function, and
+#:             they are two different keys here for the same reason: the first version of
+#:             this table used 0.02 for both, which loses the fill on a reading between
+#:             1 % and 2 % that `render.bar` draws.
+#:
+#:   `hbar`    what `render.hbar` draws, which is the usage bar of the theme ALPHA selected:
+#:             square ends, the track the full declared rectangle, and the fill coloured
+#:             **one device column at a time** along the filled part - `startColor` at the
+#:             left edge of the fill, `endColor` at its right, so the ramp's far end moves
+#:             with the reading.  `render.hbar` walks `i` in `range(int(w x SS x fraction))`
+#:             and paints `[x+i, y, x+i+1, y+h]` with a truncating lerp at `i / (n-1)`;
+#:             those rectangles overlap by a device pixel and the track's box includes its
+#:             far edge, which is what the code does and what is reproduced here rather than
+#:             tidied away: the claim of a `barPaint: hbar` file is that it paints this
+#:             program's picture, and the gate says whether it does - it does, at zero
+#:             differing pixels (docs/limits.md).  A declared `cornerRadius` is ignored by
+#:             this convention, because the function it names has no radius argument: the
+#:             suite paints this bar with a corner of 0 and of 5 and gets the same picture
+#:             both ways.
 #:
 #: Selected by `xigma.barPaint`; no key means `vendor`, which is what every copied layout
-#: is.  A `bar` may also name a colour ramp (`xigma.colourRamp`), sampled at the value's
-#: fraction: `render.bar` colours by value, and a vendor bar has no spelling for that.
+#: is.  A `bar` may also name a colour ramp (`xigma.colourRamp`) or declare stops
+#: (`xigma.colourStops`), which are sampled at the value's fraction: `render.bar` colours by
+#: value, and a vendor bar has no spelling for that.
 BAR_PAINT = {
     "vendor": {"name": "vendor", "span": "round", "track_radius": "declared",
-               "fill_radius": "declared", "guard": "span", "floor": 0.0},
+               "fill_radius": "declared", "guard": "span", "floor": 0.0,
+               "corner_floor": 0.0, "ramp": "value"},
     "render": {"name": "render", "span": "trunc", "track_radius": "half",
-               "fill_radius": "auto", "guard": "frac", "floor": 0.02},
+               "fill_radius": "auto", "guard": "frac", "floor": 0.01,
+               "corner_floor": 0.02, "ramp": "value"},
+    "hbar": {"name": "hbar", "span": "trunc", "track_radius": "square",
+             "fill_radius": "square", "guard": "span", "floor": 0.0,
+             "corner_floor": 0.0, "ramp": "columns"},
 }
 
 
@@ -298,15 +322,37 @@ def draw_bar(draw: ImageDraw.ImageDraw, prop: dict, value) -> tuple:
     a bar is a rectangle, not a rounded one - `cornerRadius` is 0 on 13 of the
     16 widgets that carry it, 5 on two, and those two are drawn round.
 
-    `xigma.barPaint: render` switches to the way this program's own themes paint one,
-    corners and all; the numbers that differ between the two are printed by the suite."""
+    `xigma.barPaint` names which painter's convention the widget was authored for, and
+    the three of them disagree about rounding, about the corners, and about where the
+    fill's colour comes from:
+
+      `vendor` (no key) - the shape above: the span rounds in panel px, the corners are
+      whatever the file declares, and the fill is one flat colour.
+      `render`  - `render.bar`: the span truncates in device px, the track is round at
+      height/2 whatever the file declares, the fill's corners are a function of the
+      reading, and a reading that rounds to no fill still gets 2 %.
+      `hbar`    - `render.hbar`, ALPHA's own usage bar: square ends regardless of the
+      declared `cornerRadius`, the track covering the whole declared rect, and the fill
+      coloured one device column at a time along the filled part.
+
+    The suite paints one bar all three ways and prints the counts; for `hbar` the count
+    against `render.hbar` itself is zero, which is the claim that key makes."""
     x, y = int(prop["x"]), int(prop["y"])
     w, h = int(prop["width"]), int(prop["height"])
     conv, conv_name = bar_paint(prop)
     if conv is None:
         return (x, y, x + w, y + h), f"unknown xigma.barPaint {conv_name!r}"
     rad = int(prop.get("cornerRadius") or 0) * SS
-    track_rad = (h * SS) // 2 if conv["track_radius"] == "half" else rad
+    # A declared `cornerRadius` is read three different ways, and that is part of what the
+    # key names: the vendor draws what the file says, `render.bar` rounds the track to
+    # height/2 whatever the file says, and `render.hbar` has no radius argument at all -
+    # so `square` means 0 and is not a request for the widget's own corners.
+    if conv["track_radius"] == "half":
+        track_rad = (h * SS) // 2
+    elif conv["track_radius"] == "square":
+        track_rad = 0
+    else:
+        track_rad = rad
     box = (x * SS, y * SS, (x + w) * SS, (y + h) * SS)
     draw.rounded_rectangle(box, radius=track_rad, fill=rgba(prop["bgColor"]))
     frac = frac_of(prop, value)
@@ -315,22 +361,39 @@ def draw_bar(draw: ImageDraw.ImageDraw, prop: dict, value) -> tuple:
     span = (int(w * SS * frac) if conv["span"] == "trunc"
             else int(round(w * frac)) * SS)
     if (frac > conv["floor"] if conv["guard"] == "frac" else span > 0):
-        if conv["fill_radius"] == "auto":
-            fill_rad = min((h * SS) // 2, int(w * SS * max(frac, conv["floor"])) // 2)
+        if conv["ramp"] == "columns":
+            # one device column at a time, `startColor` at the left edge of the *fill*
+            # and `endColor` at its right, exactly as `render.hbar` walks it - the ramp's
+            # far end therefore moves with the reading, which a declared pair alone does
+            # not say and `barPaint: hbar` does
+            stops, _bad = colour_stops(prop)
+            if stops is None:
+                stops = [(0.0, rgba(prop["startColor"])),
+                         (1.0, rgba(prop["endColor"]))]
+            for i in range(span):
+                draw.rectangle((x * SS + i, y * SS, x * SS + i + 1, (y + h) * SS),
+                               fill=ramp_at(stops, i / max(span - 1, 1), "trunc"))
         else:
-            fill_rad = rad
-        ramp, bad = colour_ramp(prop)
-        if bad is not None and ramp is None:
-            return (x, y, x + w, y + h), f"unknown xigma.colourRamp {bad!r}"
-        stops, _why = colour_stops(prop)
-        if ramp is not None:
-            fill = ramp(frac)
-        elif stops is not None:
-            fill = ramp_at(stops, frac, "trunc" if conv["span"] == "trunc" else "nearest")
-        else:
-            fill = rgba(prop["startColor"])
-        draw.rounded_rectangle((x * SS, y * SS, x * SS + span, (y + h) * SS),
-                               radius=fill_rad, fill=fill)
+            if conv["fill_radius"] == "auto":
+                fill_rad = min((h * SS) // 2,
+                               int(w * SS * max(frac, conv["corner_floor"])) // 2)
+            elif conv["fill_radius"] == "square":
+                fill_rad = 0
+            else:
+                fill_rad = rad
+            ramp, bad = colour_ramp(prop)
+            if bad is not None and ramp is None:
+                return (x, y, x + w, y + h), f"unknown xigma.colourRamp {bad!r}"
+            stops, _why = colour_stops(prop)
+            if ramp is not None:
+                fill = ramp(frac)
+            elif stops is not None:
+                fill = ramp_at(stops, frac,
+                               "trunc" if conv["span"] == "trunc" else "nearest")
+            else:
+                fill = rgba(prop["startColor"])
+            draw.rounded_rectangle((x * SS, y * SS, x * SS + span, (y + h) * SS),
+                                   radius=fill_rad, fill=fill)
     return (x, y, x + w, y + h), None
 
 
@@ -669,7 +732,8 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
 
     `specials` is the registry for the one added kind, `special`: {name: callable}.  A
     special is a picture that stays code-drawn and takes its position, size and reading
-    from the layout - the fan figures, the tick strip, the clock's readings line.  It
+    from the layout - today the clock's readings line and `dual`'s status line, and the two
+    fan figures `alpha` still needs.  It
     exists so those elements can *move* without being baked into PNGs, and it is
     injected rather than imported because those drawings live in `render.py`, which
     this module must not import (render imports this one).  A name with no drawing is

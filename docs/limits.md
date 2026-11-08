@@ -832,6 +832,42 @@ writes a theme today. What the model does and does not allow, all of it gated:
   235-255), printed by the suite. At 63.5 % the fill ends at device px 457 under one rule
   and 456 under the other, which is the whole difference and shows how easy it is to lose a
   pixel to a rounding convention nobody wrote down.
+* **A third bar convention, measured against the function it names.** `vendor` and `render`
+  describe rules; `xigma.barPaint: hbar` names a drawing - `render.hbar`, the usage bar of
+  the theme ALPHA selected - so the claim is settled by painting the same bar both ways:
+  square ends whatever the file declares, `bgColor` showing for the whole declared rect, and
+  the fill coloured **one device column at a time** along the filled part, `startColor` at
+  the fill's left edge and `endColor` at its right, so the ramp's far end travels with the
+  value. A vendor `bar` cannot say that: it declares one colour pair and, under `vendor`,
+  fills with the near one.
+  Measured at `render.py`'s own geometry and inks - the suite reads `A26_BAR_XY`,
+  `A26_BAR_WH`, `A26_TRACK`, `A26_BAR_A` and `A26_BAR_B` out of the module rather than
+  writing them down, so the probe cannot drift from the theme it tests - and it is a
+  **zero diff**: 28 pairs at device resolution and 7 more after the same LANCZOS downsample
+  a 1x frame goes through, all 0 differing pixels with worst channel 0, over values 0, 3,
+  22, 62, 100, 137 (past the declared maximum) and -5, on both of ALPHA's usage bars, and
+  at declared `cornerRadius` 0 *and* 5. The same declared bar under the other two
+  conventions sits **7 354** and **7 347** px away from that drawing at 62 %.
+  Two notes on how that gate was built, because both of them bit:
+  * the first version declared `cornerRadius: 0` and passed while the convention still
+    drew the file's rounded track - `square` was falling through to "declared". `hbar` has
+    no radius argument at all, so a declared 5 must not leak in; the second value of that
+    pair is what catches it now;
+  * a diff of zero can be reached by drawing *nothing*, so the gate also counts how many
+    pixels of the declared rect still read the track's own colour as the value rises:
+    **1 376 at 0 % -> 955 at 30 % -> 512 at 62 % -> 0 at 100 %**, the same numbers in both
+    drawings. The fill is being walked column by column, not hidden under a track that
+    happens to match.
+* **The same test for `barPaint: render`, and it found a bug.** That entry names
+  `render.bar`, so it is measured against it too: 14 values, 0 differing pixels, at
+  `dual`'s own geometry with the `heat` ramp named rather than copied
+  (`xigma.colourRamp`, and the ramp is sampled at the value's fraction). The 14 include
+  1.01 %, 1.5 %, 2 % and 2.5 %, and those four are the point: `render.bar` draws a fill
+  whenever `frac > 0.01` but rounds its corners off `max(frac, 0.02)` - **two** different
+  floors - and the convention table had a single `floor` doing both jobs, so a load between
+  1 % and 2 % drew **no fill at all** as a layout widget while `render.bar` drew one. The
+  parity gate that landed `dual` never stepped in that band, so nothing caught it until
+  this gate did; `corner_floor` is a key of its own now.
 * **A ramp can be data, or it can be named - and both are now spelled, because they are
   not equally exact.** See the `xigma.colourStops` and `xigma.colourRamp` entries printed
   by `--print-theme-fields`: three stops reproduce `render.temp_colour` at all 100 sampled

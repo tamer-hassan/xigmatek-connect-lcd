@@ -9,9 +9,9 @@ Stage 2 is **partly** built: the export machinery, the `special` kind, the exten
 it needed, the determinism rules and both gates are in the tree, and three of the five themes
 (`clock`, `gauge` and `dual`) generate to layouts that paint *exactly* what `render.py`
 paints - zero differing pixels on every reading that answers what they ask, worst channel
-delta 0. The other
-two do not generate yet, and what they still need is written out below: `alpha` is waiting
-on four drawings, and `bars` on a question about the schema itself.
+delta 0. The other two do not generate yet, and what they still need is written out below:
+`alpha` is waiting on two fan figures and one question about text sizing, and `bars` on a
+question about the schema itself.
 Stage 3, the file model, is in - what it measured is written out under "What building the file model measured" below. **Stage 4's first half is in as well**: `xigmaui/edit.py` is the editor's model, and the window's layout-editor row is a shell over it - what that half measured is under "What the editor's first half measured". Its other half, the canvas you drag widgets around inside the existing pane, is not built. Stage 5 (docs and census) and stage 6 (the glass pass) are not built. Every census figure below is re-derived by `tools/selftest.sh`'s vendor-library
 section, so it cannot rot in place. The decisions are
 settled with the owner; the census is measured out of the files in this tree on the same
@@ -31,10 +31,12 @@ the two (docs/limits.md).
    a committed copy of `gauge.json` goes stale the first time anyone edits
    `theme_gauge`, and this repo has already recorded a comparison that failed because a
    file changed between two builds (docs/packaging.md).
-3. **The fan figures, the segmented tick strip and the plate stay code-drawn.** They enter
-   a layout as a `special` row that *names* a code drawing, so their pixels keep
+3. **The two fan figures stay code-drawn, and so does the ink plate.** A figure that has
+   no geometry in the vendor's schema - this theme carries no fan widget at all - enters a
+   layout as a `special` row that *names* a code drawing, so its pixels keep
    `--text-color`, the ink halo and supersampling; no PNG assets, no new media roots,
-   nothing extra to hash.
+   nothing extra to hash. The plate is not a row: it is the theme-level `scrim` the frame
+   loop already applies, from the frame's own alpha.
 4. **The four 320×240 themes are excluded**, with the reason kept next to the gate rather
    than in a comment: the em-box anchor convention is measured only at 480
    (`xigmalcd/render.py`, and `themes/alpha/README.md`'s layout table).
@@ -188,8 +190,11 @@ All of this is printed by `tools/selftest.sh` in the vendor-library section, on 
   `why_not`) or when the file cannot be walked.
 - Three kinds of extension, all of them inert to anything but this program, since the JSON
   never goes on the wire: a `special` kind whose `name` is one of a printed list
-  (`--list-specials`; the three we need are `cpu-fan-figure`, `gpu-fan-figure`,
-  `tick-strip`); `autoFit` on a `text`/`data` row, because `_fit`/`_fit_size` in
+  (`--list-specials`; two have landed - `clock-readings` and `dual-status`, the composite
+  lines - and the two still needed are `alpha`'s fan figures. The "segmented tick strip"
+  this row originally named does not exist: it was a guess about a drawing `render.py`
+  turned out not to make, and what `theme_alpha` actually draws is now printed from its own
+  source by the suite); `autoFit` on a `text`/`data` row, because `_fit`/`_fit_size` in
   `xigmalcd/render.py` shrink a face until the string fits and the vendor schema has a
   fixed `fontSize` with no such key; and one top-level `xigma` block for theme-level
   properties - ink halo, cold/hot scale, gauge source, scrim mode. The round-trip gate
@@ -358,6 +363,15 @@ doors. The bar and each ring were checked at a zero diff on their own before the
 assembled: six load values (including 0 and one past the declared maximum) and seven
 temperatures (including one below the scale and one above).
 
+**Holding a convention to the function it names is worth doing separately, and doing on
+every shape that has one.** Widening that check to 14 load values, with the bar painted
+against `render.bar` itself, found a bug the `dual` parity gate could not see: `render.bar`
+draws a fill whenever `frac > 0.01` but rounds its corners off `max(frac, 0.02)` - two
+different floors - and `BAR_PAINT["render"]` had one number doing both jobs, so a layout
+bar at a load between 1 % and 2 % drew **no fill at all**. Parity missed it because none of
+its readings land in that band: the two values that found it are 1.5 % and 2 %. The entry
+has a `corner_floor` of its own now, and the band is in the gate.
+
 **The ramp question was answered by naming rather than rewriting.** A ramp can be data -
 `xigma.colourStops` is, and it reproduces `render.temp_colour` at all 100 sampled segment
 positions - but it does not reproduce `render.heat()`: 8 of those 100 come out one unit off,
@@ -366,14 +380,16 @@ because `heat` divides by the literals `0.3` and `0.2` where its own breakpoints
 breakpoints would be the tidy fix, and it would re-render `dual`, `alpha` and `bars`, every
 figure of which was read off the current drawing; so the call was to leave the pixels alone
 and name the ramp (`xigma.colourRamp`, one entry per drawing, `--print-theme-fields` prints
-the names with their reasons). The same rule the fan figures and the tick strip already
+the names with their reasons). The same rule the fan figures and the two composite lines
 follow.
 
-What the last two need, and they are not waiting on the same thing:
+What the last two need, and they are not waiting on the same thing. `alpha`'s list is no
+longer a guess: the suite prints the calls `theme_alpha`'s own body makes, so the row below
+is a claim about this source and not a memory of it.
 
 | theme | what is missing | why it is a decision, not a lookup |
 |---|---|---|
-| `alpha` | `render.hbar`'s per-**column** gradient; the two fan figures; the tick strip; `_fit_arc` | a vendor bar declares one colour, and `xigma.barPaint`/`colourRamp` name the by-*value* case - which is all `dual` needed; a ramp that changes from column to column has no spelling at all. The fan figures and the tick strip stay code-drawn by decision (no PNG assets), so each needs a `special` in `themes.SPECIALS` - `clock-readings` and `dual-status` are the pattern, both at a zero diff. And `_fit_arc` picks **one** text size jointly for two columns so a three-digit reading takes both down together: a relationship *between* widgets, which the schema cannot hold without a group key that does not exist yet |
+| `alpha` | the two fan figures, and `_fit_arc` | the rings and the usage bars are widgets now: `xigma.arcPaint: render` for the two `temp_arc` rings, and `xigma.barPaint: hbar` for `render.hbar`'s per-**column** gradient - the case a vendor `bar` cannot spell, since it declares one flat fill and `render.bar` colours by value instead. That last one is measured, not hoped: 28 device-px pairs and 7 at 1x at **zero differing pixels** against `render.hbar` (docs/limits.md). What is left is the two fan figures, code-drawn by decision (no PNG assets), each needing a `special` in `themes.SPECIALS` - `clock-readings` and `dual-status` are the pattern, both at a zero diff - and `_fit_arc`, which picks **one** text size jointly for two columns so a three-digit reading takes both down together: a relationship *between* widgets, which the schema cannot hold without a group key that does not exist yet |
 | `bars` | its shape, not a drawing | its row count and row pitch are functions of the machine: `row_h = min(56, max(28, 320 // len(rows)))`, and `rows` grows by up to four fan entries whose labels come from whatever `sensors` reports, truncated to 10 characters. One fixed widget list cannot be this theme's picture on every box, so either the schema gains a repeat group the vendor never had - the thing this plan decided not to invent - or `bars` stays code-drawn and is simply not editable as data. Said as the decision it is, rather than quietly resolved one way |
 
 Two things that landing the ramp key made possible, before any theme needed it. A ramp is
@@ -466,12 +482,13 @@ PROTOCOL.md §10 - so this needs the installed app off the Windows machine again
 ## What this document does not claim
 
 This document was written before any of it existed, and it is now part record, part plan.
-What does **not** exist in this tree: an editor surface of any kind (no inspector, no
-canvas, no save path driven by a window - the file model is there and its writer is
-exercised by the suite, but nothing in the CLI writes a theme); layout exports for
-`alpha`/`bars`/`dual`/`gauge`; the fan-figure and tick-strip `special` drawings. What does:
-stages 1-3 as their rows say, plus `--export-theme`, `--list-specials`,
-`--check-theme` and `--print-theme-fields`, each gated in `tools/selftest.sh`.
+What does **not** exist in this tree: the canvas half of stage 4 (widgets cannot be dragged
+or nudged, and the inspector edits one field at a time from the pinned fixture rather than
+from live readings); layout exports for `alpha` and `bars`; the `special` drawings for
+`alpha`'s two fan figures; any unit for the `space` the panel reports. What does: stages
+1-3 as their rows say, stage 4's model and the window's row over it, and
+`--export-theme`, `--list-specials`, `--check-theme` and `--print-theme-fields`, each gated
+in `tools/selftest.sh`.
 
 And the census rows are no longer a one-off `python3 -` pass: the library counts, the
 field counts, the round-trip and copy identity, the refusals and the `line` measurement are

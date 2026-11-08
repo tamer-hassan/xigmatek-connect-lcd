@@ -400,11 +400,15 @@ XIGMA_KEYS = {
                   "and bars stays valid); sampled along the sweep on an arc, at the "
                   "value fraction on a bar",
     "barPaint": "which painter's bar convention this widget was authored for: `vendor` "
-                "(fill spans round(width x fraction), corners as declared) or `render` "
+                "(fill spans round(width x fraction), corners as declared), `render` "
                 "(device-space truncation, track corners at height/2, fill corners a "
-                "function of the reading, floor 0.02). 360 px at 63.5 % is 457 device "
-                "px one way and 456 the other, so a bar export without the key is a "
-                "different picture by pixels, not by intent",
+                "function of the reading, floor 0.02) or `hbar` - the one entry that names "
+                "a drawing function rather than a set of rules, so it is held to that "
+                "function's pixels: `render.hbar`'s square ends whatever the file declares, "
+                "its track the whole declared rect, its fill coloured one device column at "
+                "a time, so the ramp's far end moves with the reading. 360 px at 63.5 % is "
+                "457 device px one way and 456 the other, so a bar export without the key "
+                "is a different picture by pixels, not by intent",
     "colourStops": "a ramp written as data: [fraction, rgba()] pairs, interpolated "
                    "piecewise-linearly. Measured against both ramps this repo draws, at "
                    "every position its ring steps through: `render.temp_colour` agrees "
@@ -584,6 +588,10 @@ def validate(obj: dict) -> tuple:
             soft.append(f"widget {i} (arc): xigma.arcPaint {layout.arc_paint(pr)[1]!r} "
                         f"is not one of {' '.join(sorted(layout.ARC_PAINT))} - the ring "
                         f"will be reported as unwritten rather than drawn by guesswork")
+        if kind == "bar" and layout.bar_paint(pr)[0] is None:
+            soft.append(f"widget {i} (bar): xigma.barPaint {layout.bar_paint(pr)[1]!r} "
+                        f"is not one of {' '.join(sorted(layout.BAR_PAINT))} - the bar "
+                        f"will be reported as unwritten rather than drawn by guesswork")
         if kind == "special" and str(pr.get("name") or "") not in SPECIALS:
             soft.append(f"widget {i}: special name {pr.get('name')!r} has no drawing "
                         f"(--list-specials prints {' '.join(special_names())})")
@@ -705,7 +713,7 @@ def delete_user_theme(name: str) -> str:
 # ------------------------------------------------------- the specials registry --
 #: {name: callable(draw, prop, values) -> ink box}.  A special is a picture that stays
 #: code-drawn and takes its position, size, colour and reading from the layout - the
-#: decision that keeps the fan figures, the tick strip and the clock's readings line
+#: decision that keeps `alpha`'s two fan figures and the two composite readings lines
 #: movable without baking PNGs (docs/theme-editor.md).  Injected into
 #: `layout.draw_theme` from here, because the drawings live in `render.py` and layout
 #: already imports render, not the other way round.

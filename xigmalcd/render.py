@@ -794,6 +794,16 @@ A26_FAN_MAX_W = 200                  # ink budget per figure: measured 192 px
 A26_FAN_F, A26_FAN_MIN = 24, 16      # size range; both figures share one size,
                                      # chosen from the wider of the two, and it
                                      # is never pushed under 16
+# the two usage bars, and the one reason they are named here instead of written
+# inline: `xigma.barPaint: hbar` in a layout file claims to paint *this* bar -
+# square ends, `A26_TRACK` showing for the whole declared rect, the fill coloured
+# one device column at a time - and the only answer that settles that claim is a
+# picture-by-picture diff against `hbar` at its own geometry.  The geometry comes
+# from ALPHA's captured frames: both bars ink exactly 280 x 10 px, at (100, 330)
+# and (100, 400), their left edges aligned under their own `CPU USED`/`GPU USED`
+# labels (see the note above `theme_alpha`).
+A26_BAR_XY = ((100, 330), (100, 400))
+A26_BAR_WH = (280, 10)
 # (For reference: the size the vendor declares for a `GPU Temperature` data
 # widget elsewhere, presetTheme[8] and [16], is 40 - half of its CPU reading.
 # That is the asymmetry this layout gives up.)
@@ -846,16 +856,17 @@ def theme_alpha(m, title=None, clock=True, clock_size=26, fan=True,
                   anchor="ma")
 
     # usage: vendor geometry, exact, its values left-aligned on their anchors
+    (cpu_bar, gpu_bar), (bar_w, bar_h) = A26_BAR_XY, A26_BAR_WH
     _text(img, (100, 300), "CPU USED", font(20, bold=False), fg,
           anchor="la")
     _text(img, (320, 290), _pct(cpu.get("load")), font(32, bold=False),
           fg, anchor="la")
-    hbar(img, 100, 330, 280, 10, (cpu.get("load") or 0) / 100.0)
+    hbar(img, *cpu_bar, bar_w, bar_h, (cpu.get("load") or 0) / 100.0)
     _text(img, (100, 370), "GPU USED", font(20, bold=False), fg,
           anchor="la")
     _text(img, (322, 362), _pct(gpu.get("load")), font(32, bold=False),
           fg, anchor="la")
-    hbar(img, 100, 400, 280, 10, (gpu.get("load") or 0) / 100.0)
+    hbar(img, *gpu_bar, bar_w, bar_h, (gpu.get("load") or 0) / 100.0)
 
     # clock, small and centred along the bottom, below the lower bar (which
     # ends at y=409).  26 of the panel's 480 px, so its digits ink about 19 px

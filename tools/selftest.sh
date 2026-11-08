@@ -1700,20 +1700,6 @@ if partial:
             f"its `source` is unanswered. Both are right by their own rule, so the counts "
             f"stand side by side - an export translates a theme's drawing, not its "
             f"fallback behaviour (docs/limits.md)")
-print(f"  not exported yet      {' '.join(sorted(set(render.THEMES) - set(themes.EXPORTS)))}"
-      f" - and they are not both waiting on the same thing. `alpha` needs four drawings"
-      f" the schema cannot spell yet: `render.hbar`'s per-**column** gradient (a vendor"
-      f" bar declares one colour, and `xigma.barPaint`/`colourRamp` now name the"
-      f" by-value case, which is all `dual` needed), the two fan figures, the tick strip,"
-      f" and `_fit_arc`, which picks one text size jointly for two columns - a"
-      f" relationship between widgets, so it wants a group key that does not exist."
-      f" `bars` is a different kind of answer: its row count and row pitch are functions"
-      f" of the machine (`row_h = min(56, max(28, 320 // len(rows)))`, and `rows` grows"
-      f" by up to four fan entries named by whatever `sensors` reports), so one fixed"
-      f" widget list cannot be its picture on every box. That is a decision about the"
-      f" schema - a repeat group the vendor never had - or `bars` stays code-drawn and"
-      f" is simply not editable as data. Nothing about the wire changes either way"
-      f" (docs/theme-editor.md)")
 
 # ---- why `xigma.arcPaint` exists at all: one arc, painted both conventions, measured
 from PIL import Image, ImageChops
@@ -1737,18 +1723,19 @@ for v in (31.0, 52.0, 57.4, 88.9):
                  max((max(px) for px in flat), default=0)))
 assert all(n > 0 for _v, n, _w in conv), conv
 assert all(w > 0 for _v, _n, w in conv), conv
-# ---- and the same question for a bar: one widget, two conventions, counted
+# ---- and the same question for a bar, where there are now three answers and one of
+# ---- them names a drawing function, so its claim is held to that function's pixels.
 _barprop = {"x": 60, "y": 340, "width": 360, "height": 14, "cornerRadius": 5,
-        "bgColor": "rgba(40, 46, 50, 1)", "startColor": "rgba(0, 247, 255, 1)",
-        "endColor": "rgba(0, 247, 255, 1)", "minValue": 0, "maxValue": 100,
-        "source": "CPU Usage"}
+            "bgColor": "rgba(40, 46, 50, 1)", "startColor": "rgba(0, 247, 255, 1)",
+            "endColor": "rgba(0, 247, 255, 1)", "minValue": 0, "maxValue": 100,
+            "source": "CPU Usage"}
 
 
-def _bar(declared, value):
+def _bar(paint, value):
     img = Image.new("RGBA", (render.W * layout.SS, render.H * layout.SS), (0, 0, 0, 0))
     prop = json.loads(json.dumps(_barprop))
-    if declared:
-        prop["xigma"] = {"barPaint": "render"}
+    if paint:
+        prop["xigma"] = {"barPaint": paint}
     from PIL import ImageDraw
     layout.draw_bar(ImageDraw.Draw(img), prop, value)
     return img.resize((render.W, render.H), Image.LANCZOS)
@@ -1756,11 +1743,152 @@ def _bar(declared, value):
 
 bars = []
 for v in (0.0, 3.0, 63.5, 100.0):
-    flat = ImageChops.difference(_bar(True, v), _bar(False, v)).get_flattened_data()
+    flat = ImageChops.difference(_bar("render", v), _bar(None, v)).get_flattened_data()
     bars.append((v, sum(1 for q in flat if q != (0, 0, 0, 0)),
                  max((max(q) for q in flat), default=0)))
 assert all(n > 0 for _v, n, _w in bars), bars
 
+# `barPaint: hbar` is different in kind from the other two: it names `render.hbar`, so
+# the only answer that counts is a zero diff against it, on the geometry and the inks that
+# function is called with.  Both come out of `render.py`'s own constants here - the two
+# usage-bar anchors, their size, the three colours - so the probe cannot drift away from
+# the theme it is testing, which is how the last remembered figure in this repo went stale.
+def _css(col):
+    return f"rgba({col[0]}, {col[1]}, {col[2]}, {col[3] / 255:.6g})"
+
+
+def _code_bar(which, value):
+    img = Image.new("RGBA", (render.W * layout.SS, render.H * layout.SS), (0, 0, 0, 0))
+    render.hbar(img, *render.A26_BAR_XY[which], *render.A26_BAR_WH,
+                min(max(value / 100.0, 0.0), 1.0))
+    return img
+
+
+def _file_bar(which, value, paint, corner):
+    prop = {"x": render.A26_BAR_XY[which][0], "y": render.A26_BAR_XY[which][1],
+            "width": render.A26_BAR_WH[0], "height": render.A26_BAR_WH[1],
+            "cornerRadius": corner, "minValue": 0, "maxValue": 100,
+            "source": "CPU Usage", "bgColor": _css(render.A26_TRACK),
+            "startColor": _css(render.A26_BAR_A), "endColor": _css(render.A26_BAR_B),
+            "xigma": {"barPaint": paint}}
+    img = Image.new("RGBA", (render.W * layout.SS, render.H * layout.SS), (0, 0, 0, 0))
+    from PIL import ImageDraw
+    _box, bad = layout.draw_bar(ImageDraw.Draw(img), prop, value)
+    assert not bad, (paint, bad)
+    return img
+
+
+def _count(a, b):
+    flat = ImageChops.difference(a, b).get_flattened_data()
+    return (sum(1 for q in flat if q != (0, 0, 0, 0)),
+            max((max(q) for q in flat), default=0))
+
+
+# device px, before the LANCZOS downsample the 1x frame goes through: the convention's
+# own resolution
+zero = []
+gap_h = {}
+for which in (0, 1):
+    for value in (0, 3, 22, 62, 100, 137, -5):    # includes past-max and negative
+        for corner in (0, 5):   # `hbar` takes no radius: a declared corner must not leak
+            assert _count(_code_bar(which, value),
+                          _file_bar(which, value, "hbar", corner))[0] == 0, \
+                (which, value, corner)
+            zero.append((which, value, corner))
+        for paint in ("vendor", "render"):
+            gap_h[(which, value, paint)] = _count(_code_bar(which, value),
+                                                  _file_bar(which, value, paint, 5))[0]
+assert len(zero) == 2 * 7 * 2, zero
+assert all(n > 0 for k, n in gap_h.items() if k[1] > 0), gap_h
+
+# The same test for the second convention that names a function, `render.bar`, at the
+# values where its own two floors make a difference.  This is not decoration: the table
+# used one number for both floors, so a load between 1 % and 2 % drew **no fill at all**
+# while `render.bar` drew one - the first version of this gate found it at 1.5 % and 2 %.
+# `render.bar` draws when `frac > 0.01` and rounds its corners off `max(frac, 0.02)`.
+def _code_load(value):
+    img = Image.new("RGBA", (render.W * layout.SS, render.H * layout.SS), (0, 0, 0, 0))
+    render.bar(img, 60, 340, 360, 14, value / 100.0, render.heat(value / 100.0))
+    return img
+
+
+def _file_load(value):
+    prop = json.loads(json.dumps(_barprop))
+    prop["xigma"] = {"barPaint": "render", "colourRamp": "heat"}
+    img = Image.new("RGBA", (render.W * layout.SS, render.H * layout.SS), (0, 0, 0, 0))
+    from PIL import ImageDraw
+    _box, bad = layout.draw_bar(ImageDraw.Draw(img), prop, value)
+    assert not bad, bad
+    return img
+
+
+LOADS = (0, 0.5, 1.0, 1.01, 1.5, 2.0, 2.5, 3, 12.5, 63.5, 99.9, 100, 137, -5)
+load_zero = [_count(_code_load(v), _file_load(v))[0] for v in LOADS]
+assert load_zero == [0] * len(LOADS), list(zip(LOADS, load_zero))
+# 1x, as the panel and the preview actually see it
+ONEX = [_count(_code_bar(0, v).resize((render.W, render.H), Image.LANCZOS),
+               _file_bar(0, v, "hbar", 5).resize((render.W, render.H), Image.LANCZOS))[0]
+        for v in (0, 3, 22, 62, 100, 137, -5)]
+assert ONEX == [0] * len(ONEX), ONEX
+# and the fill is really being walked, not hidden under the track: the number of pixels of
+# the declared rect that still read the track's own colour falls as the reading rises, and
+# falls the same way in both drawings
+def _track_px(img):
+    x, y = render.A26_BAR_XY[0]
+    w, h = render.A26_BAR_WH
+    box = img.crop((x, y, x + w, y + h)).get_flattened_data()
+    return sum(1 for q in box if q[:3] == render.A26_TRACK[:3])
+
+
+walked = []
+for value in (0, 30, 62, 100):
+    code = _code_bar(0, value).resize((render.W, render.H), Image.LANCZOS)
+    mine = _file_bar(0, value, "hbar", 0).resize((render.W, render.H), Image.LANCZOS)
+    walked.append((value, _track_px(mine), _track_px(code)))
+assert [a for _v, a, _b in walked] == [b for _v, _a, b in walked], walked
+assert walked[0][1] > walked[1][1] > walked[2][1] > walked[3][1] == 0, walked
+
+# what `theme_alpha` draws, taken out of its own source rather than remembered, so the
+# blocker list in docs/theme-editor.md is a claim about this code and not a memory of it
+import inspect, re                                 # noqa: E402
+alpha_src = inspect.getsource(render.theme_alpha)
+alpha_fn = render.theme_alpha.__name__
+# a *call*, matched at a word boundary, so `temp_arc(` does not report an `arc` and
+# `hbar(` does not report a `bar` - the two false positives the first version of this
+# line had, from plain substring matching.  A theme name is not a drawing either.
+alpha_draws = sorted({c for c in dir(render)
+                      if getattr(getattr(render, c), "__module__", None)
+                      == render.__name__ and c != alpha_fn
+                      and re.search(r"\b%s\(" % re.escape(c), alpha_src)})
+assert {"hbar", "temp_arc", "_fit_arc", "_cpu_fan_figure", "_gpu_fan_figure",
+        "_title", "clock_str"} <= set(alpha_draws), alpha_draws
+
+# the enumerated tables and the reasons `--print-theme-fields` prints for them cannot
+# drift: every name in a table has to be named in that key's stated reason
+drift = {key: [n for n in table if n not in themes.XIGMA_KEYS[key]]
+         for key, table in (("arcPaint", layout.ARC_PAINT),
+                            ("barPaint", layout.BAR_PAINT),
+                            ("colourRamp", layout.COLOUR_RAMPS))}
+assert not any(drift.values()), drift
+# and a name that is *not* in a table is reported, not drawn by guesswork: the soft
+# finding the arc has had since it lands, now one shape over for a bar
+bad_arc = json.loads(json.dumps(themes.export("gauge")))
+bad_arc["osd"]["widget"][0]["property"][0]["xigma"]["arcPaint"] = "guessed"
+bad_prop = dict(_barprop)
+bad_prop["xigma"] = {"barPaint": "hand-painted"}
+bad_bar = {"width": render.W, "height": render.H,
+           "osd": {"widget": [{"id": "xigma-bad", "type": "bar",
+                               "property": [bad_prop]}]}}
+hard, soft_bar = themes.validate(bad_bar)
+assert not hard, hard
+assert any("barPaint" in s and "hand-painted" in s for s in soft_bar), soft_bar
+assert all(n in s for n in layout.BAR_PAINT
+           for s in soft_bar if "barPaint" in s), soft_bar
+hard, soft_arc = themes.validate(bad_arc)
+assert not hard, hard
+assert any("arcPaint" in s and "guessed" in s for s in soft_arc), soft_arc
+
+bad_words = next(w for w in soft_bar if "barPaint" in w)
 gap = ", ".join(f"{v:g} -> {n:,} px differ, worst channel {w}/255"
                 for v, n, w in conv)
 print(f"  why arcPaint          one arc, two colours unchanged, drawn with "
@@ -1778,6 +1906,80 @@ print(f"  why barPaint          one bar (360x14 at 60,340, cornerRadius 5 declar
       f" reading it scales by, so at 63.5 % the fill ends at device px 457 one way and 456"
       f" the other - a bar export without the key would be off by pixels and by the"
       f" corners, not by intent")
+print(f"  barPaint: render      the second one names `render.bar`, and it is held to it the"
+      f" same way: {len(LOADS)} values, 0 differing pixels against the function at all of"
+      f" them ({', '.join(f'{v:g}%' for v in LOADS[:6])}, ... 100 %, past-max and"
+      f" negative). Two floors in the function, and the first version of the table had one"
+      f" number where there are two: `render.bar` draws whenever `frac > 0.01` but rounds"
+      f" its corners off `max(frac, 0.02)`, so a load between 1 % and 2 % drew no fill at"
+      f" all as a layout widget while `render.bar` drew one - 1.5 % and 2 % were the two"
+      f" values that found it, and `corner_floor` is a key of its own now")
+print(f"  barPaint: hbar        the third entry names a function, so it is measured against"
+      f" it: one layout `bar` at `render.A26_BAR_XY`/`A26_BAR_WH` in `A26_TRACK`/"
+      f"`A26_BAR_A`/`A26_BAR_B` - all four read out of `render.py`, not written here -"
+      f" against `render.hbar`: {len(zero)} pairs at device px and {len(ONEX)} at 1x, every"
+      f" one zero differing pixels and worst channel 0, over values 0/3/22/62/100 plus"
+      f" past-max and negative, on both of ALPHA's usage bars, and at declared"
+      f" `cornerRadius` 0 and 5. That last pair is the one the first version of this gate"
+      f" missed: it used cornerRadius 0 and passed while the convention still drew the"
+      f" file's rounded track (`hbar` has no radius argument at all)")
+print(f"                        the same declared bar under the other two conventions sits"
+      f" {gap_h[(0, 62, 'vendor')]:,} and {gap_h[(0, 62, 'render')]:,} px away from the"
+      f" drawing `hbar` names, and the fill is demonstrably walked rather than hidden"
+      f" under the track: the rect's track-coloured pixels fall "
+      + " -> ".join(f"{a:,} at {v}%" for v, a, _b in walked)
+      + f" in both drawings (docs/limits.md, docs/theme-editor.md)")
+print(f"  what alpha draws      {' '.join(alpha_draws)} - taken out of `theme_alpha`'s own"
+      f" body, so the plan's list of what alpha still needs is a claim about this source:"
+      f" the rings and the usage bars are expressible as widgets now (`arcPaint`,"
+      f" `barPaint`); what is left is the two fan figures, which stay code-drawn by"
+      f" decision, and `_fit_arc` picking one size for two columns together")
+print(f"  not exported yet      "
+      f"{' '.join(sorted(set(render.THEMES) - set(themes.EXPORTS)))}, and not for the same"
+      f" reason twice. `alpha`'s list is the derived one just printed - its rings and its"
+      f" usage bars are widgets now (`arcPaint`, `barPaint`), so what is left is"
+      f" code-drawn by decision (the two fan figures) or waiting on an answer about the"
+      f" schema (`_fit_arc`). `bars` is the second kind of answer on its own: its row"
+      f" count and row pitch are functions of the machine (`row_h = min(56, max(28, 320 //"
+      f" len(rows)))`, and `rows` grows by up to four fan entries named by whatever"
+      f" `sensors` reports), so one fixed widget list cannot be its picture on every box."
+      f" That is a decision about the schema - a repeat group the vendor never had - or"
+      f" `bars` stays code-drawn and is simply not editable as data. Nothing about the"
+      f" wire changes either way (docs/theme-editor.md)")
+print(f"  a table and its reason {' '.join(sorted(layout.BAR_PAINT))} /"
+      f" {' '.join(sorted(layout.ARC_PAINT))} / {' '.join(sorted(layout.COLOUR_RAMPS))}:"
+      f" every name in a table appears in the reason `--print-theme-fields` prints for it,"
+      f" and an unknown one is reported rather than guessed at:"
+      f" {bad_words[:82]}")
+
+# docs quote these figures, so they are re-derived here rather than remembered: the last
+# number this repo wrote down with no gate behind it went stale
+def _spaced(n):
+    return f"{n:,}".replace(",", " ")
+
+
+lim = open("docs/limits.md", encoding="utf-8").read()
+usage_txt = open("docs/usage.md", encoding="utf-8").read()
+assert " / ".join(_spaced(n) for _v, n, _w in conv) in lim, \
+    "docs/limits.md does not quote the arc numbers this run printed"
+assert " / ".join(_spaced(n) for _v, n, _w in bars) in lim, \
+    "docs/limits.md does not quote the bar numbers this run printed"
+for key in ("arc", "bar"):
+    nums = [n for _v, n, _w in (conv if key == "arc" else bars)]
+    assert f"{_spaced(min(nums))} to {_spaced(max(nums))}" in usage_txt, (key, nums)
+for paint in ("vendor", "render"):
+    assert _spaced(gap_h[(0, 62, paint)]) in lim, \
+        (paint, gap_h[(0, 62, paint)], "docs/limits.md does not quote how far a"
+         " convention sits from render.hbar")
+assert f"{len(LOADS)} values, 0 differing pixels" in lim, \
+    f"docs/limits.md does not quote the {len(LOADS)} zero-diff values against render.bar"
+assert f"{len(zero)} pairs" in lim, \
+    f"docs/limits.md does not quote the {len(zero)} zero-diff pairs"
+plan = open("docs/theme-editor.md", encoding="utf-8").read()
+assert f"{len(zero)} device-px pairs and {len(ONEX)} at 1x" in plan, \
+    f"docs/theme-editor.md does not quote the {len(zero)}/{len(ONEX)} zero-diff pairs"
+assert all(f"{a:,}".replace(",", " ") in lim for _v, a, _b in walked), \
+    "docs/limits.md does not quote how the track disappears as the fill grows"
 sp = subprocess.run([sys.executable, "-m", "xigmalcd", "--list-specials"],
                     capture_output=True, text=True, check=True)
 assert all(f"  {n}" in sp.stdout for n in themes.special_names()), sp.stdout

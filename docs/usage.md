@@ -202,7 +202,10 @@ claim:
   printed by `--print-theme-fields`: `xigma.arcPaint` (our ring is 3-degree segments
   sampled at their start, ALPHA's measured ring is 1-degree segments sampled at their
   middle - 164 to 6 989 differing pixels on one arc), `xigma.barPaint` (the same argument
-  about a bar's rounding and corners: 203 to 327 differing pixels at four loads),
+  about a bar's rounding and corners: 203 to 327 differing pixels at four loads; and both
+  entries that name one of our drawings are now held to it pixel by pixel - `render` against
+  `render.bar` at 14 values, `hbar` against `render.hbar`, both at **zero differing
+  pixels**),
   `xigma.colourStops` (a ramp as data, exact against `render.temp_colour` at all 100
   sampled positions) and `xigma.colourRamp` (a ramp named instead of copied, because
   `render.heat` is off from its own stop spelling by one unit at 8 of those 100 and
