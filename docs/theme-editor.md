@@ -302,7 +302,7 @@ number gated, the docs updated in the same change.
 |---|---|---|---|
 | 0 | this document, plus the schema written out properly: the `special` list, `autoFit`, the `xigma` block, the determinism rules, and how `--theme` opens past `choices=sorted(render.THEMES)` | 1 | 3 |
 | 1 | **landed 2026-11-08.** the 23 `1:1` layouts selectable in the loop: name→layout resolver, human names from `background.mediaFile`, the source→`sensors.collect()` table, `--list-themes`, `notes["missing"]` printed as "no pump tachometer here, widget skipped" and again over the socket's `status`, the four `4:3` themes excluded by a gate on `ratio` so a future 480 layout cannot be dropped by a filter, and a `--theme` name that is canonicalised once at parse time so the CLI, the log and the socket all spell it the same | 1-1½ | 3-4½ |
-| 2 | **machinery landed 2026-11-08.** `--export-theme NAME`, `--list-specials`, the `special` kind and its injected registry, the `xigma` extension keys, byte-stability and parity gates over four readings; `clock` generates at a zero-pixel diff; `alpha`/`bars`/`dual`/`gauge` do not generate yet, and `--print-theme-fields` is not built | 2-2½ | 6-7½ |
+| 2 | **machinery landed 2026-11-08.** `--export-theme NAME`, `--list-specials`, the `special` kind and its injected registry, the `xigma` extension keys, byte-stability and parity gates over four readings; `clock` generates at a zero-pixel diff; `alpha`/`bars`/`dual`/`gauge` do not generate yet. (`--print-theme-fields`, which was listed here as unbuilt, landed with stage 3.) | 2-2½ | 6-7½ |
 | 3 | **landed 2026-11-08.** the file model: the user root `~/.config/xigmalcd/themes` read before the checkout and before `/usr/share`, so an edited copy shadows the vendor's by file operation alone and deleting it puts the vendor's back; `canonical()`/`shape_of()`, `validate()` split into hard (will not draw) and soft (worth saying), `save()` (atomic tmp + `os.replace`, `.bak`, trailing newline, user root only, the five code names refused, traversal names refused), `copy_for_edit()`, `delete_user_theme()`, `user_copies()`, `themes.draw()` for an object that never touched a disk, and `--check-theme NAME` as the review door. The round-trip gate is in: **27/27 layouts reproduce byte for byte** and **23/23 copies are byte-identical to their source**. Not built: the window that drives it | 1-1½ | 3-4½ |
 | 4 | the surface: one-row inspector over the fields each kind carries (sized by `--print-theme-fields`, which prints the per-kind field census), the canvas inside the existing pane, pinned fixture and still preview, keyboard nudge, undo coalescing, coarse live apply (a name that resolves to your copy, since `--theme`/`status`/the socket already spell one name one way) | 3-3½ | 9-10½ |
 | 5 | docs and gates: docs/themes.md's "not in the picker, and that is not an oversight" section brought up to date, docs/usage.md's CLI table, docs/gui.md's window census, README's five-theme claims, the window's own theme tooltip (it still says the vendor files are for the panel's firmware, which §11 contradicts), `smoke` rendering every installed layout offline against a pinned values dict. The suite grows by at least one section - stage 1's gates belong in the vendor-library section that already re-derives docs/themes.md's colour census, not in a new one - and then every place `twenty` is a gate moves with it: README, docs/tools.md, docs/packaging.md, the top changelog stanza, and the count `.github/workflows/ci.yml` compares against | 1 | 3 |
@@ -332,14 +332,16 @@ PROTOCOL.md §10 - so this needs the installed app off the Windows machine again
 
 ## What this document does not claim
 
-This document was written before any of it existed, and it is now a record of three
-landed stages with the rest still planned. What does **not** exist in this tree: an editor
-surface of any kind (no inspector, no canvas, no save path driven by a window), layout
-exports for `alpha`/`bars`/`dual`/`gauge`, the fan-figure and tick-strip `special` drawings,
-and `--print-theme-fields`. What does: stages 1-3 as their rows say, each gated in
-`tools/selftest.sh`. Every number above is either quoted from
-a file in this repo (PROTOCOL.md, themes/alpha/README.md, docs/themes.md, docs/limits.md,
-docs/gui.md), printed by a tool that exists here (`tools/theme_check.py`,
-`tools/theme_previews.py`, `xigmalcd/layout.py`), or counted by a `python3 -` pass over
-`themes/alpha/layouts/**/*.json` on 2026-11-08 whose queries are written out above. The
-hours are estimates, and they are stated as estimates.
+This document was written before any of it existed, and it is now part record, part plan.
+What does **not** exist in this tree: an editor surface of any kind (no inspector, no
+canvas, no save path driven by a window - the file model is there and its writer is
+exercised by the suite, but nothing in the CLI writes a theme); layout exports for
+`alpha`/`bars`/`dual`/`gauge`; the fan-figure and tick-strip `special` drawings. What does:
+stages 1-3 as their rows say, plus `--export-theme`, `--list-specials`,
+`--check-theme` and `--print-theme-fields`, each gated in `tools/selftest.sh`.
+
+And the census rows are no longer a one-off `python3 -` pass: the library counts, the
+field counts, the round-trip and copy identity, the refusals and the `line` measurement are
+all re-derived on every run, on two machines. Where a row still rests on the 2026-11-08
+queries written out above, it says so. The hours are estimates, and they are stated as
+estimates.
