@@ -27,7 +27,7 @@ from __future__ import annotations
 import copy
 import datetime
 
-from xigmalcd import layout, render, sensors, themes
+from xigmalcd import layout, render, themes
 
 def field_names(kind: str) -> tuple:
     """Every field the inspector offers for one kind, in the order the row shows them.
@@ -200,16 +200,20 @@ class Editor:
     def save(self) -> tuple:
         """Write the edited layout into the user directory, canonically and atomically.
 
-        `themes.save` is the only writer here, and it refuses the two vendor trees, the
-        five drawn-from-code names and any name that is not one path element.  Its soft
-        findings come back with the path: they are the same warnings `--check-theme`
-        prints, and the window shows them rather than repairing anything quietly, which
-        is the rule this repo already keeps about a choice.
+        `themes.save` is the only writer here, and it raises for the names it will not
+        take: the two vendor trees, and the five drawn-from-code names - a saved
+        `gauge.json` would be a second `theme_gauge` to disagree with `render.theme_gauge`
+        (docs/limits.md).  A refusal comes back as (None, the reasons), because a window
+        should print that sentence rather than unwind through it, and the suite can then
+        read the same words the reader sees.
         """
         hard, _soft = themes.validate(self.obj)
         if hard:
             return None, hard
-        path, warnings = themes.save(self.obj, self.name)
+        try:
+            path, warnings = themes.save(self.obj, self.name)
+        except (ValueError, OSError) as exc:
+            return None, [str(exc)]
         self.path = path
         self._saved = copy.deepcopy(self.obj)     # from here, disk holds this picture
         return path, warnings
@@ -222,7 +226,10 @@ class Editor:
         wanted to see the original once.  `dirty` says so out loud, and `undo` or a
         reopen is how they get back.
         """
-        gone = themes.delete_user_theme(self.name)
+        try:
+            gone = themes.delete_user_theme(self.name)
+        except ValueError as exc:           # a name the writer would not take either
+            return f""
         self._saved = copy.deepcopy(self._baseline)
         return gone
 
@@ -238,13 +245,23 @@ class Editor:
         return (self.selected().get("property") or [{}])[0]
 
     def label(self, i: int | None = None) -> str:
-        """One line per widget: what it is, and what it shows."""
+        """One short line per widget: what it is, and what it shows.
+
+        Deliberately short enough for a combo box that is one column wide: the id is in
+        `tip`, which is where a tooltip can be as long as it needs to be.
+        """
         w = self.widgets()[self.index if i is None else i]
         pr = (w.get("property") or [{}])[0]
         what = (pr.get("source") or pr.get("content") or pr.get("name")
                 or pr.get("type") or "")
-        return (f"{w.get('type')}  {what}  at {pr.get('x')},{pr.get('y')}"
-                f"  id {w.get('id')}")
+        return (f"{w.get('type')}  {what}  at {pr.get('x')},{pr.get('y')}")
+
+    def tip(self, i: int | None = None) -> str:
+        """The same line with the widget's `id`, which is how a reader finds the one
+        entry in the file to check the edit in a diff.  Vendor ids are uuid4 and ours
+        are `xigma-*`; both are shown as they are."""
+        w = self.widgets()[self.index if i is None else i]
+        return f"id {w.get('id')}  |  {self.label(i)}"
 
     def select(self, index: int) -> None:
         if not 0 <= index < len(self.widgets()):
@@ -377,10 +394,16 @@ class Editor:
         """The layout as the loop would draw it.  Same door as `--check-theme`."""
         return themes.draw(self.obj, metrics or {}, when, scrim=scrim)
 
-    def fixture(self, pinned: bool = True) -> tuple:
-        """The metrics and the instant this editor draws with."""
-        if not pinned:
-            return sensors.collect(), None
+    def fixture(self) -> tuple:
+        """The metrics and the instant this editor draws with - always the same pair.
+
+        There is deliberately no live-readings door here yet: an edit shown against
+        sensors that move underneath it cannot be judged, and every byte-for-byte
+        comparison in the gates (the frame before an edit, the frame after, the frame
+        read back off disk) only means anything because the instant is fixed.  Showing
+        this machine's readings is stage 4's own next step, listed as unbuilt in
+        docs/theme-editor.md rather than half-offered by a flag nothing exercises.
+        """
         return dict(FIXTURE), FIXTURE_WHEN
 
     def fixture_line(self) -> str:

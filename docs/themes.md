@@ -93,13 +93,16 @@ them here instead, and both are gated in `tools/selftest.sh` rather than asserte
   choice rather than measured off the vendor's picture (`Time`, `CPU Frequency`,
   `Pump Speed`) are named in the same note.
 
-What is planned and not built is the window: no inspector, no canvas, no save driven from
-a UI. The model underneath it is already in the tree and gated - a layout file under
-`~/.config/xigmalcd/themes` is read before the vendor's copy of the same name, a copy made
-for editing is byte-identical to the file it came from (23/23), a save is atomic and keeps
-a `.bak`, and deleting your copy puts the vendor's back in front. All of it is offline
-behaviour: the panel is still handed nothing but `.osd` frames (docs/usage.md has the
-`--check-theme` door that reports which file is drawing). The plan, the census it rests on
+What is **not** built is the canvas: no dragging widgets around inside the preview,
+no keyboard nudge, and no editor drawn from live readings. What **is** built, since
+2026-11-08, is the window's `Layout` box - one layout, one widget, one field at a
+time, over the same model the suite drives headless: a layout file under
+`~/.config/xigmalcd/themes` is read before the vendor's copy of the same name, a copy
+made for editing is byte-identical to the file it came from (23/23), a save is atomic
+and keeps a `.bak`, and deleting your copy puts the vendor's back in front. All of it
+is offline behaviour: the panel is still handed nothing but `.osd` frames
+(docs/usage.md has the `--check-theme` door that reports which file is drawing, and
+docs/gui.md what one edit is worth in pixels). The plan, the census it rests on
 and the parts that stay gaps are written out in [theme-editor.md](theme-editor.md).
 
 ## The `alpha` theme, and its rings

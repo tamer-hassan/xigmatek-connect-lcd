@@ -6,12 +6,13 @@ under `~/.config/xigmalcd/themes`, `--list-themes` and `--check-theme` print
 it with the counts, `--theme <background name>` selects a layout, the canvas refusal is a
 gate on each file's own `ratio` field, and the same names work over the control socket.
 Stage 2 is **partly** built: the export machinery, the `special` kind, the extension keys
-it needed, the determinism rules and both gates are in the tree, and two of the five themes
+it needed, the determinism rules and both gates are in the tree, and three of the five themes
 (`clock`, `gauge` and `dual`) generate to layouts that paint *exactly* what `render.py`
-paints - zero differing pixels across four readings each, worst channel delta 0. The other
+paints - zero differing pixels on every reading that answers what they ask, worst channel
+delta 0. The other
 two do not generate yet, and what they still need is written out below: `alpha` is waiting
 on four drawings, and `bars` on a question about the schema itself.
-Stage 3, the file model, is in - what it measured is written out under "What building the file model measured" below. Stage 4 (the inspector and the canvas), stage 5 (docs and census) and stage 6 (the glass pass) are not built. Every census figure below is re-derived by `tools/selftest.sh`'s vendor-library
+Stage 3, the file model, is in - what it measured is written out under "What building the file model measured" below. **Stage 4's first half is in as well**: `xigmaui/edit.py` is the editor's model, and the window's layout-editor row is a shell over it - what that half measured is under "What the editor's first half measured". Its other half, the canvas you drag widgets around inside the existing pane, is not built. Stage 5 (docs and census) and stage 6 (the glass pass) are not built. Every census figure below is re-derived by `tools/selftest.sh`'s vendor-library
 section, so it cannot rot in place. The decisions are
 settled with the owner; the census is measured out of the files in this tree on the same
 date, and each figure says where it came from, so that a reader can re-run it rather than
@@ -208,6 +209,65 @@ All of this is printed by `tools/selftest.sh` in the vendor-library section, on 
   theme whose parity cannot be driven to a printed small number does not get exported, and
   the doc says which five are in and which are not.
 
+### What the editor's first half measured (stage 4, 2026-11-08)
+
+The model is `xigmaui/edit.py`, and it holds no Qt on purpose: the suite drives it in the
+GUI section under a temp `XDG_CONFIG_HOME`, so every save, revert and refusal below
+happens somewhere that cannot touch the reader's own `~/.config`. The window's group is a
+shell over that model, and the gates say so in counts.
+
+* **Opening writes nothing.** Three library layouts and three generated ones opened, and
+  the user theme directory still holds 0 files. This was not the first version: an
+  earlier `open_theme` copied the file on open, which left a shadow of `Theme_28` behind
+  whenever a later assertion failed - and a shadow is not inert, because `--theme
+  Theme_28` and the socket both find it first. The count is the gate against that coming
+  back.
+* **The field list comes out of the code.** 25 field names across 6 kinds
+  (`arc bar data line special text`), every one a key `themes.keys_read()` proves
+  `layout.py` reads; none of the 11 keys the vendor carries without reading is offered.
+* **A save drops nothing it did not understand.** The per-widget `property` key sets
+  after a save are identical to the vendor file's, and every inert key that was there is
+  still there. An editor that rewrites a schema it does not parse corrupts files.
+* **An edit is the picture, and only the picture.** The literal `text` in `Theme_28`,
+  x nudged to 227 over **20** spinbox keystrokes, is **1** undo step; exactly one ink box
+  moves - by `(20, 0)` - and the other 5 stay put; **1 163 of 230 400** pixels change.
+  That is the same edit, the same fixture and the same count as stage 3's shadowing gate,
+  reached through the row rather than through the library, which is the point.
+* **The file draws what the row drew.** After `save`, `--theme Theme_28` reads the copy
+  (origin: *your copy*) and paints a frame byte-identical to the one that was on screen;
+  one undo returns the first frame byte for byte; revert removes the copy and the
+  vendor's frame is back, identical to the session's first.
+* **A colour is stored the way the library writes it.** `#ff4040` becomes
+  `rgba(255, 64, 64, 1)` - the spelling all 152 shipped widgets use, and the only one
+  `layout.rgba` can read - and the row prints `stored as …` rather than leaving the
+  reader to find it in a diff. 838 pixels change.
+* **A refusal moves nothing.** Six refused writes against one `special` widget - an
+  off-canvas coordinate, a non-number, `cerise`, `bold: "yes"`, `fontSize: null` (only
+  this program's own keys mean anything by an absent value), a field the kind does not
+  carry, and an unknown drawing name - leave 0 undo steps and `dirty` false.
+* **Un-setting is a value.** Removing the gauge ring's `arcPaint` takes the empty `xigma`
+  object with it and changes the whole frame by **3 887 px** at the fixture reading - the
+  two ring conventions, one key apart (`layout.ARC_PAINT`). Setting it back paints
+  byte-identically to the start and leaves 2 undo steps with `dirty` **false**: that flag
+  answers "does memory disagree with the file?", not "was anything typed?", so it is
+  derived from two snapshots rather than a counter.
+* **The row does not lie about the model.** The combo offers 26 names (3 generated + 23
+  files), the field list for a `bar` is the model's 14, an `x` of 9999 sits in the
+  spinbox refused in words while the picture stays put, and the one library layout that
+  carries an `arc` shows `(not set)` for `arcPaint` rather than picking a default to
+  display - *which* file that is gets derived by the gate, because the last figure that
+  was remembered here instead of derived went stale. The pane's cap - never larger than
+  the 480 px glass - holds with an editor frame in it.
+* **Pixel counts mean one thing.** `px_differ` in the suite counts pixels that disagree in
+  any channel, the same count `themes.parity` reports. The first version divided a byte
+  count by four, which printed 905 where the honest number is 1 163 - a fifth out, in the
+  direction that flatters the edit.
+
+Not built, and not claimed: dragging widgets inside the pane, keyboard nudge, coarse live
+apply, adding or removing widgets, renaming a copy, drawing the editor from live readings.
+The window's theme combo still lists the five, because that combo picks what the loop
+draws from this machine's sensors.
+
 ## What generating an export actually found
 
 The plan assumed our five would fit the vendor's shape with one added kind and two
@@ -377,7 +437,7 @@ number gated, the docs updated in the same change.
 | 1 | **landed 2026-11-08.** the 23 `1:1` layouts selectable in the loop: name→layout resolver, human names from `background.mediaFile`, the source→`sensors.collect()` table, `--list-themes`, `notes["missing"]` printed as "no pump tachometer here, widget skipped" and again over the socket's `status`, the four `4:3` themes excluded by a gate on `ratio` so a future 480 layout cannot be dropped by a filter, and a `--theme` name that is canonicalised once at parse time so the CLI, the log and the socket all spell it the same | 1-1½ | 3-4½ |
 | 2 | **machinery landed 2026-11-08,** `--export-theme NAME`, `--list-specials`, the `special` kind and its injected registry, the `xigma` extension keys, byte-stability and parity gates over four readings; three of five generate today: `clock` (3 widgets, 1 448 chars), `gauge` (5, 2 314) and `dual` (10, 4 677) each reach a **zero-pixel diff** on every reading that answers what they ask; `alpha` and `bars` do not, and the table under "What settled the ring and the bar" says what each still needs - including that `bars` may not be expressible as one file at all. (`--print-theme-fields`, listed here as unbuilt, landed with stage 3.) | 2-2½ | 6-7½ |
 | 3 | **landed 2026-11-08.** the file model: the user root `~/.config/xigmalcd/themes` read before the checkout and before `/usr/share`, so an edited copy shadows the vendor's by file operation alone and deleting it puts the vendor's back; `canonical()`/`shape_of()`, `validate()` split into hard (will not draw) and soft (worth saying), `save()` (atomic tmp + `os.replace`, `.bak`, trailing newline, user root only, the five code names refused, traversal names refused), `copy_for_edit()`, `delete_user_theme()`, `user_copies()`, `themes.draw()` for an object that never touched a disk, and `--check-theme NAME` as the review door. The round-trip gate is in: **27/27 layouts reproduce byte for byte** and **23/23 copies are byte-identical to their source**. Not built: the window that drives it | 1-1½ | 3-4½ |
-| 4 | the surface: one-row inspector over the fields each kind carries (sized by `--print-theme-fields`, which prints the per-kind field census), the canvas inside the existing pane, pinned fixture and still preview, keyboard nudge, undo coalescing, coarse live apply (a name that resolves to your copy, since `--theme`/`status`/the socket already spell one name one way) | 3-3½ | 9-10½ |
+| 4 | **first half landed 2026-11-08**: the model (`xigmaui/edit.py`, no Qt, driven headless by the suite) and the window's layout-editor row over it - one layout combo (3 generated + 23 files), one widget, one field, one value; opening writes nothing; the field list is derived from `themes.keys_read()`; colours are stored in the vendor's `rgba()` spelling; refusals move nothing; 20 keystrokes are 1 undo step; the saved file redraws byte-identically what was on screen (1 163 px for the `(20, 0)` nudge, through both doors). Still to build: the canvas inside the existing pane, keyboard nudge, and coarse live apply (a name that resolves to your copy, since `--theme`/`status`/the socket already spell one name one way) | 3-3½ | 9-10½ |
 | 5 | docs and gates: docs/themes.md's "not in the picker, and that is not an oversight" section brought up to date, docs/usage.md's CLI table, docs/gui.md's window census, README's five-theme claims, the window's own theme tooltip (it still says the vendor files are for the panel's firmware, which §11 contradicts), `smoke` rendering every installed layout offline against a pinned values dict. The suite grows by at least one section - stage 1's gates belong in the vendor-library section that already re-derives docs/themes.md's colour census, not in a new one - and then every place `twenty` is a gate moves with it: README, docs/tools.md, docs/packaging.md, the top changelog stanza, and the count `.github/workflows/ci.yml` compares against | 1 | 3 |
 | 6 | on glass, with the panel attached and the owner watching: the runnable set at 1 and 2 fps, achieved fps, loop seams for the vendor clips, the dark-ink-over-bright question that docs/limits.md still carries, and the transcript kept the way docs/packaging/ keeps installs | 1 | 3 |
 | | **total** | **10-12** | **30-36 h** |

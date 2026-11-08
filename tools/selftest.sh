@@ -3170,8 +3170,18 @@ print("  clip detail             the readout under the list, not a second copy o
 # Default: folded.  Everything hidden keeps its value and still goes out on Apply -
 # the switch is about pixels, not about defaults - and the factory reset stays put,
 # because a guarded recovery that is hard to find is worse than one in the way.
-folded = [win.canvas, win.scrim, win.fanline, win.d_events, win.btn_live,
-          win.status_box]
+folded = [win.canvas, win.scrim, win.fanline, win.d_events,
+          win.btn_live, win.status_box, win.ed_group]
+assert len(folded) == 7, folded          # the note names each one
+# the note beside the switch is the reader's only map of what folds away, so it is
+# checked against the code's own list: same number of things, and the layout editor is
+# in the doc that walks the window, or the doc is describing a window that no longer
+# has one
+note_folded = win.adv_note.text()
+assert len(folded) == len([p for p in note_folded.split(",") if p.strip()]), \
+    (len(folded), note_folded)
+gui_txt = open("docs/gui.md", encoding="utf-8").read()
+assert "layout editor" in gui_txt, "the window grew an editor and gui.md did not"
 assert all(not w.isVisible() for w in folded), [w.objectName() for w in folded
                                                 if w.isVisible()]
 assert all(w.isVisible() for w in (win.clips, win.theme, win.btn_upload,
@@ -3197,8 +3207,9 @@ again2.panel.wait(2000)
 win.adv_toggle.setChecked(False)
 for _ in range(6):
     appq.processEvents()
-print("  advanced switch         folds the six secondary controls, keeps their values, "
-      "remembers itself, and leaves the reset box where it was")
+print(f"  advanced switch         folds the {len(folded)} secondary controls the note "
+      f"names ({note_folded}), keeps their values exactly, remembers itself, and "
+      f"leaves the reset box where it was")
 
 # and the split is remembered, with a collapsed pane refused rather than restored
 moved = list(win.split.sizes())
@@ -3605,8 +3616,19 @@ panel.glob = real_glob
 # ---- block because nothing else in this heredoc needed the theme library.
 from xigmaui import edit as gui_edit
 
+from PIL import ImageChops
 from xigmalcd import layout, themes
 from xigmaui import edit as gui_edit
+
+
+def px_differ(a, b):
+    """Pixels where two frames disagree in any channel.  Not a byte count over four: a
+    pixel that differs in one channel is still one pixel, and the two counts differ by a
+    fifth here (905 against 1 163, measured).  This is the same count `themes.parity`
+    reports, so an editor number and an export number mean the same thing."""
+    return sum(1 for q in ImageChops.difference(a.convert("RGBA"),
+                                                b.convert("RGBA")).get_flattened_data()
+               if q != (0, 0, 0, 0))
 
 pick, _rej = themes.scan()
 opened = [gui_edit.Editor.open_theme(r["name"]) for r in pick[:3]]
@@ -3623,6 +3645,12 @@ assert offered <= set(read), sorted(offered - set(read))
 assert not offered & inert, sorted(offered & inert)
 ext_offered = {f for kind in kinds for f in gui_edit.extension_fields(kind)}
 assert ext_offered <= set(sub), sorted(ext_offered - set(sub))
+# the model is the part that can be *held to a number*, and that is only true while it
+# needs no display: PyQt in this module would mean every claim below runs in the GUI
+# section instead, where a broken window can excuse a broken model
+qt = [ln for ln in open("xigmaui/edit.py", encoding="utf-8").read().splitlines()
+      if "PyQt" in ln]
+assert not qt, qt
 fx = generated[0].fixture_line()
 for want in ("CPU Temperature 57.0", "GPU Temperature 47.0", "2026-02-17"):
     assert want in fx, fx
@@ -3656,11 +3684,22 @@ shift = [(int(b[2][0]) - int(a[2][0]), int(b[2][1]) - int(a[2][1]))
          for a, b in zip(notes0["boxes"], notes1["boxes"])]
 assert sum(1 for sh in shift if sh == (NUDGE, 0)) == 1, (kind, shift)
 assert sum(1 for sh in shift if sh == (0, 0)) == len(shift) - 1, shift
-moved = sum(1 for a, b in zip(base.tobytes(), after.tobytes()) if a != b) // 4
+moved = px_differ(base, after)
 assert moved > 200, moved
 path, warnings = ed.save()
 assert path and not warnings, (path, warnings)
 assert not ed.dirty, "save did not clear dirty"
+# nothing dropped and nothing invented: the keys each widget carries after a save are the
+# keys the vendor's file carried, plus `xigma` only where an extension key was set.  An
+# editor that rewrites the schema it does not understand is an editor that corrupts files.
+untouched = gui_edit.Editor.open_theme("Theme_28")
+keys_before = [sorted((w.get("property") or [{}])[0]) for w in untouched.widgets()]
+keys_after = [sorted((w.get("property") or [{}])[0]) for w in
+              themes.load(path)["osd"]["widget"]]
+assert keys_before == keys_after,     [(i3, b, a) for i3, (b, a) in enumerate(zip(keys_before, keys_after)) if b != a]
+lost = [k for i3, keys in enumerate(keys_before) for k in keys
+        if k in inert and k not in keys_after[i3]]
+assert not lost, ("an inert vendor key was dropped on the way out", lost)
 again = gui_edit.Editor.open_theme("Theme_28")
 assert again.origin == "your copy" and not again.dirty, again.origin
 assert int(again.widgets()[target]["property"][0]["x"]) == x0 + NUDGE
@@ -3691,7 +3730,7 @@ gone.select(target)
 ok, note = gone.set("textColor", "#ff4040")
 assert ok and note == "stored as rgba(255, 64, 64, 1)", (ok, note)
 tinted, _ = gone.paint(*gone.fixture())
-touched = sum(1 for x, y in zip(base.tobytes(), tinted.tobytes()) if x != y) // 4
+touched = px_differ(base, tinted)
 assert touched > 100, touched
 assert layout.rgba(gone.value("textColor")) == (255, 64, 64, 255)
 assert gone.undo() and gone.paint(*gone.fixture())[0].tobytes() == base.tobytes()
@@ -3738,7 +3777,7 @@ ok, note = ga.set("arcPaint", None)
 assert ok, note
 assert "xigma" not in ga.prop(), ga.prop()
 without, _ = ga.paint(*ga.fixture())
-gap = sum(1 for x, y in zip(with_key.tobytes(), without.tobytes()) if x != y) // 4
+gap = px_differ(with_key, without)
 assert gap > 0, gap
 ok, note = ga.set("arcPaint", "render")
 assert ok, note
@@ -3756,6 +3795,162 @@ print(f"  an unset is a value   un-setting the ring's `arcPaint` removes the key
       f" `render` again paints byte-identically to the start - a round trip that leaves"
       f" {2} undo steps in the history and `dirty` false, because that flag is a state"
       f" (does memory disagree with the file?) and not a counter of what was typed.")
+
+# ---- the same model, behind the window's own controls ----
+# Not a second set of claims: the checks that the shell does not lie about the model.
+# The fields it lists are the model's list; the picture in the pane is `themes.draw`'s
+# at the pinned fixture; the file appears on Save and nowhere before it; and the pane's
+# oldest rule - this window never draws the 480 px frame larger than 480 px - survives
+# a layout being shown in it.
+was_adv = win.adv_toggle.isChecked()
+win.adv_toggle.setChecked(False)
+for _ in range(6):
+    appq.processEvents()
+assert win.ed_group not in win._adv_hide or not win.ed_group.isVisible(), \
+    "the editor group ignores the advanced switch"
+win.adv_toggle.setChecked(True)
+for _ in range(6):
+    appq.processEvents()
+assert win.ed_group.isVisible(), "advanced on, and the layout editor stayed hidden"
+assert win.ed_name.count() == 1 + len(themes.EXPORTS) + len(pick), win.ed_name.count()
+assert win.ed_name.itemText(0) == app.NO_EDITOR, win.ed_name.itemText(0)
+assert win.ed is None and not win.ed_widget.isEnabled(), \
+    "the row was live before a layout was opened"
+win.ed_name.setCurrentText("Theme_28")
+for _ in range(6):
+    appq.processEvents()
+assert win.ed is not None and win.ed.name == "Theme_28", win.ed.name
+assert win.ed_widget.count() == len(win.ed.widgets())
+kind0 = win.ed.selected()["type"]
+listed = [win.ed_field.itemText(i) for i in range(win.ed_field.count())]
+assert listed == (list(gui_edit.field_names(kind0))
+                  + list(gui_edit.extension_fields(kind0))), (kind0, listed)
+assert win.ed_widget.toolTip() == win.ed.tip(0) and \
+    str(win.ed.widgets()[0]["id"]) in win.ed_widget.toolTip(), "no id in the tip"
+assert "pinned fixture" in win.caption.text(), win.caption.text()[:90]
+assert "pinned fixture" in win.metrics.text(), win.metrics.text()[:80]
+assert themes.user_copies() == [], "opening a layout wrote a file"
+osd_open = win._osd.copy()
+
+# a generated layout names its two conventions in the value menu, and a vendor file that
+# carries neither shows the absence rather than picking a default to display
+win.ed_name.setCurrentText("gauge")
+for _ in range(6):
+    appq.processEvents()
+garows = [win.ed_field.itemText(i) for i in range(win.ed_field.count())]
+assert "arcPaint" in garows and "colourRamp" in garows, garows
+win.ed_field.setCurrentText("arcPaint")
+for _ in range(4):
+    appq.processEvents()
+assert win.ed_stack.currentWidget() is win.ed_menu, "an enumerated key got a text box"
+assert [win.ed_menu.itemText(i) for i in range(win.ed_menu.count())] == \
+    ["render", "vendor"], "the two ring conventions are not the two on show"
+unset = ""
+# which library file carries an `arc` is derived, not remembered: the census says one of
+# the 27 does, and which one it is belongs to the files, not to this gate
+arcs = [r["name"] for r in pick
+        if "arc" in [w["type"] for w in themes.load(r["path"])["osd"]["widget"]]]
+if arcs:
+    win.ed_name.setCurrentText(arcs[0])
+    for _ in range(6):
+        appq.processEvents()
+    arc_at = next(i2 for i2, w in enumerate(win.ed.widgets()) if w["type"] == "arc")
+    win.ed_widget.setCurrentIndex(arc_at)
+    for _ in range(4):
+        appq.processEvents()
+    win.ed_field.setCurrentText("arcPaint")
+    for _ in range(4):
+        appq.processEvents()
+    unset = win.ed_menu.itemText(0)
+    assert unset == app.UNSET and win.ed_menu.currentText() == app.UNSET, \
+        (unset, win.ed_menu.currentText())
+    assert win.ed.value("arcPaint") is None
+win.ed_name.setCurrentText("Theme_28")
+for _ in range(6):
+    appq.processEvents()
+win.ed_widget.setCurrentIndex(target)
+for _ in range(4):
+    appq.processEvents()
+assert win.ed_field.itemText(0) == "x" and win.ed_stack.currentWidget() is win.ed_num, \
+    "a coordinate got something other than a spinbox"
+before_x = int(win.ed.value("x"))
+win.ed_num.setValue(before_x + 20)
+win.ed_num.editingFinished.emit()
+for _ in range(6):
+    appq.processEvents()
+assert int(win.ed.value("x")) == before_x + 20, win.ed.value("x")
+assert win._osd.tobytes() != osd_open.tobytes(), "the pane did not move with the edit"
+assert themes.user_copies() == [], "typing wrote a file"
+assert win.ed_save.isEnabled() and "not saved yet" in win.ed_state.text(), \
+    win.ed_state.text()
+edited = win._osd.copy()
+moved_win = px_differ(osd_open, edited)
+assert moved_win > 200, moved_win
+
+# a value the model refuses: the spinbox holds it, the note says why, and the picture
+# stays put - the difference between a refusal and a silent clamp
+win.ed_num.setValue(9999)
+for _ in range(4):
+    appq.processEvents()
+assert "canvas" in win.ed_note.text(), win.ed_note.text()[:70]
+assert int(win.ed.value("x")) == before_x + 20, "a refused value reached the layout"
+assert win._osd.tobytes() == edited.tobytes(), "a refused edit moved the picture"
+win.ed_num.blockSignals(True)
+win.ed_num.setValue(before_x + 20)
+win.ed_num.blockSignals(False)
+assert win.ed.steps == 1, win.ed.steps
+
+win.ed_save.click()
+for _ in range(6):
+    appq.processEvents()
+assert themes.user_copies() == ["Theme_28"], themes.user_copies()
+assert themes.origin(themes.resolve("Theme_28")) == "your copy"
+assert not win.ed.dirty and "nothing outstanding" in win.ed_state.text(), \
+    win.ed_state.text()
+assert "saved at" in win.ed_note.text(), win.ed_note.text()[:60]
+# and the file on disk is the picture that was on screen: opened again, drawn again
+disk = gui_edit.Editor.open_theme("Theme_28")
+assert int(disk.widgets()[target]["property"][0]["x"]) == before_x + 20
+same, _notes = disk.paint(*disk.fixture())
+assert same.tobytes() == edited.tobytes(), "Save wrote something other than what it showed"
+win.ed_undo.click()
+for _ in range(6):
+    appq.processEvents()
+assert win._osd.tobytes() == osd_open.tobytes(), "undo did not return the frame"
+assert win.ed.dirty and win.ed_undo.text() == "undo", (win.ed.dirty,
+                                                       win.ed_undo.text())
+win.ed_revert.click()
+for _ in range(6):
+    appq.processEvents()
+assert themes.user_copies() == [], themes.user_copies()
+assert not win.ed.dirty, "revert left an edit claimed as saved"
+win.ed_name.setCurrentText(app.NO_EDITOR)
+for _ in range(6):
+    appq.processEvents()
+assert win.ed is None and "pinned fixture" not in win.caption.text(), \
+    win.caption.text()[:80]
+# the pane cap, the window's oldest rule, with an editor frame in it
+win.resize(1600, 900)
+win.split.setSizes([1200, 380, 520])
+for _ in range(6):
+    appq.processEvents()
+win._fit()
+assert win.preview.pixmap().width() == render.W, win.preview.pixmap().size()
+win.adv_toggle.setChecked(was_adv)
+for _ in range(6):
+    appq.processEvents()
+assert win.ed_group.isVisible() == bool(was_adv), (was_adv,
+                                                   win.ed_group.isVisible())
+print(f"  the window's row        offers {win.ed_name.count() - 1} layouts "
+      f"({len(themes.EXPORTS)} generated, {len(pick)} files) and lists the model's own "
+      f"fields - {len(listed)} for a `{kind0}`. x through the spinbox moved {moved_win:,}"
+      f" px of the pane's layer and wrote no file; 9999 sat in the spinbox, refused in"
+      f" words, and the picture did not move"
+      + (f"; a vendor arc with no `arcPaint` shows {unset!r} rather than a default"
+         if unset else "")
+      + f". Save wrote Theme_28.json and that file redraws the frame that was on screen;"
+      f" undo brought the first frame back; revert removed the copy. The pane is still"
+      f" capped at {win.preview.pixmap().width()} px for a {render.W} px glass.")
 PY
 
 echo

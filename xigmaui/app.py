@@ -21,11 +21,12 @@ the glass does not have would be a lie), so a preview column wider than 480 px i
 dead space; and a clip row follows its icon, so the thumbnails are 64 px, not the
 112 px that made every row 114 px tall.
 
-The `advanced controls` switch folds away the six secondary things (canvas, scrim,
+The `advanced controls` switch folds away the seven secondary things (canvas, scrim,
 fan figures, the display's event log, the panel's `conn 1` hello, the 30 second
-frame run).  It is pixels only, never values: what is hidden keeps its setting and
-`Apply` sends it.  The guarded factory reset stays on screen whatever the switch
-says, because a recovery that is hard to find is worse than one that is in the way.
+frame run, the layout editor).  It is pixels only, never values: what is hidden keeps
+its setting and `Apply` sends it.  The guarded factory reset stays on screen whatever
+the switch says, because a recovery that is hard to find is worse than one that is in
+the way.
 
 The preview is `tools/previews.py`'s composite running live: the stored
 background frame underneath, `render.draw` on top. It is labelled in the window
@@ -69,14 +70,16 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QColorDialog, QComboBox,
                              QHBoxLayout, QLabel, QLineEdit, QListWidget,
                              QListWidgetItem, QMainWindow, QMenu, QMessageBox,
                              QProgressBar, QPushButton, QScrollArea,
-                             QSizePolicy, QSpinBox, QSplitter, QSystemTrayIcon,
+                             QSizePolicy, QSpinBox, QSplitter, QStackedWidget,
+                             QSystemTrayIcon,
                              QVBoxLayout, QWidget)
 
 from xigmalcd import control as wire                              # noqa: E402
-from xigmalcd import protocol, render, sensors                   # noqa: E402
+from xigmalcd import protocol, render, sensors, themes       # noqa: E402
 from xigmalcd.main import (BRIGHT_LUMA, CLIP_LUMA, DEFAULT_MP4,   # noqa: E402
                            SCRIM_ON_BRIGHT)
 from . import clips as clipdb
+from . import edit
 from . import settings
 from .daemon import Daemon
 from .panel import Panel, describe, flatten, port_busy
@@ -106,6 +109,17 @@ TITLE = "Xigmatek Connect LCD"
 # around a 480 px picture (`_fit()` never scales up); _build() applies it and the
 # suite checks the arithmetic against the frame size itself.
 PANE_CHROME = 52
+
+#: The menu entry that means "this key is not in the file at all", for the one kind of
+#: field whose absence is a value: this program's own `xigma` extension keys.  It is a
+#: label and a sentinel in one, because the row both shows what the file says and is how
+#: a reader un-says it - and because picking the first real choice instead would be a lie
+#: (`no arcPaint` is the vendor's ring convention, not "render").
+UNSET = "(not set)"
+
+#: The layout combo's first entry: "close the editor".  A constant rather than a string
+#: in two places, because the row's behaviour keys off it and a gate asserts it by name.
+NO_EDITOR = "(nobody: preview the theme above)"
 
 #: How much of the window's own log is kept on screen, in lines.  Not taste: the
 #: log is one wrapped QLabel, so every new line re-sets the whole text, and a
@@ -324,14 +338,15 @@ class Window(QMainWindow):
         self.adv_toggle = QCheckBox("advanced controls")
         self.adv_toggle.setToolTip(
             "show the canvas and scrim pickers, the fan figures switch, the "
-            "display's event log, the panel's own `conn 1` hello, and the 30 "
-            "second frame run. Hiding them does not change them: what is not "
-            "shown is still what is set, and Apply sends it either way")
+            "display's event log, the panel's own `conn 1` hello, the 30 second "
+            "frame run, and the layout editor. Hiding them does not change them: "
+            "what is not shown is still what is set, and Apply sends it either way")
         self.adv_toggle.setChecked(bool(self.cfg.get("advanced")))
         self.adv_toggle.toggled.connect(self._set_advanced)
         self.anim_toggle.toggled.connect(self._set_animate)
         head.addWidget(self.adv_toggle)
-        self.adv_note = QLabel("canvas, scrim, fans, the event log, panel hello")
+        self.adv_note = QLabel("canvas, scrim, fans, the event log, panel hello, the "
+                               "30 s run, the layout editor")
         self.adv_note.setStyleSheet("color:#888;font-style:italic;")
         self.adv_note.setWordWrap(True)
         head.addWidget(self.adv_note, 1)
@@ -458,13 +473,14 @@ class Window(QMainWindow):
         self.theme.currentTextChanged.connect(self._changed)
         self.theme.setToolTip(
             "the drawings `xigmalcd` renders itself, from live sensor readings. "
-            "The vendor's layouts are not in this list on purpose: this window can "
-            "preview the five, and offering a picture it cannot preview would be a "
-            "control that lies about what it showed. The daemon does draw 23 of them "
-            "- `xigmalcd --theme Theme_07`, and `--list-themes` prints the set with "
-            "the four refused on canvas. docs/themes.md says what the library is and "
-            "is not, including that the panel is never handed a layout file "
-            "(PROTOCOL.md §11).")
+            "The vendor's layouts are not in this list on purpose: this combo picks "
+            "what the *loop* draws from this machine's readings, and the five are what "
+            "`render.py` draws from them. The daemon does draw 23 of the library "
+            "layouts - `xigmalcd --theme Theme_07`, and `--list-themes` prints the set "
+            "with the four refused on canvas - and the layout editor below previews "
+            "those files on this same pane, at a pinned fixture rather than live "
+            "readings. docs/themes.md says what the library is and is not, including "
+            "that the panel is never handed a layout file (PROTOCOL.md §11).")
         form.addRow("theme", self.theme)
         # the question this combo provokes, answered where it is asked: the
         # `xigmatek-connect-lcd-themes` package is on the machine, so why is not
@@ -567,6 +583,127 @@ class Window(QMainWindow):
         self.fanline.stateChanged.connect(self._changed)
         adv_row("fans", self.fanline)
         col.addWidget(theme)
+        # ---- the layout editor (docs/theme-editor.md, stage 4) ----------------
+        # The model behind this group is `xigmaui/edit.py`, which holds no Qt: that is
+        # the only reason the claims here are gates rather than hopes - what one edit
+        # moves, what undo owes back, when a file gets written.  Two of its rules
+        # decide what is on screen:
+        #
+        #   * every field this row offers is a key `layout.py` is *proven* to read
+        #     (`themes.keys_read()` takes them out of the painter's own source), so the
+        #     vendor's unread bookkeeping - `enableMove`, `screenStatus` - is never
+        #     offered and survives a save untouched;
+        #   * opening writes nothing.  A file appears on Save, because `--theme Name`
+        #     finds your copy first and that shadowing is a fact about files, not about
+        #     this window: looking at a theme's fields must not quietly change what the
+        #     loop draws.
+        #
+        # It folds away with the advanced switch - one group box, one entry in
+        # `_adv_hide`.  A first run does not need a layout editor, and this column
+        # measured 742 of its 744 px at the fresh 1180x780 default before it arrived.
+        editor = QGroupBox("Layout: edit a file the loop can draw")
+        eform = QFormLayout(editor)
+        self.ed_name = QComboBox()
+        # `themes.scan()` is already user-first, so a name that has been edited appears
+        # once and opens the copy: reopening continues rather than starting over.  The
+        # first entry gives the pane back to the live theme preview.
+        self.ed_name.addItem(NO_EDITOR)
+        self.ed_name.addItems(sorted(themes.EXPORTS))
+        self.ed_name.addItems([r["name"] for r in themes.scan()[0]])
+        self.ed_name.setToolTip(
+            "the three generated layouts (`clock`, `dual`, `gauge`: JSON written out of "
+            "`render.py` on demand, also printed by `--export-theme NAME`) and every "
+            "layout file this canvas can select - 23 of the vendor's 27 today, the other "
+            "four are 4:3 and refused on a 480x480 panel (docs/themes.md). A name you "
+            "have already edited opens your copy. No layout file is ever sent to the "
+            "panel and nothing is read back from it (PROTOCOL.md \u00a711): what a save "
+            "changes is what *this machine's* daemon draws next time it names that theme")
+        self.ed_name.currentTextChanged.connect(self._editor_open)
+        self.ed_state = QLabel("not editing: the pane shows the theme above, drawn from "
+                               "this machine's readings")
+        self.ed_state.setStyleSheet("color:#888;font-style:italic;")
+        self.ed_state.setWordWrap(True)
+        eform.addRow("layout", self.ed_name)
+        eform.addRow("", self.ed_state)
+
+        self.ed_widget = QComboBox()
+        self.ed_widget.setToolTip("one widget of this layout: its kind, what it shows, "
+                                  "and where it sits")
+        self.ed_widget.currentIndexChanged.connect(self._editor_pick_widget)
+        eform.addRow("widget", self.ed_widget)
+
+        self.ed_field = QComboBox()
+        self.ed_field.setToolTip(
+            "a key the painter actually reads. This list comes out of the code rather "
+            "than a table kept here: `themes.keys_read()` parses `layout.py`, and the "
+            "keys the vendor's files carry that nothing reads - which "
+            "`--print-theme-fields` prints with the reason each is inert - are not "
+            "offered")
+        self.ed_field.currentTextChanged.connect(self._editor_pick_field)
+        eform.addRow("field", self.ed_field)
+
+        # One page per kind of value, because a free-text box for `bold` or a menu for a
+        # coordinate is a way of typing something the model can only refuse.  The menus
+        # are the vocabulary that already exists in code: families in `layout.FONTS`,
+        # metric names in the source table, drawings in `themes.SPECIALS`, painter
+        # conventions in `layout.ARC_PAINT`/`BAR_PAINT`, named ramps in
+        # `layout.COLOUR_RAMPS`.
+        self.ed_stack = QStackedWidget()
+        self.ed_num = QSpinBox()
+        # Deliberately wider than any legal value. A spinbox that clamps 999 down to 479
+        # is a widget editing the file on its own; this repo's rule is that an
+        # out-of-range value is *said*, so the spinbox holds it, the model refuses it,
+        # and the note under this row prints the refusal.
+        self.ed_num.setRange(-100000, 100000)
+        self.ed_num.valueChanged.connect(lambda *_a: self._editor_apply(False))
+        self.ed_num.editingFinished.connect(lambda: self._editor_apply(True))
+        self.ed_menu = QComboBox()
+        self.ed_menu.currentIndexChanged.connect(lambda _i: self._editor_apply(True))
+        self.ed_text = QLineEdit()
+        self.ed_text.textEdited.connect(lambda *_a: self._editor_apply(False))
+        self.ed_text.editingFinished.connect(lambda: self._editor_apply(True))
+        self.ed_bool = QCheckBox("bold")
+        self.ed_bool.toggled.connect(lambda _b: self._editor_apply(True))
+        for page in (self.ed_num, self.ed_menu, self.ed_text, self.ed_bool):
+            self.ed_stack.addWidget(page)
+        eform.addRow("value", self.ed_stack)
+
+        brow = QHBoxLayout()
+        self.ed_undo = QPushButton("undo")
+        self.ed_undo.setToolTip("back one edit. A run of keystrokes in the value box is "
+                                "one step, not one per press")
+        self.ed_undo.clicked.connect(self._editor_undo)
+        self.ed_save = QPushButton("save as your copy")
+        self.ed_save.setToolTip(
+            "write this layout to ~/.config/xigmalcd/themes/<name>.json - the one place "
+            "an edited theme lives, and the file `--theme <name>` finds first. The two "
+            "vendor trees are refused, and so are the five drawn-from-code names: a "
+            "saved `gauge.json` would be a second `theme_gauge` (docs/limits.md)")
+        self.ed_save.clicked.connect(self._editor_save)
+        self.ed_revert = QPushButton("revert")
+        self.ed_revert.setToolTip("drop your copy: the loop reads the vendor's file "
+                                  "again. What you typed stays in this window, and the "
+                                  "line above says so")
+        self.ed_revert.clicked.connect(self._editor_revert)
+        brow.addWidget(self.ed_undo)
+        brow.addWidget(self.ed_save)
+        brow.addWidget(self.ed_revert)
+        eform.addRow("", brow)
+
+        self.ed_note = QLabel()
+        self.ed_note.setWordWrap(True)
+        self.ed_note.setStyleSheet("color:#999;font-style:italic;")
+        eform.addRow("", self.ed_note)
+        self.ed_group = editor                   # the suite's gate names it from outside
+        self._adv_hide.append(editor)
+        col.addWidget(editor)
+        self.ed = None                        # nothing open until a name is picked
+        self._ed_notes = {}                   # what the last editor frame reported
+        # nothing to edit until a layout is open: a row that offers fields before there
+        # is a file behind it is a row that will write to nothing
+        for wid in (self.ed_widget, self.ed_field, self.ed_stack, self.ed_undo,
+                    self.ed_save, self.ed_revert):
+            wid.setEnabled(False)
 
         media = QGroupBox("Background: the layer under our frame")
         mlay = QVBoxLayout(media)
@@ -862,11 +999,21 @@ class Window(QMainWindow):
         m = sensors.collect()
         self._last = m
         theme = self.theme.currentText()
-        img = render.draw(m, theme, **self._render_kw())
+        if self.ed is not None:
+            # The pane shows *the file being edited*, drawn by `themes.draw` - the same
+            # door `--check-theme` uses and the frame loop uses for a layout theme - at
+            # the pinned fixture.  Not a detail: a preview that moved with this
+            # machine's readings would make it impossible to tell an edit from a
+            # temperature, and the whole claim of the editor is that a field change is
+            # the only thing that can move a pixel.
+            img, self._ed_notes = self.ed.paint(*self.ed.fixture())
+        else:
+            img = render.draw(m, theme, **self._render_kw())
         self._osd = img
         self._seq += 1
         self.metrics.setText(
-            f"cpu {(m.get('cpu') or {}).get('temperature')}°C  "
+            ("pane: pinned fixture  |  this machine: " if self.ed is not None else "")
+            + f"cpu {(m.get('cpu') or {}).get('temperature')}°C  "
             f"load {(m.get('cpu') or {}).get('load')}%  "
             f"gpu {(m.get('gpu') or {}).get('temperature')}°C  "
             f"gpu fan {(m.get('gpu') or {}).get('fan')}%  "
@@ -927,7 +1074,24 @@ class Window(QMainWindow):
         either.
         """
         played = self.player is not None
-        if played:
+        if self.ed is not None:
+            # The pane is showing a file, not this machine: said in the same place the
+            # live preview says what it is, because the two pictures look alike and mean
+            # different things.  `themes.draw` is the door `--check-theme` uses and the
+            # frame loop uses for a layout theme, so the pane and the glass can only
+            # disagree about the readings, and those are pinned on purpose.
+            miss = ", ".join(sorted(set((self._ed_notes or {}).get("missing") or [])))
+            self.caption.setText(
+                f"Layout `{self.ed.name}` ({self.ed.origin}), drawn through "
+                "`themes.draw` - the door `--check-theme` uses, and the frame loop uses "
+                "for a layout theme. The readings are the editor's pinned fixture, not "
+                "this machine's, so an edit is the only thing that can move a pixel "
+                "here."
+                + (f" No reading for: {miss}." if miss else "")
+                + " This pane sends nothing: the panel is never handed a layout file "
+                  "(PROTOCOL.md \u00a711), so what Save changes is what this machine's "
+                  "daemon draws next time it names that theme.")
+        elif played:
             # the loop's own facts, from the probe the player already did, instead of
             # the still frame's note: the two used to be concatenated without a
             # separator, which printed "...measures those.background Theme_25.mp4 at
@@ -1329,10 +1493,221 @@ class Window(QMainWindow):
         for w in self._adv_hide:
             w.setVisible(bool(on))
         self.adv_note.setText(
-            "canvas, scrim, fans, the event log, panel hello, the 30 s run"
+            "canvas, scrim, fans, the event log, panel hello, the 30 s run, the "
+            "layout editor"
             if not on else "shown, and they keep their values either way")
         self.save_timer.start()
 
+    # ---- the layout editor --------------------------------------------------
+    # Every claim in this group belongs to `xigmaui/edit.py`, which holds no Qt and is
+    # gated in tools/selftest.sh without a display: what an edit moves, what undo owes
+    # back, when a file is written.  The window's job is narrow - offer the fields the
+    # painter reads, show the picture that comes out of them, and never write a file
+    # nobody asked for.
+    def _editor_open(self, name: str) -> None:
+        """Open one layout in the editor.  Reads a file; writes nothing.
+
+        The combo's first entry closes the editor and gives the pane back to the live
+        theme preview, which is the difference a reader needs to see: an open layout is
+        a picture of *the file*, drawn from a pinned fixture, not of what this machine's
+        sensors are putting on the glass right now.
+        """
+        if not name or name == NO_EDITOR:
+            self.ed = None
+            for wid in (self.ed_widget, self.ed_field, self.ed_stack, self.ed_undo,
+                        self.ed_save, self.ed_revert):
+                wid.setEnabled(False)
+            self.ed_state.setText("not editing: the pane below shows the theme above, "
+                                  "drawn from this machine's readings")
+            self.ed_note.setText("")
+            self._repaint()
+            return
+        try:
+            self.ed = edit.Editor.open_theme(name)
+        except (KeyError, ValueError) as exc:
+            # `themes.why_not`'s own sentence: a name that is not a layout, or a file
+            # that will not parse.  Nothing here guesses at a repair.
+            self.ed = None
+            self.ed_state.setText("not editing")
+            self.ed_note.setText(str(exc))
+            self._repaint()
+            return
+        for wid in (self.ed_widget, self.ed_field, self.ed_stack, self.ed_save,
+                    self.ed_revert):
+            wid.setEnabled(True)
+        self.ed_undo.setEnabled(False)
+        self.ed_undo.setText("undo")
+        self.ed_widget.blockSignals(True)
+        self.ed_widget.clear()
+        # The short line on the row; the `id` goes in the combo's own tooltip, updated
+        # with the selection, because a vendor id is a uuid4 and this column is one box
+        # wide.  It is the string a reader greps the file for.
+        for i in range(len(self.ed.widgets())):
+            self.ed_widget.addItem(self.ed.label(i))
+        self.ed_widget.blockSignals(False)
+        self.ed_widget.setCurrentIndex(0)
+        self._editor_pick_widget(0)
+        self._repaint()
+
+    def _editor_state(self) -> None:
+        """One line: where this layout came from, and whether a file holds it now."""
+        if self.ed is None:
+            return
+        where = {"generated from render.py":
+                 "generated from `render.py`: there is no file, and saving one is "
+                 "refused, because a `gauge.json` would be a second `theme_gauge`",
+                 "checkout": "the vendor's file in this checkout",
+                 "package": "the installed themes package",
+                 "your copy": "your copy under ~/.config/xigmalcd/themes"}.get(
+                     self.ed.origin, self.ed.origin)
+        copies = themes.user_copies()
+        state = "edit not saved yet" if self.ed.dirty else "nothing outstanding"
+        self.ed_state.setText(f"{where}; {state}")
+        self.ed_save.setEnabled(self.ed.dirty)
+        self.ed_revert.setEnabled(self.ed.name in copies)
+        self.ed_undo.setEnabled(self.ed.steps > 0)
+        self.ed_undo.setText(f"undo ({self.ed.steps})" if self.ed.steps else "undo")
+
+    def _editor_pick_widget(self, index: int) -> None:
+        """Select one widget and rebuild the field list for its kind."""
+        if self.ed is None or int(index) < 0:
+            return
+        self.ed.select(int(index))
+        self.ed_widget.setToolTip(self.ed.tip(int(index)))
+        kind = str(self.ed.selected().get("type") or "")
+        fields = list(edit.field_names(kind)) + list(edit.extension_fields(kind))
+        self.ed_field.blockSignals(True)
+        self.ed_field.clear()
+        self.ed_field.addItems(fields)
+        self.ed_field.blockSignals(False)
+        if fields:
+            self.ed_field.setCurrentIndex(0)
+            self._editor_pick_field(fields[0])
+        self._editor_state()
+
+    def _editor_pick_field(self, field: str) -> None:
+        """Show the right editor for one field, holding its current value.
+
+        A menu wherever the vocabulary already exists in code, a checkbox for a bool, a
+        spinbox for a number, and a text box only for what is genuinely free text - a
+        colour, a format, a line of content.  That split is `edit.choices()` and
+        `edit.number_fields()`, not a guess made here.
+        """
+        if self.ed is None:
+            return
+        value = self.ed.value(field)
+        opts = edit.choices(field)
+        spelled = [str(o) for o in opts]
+        if field == "bold":
+            page = self.ed_bool
+            self.ed_bool.blockSignals(True)
+            self.ed_bool.setChecked(bool(value))
+            self.ed_bool.blockSignals(False)
+        elif opts:
+            page = self.ed_menu
+            self.ed_menu.blockSignals(True)
+            self.ed_menu.clear()
+            # An extension key that is absent has no value to select, and showing the
+            # first choice as though it were would be the one lie this row could tell:
+            # `arcPaint` missing means the vendor's ring, not "render".  So the row says
+            # it is missing, and choosing that entry is how a reader un-sets a key.
+            ext = field in edit.extension_fields(
+                str(self.ed.selected().get("type") or ""))
+            items = list(spelled)
+            if value is None and ext:
+                items.insert(0, UNSET)
+            elif str(value) not in items:
+                items.insert(0, str(value))   # a value the vocabulary does not name
+            self.ed_menu.addItems(items)
+            self.ed_menu.setCurrentText(items[0])
+            self.ed_menu.blockSignals(False)
+        elif field in edit.number_fields():
+            page = self.ed_num
+            self.ed_num.blockSignals(True)
+            try:
+                self.ed_num.setValue(int(value))
+            except (TypeError, ValueError):
+                self.ed_num.setValue(0)      # a missing key: the drawer's own default
+            self.ed_num.blockSignals(False)
+        else:
+            page = self.ed_text
+            self.ed_text.blockSignals(True)
+            self.ed_text.setText("" if value is None else str(value))
+            self.ed_text.blockSignals(False)
+        self.ed_stack.setCurrentWidget(page)
+        # an extension key gets the reason it exists next to the field, because that is
+        # the one thing a reader cannot infer from the value: `no arcPaint` is not
+        # "unset", it is the vendor's ring
+        why = themes.XIGMA_KEYS.get(field)
+        self.ed_note.setText(f"xigma.{field}: {why}" if why else "")
+
+    def _editor_value(self):
+        """What the on-screen editor currently holds for the selected field."""
+        page = self.ed_stack.currentWidget()
+        if page is self.ed_bool:
+            return self.ed_bool.isChecked()
+        if page is self.ed_menu:
+            return (None if self.ed_menu.currentText() == UNSET
+                    else self.ed_menu.currentText())
+        if page is self.ed_num:
+            return self.ed_num.value()
+        return self.ed_text.text()
+
+    def _editor_apply(self, commit: bool) -> None:
+        """Hand one value to the model, and print in words what it did.
+
+        `commit=False` is a keystroke: the picture moves and the undo step waits, so a
+        run of typing is one undo (the coalescing `edit.Editor.set` implements).  A
+        refusal repaints nothing - the layout, the dirty flag and the history stay as
+        they were, which is the part an editor most often gets wrong.
+        """
+        if self.ed is None:
+            return
+        field = self.ed_field.currentText()
+        if not field:
+            return
+        ok, note = self.ed.set(field, self._editor_value(), commit=commit)
+        if note:
+            self.ed_note.setText(note)
+        if ok:
+            self._repaint()
+        self._editor_state()
+
+    def _editor_undo(self) -> None:
+        if self.ed is None:
+            return
+        if self.ed.undo():
+            self.ed_note.setText(f"back one step: {self.ed.steps} left in the history")
+            self._editor_pick_field(self.ed_field.currentText())
+            self._repaint()
+        self._editor_state()
+
+    def _editor_save(self) -> None:
+        """Write through the library's one writer, and report what it said."""
+        if self.ed is None:
+            return
+        path, notes = self.ed.save()
+        if path is None:
+            self.ed_note.setText(" / ".join(notes))
+            self._log(f"layout not saved: {notes[0]}")
+            self._editor_state()
+            return
+        self._log(f"layout saved: {path}")
+        self.ed_note.setText(
+            f"saved at {path}" + (f" - {'; '.join(notes)}" if notes else
+                                  f" - `--theme {self.ed.name}` now draws this file, "
+                                  "and a loop already running that name picks it up on "
+                                  "its next read (the file is re-read when it changes)"))
+        self._editor_state()
+
+    def _editor_revert(self) -> None:
+        if self.ed is None:
+            return
+        gone = self.ed.revert()
+        self._log(f"layout copy removed: {gone or self.ed.name}")
+        self.ed_note.setText("your copy is gone: the loop reads the vendor's file "
+                             "again. What you typed is still here, unsaved.")
+        self._editor_state()
     # ---- what the panel actually holds ----------------------------------
     def _read_ring(self, events: list) -> None:
         """Learn from the display's record which background it put on the panel.

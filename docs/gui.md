@@ -72,13 +72,14 @@ one of them (see "How the three columns get their sizes", after the table):
 | the running display | controls | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. It also spells out the settings that display is running with - canvas, clock size, scrim, fans, and **the text colour it holds, as the hex it will answer again** (`text #ffc400`), which is the only place in the window you can see a colour you did not pick yourself. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Measured 1 ms for the commands Apply sends - six on the 0.2 bench ledgers below, seven in the tree, and the suite re-measures the line every run |
 | preview | preview | the background with `render.draw`'s OSD layer composited on top - playing, via one streaming ffmpeg, or as one mid-loop frame (`playing` box, see "The preview plays" below), refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How the three columns get their sizes" below | nothing |
 | theme | controls | the five themes, clock size, **the colour of the text it draws**, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
+| layout editor | controls, advanced | opens one of the layouts this machine can select (or one of the three generated ones), shows its widgets, and edits one field at a time; the pane under the picture then shows *that file* rather than the live theme | nothing, ever: the panel is never handed a layout file (PROTOCOL.md §11). What `save` changes is what this machine's own daemon draws next time it names that theme |
 | clips | library | every MP4 the roots hold, listed once per **distinct file** - **40 rows here out of 161 files**: 3 vendored here and 37 from the vendor's library; the other 121 are copies (69 in the Windows app's upload history, 43 in its static media, 9 left by the installed packages), 35 of them under a different name; the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. One thing that is **not** a root: this checkout's own `themes/alpha/clips` - a clone reaches the vendor's library by installing the themes package, which is why a bare checkout lists 3 clips and an installed box lists 40, while `tools/preview_gif.py --clip themes/alpha/clips/Theme_30.mp4` reaches the tree's copy directly (that is how all five README previews are made). Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
 | background state | library | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the gate refuses says so, in the gate's words, before the button is pressed | nothing: it is a readout |
 | `One frame now` | library | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
 | `Send frames for 30 s` | library, advanced | the picture loop, so you can watch the real glass | `STATE all 1` twice, then 60 uploads at 2 fps |
 | status | library, advanced | the panel's `conn 1` reply: sn, versions, `space`, `brightness`, `mode`, `logo`, `osdState`, `timeout`, each annotated only where PROTOCOL.md records what it means | `conn 1`, `power resume`, `timeout 60` - and no metrics blob, because it puts no picture on the glass. With a display running there is no fresh `conn 1` to ask for, so the box shows the one that display read at its own session start, labelled as such |
 | log | preview, under the picture | the window's own last 200 lines (`LOG_KEEP`): what it sent, what the panel answered, what failed and why. Scrollable, selectable, newest at the bottom; the display's full record is its journal, `journalctl --user -u xigmalcd -f` (docs/usage.md) | nothing: it is a readout |
-| `advanced controls` | controls, top row | folds away the six secondary things named further down; it hides pixels and never values | nothing |
+| `advanced controls` | controls, top row | folds away the seven secondary things named further down; it hides pixels and never values | nothing |
 | reset | controls, always on | the vendor's `recovery` | needs the word `reset` typed in, then a confirm dialog. With a display running it goes over the socket, which refuses it unless that display was started `--allow-reset`, and the refusal is quoted in the daemon's words |
 
 ### How the three columns get their sizes, and why the preview is never bigger than the glass
@@ -223,19 +224,76 @@ A preview is only ever blamed for what it adds, and the suite holds each file to
 
 ### The advanced switch
 
-A checkbox at the top of the controls column, default **off**, folds away six
+A checkbox at the top of the controls column, default **off**, folds away seven
 secondary things: the `canvas` and `scrim` pickers, the fan-figures switch, the
-display's event ring, the panel's own `conn 1` hello, and the "send frames for 30 s"
-run. It is about pixels and nothing else - every hidden control keeps its value and
-`Apply` sends it, which is what the suite checks by setting `scrim` while it is
-invisible, restarting the window and reading the same 200 back. The choice is
-remembered (`advanced` in the settings file), and the note beside the switch names
-what is folded so a reader is never hunting for a control that exists.
+display's event ring, the panel's own `conn 1` hello, the "send frames for 30 s"
+run, and the layout editor. It is about pixels and nothing else - every hidden
+control keeps its value and `Apply` sends it, which is what the suite checks by
+setting `scrim` while it is invisible, restarting the window and reading the same
+200 back. The choice is remembered (`advanced` in the settings file), and the note
+beside the switch names what is folded so a reader is never hunting for a control
+that exists.  The suite also checks that the note names as many things as the code
+hides (`win._adv_hide`), because a map that leaves something out is worse than no map.
 
 The **guarded factory reset is deliberately not in there**. It stays on screen whether
 the switch is on or off: hiding the one thing that can put a panel back to its default
 would trade a wasted 90 px for a feature people search for when their panel has gone
 white (docs/troubleshooting.md).
+
+### The layout editor
+
+One group box, folded away by default, that opens a layout as data: the three
+generated themes (`clock`, `dual`, `gauge` - JSON written out of `render.py` on demand)
+and the 23 layout files this canvas can select, the same set `--list-themes` prints.
+A row picks a widget, a field, and a value; a second row says what happened.
+
+Four things about it are measured by the suite rather than assumed, and all four are
+things an editor commonly gets wrong:
+
+* **Opening writes nothing.** The file appears at `save`, because your copy of a name is
+  what `--theme` and the control socket find first, and that shadowing is a fact about
+  files: browsing a theme's fields must not quietly change what the loop draws. The gate
+  opens three layouts and three generated ones and then counts the user directory: still
+  empty.
+* **The field list comes out of the code.** A kind offers the intersection of the keys
+  `layout.py` is *proven* to read (`themes.keys_read()` parses the painter's own source)
+  and what that kind draws - 25 names across 6 kinds today, counted in the gate. The keys
+  the vendor's files carry that nothing reads (`enableMove`, `screenStatus`, and eight
+  more, each with its reason printed by `--print-theme-fields`) are never offered, and the
+  writer keeps them in the file exactly as it found them, because an editor that drops
+  keys it does not understand is an editor that corrupts the vendor's own files.
+* **The pane shows the file, at pinned readings.** `themes.draw` - the door
+  `--check-theme` uses and the frame loop uses for a layout theme - with the fixture every
+  documented figure in this repo was read at (CPU 57.0 °C, GPU 47.0 °C, 2026-02-17
+  09:30:12). The line under the picture says so (`pane: pinned fixture | this machine: …`)
+  because a preview that moved with the sensors would make it impossible to tell an edit
+  from a temperature.
+* **A refused value changes nothing at all.** Type 9999 into `x` and the spinbox holds it,
+  the note prints the model's sentence ("must stay inside the 480x480 canvas this layout
+  declares"), and the picture, the dirty flag and the undo history do not move. Six
+  attempts at one widget leave zero undo steps.
+
+What one edit is worth, in pixels: the literal text widget in `Theme_28` moved 20 px in x
+over twenty spinbox keystrokes is **one** undo step; exactly one ink box moves, by
+(20, 0), the other five stay put, and 905 of 230 400 pixels change. Saving puts the file
+in `~/.config/xigmalcd/themes/`, after which `--theme Theme_28` reads *that* file and
+paints a byte-identical frame; one undo returns the first frame byte for byte; revert
+removes the copy and the vendor's picture is back. A colour typed as `#ff4040` is stored
+as `rgba(255, 64, 64, 1)` - the spelling all 152 shipped widgets use, which `layout.rgba`
+can read and `#ff4040` cannot - and the note says `stored as …` instead of leaving the
+reader to find it in a diff. An extension key can be un-set: removing the gauge ring's
+`arcPaint` takes the empty `xigma` object with it and changes the frame by 1 200 px at
+this reading (that is what the two ring conventions in `layout.ARC_PAINT` are worth), and
+a vendor arc that never carried the key shows `(not set)` rather than picking a default to
+display.
+
+What it does **not** do, said plainly: nothing is sent to the panel (PROTOCOL.md §11 - the
+panel is never handed a layout file), so what a save changes is what *this machine's*
+daemon draws next time it names that theme; there is no dragging the picture yet (that is
+the other half of stage 4, docs/theme-editor.md); no widget is added, removed or
+reordered; the editor draws from the pinned fixture and not live readings; and the theme
+combo above still lists only the five, because that combo picks what the loop draws from
+this machine's sensors.
 
 ### The colour of the text
 

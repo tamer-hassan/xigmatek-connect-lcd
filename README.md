@@ -92,6 +92,13 @@ sight, for the colour of the text it draws. This is a capture of the real progra
 (`tools/screenshot.py`, no panel attached), with this machine's live readings in the
 preview:
 
+Behind the `advanced controls` switch there is also a row that opens one of the vendor's
+layout files — or one of the three themes generated from our own drawing code — and edits
+the fields this program's painter actually reads, with the picture under the preview
+redrawn from the file as it changes. The panel is never handed a layout file, so what that
+editor changes is what a loop on *this* machine draws the next time it names that theme
+([docs/gui.md](docs/gui.md) has the row and its limits).
+
 ![xigmaui, the window in three columns: the playing preview and the log on the left,
 the display's status, the theme picker and the text-colour row in the middle, and the
 background clip library on the right listing this machine's clips once per distinct
