@@ -1627,11 +1627,17 @@ print(f"  export shape          {'; '.join(shapes)} - ids derived from the theme
 # render.py, one pinned instant and one pinned metrics dict, four different readings.
 # The diff is over all four channels - an alpha-only comparison would not see a colour
 # that had drifted, and colour is exactly what `xigma.textColor` carries.
-CASES = ({"cpu": {"temperature": 57}, "gpu": {"temperature": 47},
+# the first two answer every source an export asks for (temperatures, load, memory); the
+# last three deliberately do not, and what happens then is reported, not hidden - the
+# second-to-last one only leaves `load` out, which is the case where the two doors still
+# land on the same pixels, because the reading gates a whole widget rather than a fallback
+CASES = ({"cpu": {"temperature": 57, "load": 62}, "gpu": {"temperature": 47},
+          "memory": {"used": 4_200_000, "total": 16_000_000},
           "fans": [{"value": 1957}]},
-         {"cpu": {"temperature": 100}, "gpu": {"temperature": 100},
-          "fans": [{"value": 12345}]},
+         {"cpu": {"temperature": 100, "load": 0}, "gpu": {"temperature": 100},
+          "memory": {"used": 0, "total": 0}, "fans": [{"value": 12345}]},
          {"cpu": {"temperature": 24}},
+         {"cpu": {"temperature": 40}, "gpu": {"temperature": 55}},
          {})
 rows = []
 export_faces = set()
@@ -1645,24 +1651,33 @@ no_face = sorted(f"{f}{'b' if b else ''}/{sz}" for f, b, sz in export_faces
                  if layout.font_for({"fontFamily": f, "bold": b,
                                      "fontSize": sz})[0] is None)
 partial = []
+asked = {n: {w["property"][0].get("source") for w in recipe()["osd"]["widget"]}
+         for n, recipe in themes.EXPORTS.items()}
 for name in sorted(themes.EXPORTS):
-    for m in CASES:
+    for idx, m in enumerate(CASES):
         r = themes.parity(name, m, WHEN)
         if no_face:      # an export's own face is not installed here: say so, don't fail
             break
         if r["missing"]:
-            # a reading this metrics dict does not answer: the code theme still draws what
-            # it can - a gauge keeps its track, a bar keeps its groove - while a layout
-            # skips the widget whose `source` has no value.  Both are right by their own
-            # rule, so the numbers are printed rather than averaged away.
-            partial.append((name, tuple(sorted(set(r["missing"]))), r["code_px"],
-                            r["layout_px"]))
+            assert set(r["missing"]) <= set(asked[name]), (name, r["missing"],
+                                                           sorted(asked[name]))
+            partial.append((name, idx, tuple(sorted(set(r["missing"]))), r["diff_px"],
+                            r["code_px"], r["layout_px"]))
             continue
-        assert r["diff_px"] == 0 and r["worst_channel_delta"] == 0, (name, r)
-        assert r["code_px"] == r["layout_px"] > 4000, (name, r)
+        assert r["diff_px"] == 0 and r["worst_channel_delta"] == 0, (name, idx, r)
+        assert r["code_px"] == r["layout_px"] > 4000, (name, idx, r)
         rows.append((name, r["code_px"]))
     if no_face:
         break
+# every export has to reach a zero diff on both complete fixture readings; a case that
+# leaves a source out may still agree (dual with no `load`: no bar, no line, both doors
+# draw nothing) or may not (no GPU temperature: the code theme keeps the ring's track,
+# the layout has no ring at all), and which is which is printed below
+assert {n for n, _p in rows} == set(themes.EXPORTS), (sorted(rows), sorted(themes.EXPORTS))
+assert all(idx >= 2 for _n, idx, _ms, _d, _c, _l in partial), partial
+agree = [p for p in partial if p[3] == 0]
+disagree = [p for p in partial if p[3] != 0]
+assert len(agree) + len(disagree) == len(partial), partial
 per = ", ".join(f"{n} {p} px identical" for n, p in rows)
 if no_face:
     print(f"  export parity         SKIPPED on this machine: the exported themes name "
@@ -1672,21 +1687,33 @@ print(f"  export parity         {len(themes.EXPORTS)} of the five themes export 
       f"generated layout and render.py put down the same pixels: {per}")
 assert len(rows) >= 4 * len(themes.EXPORTS) - len(partial), (rows, partial)
 if partial:
-    assert all(p[0] == "gauge" and p[1] == ("CPU Temperature",) for p in partial), partial
-    print(f"  a reading missing     {len(partial)} of the {len(CASES) * len(themes.EXPORTS)} "
-          f"parity cases leave a source unanswered (the empty metrics dict): the code theme "
-          f"still paints what does not need it - gauge draws its ring's track with no "
-          f"fill, {max(p[2] for p in partial):,} px - where the exported layout paints "
-          f"{min(p[3] for p in partial):,} px, because a layout skips the widget whose "
-          f"`source` has no value. Kept as two pictures, not one fudge factor")
+    both = (f"{len(agree)} of them agree to the pixel anyway, because a code theme that "
+            f"has no load reading draws no bar and no line, exactly as a layout skips the "
+            f"widget" if agree else "none of them agree")
+    print(f"  a reading missing     {len(partial)} of the "
+          f"{len(CASES) * len(themes.EXPORTS)} parity cases leave a source unanswered; "
+          f"{both}, and {len(disagree)} differ: "
+          + "; ".join(f"{nm} without {', '.join(ms)}: code {c:,} px, layout {l:,} px"
+                      for nm, idx, ms, d, c, l in disagree)
+          + ". The difference is a ring's track: `theme_dual`/`theme_gauge` paint the "
+            f"unfilled arc even with no reading, and a layout has no widget to paint when "
+            f"its `source` is unanswered. Both are right by their own rule, so the counts "
+            f"stand side by side - an export translates a theme's drawing, not its "
+            f"fallback behaviour (docs/limits.md)")
 print(f"  not exported yet      {' '.join(sorted(set(render.THEMES) - set(themes.EXPORTS)))}"
-      f" - what stands between them and a zero diff: `render.hbar`'s per-column gradient"
-      f" (`layout.draw_bar` declares one colour, not a ramp), the two fan figures and the"
-      f" tick strip (code-drawn, so each needs a `special` drawing), dual's load bar, and"
-      f" the pairs of rings in alpha and dual sitting on top of other widgets. The ring"
-      f" geometry and the arc convention are settled now - the last of the unknowns that"
-      f" stopped being unknown - and an export that does not reach a zero diff is not"
-      f" shipped (docs/theme-editor.md)")
+      f" - and they are not both waiting on the same thing. `alpha` needs four drawings"
+      f" the schema cannot spell yet: `render.hbar`'s per-**column** gradient (a vendor"
+      f" bar declares one colour, and `xigma.barPaint`/`colourRamp` now name the"
+      f" by-value case, which is all `dual` needed), the two fan figures, the tick strip,"
+      f" and `_fit_arc`, which picks one text size jointly for two columns - a"
+      f" relationship between widgets, so it wants a group key that does not exist."
+      f" `bars` is a different kind of answer: its row count and row pitch are functions"
+      f" of the machine (`row_h = min(56, max(28, 320 // len(rows)))`, and `rows` grows"
+      f" by up to four fan entries named by whatever `sensors` reports), so one fixed"
+      f" widget list cannot be its picture on every box. That is a decision about the"
+      f" schema - a repeat group the vendor never had - or `bars` stays code-drawn and"
+      f" is simply not editable as data. Nothing about the wire changes either way"
+      f" (docs/theme-editor.md)")
 
 # ---- why `xigma.arcPaint` exists at all: one arc, painted both conventions, measured
 from PIL import Image, ImageChops
@@ -1710,6 +1737,30 @@ for v in (31.0, 52.0, 57.4, 88.9):
                  max((max(px) for px in flat), default=0)))
 assert all(n > 0 for _v, n, _w in conv), conv
 assert all(w > 0 for _v, _n, w in conv), conv
+# ---- and the same question for a bar: one widget, two conventions, counted
+_barprop = {"x": 60, "y": 340, "width": 360, "height": 14, "cornerRadius": 5,
+        "bgColor": "rgba(40, 46, 50, 1)", "startColor": "rgba(0, 247, 255, 1)",
+        "endColor": "rgba(0, 247, 255, 1)", "minValue": 0, "maxValue": 100,
+        "source": "CPU Usage"}
+
+
+def _bar(declared, value):
+    img = Image.new("RGBA", (render.W * layout.SS, render.H * layout.SS), (0, 0, 0, 0))
+    prop = json.loads(json.dumps(_barprop))
+    if declared:
+        prop["xigma"] = {"barPaint": "render"}
+    from PIL import ImageDraw
+    layout.draw_bar(ImageDraw.Draw(img), prop, value)
+    return img.resize((render.W, render.H), Image.LANCZOS)
+
+
+bars = []
+for v in (0.0, 3.0, 63.5, 100.0):
+    flat = ImageChops.difference(_bar(True, v), _bar(False, v)).get_flattened_data()
+    bars.append((v, sum(1 for q in flat if q != (0, 0, 0, 0)),
+                 max((max(q) for q in flat), default=0)))
+assert all(n > 0 for _v, n, _w in bars), bars
+
 gap = ", ".join(f"{v:g} -> {n:,} px differ, worst channel {w}/255"
                 for v, n, w in conv)
 print(f"  why arcPaint          one arc, two colours unchanged, drawn with "
@@ -1719,6 +1770,14 @@ print(f"  why arcPaint          one arc, two colours unchanged, drawn with "
       f"(`layout.ARC_PAINT`, both entries with their provenance in the comment). Without "
       f"the key a gauge export would sit {conv[2][1]:,} px away from the theme it claims "
       f"to describe, and the parity gate above would be decoration.")
+print(f"  why barPaint          one bar (360x14 at 60,340, cornerRadius 5 declared), drawn"
+      f" with `xigma.barPaint: render` and without it: "
+      + ", ".join(f"{v:g}% -> {n:,} px differ, worst {w}/255" for v, n, w in bars)
+      + ". The vendor rounding is `round(width x fraction)` in panel px, `render.bar` takes"
+      f" `int(width x SS x fraction)` in device px and rounds its corners off the same"
+      f" reading it scales by, so at 63.5 % the fill ends at device px 457 one way and 456"
+      f" the other - a bar export without the key would be off by pixels and by the"
+      f" corners, not by intent")
 sp = subprocess.run([sys.executable, "-m", "xigmalcd", "--list-specials"],
                     capture_output=True, text=True, check=True)
 assert all(f"  {n}" in sp.stdout for n in themes.special_names()), sp.stdout
@@ -2093,7 +2152,8 @@ assert sorted(set(read) - set(cen["keys"])) == ["lineColor", "lineWidth", "name"
     sorted(set(read) - set(cen["keys"]))
 assert sorted(set(cen["keys"]) - set(read)) == sorted(themes.UNREAD_WHY), \
     sorted(set(cen["keys"]) - set(read))
-assert set(sub) == {"anchor", "arcPaint", "autoFitMax", "colourStops", "format"}, sub
+assert set(sub) == {"anchor", "arcPaint", "autoFitMax", "barPaint", "colourRamp",
+                    "colourStops", "format"}, sub
 assert set(sub) == set(themes.XIGMA_KEYS), (sorted(set(sub) - set(themes.XIGMA_KEYS)),
                                             sorted(set(themes.XIGMA_KEYS) - set(sub)))
 assert cen["values"]["enableMove"] == {"False": 152}

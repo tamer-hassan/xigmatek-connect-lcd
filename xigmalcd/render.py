@@ -493,15 +493,10 @@ def theme_dual(m, title="CPU  /  GPU", clock=True, cold=30.0, hot=90.0,
         _text(img, (cx, 298), name, font(15), mid)
     if title:
         _title(img, title, y=26, colour=fg)
-    mem = m.get("memory") or {}
     util = cpu.get("load")
     if util is not None:
         bar(img, 60, 340, 360, 14, util / 100.0, heat(util / 100.0))
-        line = f"CPU {util:.0f}%"
-        if mem.get("total"):
-            line += (f"    {mem.get('used', 0) // 1024} / "
-                     f"{mem.get('total', 0) // 1024} GB")
-        _text(img, (240, 372), line, font(17), mid)
+        _text(img, (240, 372), dual_status_line(m), font(17), mid)
     if clock:
         _text(img, (240, 444), clock_str(), font(30), acc)
     return img.resize((W, H), Image.LANCZOS)
@@ -530,6 +525,31 @@ def clock_readings_line(m: dict) -> str:
     if fans:
         parts.append(f"{round(sum(fans) / len(fans))} RPM")
     return "    ".join(parts) if parts else ""
+
+
+def dual_status_line(m: dict) -> str:
+    """`dual`'s middle line: the CPU load, and memory in GB when there is memory to say.
+
+    Pulled out of `theme_dual` for the same reason as `clock_readings_line`, and with the
+    same consequence: the string is a composite of three readings (`cpu.load`,
+    `memory.used`, `memory.total`) and the padding between the two halves is four spaces
+    inside one string, so no vendor `source` stands for it.  An exported `dual` layout
+    places it as a `special` and draws the text built here - one builder, two doors, so
+    what the code theme says and what the layout says cannot drift apart.
+
+    The empty string means "nothing to say": `theme_dual` draws the line only when a load
+    reading exists, and a layout with no value for it reports it as missing rather than
+    painting a bare `%`.
+    """
+    util = (m.get("cpu") or {}).get("load")
+    if util is None:
+        return ""
+    mem = m.get("memory") or {}
+    line = f"CPU {util:.0f}%"
+    if mem.get("total"):
+        line += (f"    {mem.get('used', 0) // 1024} / "
+                 f"{mem.get('total', 0) // 1024} GB")
+    return line
 
 
 def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY, ink=None):

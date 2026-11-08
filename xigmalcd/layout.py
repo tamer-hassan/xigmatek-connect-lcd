@@ -27,7 +27,7 @@ import json
 
 from PIL import Image, ImageDraw, ImageFont
 
-from .render import SS, _FONT_GLOBS
+from .render import SS, _FONT_GLOBS, heat
 
 # Fonts the layouts name, and what this machine has.  No Microsoft fonts are
 # installed here, so every one of these is a substitution; Liberation Sans is
@@ -221,25 +221,117 @@ def draw_special_line(draw: ImageDraw.ImageDraw, prop: dict, text: str):
     return draw_text(draw, prop, text, face, relayout)
 
 
+#: Ramps that stay code, named so a file can ask for one: `xigma.colourRamp`.  Each entry
+#: is the very function our themes call, so the named ramp cannot drift from the drawing -
+#: and adding one here is a decision, because `themes.XIGMA_KEYS` and the census gate have
+#: to agree about the key that carries it.
+COLOUR_RAMPS = {"heat": heat}
+
+
+def colour_ramp(prop: dict) -> tuple:
+    """(a named ramp callable, its name, or why there is none).
+
+    A ramp can be data (`xigma.colourStops`) and for `render.temp_colour` that is exact -
+    measured at every position a ring steps through, all 100 agree.  `render.heat` is not:
+    its breakpoints are 0.5 and 0.8 while its own arithmetic divides by the literals 0.3
+    and 0.2, and `0.8 - 0.5` is 0.30000000000000004, so a copy spelled in stops differs at
+    8 of 100 sampled positions, by one unit, in the red and blue channels.  The owner's
+    decision (docs/theme-editor.md) is to *name* such a ramp rather than change the drawing:
+    a named ramp is the same rule the fan figures and the tick strip follow - geometry and
+    colour position come from the file, the picture stays code - and it keeps every figure
+    that was read off those themes valid.
+
+    Where the name is applied: on an `arc` it is sampled along the sweep, on a `bar` at the
+    value's fraction of the bar's own range.  An unknown name is reported, not guessed at.
+    """
+    ext = prop.get("xigma") or {}
+    name = ext.get("colourRamp")
+    if name is None:
+        return None, None
+    name = str(name)
+    if name not in COLOUR_RAMPS:
+        return None, name
+    return COLOUR_RAMPS[name], name
+
+
+#: How a `bar`'s fill is rasterised - the same kind of key as `ARC_PAINT`, for the same
+#: reason: two painters, two rasters, and an export has to say which one it means.
+#:
+#:   `vendor`  measured off ALPHA's own preview: the fill spans `round(width x fraction)`
+#:             panel pixels, the corners are the declared `cornerRadius`, and the fill is
+#:             drawn when that span is at least one pixel.
+#:   `render`  what `render.bar` does: the span is `int(width x SS x fraction)` in **device**
+#:             pixels (a different rounding: 360 px wide at 63.5 % is 457 device px here
+#:             against 456 the other way), the track's corners are `height/2`, the fill's
+#:             corners are `min(height/2, int(width x max(fraction, 0.02))/2)` - so the
+#:             roundness *changes with the reading* - and the fill is drawn when the
+#:             fraction itself is above 0.01.
+#:
+#: Selected by `xigma.barPaint`; no key means `vendor`, which is what every copied layout
+#: is.  A `bar` may also name a colour ramp (`xigma.colourRamp`), sampled at the value's
+#: fraction: `render.bar` colours by value, and a vendor bar has no spelling for that.
+BAR_PAINT = {
+    "vendor": {"name": "vendor", "span": "round", "track_radius": "declared",
+               "fill_radius": "declared", "guard": "span", "floor": 0.0},
+    "render": {"name": "render", "span": "trunc", "track_radius": "half",
+               "fill_radius": "auto", "guard": "frac", "floor": 0.02},
+}
+
+
+def bar_paint(prop: dict) -> tuple:
+    """(the convention table for one bar, or None, and the name that was asked for).
+
+    The local is named `ext` for the same reason as `arc_paint`: `themes.keys_read()` reads
+    this module's source to find the extension keys, so a new one cannot be added without
+    the census noticing.
+    """
+    ext = prop.get("xigma") or {}
+    name = str(ext.get("barPaint") or "vendor")
+    if name not in BAR_PAINT:
+        return None, name
+    return BAR_PAINT[name], name
+
+
 def draw_bar(draw: ImageDraw.ImageDraw, prop: dict, value) -> tuple:
     """One `bar`.  The app's own preview measures the track at exactly
     width x height from (x, y), and its fill at percent x width / (max-min), so
     a bar is a rectangle, not a rounded one - `cornerRadius` is 0 on 13 of the
-    16 widgets that carry it, 5 on two, and those two are drawn round."""
+    16 widgets that carry it, 5 on two, and those two are drawn round.
+
+    `xigma.barPaint: render` switches to the way this program's own themes paint one,
+    corners and all; the numbers that differ between the two are printed by the suite."""
     x, y = int(prop["x"]), int(prop["y"])
     w, h = int(prop["width"]), int(prop["height"])
+    conv, conv_name = bar_paint(prop)
+    if conv is None:
+        return (x, y, x + w, y + h), f"unknown xigma.barPaint {conv_name!r}"
     rad = int(prop.get("cornerRadius") or 0) * SS
+    track_rad = (h * SS) // 2 if conv["track_radius"] == "half" else rad
     box = (x * SS, y * SS, (x + w) * SS, (y + h) * SS)
-    draw.rounded_rectangle(box, radius=rad, fill=rgba(prop["bgColor"]))
+    draw.rounded_rectangle(box, radius=track_rad, fill=rgba(prop["bgColor"]))
     frac = frac_of(prop, value)
-    span = int(round(w * frac))
-    if span > 0:
-        # startColor -> endColor along the fill; on the shipped themes both bars
-        # carry a near-identical pair, so the ramp is usually invisible
-        fill = rgba(prop["startColor"])
-        draw.rounded_rectangle((x * SS, y * SS, (x + span) * SS, (y + h) * SS),
-                               radius=rad, fill=fill)
-    return (x, y, x + w, y + h)
+    # device-space for the `render` convention, panel space for the vendor's: the two
+    # round at different points, which is exactly the difference being named
+    span = (int(w * SS * frac) if conv["span"] == "trunc"
+            else int(round(w * frac)) * SS)
+    if (frac > conv["floor"] if conv["guard"] == "frac" else span > 0):
+        if conv["fill_radius"] == "auto":
+            fill_rad = min((h * SS) // 2, int(w * SS * max(frac, conv["floor"])) // 2)
+        else:
+            fill_rad = rad
+        ramp, bad = colour_ramp(prop)
+        if bad is not None and ramp is None:
+            return (x, y, x + w, y + h), f"unknown xigma.colourRamp {bad!r}"
+        stops, _why = colour_stops(prop)
+        if ramp is not None:
+            fill = ramp(frac)
+        elif stops is not None:
+            fill = ramp_at(stops, frac, "trunc" if conv["span"] == "trunc" else "nearest")
+        else:
+            fill = rgba(prop["startColor"])
+        draw.rounded_rectangle((x * SS, y * SS, x * SS + span, (y + h) * SS),
+                               radius=fill_rad, fill=fill)
+    return (x, y, x + w, y + h), None
 
 
 def frac_of(prop: dict, value) -> float:
@@ -411,6 +503,12 @@ def arc_colour(prop: dict, deg: float, sweep: float, conv: dict | None = None) -
     mix = (lambda a, b, t: tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(4))
            if conv["round"] == "trunc" else
            tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(4)))
+    ramp, bad = colour_ramp(prop)
+    if ramp is not None:
+        t = max(0.0, min(1.0, deg / sweep))
+        return ramp(t), ("`xigma.colourRamp`, sampled at the " + conv["sample"] +
+                         " of each segment: a ramp this program draws, named rather than "
+                         "copied into stops (see colour_ramp)")
     stops, _bad = colour_stops(prop)
     if stops is not None:
         # a ramp declared in the file beats a profile looked up by colour pair: one is
@@ -493,6 +591,10 @@ def draw_arc(draw: ImageDraw.ImageDraw, prop: dict, value) -> tuple:
     if conv is None:
         return (x // SS, y // SS, x // SS + sw, y // SS + sh), \
             f"unknown xigma.arcPaint {conv_name!r}: {' '.join(sorted(ARC_PAINT))}"
+    _ramp, bad_ramp = colour_ramp(prop)
+    if _ramp is None and bad_ramp is not None:
+        return (x // SS, y // SS, x // SS + sw, y // SS + sh), \
+            f"unknown xigma.colourRamp {bad_ramp!r}: {' '.join(sorted(COLOUR_RAMPS))}"
     stop = a0 + f * (a1 - a0)
     a, col, ramp_note = a0, None, None
     while a < stop - conv["epsilon"]:
@@ -615,8 +717,10 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
             if prop["source"] not in values:
                 notes["missing"].append(prop["source"])
                 continue
-            notes["boxes"].append(("bar", prop["source"], draw_bar(draw, prop,
-                                                                   values[prop["source"]])))
+            bar_box, bar_bad = draw_bar(draw, prop, values[prop["source"]])
+            if bar_bad:
+                notes["missing"].append(bar_bad.split(":", 1)[0])
+            notes["boxes"].append(("bar", prop["source"], bar_box))
         elif kind == "arc":
             if prop["source"] not in values:
                 notes["missing"].append(prop["source"])
@@ -624,7 +728,7 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
             box, ramp = draw_arc(draw, prop, values[prop["source"]])
             notes["arc_colour"] = ramp
             if ramp.startswith("unknown "):
-                notes["missing"].append("arcPaint name")
+                notes["missing"].append(ramp[len("unknown "):].split(":")[0])
             if ramp.startswith("straight"):
                 notes["gaps"].append("arc colour, " + prop["source"])
             notes["boxes"].append(("arc", prop["source"], box))

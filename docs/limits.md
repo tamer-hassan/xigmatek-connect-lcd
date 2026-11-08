@@ -781,9 +781,14 @@ writes a theme today. What the model does and does not allow, all of it gated:
   empty one, the code theme still paints what does not depend on a reading - it draws the
   ring's track with no fill, 17 451 lit pixels - while the exported layout paints 4 319,
   because a layout skips each widget whose `source` has no value (the same rule that makes
-  `Theme_28` draw six boxes instead of seven). Both are right by their own rule, so the two
-  counts are printed side by side rather than reconciled: an export translates the drawing,
-  not the theme's fallback behaviour.
+  `Theme_28` draw six boxes instead of seven). Measured across the fixture readings the
+  suite keeps: `dual` without a GPU temperature is 29 228 px by code and 18 743 by layout,
+  with nothing answered at all 27 388 against 6 409, and `gauge` 17 451 against 4 319. Both
+  are right by their own rule, so the counts are printed side by side rather than
+  reconciled: an export translates the drawing, not the theme's fallback behaviour. Where a
+  code theme skips a widget too - a `dual` with no load reading draws no bar and no status
+  line - the two doors agree to the pixel anyway, and the gate counts those cases
+  separately rather than folding them into the pass.
 * **A ramp can be written as data, and this was measured rather than assumed.**
   `xigma.colourStops` holds `[fraction, rgba()]` pairs interpolated piecewise-linearly,
   and at every position a ring actually steps through (3 degrees along a 300-degree sweep,
@@ -818,6 +823,34 @@ writes a theme today. What the model does and does not allow, all of it gated:
   both ways and prints it. That is why `xigma.arcPaint` exists as an enumerated key instead
   of being left to the painter's mood, and why the copied library, which carries no such
   key, keeps drawing exactly as stage 1 measured it: 114 boxes, 315 287 lit pixels here.
+* **The same argument one shape over, for a bar.** `xigma.barPaint` selects `vendor`
+  (fill spans `round(width x fraction)` panel px, corners as declared) or `render`
+  (`int(width x SS x fraction)` in **device** px, track corners at `height/2`, fill corners
+  `min(height/2, int(width x max(fraction, 0.02))/2)` - corners that change with the
+  reading). One bar, 360x14 at (60, 340), declared cornerRadius 5, drawn both conventions:
+  **203 / 306 / 327 / 206 differing pixels** at 0, 3, 63.5 and 100 % (worst channel delta
+  235-255), printed by the suite. At 63.5 % the fill ends at device px 457 under one rule
+  and 456 under the other, which is the whole difference and shows how easy it is to lose a
+  pixel to a rounding convention nobody wrote down.
+* **A ramp can be data, or it can be named - and both are now spelled, because they are
+  not equally exact.** See the `xigma.colourStops` and `xigma.colourRamp` entries printed
+  by `--print-theme-fields`: three stops reproduce `render.temp_colour` at all 100 sampled
+  segment positions and miss `render.heat` at 8 of them by one unit. The owner's decision
+  (2026-11-08) was to **name** `heat` rather than fix its arithmetic, because dividing by
+  `(0.8 - 0.5)` instead of the literal `0.3` would re-render `dual`, `alpha` and `bars`,
+  and every figure recorded for those three themes was read off the drawing as it is. That
+  keeps the recorded evidence intact and puts the inconsistency on the record in
+  `render.heat`'s docstring rather than in a doc nobody re-reads.
+* **`bars` may not be expressible as one layout file at all, and that is a limit rather
+  than a to-do.** Its rows are built at draw time: six fixed readings plus up to four fan
+  entries taken from whatever `sensors.collect()` reports (labels truncated to 10
+  characters), and the row pitch is `min(56, max(28, 320 // len(rows)))` - so the vertical
+  geometry of the theme changes with the machine. A vendor-shape layout is a fixed widget
+  list, and making this theme one would mean inventing a repeat group ALPHA's schema never
+  had, which is the one thing the export plan decided against. So either that construct
+  gets designed on purpose, with its own reasons, or `bars` stays code-drawn and is not
+  editable as data. Said here so the choice is visible; nothing about the wire changes
+  either way (docs/theme-editor.md carries the same note in the plan's own table).
   A related fact came out of the same work: the one colour pair with a measured ramp is
   ALPHA's *declared* pair, (0,247,255) to (0,255,113), and the plateau that curve ends at
   is (0,251,184) - which is what `render.ALPHA_HOT` is. Our theme took the far end of

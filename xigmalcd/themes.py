@@ -310,7 +310,7 @@ def draw(obj: dict, metrics: dict, when=None, scrim: int = 0) -> tuple:
     what an editor shows and what the loop uploads cannot be two different pictures.
     """
     vals, absent = values(metrics, when)
-    vals["readings"] = render.clock_readings_line(metrics)
+    fill_lines(vals, metrics)
     img, notes = layout.draw_theme(obj, vals,
                                    canvas=(obj.get("width") or render.W,
                                            obj.get("height") or render.H),
@@ -392,6 +392,19 @@ XIGMA_KEYS = {
               "`%A %d %B %Y`); the vendor `Date` shape in this repo is `%m/%d/%Y`; neither "
               "has been measured off the vendor's picture, so rewriting our theme to the "
               "other one would change the glass for no measured reason",
+    "colourRamp": "a ramp this program draws, named rather than copied into stops: "
+                  "`heat` divides by the literals 0.3 and 0.2 where its own breakpoints "
+                  "would give 0.30000000000000004 and 0.19999999999999996, so the data "
+                  "spelling is off by one unit at 8 of 100 sampled positions. The owner "
+                  "chose to name it (no pixels change, every figure read off dual, alpha "
+                  "and bars stays valid); sampled along the sweep on an arc, at the "
+                  "value fraction on a bar",
+    "barPaint": "which painter's bar convention this widget was authored for: `vendor` "
+                "(fill spans round(width x fraction), corners as declared) or `render` "
+                "(device-space truncation, track corners at height/2, fill corners a "
+                "function of the reading, floor 0.02). 360 px at 63.5 % is 457 device "
+                "px one way and 456 the other, so a bar export without the key is a "
+                "different picture by pixels, not by intent",
     "colourStops": "a ramp written as data: [fraction, rgba()] pairs, interpolated "
                    "piecewise-linearly. Measured against both ramps this repo draws, at "
                    "every position its ring steps through: `render.temp_colour` agrees "
@@ -704,7 +717,30 @@ def _sp_clock_readings(draw, prop, values):
     return layout.draw_special_line(draw, prop, line)
 
 
-SPECIALS = {"clock-readings": _sp_clock_readings}
+def _sp_dual_status(draw, prop, values):
+    """`dual`'s middle line: `render.dual_status_line` builds it, the layout places it."""
+    line = str(values.get("status") or "")
+    if not line:
+        return None
+    return layout.draw_special_line(draw, prop, line)
+
+
+SPECIALS = {"clock-readings": _sp_clock_readings, "dual-status": _sp_dual_status}
+
+#: A `special` that draws a line of text this repo builds in code: name -> (the key it
+#: reads out of the values dict, the builder).  `draw` and `parity` fill those keys from
+#: the same metrics the widgets' own `source`s come from, so the line the code theme
+#: writes and the line the layout paints are one string built once - the composite cannot
+#: drift into two versions of what the theme says.
+SPECIAL_LINES = {"clock-readings": ("readings", render.clock_readings_line),
+                 "dual-status": ("status", render.dual_status_line)}
+
+
+def fill_lines(vals: dict, metrics: dict) -> dict:
+    """Add every composite line a `special` needs, built from this frame's readings."""
+    for _name, (key, builder) in SPECIAL_LINES.items():
+        vals[key] = builder(metrics)
+    return vals
 
 
 def special_names() -> tuple:
@@ -833,7 +869,77 @@ def gauge_recipe() -> dict:
     }
 
 
-EXPORTS = {"clock": clock_recipe, "gauge": gauge_recipe}
+def dual_recipe() -> dict:
+    """`dual` as a layout: two rings, two readings, two labels, a bar, one line, a clock.
+
+    Both rings carry `xigma.colourRamp: "heat"` and `xigma.arcPaint: "render"`, and the bar
+    carries `xigma.barPaint: "render"` with the same named ramp sampled at the value's
+    fraction.  Those keys exist because the two painters disagree in pixels, not in intent:
+    a bar 360 px wide at 63.5 % spans 457 device px under `render.bar` and 456 under the
+    vendor's rounding, and `heat` as data stops is off by one unit at 8 of 100 sampled
+    positions (docs/limits.md).  With the keys named, the ring and the bar each reproduce
+    their code counterpart at a zero pixel diff on their own, before the whole theme is
+    assembled.
+
+    The middle line is a `special` because it is a composite of three readings
+    (`cpu.load`, `memory.used`, `memory.total`) in one string with four spaces inside it -
+    no vendor `source` stands for that, so the layout places the line and
+    `render.dual_status_line` builds it.  One builder, two doors.
+
+    Geometry comes out of `theme_dual`: rings at (128, 228) and (352, 228), bbox semi-axis
+    96, stroke 20, 300 degrees from 120 in Pillow's angles (30 to 330 in the app's), scale
+    30..90 C; bar at (60, 340) 360x14; title at (240, 26), digits at 222, labels at 298,
+    line at 372, clock at 444.
+    """
+    ext = lambda anchor, maxw=None, **kw: dict(
+        {"anchor": anchor}, **({"autoFitMax": maxw} if maxw else {}), **kw)
+    rings, readouts = [], []
+    for cid, cx, dev, label in (("cpu", 128, "CPU Temperature", "CPU TEMP"),
+                                ("gpu", 352, "GPU Temperature", "GPU TEMP")):
+        rings.append(widget(f"xigma-dual-{cid}-ring", "arc", {
+            "x": cx - 96, "y": 228 - 96, "sizeWidth": 192, "sizeHeight": 192,
+            "radius": 76, "width": 20, "angleStart": 30, "angleEnd": 330,
+            "bgColor": rgba_str(render.ARC_TRACK),
+            "startColor": rgba_str(render.CYAN), "endColor": rgba_str(render.RED),
+            "minValue": 30, "maxValue": 90, "source": dev,
+            "xigma": {"arcPaint": "render", "colourRamp": "heat"}}, 0))
+        readouts.append(widget(f"xigma-dual-{cid}-value", "data", {
+            "x": cx, "y": 222, "source": dev, "fontFamily": "dejavu", "fontSize": 52,
+            "bold": True, "textColor": rgba_str(render.WHITE),
+            "xigma": ext("mm", 120, format=".0f")}, 1))
+        readouts.append(widget(f"xigma-dual-{cid}-label", "text", {
+            "x": cx, "y": 298, "content": label, "fontFamily": "dejavu",
+            "fontSize": 15, "bold": True, "textColor": rgba_str(render.DIM),
+            "xigma": ext("mm")}, 1))
+    return {
+        "id": "xigma-dual", "width": render.W, "height": render.H, "ratio": "1:1",
+        "xigma": {"theme": "dual", "generated-from": "xigmalcd/render.py",
+                  "version": __import__("xigmalcd").__version__},
+        "osd": {"widget": [
+            rings[0], readouts[0], readouts[1], rings[1], readouts[2], readouts[3],
+            widget("xigma-dual-title", "text", {
+                "x": 240, "y": 26, "content": "CPU  /  GPU", "fontFamily": "dejavu",
+                "fontSize": 24, "bold": True, "textColor": rgba_str(render.WHITE),
+                "xigma": ext("mm", 440)}, 2),
+            widget("xigma-dual-bar", "bar", {
+                "x": 60, "y": 340, "width": 360, "height": 14, "cornerRadius": 0,
+                "bgColor": rgba_str((40, 46, 50, 255)),
+                "startColor": rgba_str(render.CYAN), "endColor": rgba_str(render.RED),
+                "minValue": 0, "maxValue": 100, "source": "CPU Usage",
+                "xigma": {"barPaint": "render", "colourRamp": "heat"}}, 3),
+            widget("xigma-dual-status", "special", {
+                "name": "dual-status", "x": 240, "y": 372, "fontFamily": "dejavu",
+                "fontSize": 17, "bold": True, "textColor": rgba_str(render.DIM),
+                "xigma": ext("mm")}, 4),
+            widget("xigma-dual-clock", "data", {
+                "x": 240, "y": 444, "source": "Time", "fontFamily": "dejavu",
+                "fontSize": 30, "bold": True, "textColor": rgba_str(render.CYAN),
+                "xigma": ext("mm")}, 5),
+        ]},
+    }
+
+
+EXPORTS = {"clock": clock_recipe, "dual": dual_recipe, "gauge": gauge_recipe}
 
 
 def export(name: str) -> dict:
@@ -866,7 +972,7 @@ def parity(name: str, metrics: dict, when=None) -> dict:
         render._now = real_now
     obj = export(name)
     vals, absent = values(metrics, when)
-    vals["readings"] = render.clock_readings_line(metrics)
+    fill_lines(vals, metrics)
     lay, notes = layout.draw_theme(obj, vals, canvas=(obj["width"], obj["height"]),
                                    specials=SPECIALS)
     a, b = code.convert("RGBA"), lay.convert("RGBA")

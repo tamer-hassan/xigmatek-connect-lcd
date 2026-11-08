@@ -7,9 +7,10 @@ it with the counts, `--theme <background name>` selects a layout, the canvas ref
 gate on each file's own `ratio` field, and the same names work over the control socket.
 Stage 2 is **partly** built: the export machinery, the `special` kind, the extension keys
 it needed, the determinism rules and both gates are in the tree, and two of the five themes
-(`clock` and `gauge`) generate to layouts that paint *exactly* what `render.py` paints - zero
-differing pixels across four readings each, worst channel delta 0. The other three do not
-generate yet, and what they still need is written out below.
+(`clock`, `gauge` and `dual`) generate to layouts that paint *exactly* what `render.py`
+paints - zero differing pixels across four readings each, worst channel delta 0. The other
+two do not generate yet, and what they still need is written out below: `alpha` is waiting
+on four drawings, and `bars` on a question about the schema itself.
 Stage 3, the file model, is in - what it measured is written out under "What building the file model measured" below. Stage 4 (the inspector and the canvas), stage 5 (docs and census) and stage 6 (the glass pass) are not built. Every census figure below is re-derived by `tools/selftest.sh`'s vendor-library
 section, so it cannot rot in place. The decisions are
 settled with the owner; the census is measured out of the files in this tree on the same
@@ -245,11 +246,12 @@ because `layout` already imports `render` and not the other way round; an unknow
 back in `notes["missing"]` as `special:<name>`, so a typo in a layout is reported instead of
 drawn as something else.
 
-With those in place, `clock` generates to 3 widgets and 1 448 characters and `gauge` to 5
-widgets and 2 314 characters, both byte-identical across runs, and parity reports the same
-painted count both ways on four readings each - 25 548, 25 545, 22 944 and 21 003 lit pixels
-for `clock`, 20 608, 21 391, 20 498 and 17 451 for `gauge` - with **zero** differing pixels
-and a worst channel delta of 0. The diff is taken over all four channels on purpose: an alpha-only comparison
+With those in place, `clock` generates to 3 widgets and 1 448 characters, `gauge` to 5 and
+2 314, and `dual` to 10 and 4 677 - each byte-identical across runs - and parity reports the
+same painted count both ways on every reading that answers what the theme asks for: 25 548,
+25 545, 22 944 and 21 003 lit pixels for `clock`, 20 608, 21 391 and 20 498 for `gauge`,
+40 006 and 40 549 for `dual`, every one of them **zero** differing pixels and a worst channel
+delta of 0. The diff is taken over all four channels on purpose: an alpha-only comparison
 would not see a colour that had drifted, and colour is exactly what a layout carries in
 `textColor`. The same gate watches the vendor side from the other direction: all 23
 pickable layouts still paint **114 boxes and 315 287 lit pixels** (the total moved by
@@ -257,7 +259,7 @@ pickable layouts still paint **114 boxes and 315 287 lit pixels** (the total mov
 which is what proves the
 anchor/autoFit keys and the `special` branch changed nothing about a vendor theme.
 
-### What settled the gauge ring, and what is left for the other three
+### What settled the ring and the bar, and what is left for the last two
 
 The ring was the last geometry question that could not be answered from the tree, and
 `gauge` answered it: centre (236, 236), stroke centre-line at radius 127, 22 px thick, 260
@@ -287,13 +289,32 @@ theme took the end of the vendor's curve as its own end colour and drew a straig
 it, so the numbers above are stepping, sampling and rounding only: for this pair neither
 painter has a profile to differ about.
 
-What the remaining three need, each with the reason it is not yet answerable:
+`dual` landed on the same machinery: two rings (`xigma.arcPaint: render` plus
+`xigma.colourRamp: "heat"`), the bar (`xigma.barPaint: render` with that same ramp sampled
+at the value's fraction), and a `special` for its middle line, because `CPU 62%    4101 /
+15625 GB` is a composite of three readings inside one string and no vendor `source` stands
+for it - `render.dual_status_line` builds it and the layout places it, one builder, two
+doors. The bar and each ring were checked at a zero diff on their own before the theme was
+assembled: six load values (including 0 and one past the declared maximum) and seven
+temperatures (including one below the scale and one above).
+
+**The ramp question was answered by naming rather than rewriting.** A ramp can be data -
+`xigma.colourStops` is, and it reproduces `render.temp_colour` at all 100 sampled segment
+positions - but it does not reproduce `render.heat()`: 8 of those 100 come out one unit off,
+because `heat` divides by the literals `0.3` and `0.2` where its own breakpoints would give
+`0.30000000000000004` and `0.19999999999999996`. Changing `heat` to agree with its own
+breakpoints would be the tidy fix, and it would re-render `dual`, `alpha` and `bars`, every
+figure of which was read off the current drawing; so the call was to leave the pixels alone
+and name the ramp (`xigma.colourRamp`, one entry per drawing, `--print-theme-fields` prints
+the names with their reasons). The same rule the fan figures and the tick strip already
+follow.
+
+What the last two need, and they are not waiting on the same thing:
 
 | theme | what is missing | why it is a decision, not a lookup |
 |---|---|---|
-| `bars` | `render.hbar`'s per-column gradient | a vendor `bar` declares `startColor` and `endColor`, and `draw_bar` fills flat from `startColor`; a per-column ramp has no spelling in the vendor schema. Either a `xigma` ramp key names a code-drawn gradient, or the bar becomes a `special`. Both are on the table, neither is measured |
-| `dual` | two rings on `heat()`, a `render.bar` whose fill radius is a function of the value (`min(h/2, w*max(frac,0.02)/2)`, so its corners change with the reading), and `_fit_arc` | **ramps are settled as data** - `xigma.colourStops`, measured exact against `temp_colour` at all 100 sampled positions and off by one unit at 8 of them against `heat`, because `heat` divides by the literals 0.3 and 0.2 while its breakpoints are 0.5 and 0.8 (docs/limits.md, printed by the suite) - so `dual` waits on a decision about *our* arithmetic, not on the schema. `_fit_arc` picks **one** text size jointly for two columns so a three-digit reading takes both down together: a relationship between widgets, which a per-widget schema cannot hold without a group key |
-| `alpha` | the two fan figures, the tick strip, and its rings' `temp_colour` ramp | the fan figures and the tick strip stay code-drawn by decision (no PNG assets), so each needs a `special` drawing in `themes.SPECIALS` first - `clock-readings` is the pattern, and it reached a zero diff |
+| `alpha` | `render.hbar`'s per-**column** gradient; the two fan figures; the tick strip; `_fit_arc` | a vendor bar declares one colour, and `xigma.barPaint`/`colourRamp` name the by-*value* case - which is all `dual` needed; a ramp that changes from column to column has no spelling at all. The fan figures and the tick strip stay code-drawn by decision (no PNG assets), so each needs a `special` in `themes.SPECIALS` - `clock-readings` and `dual-status` are the pattern, both at a zero diff. And `_fit_arc` picks **one** text size jointly for two columns so a three-digit reading takes both down together: a relationship *between* widgets, which the schema cannot hold without a group key that does not exist yet |
+| `bars` | its shape, not a drawing | its row count and row pitch are functions of the machine: `row_h = min(56, max(28, 320 // len(rows)))`, and `rows` grows by up to four fan entries whose labels come from whatever `sensors` reports, truncated to 10 characters. One fixed widget list cannot be this theme's picture on every box, so either the schema gains a repeat group the vendor never had - the thing this plan decided not to invent - or `bars` stays code-drawn and is simply not editable as data. Said as the decision it is, rather than quietly resolved one way |
 
 Two things that landing the ramp key made possible, before any theme needed it. A ramp is
 now data (`xigma.colourStops`), and it was tested against both ramps this repo draws rather
@@ -354,7 +375,7 @@ number gated, the docs updated in the same change.
 |---|---|---|---|
 | 0 | this document, plus the schema written out properly: the `special` list, `autoFit`, the `xigma` block, the determinism rules, and how `--theme` opens past `choices=sorted(render.THEMES)` | 1 | 3 |
 | 1 | **landed 2026-11-08.** the 23 `1:1` layouts selectable in the loop: name→layout resolver, human names from `background.mediaFile`, the source→`sensors.collect()` table, `--list-themes`, `notes["missing"]` printed as "no pump tachometer here, widget skipped" and again over the socket's `status`, the four `4:3` themes excluded by a gate on `ratio` so a future 480 layout cannot be dropped by a filter, and a `--theme` name that is canonicalised once at parse time so the CLI, the log and the socket all spell it the same | 1-1½ | 3-4½ |
-| 2 | **machinery landed 2026-11-08,** `--export-theme NAME`, `--list-specials`, the `special` kind and its injected registry, the `xigma` extension keys, byte-stability and parity gates over four readings; two of five generate today: `clock` (3 widgets, 1 448 chars) and `gauge` (5 widgets, 2 314 chars) both reach a **zero-pixel diff** on four readings each; `alpha`/`bars`/`dual` do not generate yet and the table under "What settled the gauge ring" says what each still needs. (`--print-theme-fields`, listed here as unbuilt, landed with stage 3.) | 2-2½ | 6-7½ |
+| 2 | **machinery landed 2026-11-08,** `--export-theme NAME`, `--list-specials`, the `special` kind and its injected registry, the `xigma` extension keys, byte-stability and parity gates over four readings; three of five generate today: `clock` (3 widgets, 1 448 chars), `gauge` (5, 2 314) and `dual` (10, 4 677) each reach a **zero-pixel diff** on every reading that answers what they ask; `alpha` and `bars` do not, and the table under "What settled the ring and the bar" says what each still needs - including that `bars` may not be expressible as one file at all. (`--print-theme-fields`, listed here as unbuilt, landed with stage 3.) | 2-2½ | 6-7½ |
 | 3 | **landed 2026-11-08.** the file model: the user root `~/.config/xigmalcd/themes` read before the checkout and before `/usr/share`, so an edited copy shadows the vendor's by file operation alone and deleting it puts the vendor's back; `canonical()`/`shape_of()`, `validate()` split into hard (will not draw) and soft (worth saying), `save()` (atomic tmp + `os.replace`, `.bak`, trailing newline, user root only, the five code names refused, traversal names refused), `copy_for_edit()`, `delete_user_theme()`, `user_copies()`, `themes.draw()` for an object that never touched a disk, and `--check-theme NAME` as the review door. The round-trip gate is in: **27/27 layouts reproduce byte for byte** and **23/23 copies are byte-identical to their source**. Not built: the window that drives it | 1-1½ | 3-4½ |
 | 4 | the surface: one-row inspector over the fields each kind carries (sized by `--print-theme-fields`, which prints the per-kind field census), the canvas inside the existing pane, pinned fixture and still preview, keyboard nudge, undo coalescing, coarse live apply (a name that resolves to your copy, since `--theme`/`status`/the socket already spell one name one way) | 3-3½ | 9-10½ |
 | 5 | docs and gates: docs/themes.md's "not in the picker, and that is not an oversight" section brought up to date, docs/usage.md's CLI table, docs/gui.md's window census, README's five-theme claims, the window's own theme tooltip (it still says the vendor files are for the panel's firmware, which §11 contradicts), `smoke` rendering every installed layout offline against a pinned values dict. The suite grows by at least one section - stage 1's gates belong in the vendor-library section that already re-derives docs/themes.md's colour census, not in a new one - and then every place `twenty` is a gate moves with it: README, docs/tools.md, docs/packaging.md, the top changelog stanza, and the count `.github/workflows/ci.yml` compares against | 1 | 3 |
