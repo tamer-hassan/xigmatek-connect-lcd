@@ -418,15 +418,15 @@ What has been measured on glass, by whom, with how many frames - and what has no
   change while you watch. They are not GIFs because an `.mp4` written into markdown as an
   image becomes an `<img>` tag no browser plays (checked against GitHub's own markdown
   endpoint, not remembered), so a video has to go up through GitHub's editor, which
-  rewrites the markdown to point at its CDN. README keeps a visible marker in each cell -
-  backticked text naming the file to upload and telling whoever uploads to delete the
-  marker afterwards - rather than an HTML comment, which would be invisible in the raw text
-  they are editing.  The suite counts those slots: markers plus uploaded links have to add
-  up to the number of previews the document promises, so a marker deleted with nothing put
-  back is a hole it can see - and so is the shape that looks right and is dead, a relative
-  `docs/videos/*.mp4` image link. Two consequences worth writing down: nothing inside
-  `docs/` can honestly say "the picture above", and the encoding settings are now x264's
-  (`crf 20`, `preset medium`) rather than a palette's.
+  rewrites the markdown to point at its CDN.  Until the upload happens, README holds a
+  visible marker in each cell - backticked text naming the file to upload and telling whoever
+  uploads to delete the marker afterwards - rather than an HTML comment, which would be
+  invisible in the raw text they are editing.  The suite counts those slots: markers plus
+  uploaded links have to add up to the number of previews the document promises, so a marker
+  deleted with nothing put back is a hole it can see - and so is the shape that looks right
+  and is dead, a relative `docs/videos/*.mp4` image link.  Two consequences worth writing
+  down: nothing inside `docs/` can honestly say "the picture above", and the encoding
+  settings are x264's (`crf 20`, `preset medium`) rather than a palette's.
 
   Every figure in this table is printed by `tools/selftest.sh` from the written files on
   every run, and it came out identical across four runs on 2026-11-08 - two of them with the
@@ -493,6 +493,26 @@ What has been measured on glass, by whom, with how many frames - and what has no
     a 160 px / 6-frame / 128-colour GIF written in the same run is **(252, 197, 2)**, 3/255
     off - and neither stands in for the other, or for the 256-colour PNG the upload path
     sends (§10, 1/255 per channel).
+
+  * **What GitHub writes for a video, and what it then serves.** Both halves of that were
+    learned by getting one wrong first.  **The shape:** GitHub's editor writes an *image* as
+    `![alt](https://github.com/user-attachments/assets/…)` and a *video* as that URL alone on
+    the line, no `!`, no brackets - the renderer turns the bare autolink into an inline
+    player.  The suite's slot count only knew the image form, so the commit that finished the
+    upload came back `0 markers + 0 uploads for 5 previews` and failed the run (9b0cfa7, CI
+    42427101692).  The counting rule was right and its pattern was not; both forms match now,
+    which is why an uploaded README and a marker-bearing one can both pass while an empty
+    cell cannot.  **The bytes:** the six URLs README and docs/gui.md hold were fetched with
+    `curl -L` on 2026-11-08, and every one came back byte-identical to the file in the tree -
+    908 420, 1 930 104, 214 113, 802 310, 278 884 and 927 752 B, each `cmp` clean, sha256
+    `e3c272ec…`, `99c8005b…`, `5117a5c0…`, `cfe8d640…`, `0f73b6be…`, `731cb1a7…`.  What that
+    proves is about the link: the URL in the markdown resolves to the tree's own bytes, so a
+    reader who opens or saves it gets the measured file.  Whether GitHub's embedded player
+    ever fetches a rendition of its own for a given client was not measured and is not
+    claimed - the same line this file keeps everywhere, between what a file can be read to
+    say and what has to be looked at.  It is a hand measurement with a date rather than a
+    gate: a suite that fetched the CDN would stop being the offline suite.  And it says
+    nothing about the panel, which still cannot be asked what it shows (§11).
   * **A frame's clock is one instant, and its zone has to be written down.** The first CI
     run of this section measured a different picture than the bench from byte-identical
     files: `clock`'s glyph-against-halo gap read **134.6** here and **126.2** there.  The
@@ -562,8 +582,9 @@ What has been measured on glass, by whom, with how many frames - and what has no
     costs 1.05-1.18 MB each. GitHub's own accessibility docs also say animated GIFs follow the
     reader's system reduced-motion preference (Settings → Accessibility → Motion → "Autoplay
     animated images"), which is why the alt text and the sentence beside the picture had to
-    carry the description. A video does not go quiet in the reader's settings that way - and
-    it does not appear at all until someone uploads it, which is what the markers are for.
+    carry the description. A video does not go quiet in the reader's settings that way, and
+    it is not in the document at all until someone uploads it - which is what the markers are
+    for, and why the six files stay in `docs/videos/` afterwards as the measured originals.
 
   * **The `clock` theme fitted its big line and not the other two**, which is how a reading
     line ran off the glass: at font 26, `CPU 57°C  GPU 47°C  1957 RPM` measures 494.2 panel px

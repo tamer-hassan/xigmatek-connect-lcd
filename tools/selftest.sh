@@ -726,28 +726,37 @@ def preview_slots(text, doc):
     """(the files named by a marker, the number of uploaded videos) in this document.
 
     A preview slot is a markdown table cell or standalone line holding either a
-    `PREVIEW ME ... docs/videos/<file>` marker - the state this commit is in - or an
-    image link to GitHub's own attachments CDN, which is what the editor writes when one
-    of these MP4s is uploaded and the marker is deleted.  Counting both, rather than just
-    looking for the marker, is what makes the check survive that edit without going soft:
-    the two counts have to add up to the number of previews the document promises, so a
-    marker quietly removed with nothing put back leaves a hole this can see.
+    `PREVIEW ME ... docs/videos/<file>` marker - the state the tree was in before the
+    upload - or an uploaded video, which GitHub's editor writes as a link to its own
+    attachments CDN.  Counting both, rather than just looking for the marker, is what
+    makes the check survive that edit without going soft: the two counts have to add up to
+    the number of previews the document promises, so a marker quietly removed with nothing
+    put back leaves a hole this can see.
 
-    A relative `docs/videos/*.mp4` image link is rejected outright.  That is the shape
-    that looks correct and is dead: GitHub renders it as an `<img>` whose src ends in
-    `.mp4`, which no browser plays, and the suite's own link checker cannot call it dead
-    because the file really does exist in the tree.
+    The shape of the link matters, and was learned the hard way: for an **image** GitHub
+    writes `![alt](https://github.com/user-attachments/assets/…)`; for a **video** it
+    writes the URL alone on the line, no `!`, no brackets, and the renderer turns that
+    autolink into an inline player.  A pattern that only matched the image form counted
+    the README's five finished uploads as zero and failed the run (9b0cfa7, CI 42427101692:
+    `0 markers + 0 uploads for 5 previews`).  Both forms are matched here, so neither the
+    marker state nor the uploaded state can be mistaken for a hole.
+
+    A relative `docs/videos/*.mp4` image link is still rejected outright.  That is the
+    shape that looks correct and is dead: GitHub renders it as an `<img>` whose src ends
+    in `.mp4`, which no browser plays, and the suite's own link checker cannot call it
+    dead because the file really does exist in the tree.
     """
     marked = set()
     uploads = 0
+    cdn = (r"https://(?:github\.com|media\.github\.com|raw\.githubusercontent\.com)"
+           r"/[^\s)|]*(?:user-attachments|assets|githubusercontent)[^\s)|]*")
     for line in text.split("\n"):
         for slot in line.split("|") if line.strip().startswith("|") else [line]:
             m = re.search(r"PREVIEW ME[^|]*?(docs/videos/[A-Za-z0-9_.-]+\.mp4)", slot)
             if m:
                 marked.add(m.group(1))
-            if re.search(r"!\[[^\]]*\]\(https://(?:github\.com|media\.github\.com)"
-                         r"[^) ]*(?:assets|githubusercontent)[^) ]*\)", slot):
-                uploads += 1
+            if re.search(rf"!\[[^\]]*\]\({cdn}\)", slot) or re.search(cdn, slot):
+                uploads += 1          # image form or bare autolink: either is an upload
             dead = re.search(r"!\[[^\]]*\]\((?:\./)?docs/videos/[^) ]+\.mp4[^)]*\)",
                              slot)
             assert not dead, (doc, dead and dead.group(0),

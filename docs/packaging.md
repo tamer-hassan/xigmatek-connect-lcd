@@ -174,11 +174,12 @@ theme contact sheets in `docs/previews/` (1 596 454 B). The videos: the six MP4s
 docs/gui.md carries) and the readings JSON that drives them (13 916 B). **7 749 830 B**
 across eleven files, part of it rendered from XIGMATEK's own theme library, which is the
 other package's files and its own licence question - and the videos are also not package
-material for a second reason: README does not even link them, because a `.mp4` link in
-markdown is an `<img>` no browser plays. They sit in the repository until the owner uploads
-them through GitHub's editor, which is the only place they will play. So an installed
-README shows prose with repo-relative links that point at nothing on disk, and that is said
-here rather than discovered by a reader.
+material for a second reason: what README links is GitHub's copy of them - the editor
+uploads the file to its CDN and writes that URL into the cell - and a URL is not a path this
+package could install. The files themselves stay in `docs/videos/` as the measured
+originals, byte-identical to what those URLs serve (docs/limits.md keeps that comparison).
+So an installed README shows prose with repo-relative links that point at nothing on disk,
+and that is said here rather than discovered by a reader.
 
 Checked on the unpacked 0.3 packages, in that layout: **11** markdown files with no `.gz`
 next to any of them, **43** links from one document to another resolving (none dead),

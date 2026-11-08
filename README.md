@@ -48,15 +48,18 @@ and the file says so.
 `clock` runs over a bright clip (mean luma 176 of 255), which is why its lettering
 carries a dark plate behind it — the same rule the window applies, described in
 [docs/gui.md](docs/gui.md). The sixth video, the same `alpha` clip with the lettering
-drawn in `#ffc400` instead of white, sits at the bottom of [docs/gui.md](docs/gui.md)
-and needs uploading too.
+drawn in `#ffc400` instead of white, is at the bottom of [docs/gui.md](docs/gui.md).
 
 Videos rather than GIFs, because an `.mp4` written into markdown as an image becomes an
-`<img>` tag no browser plays: these have to be uploaded through GitHub's own editor, which
-rewrites the markdown to point at its CDN. Until that happens the placeholders above
-are what you see, and the files wait in `docs/videos/`. Each one is 10–12 s at the
-clip's own frame rate; `tools/preview_gif.py` makes them through the same path the
-window's preview pane uses, and [docs/tools.md](docs/tools.md) carries the command.
+`<img>` tag no browser plays — so these went up through GitHub's own editor, which stores
+the file on its CDN and writes the URL into the cell. The originals stay in `docs/videos/`,
+and the two things are the same bytes: fetching those six URLs answers with the tree's
+files `cmp`-clean, sizes and sha256s included ([docs/limits.md](docs/limits.md) keeps that
+measurement), so every figure quoted here and there was read out of what you are watching.
+Each one is 10–12 s at the clip's own frame rate; `tools/preview_gif.py` makes them through
+the same path the window's preview pane uses, and [docs/tools.md](docs/tools.md) carries the
+command. Whether they animate on your screen is your browser's motion setting, not a switch
+in this repository.
 
 `alpha` is the vendor's currently selected theme redrawn widget for widget, with the
 things that theme has no widget for added: a GPU-temperature column, a gauge arc
