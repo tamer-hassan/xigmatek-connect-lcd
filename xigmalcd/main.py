@@ -795,6 +795,12 @@ def build_parser() -> argparse.ArgumentParser:
                          "committed - a committed gauge.json goes stale the first time "
                          "anyone edits theme_gauge. Nothing is written to disk and "
                          "nothing here goes near the panel")
+    ap.add_argument("--check-theme", metavar="NAME",
+                    help="report one theme the way the loop will see it: the file's own "
+                         "accounting (widgets, what draws, what is skipped and why), plus "
+                         "the warnings worth hearing before an edit - an unknown metric "
+                         "name, a size outside the ten the shipped library uses, a colour "
+                         "that is not the rgba() spelling, a widget off the canvas")
     ap.add_argument("--list-specials", action="store_true",
                     help="print the names a `special` widget may carry: the parts of "
                          "our own themes that stay code-drawn and take their position, "
@@ -812,6 +818,55 @@ def main(argv=None) -> int:
 
     if args.overlay:                          # kept for old command lines
         args.bg = "clear"
+
+    if args.check_theme:
+        # report one theme exactly as the loop will meet it: the file's own accounting,
+        # the warnings worth hearing before an edit, and what this machine can answer
+        metrics = sensors.collect()
+        rec = themes.resolve(args.check_theme)
+        if rec is not None:
+            obj = themes.load(rec["path"])
+            print(f"  {rec['name']} ({rec['id']}): {rec['w']}x{rec['h']} ratio "
+                  f"{rec['ratio']}, {rec['widgets']} widgets, from {themes.origin(rec)}")
+        elif args.check_theme in themes.EXPORTS:
+            obj = themes.export(args.check_theme)
+            print(f"  {args.check_theme}: generated from render.py, "
+                  f"{len(obj['osd']['widget'])} widgets, every reading named by "
+                  f"`source`")
+        elif args.check_theme in render.THEMES:
+            print(f"  {args.check_theme}: drawn from render.py by code, and no layout "
+                  f"export for it yet - {' '.join(sorted(themes.EXPORTS))} have one "
+                  f"(docs/theme-editor.md says what each still needs)")
+            return 0
+        else:
+            print(f"  {themes.why_not(args.check_theme)}", file=sys.stderr)
+            return 2
+        hard, soft = themes.validate(obj)
+        for note in hard:
+            print(f"  will not draw: {note}")
+        for note in soft:
+            print(f"  warning: {note}")
+        img, notes = themes.draw(obj, metrics)
+        lit = sum(1 for v in img.getchannel("A").get_flattened_data() if v)
+        print(f"  drawn from this machine's readings: {len(notes['boxes'])} boxes, "
+              f"{lit} lit px, skipped: "
+              + (", ".join(notes["missing"]) if notes["missing"] else "nothing"))
+        if notes["gaps"]:
+            print("  shaped by this repo rather than measured off the vendor's "
+                  "picture: " + ", ".join(sorted(set(notes["gaps"]))))
+        asked = sorted({(w.get("property") or [{}])[0].get("source")
+                        for w in obj["osd"]["widget"]
+                        if (w.get("property") or [{}])[0].get("source")})
+        if asked:
+            cannot = [s for s in asked if s in notes.get("absent", {})]
+            answers = [s for s in asked if s not in notes.get("absent", {})]
+            print("  this theme asks for: " + ", ".join(asked))
+            print("  this machine answers: " + (", ".join(answers)
+                                                if answers else "none of them"))
+            if cannot:
+                print("  and cannot: " + ", ".join(cannot))
+        return 0 if not hard else 2
+
 
     if args.list_specials:
         for name in themes.special_names():
@@ -852,8 +907,16 @@ def main(argv=None) -> int:
         if unmeasured:
             print("    formats taken from this repo, not measured off the vendor's own "
                   "picture: " + ", ".join(unmeasured))
-        print(f"  an edited theme would be read from {themes.user_root()} - nothing is "
-              "written there yet, and docs/theme-editor.md keeps that plan")
+        yours = themes.user_copies()
+        if yours:
+            print(f"  your copies, read before the vendor's: {' '.join(yours)} "
+                  f"(from {themes.user_root()}; a copy of a name the library also has "
+                  f"shadows it, and --check-theme reports which one is drawing)")
+        else:
+            print(f"  nothing saved yet: a theme written to {themes.user_root()} is "
+                  f"read before the vendor's copy of the same name, and "
+                  f"--check-theme NAME says which file is drawing. The editor that "
+                  f"writes one is stage 4 of docs/theme-editor.md")
         return 0
 
     if args.list:

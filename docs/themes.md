@@ -93,10 +93,14 @@ them here instead, and both are gated in `tools/selftest.sh` rather than asserte
   choice rather than measured off the vendor's picture (`Time`, `CPU Frequency`,
   `Pump Speed`) are named in the same note.
 
-The rest is planned and not built: reading a layout in the window, and editing a copy of
-one under `~/.config` with no new wire traffic of any kind. The plan, the census it rests
-on and the parts that stay gaps are written out in
-[theme-editor.md](theme-editor.md).
+What is planned and not built is the window: no inspector, no canvas, no save driven from
+a UI. The model underneath it is already in the tree and gated - a layout file under
+`~/.config/xigmalcd/themes` is read before the vendor's copy of the same name, a copy made
+for editing is byte-identical to the file it came from (23/23), a save is atomic and keeps
+a `.bak`, and deleting your copy puts the vendor's back in front. All of it is offline
+behaviour: the panel is still handed nothing but `.osd` frames (docs/usage.md has the
+`--check-theme` door that reports which file is drawing). The plan, the census it rests on
+and the parts that stay gaps are written out in [theme-editor.md](theme-editor.md).
 
 ## The `alpha` theme, and its rings
 

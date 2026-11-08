@@ -72,7 +72,9 @@ contact sheet of it is
 [`docs/previews/alpha-themes-480X480.png`](docs/previews/alpha-themes-480X480.png).
 The daemon can draw 23 of those 27 layouts as they are - `xigmalcd --theme Theme_07` -
 and `xigmalcd --list-themes` prints that set, the four refused on canvas with the reason,
-and the one metric this box has no reading for. They reach the panel as ordinary
+and the one metric this box has no reading for; `--check-theme Theme_07` reports one of
+them the way the loop sees it - which file answers the name, what draws from this
+machine's readings, and what is skipped. They reach the panel as ordinary
 transparent frames: a layout file is never sent, because this firmware does not read one
 (PROTOCOL.md §11).
 

@@ -92,6 +92,7 @@ Put the module in `/etc/modules-load.d/` if you want it at every boot.
 | `--status` | ask the display that is already running what it is showing, print it, exit. One line on the control socket: the serial port is never opened, so this works while the loop runs. Exit 1 with "no display answering" when nothing is listening |
 | `--list` | list candidate ports with their USB descriptions |
 | `--export-theme NAME` | print the generated layout for one of the five drawn-from-code themes as JSON on stdout - sorted keys, byte-identical between runs. Nothing is written to disk, and what it prints is a layout this program draws, never something sent to the panel |
+| `--check-theme NAME` | report one theme exactly as the loop will meet it: which root answered the name (ALPHA's file, or your copy of it), the file's own accounting, then what this machine's readings actually draw - boxes, lit pixels, which widgets were skipped and why, which shapes are this repo's choice rather than measured off the vendor's picture, and the sources *that theme* asks for split into answered and not. Plus the warnings worth hearing before an edit: a metric name with no entry, a font family `layout.FONTS` does not know, a `fontSize` outside the ten the shipped library uses, a colour outside `rgba()`, a widget off the canvas, an `id` repeated inside one theme, a `property` that is not the one-element list every vendor file uses. Exit 2 if the name resolves to nothing, or if the file cannot be walked at all |
 | `--list-specials` | print the names a `special` widget may carry: the parts of our own themes that stay code-drawn and take position, size and colour from a layout |
 | `--list-themes` | print everything `--theme` accepts: the five drawn from `render.py`, then ALPHA's 23 `1:1` layouts with their widget counts and which tree the file came from, then the four refused and the reason. No port is opened
 | `-v, --verbose` | log every frame in both directions |
@@ -145,6 +146,42 @@ claim:
   lists the five: the window previews what it lists, and it cannot preview a layout yet.
   That is the editor plan in [theme-editor.md](theme-editor.md), and it is the one thing
   here that is not built.
+* **`--check-theme NAME` is how you read one of these files before touching it.** It runs
+  the same code path the loop runs (`themes.draw`, which is also what an editor's preview
+  pane would use), and its lines are the accounting rather than a pretty print:
+
+  ```
+  Theme_28 (1757491588618): 480x480 ratio 1:1, 7 widgets, from checkout
+  drawn from this machine's readings: 6 boxes, 19 253 lit px, skipped: Pump Speed
+  shaped by this repo rather than measured off the vendor's picture: Time
+  this theme asks for: CPU Usage, Pump Speed, Time
+  this machine answers: CPU Usage, Time        and cannot: Pump Speed
+  ```
+
+  Which lines of that are stable and which are not: the first is read out of the file and
+  is the same on every machine (the suite pins 23 pickable / 4 refused and every widget
+  count), `skipped: Pump Speed` for those 9 themes is gated on every machine, and the box
+  and pixel counts are this bench's - 19 253 lit px is from 2026-11-08, printed next to the
+  machine name for exactly that reason. For one of the five it says where the drawing comes
+  from: `clock: generated from render.py, 3 widgets`, and for a theme whose export is not
+  built yet it says so instead of failing.
+* **One theme directory is read, and one is writable, and they are the same one:**
+  `~/.config/xigmalcd/themes` (`$XDG_CONFIG_HOME`). A `<name>.json` there is scanned
+  **before** the checkout and before `/usr/share/xigmalcd/themes/alpha`, so an edited copy
+  of `Theme_28` is what `--theme Theme_28` draws, and deleting the file puts the vendor's
+  back in front - `--list-themes` and `--check-theme` both print which one answered
+  ("your copy" or "checkout" or "package"). Neither `themes/alpha` in a checkout nor the
+  installed `/usr/share` tree is ever written: the first is where every number in these
+  docs was read from, the second is dpkg-owned and re-hashed by the install test. The five
+  drawn-from-code names are refused as file names too, so there cannot be a second
+  `gauge` that disagrees with `render.theme_gauge`.
+* **Nothing in the CLI writes a theme today.** The writer is in the library -
+  `copy_for_edit`, `save`, `delete_user_theme` - and it is gated, not shipped as a flag:
+  a save is atomic (tmp then `os.replace`), keeps the previous file as `<name>.json.bak`,
+  emits the same shape the vendor's files are in (all 27 reproduce byte for byte from
+  their own parsed content; 18 of them escape non-ASCII and 9 do not, so the writer asks
+  each file which shape it is in), and refuses a name with a path separator in it. Stage 4
+  of [theme-editor.md](theme-editor.md) is the window that drives it.
 
 ## Two processes, one port
 

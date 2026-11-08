@@ -1,14 +1,15 @@
 # The theme editor, and the 27 vendor themes: the plan, with the numbers under it
 
 **This is a plan, part of it landed.** As of 2026-11-08, stage 0's write-up (this file)
-and stage 1 are in the tree: `xigmalcd/themes.py` finds the library, `--list-themes` prints
+and stages 1-3 are in the tree: `xigmalcd/themes.py` finds the library and the file model
+under `~/.config/xigmalcd/themes`, `--list-themes` and `--check-theme` print
 it with the counts, `--theme <background name>` selects a layout, the canvas refusal is a
 gate on each file's own `ratio` field, and the same names work over the control socket.
 Stage 2 is **partly** built: the export machinery, the `special` kind, the extension keys
 it needed, the determinism rules and both gates are in the tree, and one of the five themes
 (`clock`) generates to a layout that paints *exactly* what `render.py` paints - zero
 differing pixels across four different readings. The other four do not generate yet.
-Stages 3-6 (file model, inspector, canvas, glass pass) are not built. Every census figure below is re-derived by `tools/selftest.sh`'s vendor-library
+Stage 3, the file model, is in - what it measured is written out under "What building the file model measured" below. Stage 4 (the inspector and the canvas), stage 5 (docs and census) and stage 6 (the glass pass) are not built. Every census figure below is re-derived by `tools/selftest.sh`'s vendor-library
 section, so it cannot rot in place. The decisions are
 settled with the owner; the census is measured out of the files in this tree on the same
 date, and each figure says where it came from, so that a reader can re-run it rather than
@@ -120,7 +121,49 @@ the vendor-library section, from the shipped files - not a snapshot of a one-off
   already a valid editable user theme, and "edit the 27" costs no new format.
 - **The editor never writes into `/usr/share/xigmalcd/themes/alpha`.** Those files are
   dpkg-owned and re-hashed by `debian/tests/smoke`, 125/125, on every install; "back to
-  the vendor's own" means re-reading the installed copy.
+  the vendor's own" means re-reading the installed copy. The checkout's copy is read-only
+  here for a second reason: it is the file every figure in these docs was read from.
+
+### What building the file model measured (stage 3, 2026-11-08)
+
+All of this is printed by `tools/selftest.sh` in the vendor-library section, on a temp
+`XDG_CONFIG_HOME`, and nothing in it is written outside that directory.
+
+* **Every shipped layout is reproducible from its own parsed content: 27/27.** One
+  indentation (1 space), sorted keys, newline-terminated, and the only thing the vendor's
+  own files disagree about is escaping: **18** write non-ASCII as `\uXXXX`, **9** keep it
+  raw (the ones carrying a `宋体` family or CJK `content`). That is `json.dump`'s
+  `ensure_ascii` switch and nothing else, and it is why `shape_of(path)` asks each file
+  which shape it is in and `copy_for_edit` keeps it: a writer that always escaped would
+  "change" 9 files nobody opened.
+* **A copy for editing is byte-identical to its source, 23/23** - not re-dumped. After
+  that, the diff between the vendor's file and yours is only what you touched.
+* **Shadowing works as a file operation:** moving one text widget's `x` by 20 in a copy of
+  `Theme_28` moves exactly that widget's box by `(20, 0)` and changes 1 163 of 230 400
+  pixels on this bench (that count depends on which face resolves the label, so the gate
+  prints it per machine and asserts only the `(20, 0)`-once, everything-else-still
+  shape), while the vendor's file is still `2d9ccf610ab9…` byte for byte; `--list-themes`
+  and `--check-theme Theme_28` both say "your copy", and after `delete_user_theme` both
+  say "checkout" again. The moved widget is deliberately a *literal* text with no
+  `source`, so a box that fails to move means the edit was ignored, not that a sensor
+  reading was missing.
+* **What is refused, in words** (`validate` returns `(hard, soft)`; hard raises on save,
+  soft comes back with the path and is printed): writing anywhere but the user root, a
+  name that is one of the five drawn from `render.py` (a saved `gauge.json` would be a
+  second source of truth for `render.theme_gauge` - exactly what the export design exists
+  to avoid), a name with a path separator or a leading dot, an empty `osd.widget` list,
+  and a `property` with more than one entry - because `draw_theme` reads only
+  `property[0]`, so the rest would be silently unwritten. The soft list, one fixture
+  covering all nine: an unknown `source`, a family outside `layout.FONTS`, a `fontSize`
+  outside the **ten** the library ships (12 14 16 20 24 32 40 70 100 140), a colour
+  outside `rgba(r, g, b, a)`, a widget off the canvas, an `id` repeated inside one theme,
+  a `special` with no drawing, a `text` with no `content`, a repeated `property` entry.
+* **`--check-theme NAME` is the review door** for all of it: the file's own accounting,
+  which root answered, the warnings, then what this machine's readings draw - boxes, lit
+  pixels, what was skipped and why, which shapes are this repo's choice rather than
+  measured off the vendor's picture, and the sources this box can and cannot answer *for
+  that theme*. It exits 2 when the name resolves to nothing (the reason printed by
+  `why_not`) or when the file cannot be walked.
 - Three kinds of extension, all of them inert to anything but this program, since the JSON
   never goes on the wire: a `special` kind whose `name` is one of a printed list
   (`--list-specials`; the three we need are `cpu-fan-figure`, `gpu-fan-figure`,
@@ -241,8 +284,8 @@ number gated, the docs updated in the same change.
 | 0 | this document, plus the schema written out properly: the `special` list, `autoFit`, the `xigma` block, the determinism rules, and how `--theme` opens past `choices=sorted(render.THEMES)` | 1 | 3 |
 | 1 | **landed 2026-11-08.** the 23 `1:1` layouts selectable in the loop: name→layout resolver, human names from `background.mediaFile`, the source→`sensors.collect()` table, `--list-themes`, `notes["missing"]` printed as "no pump tachometer here, widget skipped" and again over the socket's `status`, the four `4:3` themes excluded by a gate on `ratio` so a future 480 layout cannot be dropped by a filter, and a `--theme` name that is canonicalised once at parse time so the CLI, the log and the socket all spell it the same | 1-1½ | 3-4½ |
 | 2 | **machinery landed 2026-11-08.** `--export-theme NAME`, `--list-specials`, the `special` kind and its injected registry, the `xigma` extension keys, byte-stability and parity gates over four readings; `clock` generates at a zero-pixel diff; `alpha`/`bars`/`dual`/`gauge` do not generate yet, and `--print-theme-fields` is not built | 2-2½ | 6-7½ |
-| 3 | the file model: atomic save plus `.bak` under `~/.config`, warnings-not-errors validation from the census above (unknown source, off-canvas x/y, a `fontSize` outside the ten measured, an unparseable `rgba()`, overlapping boxes), and the round-trip gate: an unedited vendor theme re-saves byte-identical with unknown keys preserved | 1-1½ | 3-4½ |
-| 4 | the surface: one-row inspector over the fields each kind carries, the canvas inside the existing pane, pinned fixture and still preview, keyboard nudge, undo coalescing, coarse live apply (`{"cmd":"theme","value":"user:foo"}`) | 3-3½ | 9-10½ |
+| 3 | **landed 2026-11-08.** the file model: the user root `~/.config/xigmalcd/themes` read before the checkout and before `/usr/share`, so an edited copy shadows the vendor's by file operation alone and deleting it puts the vendor's back; `canonical()`/`shape_of()`, `validate()` split into hard (will not draw) and soft (worth saying), `save()` (atomic tmp + `os.replace`, `.bak`, trailing newline, user root only, the five code names refused, traversal names refused), `copy_for_edit()`, `delete_user_theme()`, `user_copies()`, `themes.draw()` for an object that never touched a disk, and `--check-theme NAME` as the review door. The round-trip gate is in: **27/27 layouts reproduce byte for byte** and **23/23 copies are byte-identical to their source**. Not built: the window that drives it | 1-1½ | 3-4½ |
+| 4 | the surface: one-row inspector over the fields each kind carries, the canvas inside the existing pane, pinned fixture and still preview, keyboard nudge, undo coalescing, coarse live apply (a name that resolves to your copy, since `--theme`/`status`/the socket already spell one name one way) | 3-3½ | 9-10½ |
 | 5 | docs and gates: docs/themes.md's "not in the picker, and that is not an oversight" section brought up to date, docs/usage.md's CLI table, docs/gui.md's window census, README's five-theme claims, the window's own theme tooltip (it still says the vendor files are for the panel's firmware, which §11 contradicts), `smoke` rendering every installed layout offline against a pinned values dict. The suite grows by at least one section - stage 1's gates belong in the vendor-library section that already re-derives docs/themes.md's colour census, not in a new one - and then every place `twenty` is a gate moves with it: README, docs/tools.md, docs/packaging.md, the top changelog stanza, and the count `.github/workflows/ci.yml` compares against | 1 | 3 |
 | 6 | on glass, with the panel attached and the owner watching: the runnable set at 1 and 2 fps, achieved fps, loop seams for the vendor clips, the dark-ink-over-bright question that docs/limits.md still carries, and the transcript kept the way docs/packaging/ keeps installs | 1 | 3 |
 | | **total** | **10-12** | **30-36 h** |
@@ -270,8 +313,12 @@ PROTOCOL.md §10 - so this needs the installed app off the Windows machine again
 
 ## What this document does not claim
 
-It claims no behaviour that exists: there is no editor, no `--export-theme`, no `special`
-kind and no selectable vendor theme in this tree. Every number above is either quoted from
+This document was written before any of it existed, and it is now a record of three
+landed stages with the rest still planned. What does **not** exist in this tree: an editor
+surface of any kind (no inspector, no canvas, no save path driven by a window), layout
+exports for `alpha`/`bars`/`dual`/`gauge`, the fan-figure and tick-strip `special` drawings,
+and `--print-theme-fields`. What does: stages 1-3 as their rows say, each gated in
+`tools/selftest.sh`. Every number above is either quoted from
 a file in this repo (PROTOCOL.md, themes/alpha/README.md, docs/themes.md, docs/limits.md,
 docs/gui.md), printed by a tool that exists here (`tools/theme_check.py`,
 `tools/theme_previews.py`, `xigmalcd/layout.py`), or counted by a `python3 -` pass over

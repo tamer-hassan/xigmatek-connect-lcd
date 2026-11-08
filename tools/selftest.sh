@@ -1669,6 +1669,160 @@ print(f"  --list-specials       {' '.join(themes.special_names())}; drawn by cod
       f"placed by the layout, no port opened")
 PY
 
+# ---- the file model (stage 3 of docs/theme-editor.md): the shape the library is stored
+# ---- in, what validate refuses or warns about, and an edit that shadows the vendor's
+# ---- copy without ever writing to it.  Its own process, because themes.user_root() is
+# ---- decided at import and this must not touch the real ~/.config, /usr/share, or the
+# ---- checkout's copies that every figure in the docs was read from.
+EDIT_TMP="$(mktemp -d)"
+XDG_CONFIG_HOME="$EDIT_TMP" python3 - <<'PY' || { echo "theme file model FAILED"; exit 1; }
+import datetime, os, subprocess, sys
+from PIL import ImageChops
+from xigmalcd import layout, render, sensors, themes
+WHEN = datetime.datetime(2026, 2, 17, 9, 30)
+
+files = sorted(themes._glob.glob(os.path.join(themes.REPO_ROOT, "layouts", "**", "*.json"),
+                                 recursive=True))
+shapes = [themes.shape_of(f) for f in files]
+assert len(files) == 27 and None not in shapes, [f for f, s in zip(files, shapes)
+                                                 if s is None]
+identical = 0
+for f in files:
+    txt = themes.canonical(themes.load(f), themes.shape_of(f))
+    raw = open(f, encoding="utf-8").read()
+    identical += raw in (txt, txt + "\n")
+assert identical == 27, identical
+print(f"  file shape          all 27 layouts reproduce, byte for byte, from their own "
+      f"parsed content ({identical}/27 after a load/save round trip). The files disagree "
+      f"with each other about one setting only: {shapes.count(True)} escape non-ASCII as "
+      f"\\uXXXX and {shapes.count(False)} keep it raw (the ones carrying 宋体 or CJK "
+      f"content) - which is why the writer asks each file which shape it is in")
+
+ok, _ex = themes.scan()
+copies = 0
+for rec in ok:
+    _r, path, _s = themes.copy_for_edit(rec["name"])
+    copies += open(path, "rb").read() == open(rec["path"], "rb").read()
+    themes.delete_user_theme(rec["name"])
+assert copies == len(ok) == 23, copies
+
+import hashlib
+rec = themes.resolve("Theme_28")
+vendor_sha = hashlib.sha256(open(rec["path"], "rb").read()).hexdigest()
+obj = themes.load(rec["path"])
+# a text label with no `source`: it draws on any machine, with any sensors, so a box
+# that does not move here means the edit was ignored, not that a reading was missing
+target = next(w for w in obj["osd"]["widget"]
+              if not (w.get("property") or [{}])[0].get("source")
+              and (w.get("property") or [{}])[0].get("content"))
+label = target["property"][0]["content"]
+x0 = target["property"][0]["x"]
+target["property"][0]["x"] = x0 + 20
+_, path = themes.copy_for_edit("Theme_28")[:2]
+path, soft = themes.save(obj, "Theme_28")
+assert soft == [], soft
+assert not os.path.exists(path + ".tmp"), "a .tmp survived the atomic replace"
+assert os.path.exists(path + ".bak"), "the copy being overwritten left no backup"
+metrics = sensors.collect()
+img_v, notes_v = themes.draw(themes.load(rec["path"]), metrics)
+img_u, notes_u = themes.draw(obj, metrics)
+assert len(notes_v["boxes"]) == len(notes_u["boxes"]), (notes_v["missing"],
+                                                        notes_u["missing"])
+delta = [(b[2][0] - a[2][0], b[2][1] - a[2][1])
+         for a, b in zip(notes_v["boxes"], notes_u["boxes"])]
+assert [d for d in delta if d != (0, 0)] == [(20, 0)], (label, delta)
+moved = next(a for a, b in zip(notes_v["boxes"], notes_u["boxes"])
+             if b[2][0] - a[2][0])
+assert moved[1] == label and moved[0] == target["type"], moved
+rec2 = themes.resolve("Theme_28")
+assert rec2["edited"] and rec2["root"] == themes.user_root(), rec2
+
+
+def _changed_pixels(a, b):
+    """Pixels where the two pictures differ in any channel (no deprecated getdata)."""
+    raw = ImageChops.difference(a, b).tobytes()
+    return sum(1 for i in range(0, len(raw), 4) if raw[i:i + 4] != b"\0\0\0\0")
+print(f"  edit shadows        copying one of the 23 gives a byte-identical file "
+      f"({copies}/23), and editing it is the copy that draws: one widget's box moves by "
+      f"exactly (20, 0), the other {len(delta) - 1} stay put, "
+      f"{_changed_pixels(img_v, img_u)} of {render.W * render.H} pixels change, and "
+      f"the vendor's file is still "
+      f"{vendor_sha[:12]}... byte for byte. The terminal agrees: --list-themes and "
+      f"--check-theme Theme_28 both name the copy, and both go back to the "
+      f"vendor's file once it is deleted")
+
+# the same fact the terminal user needs, checked where they would read it
+listing = subprocess.run([sys.executable, "-m", "xigmalcd", "--list-themes"],
+                         capture_output=True, text=True, check=True)
+checked = subprocess.run([sys.executable, "-m", "xigmalcd", "--check-theme", "Theme_28"],
+                         capture_output=True, text=True, check=True)
+assert "from your copy" in listing.stdout and "your copies" in listing.stdout, listing.stdout
+assert "from your copy" in checked.stdout.splitlines()[0], checked.stdout
+refused = []
+for what, call in (
+        ("outside the user directory", lambda: themes.save(
+            obj, "Theme_28", root=os.path.join(themes.SYSTEM_ROOT, "alpha"))),
+        ("a generated theme's name", lambda: themes.save(obj, "gauge")),
+        ("a path element", lambda: themes.save(obj, "../escape")),
+        ("a nested name", lambda: themes.save(obj, "a/b")),
+        ("no widgets to draw", lambda: themes.save(
+            {"width": 480, "height": 480, "osd": {"widget": []}}, "empty")),
+        ("a two-element property", lambda: themes.save(
+            {"width": 480, "height": 480, "osd": {"widget": [{
+                "type": "text", "id": "xigma-t",
+                "property": [{"x": 0, "y": 0}, {"x": 1, "y": 1}]}]}}, "two"))):
+    try:
+        call()
+        refused.append(f"{what}: NOT REFUSED")
+    except ValueError as exc:
+        refused.append(f"{what}: {str(exc)[:40]}")
+assert not any("NOT REFUSED" in r for r in refused), refused
+themes.delete_user_theme("Theme_28")
+back = themes.resolve("Theme_28")
+assert not back.get("edited"), back
+after = subprocess.run([sys.executable, "-m", "xigmalcd", "--list-themes"],
+                       capture_output=True, text=True, check=True)
+assert "from your copy" not in after.stdout
+assert "nothing saved yet" in after.stdout, after.stdout
+print(f"  refusals            {'; '.join(refused)} - and deleting your copy puts the "
+      f"vendor's back in front ({themes.origin(back)})")
+
+bad = {"width": 480, "height": 480, "osd": {"widget": [
+    {"type": "data", "id": "xigma-a", "property": [
+        {"x": 600, "y": 10, "source": "Pump Flow", "fontFamily": "comic sans",
+         "fontSize": 33, "textColor": "#ffffff",
+         "time": "2026-01-01T00:00:00.000Z"}]},
+    {"type": "data", "id": "xigma-a", "property": []},
+    {"type": "data", "id": "xigma-a", "property": [
+        {"x": 5, "y": 5, "source": "CPU Usage"}]},
+    {"type": "special", "id": "xigma-b", "property": [
+        {"x": 10, "y": 10, "name": "mystery-thing", "fontSize": 26}]},
+    {"type": "text", "id": "xigma-c", "property": [{"x": 10, "y": 10}]}]}}
+hard, soft = themes.validate(bad)
+named = ["outside the 480x480 canvas", "has no entry in", "is not in layout.FONTS",
+         "is outside the ten sizes", "rgba(r, g, b, a)", "repeats inside this theme",
+         "has no drawing", "no `content`", "one-element list"]
+hit = sum(1 for n in named if any(n in s for s in soft + hard))
+assert hit == len(named) and len(soft) == 9 and len(hard) == 1, (hit, soft, hard)
+n_soft, n_hard = len(soft), len(hard)
+
+img_mem, notes_mem = themes.draw(themes.export("clock"), {})
+path, soft = themes.save(themes.export("clock"), "clock-as-file")
+img_file, notes_file = themes.draw(themes.load(path), {})
+assert img_mem.tobytes() == img_file.tobytes() and notes_mem["boxes"] == notes_file["boxes"]
+lit = sum(1 for v in img_mem.getchannel("A").get_flattened_data() if v)
+print(f"  validate            {hit}/{len(named)} named in one fixture "
+      f"({n_soft} soft warnings + {n_hard} hard refusal on one fixture): an unknown "
+      f"metric name, "
+      f"a font family outside layout.FONTS, a size outside the ten the library ships, a "
+      f"colour outside rgba(), a widget off the canvas, an id repeated inside one theme, "
+      f"a special with no drawing, a text with no content, and a `property` that is not "
+      f"the one-element list every vendor file uses. A layout held in memory paints the "
+      f"same {len(notes_mem['boxes'])} boxes and {lit} lit pixels as the same layout read "
+      f"back off disk, so an editor's preview and the loop's frame are one code path")
+PY
+rm -rf "$EDIT_TMP"
+
 echo
 echo "== decoder round-trip: encode -> decode -> re-encode"
 python3 - <<'PY' || { echo "decoder round-trip FAILED"; exit 1; }

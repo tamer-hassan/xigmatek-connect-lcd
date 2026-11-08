@@ -55,15 +55,27 @@ def user_root() -> str:
 
 
 def roots() -> tuple:
-    """Library roots that exist, first-winning order, no repeats."""
-    return tuple(dict.fromkeys(r for r in (os.path.abspath(REPO_ROOT), SYSTEM_ROOT)
-                               if os.path.isdir(r)))
+    """Library roots that exist, first-winning order, no repeats: your edited copies
+    first, then the checkout, then the installed package.
+
+    A user root is scanned flat (`<name>.json`); the vendor trees are scanned
+    `layouts/<canvas>/*.json`, which is how the installer ships them.  Putting yours first
+    is what makes "edit a copy, keep the original" a file operation rather than a
+    feature: `--theme Theme_07` finds your copy of that name, and deleting it puts the
+    vendor's back in front.
+    """
+    return tuple(dict.fromkeys(
+        r for r in ((os.path.abspath(user_root()), "*.json"),
+                    (os.path.abspath(REPO_ROOT), os.path.join("layouts", "**", "*.json")),
+                    (SYSTEM_ROOT, os.path.join("layouts", "**", "*.json")))
+        if os.path.isdir(r[0])))
 
 
 #: The canvas a layout must declare to be pickable, and the reason it is the one.
 NEED_RATIO = "1:1"
-RATIO_WHY = ('ratio {ratio}: {w}x{h}, and the em-box anchor convention text is drawn by '
-             'was measured at 480 only - docs/theme-editor.md keeps that plan and its cost')
+RATIO_WHY = ('ratio {ratio}: {w}x{h}, and the em-box anchor convention this program '
+             'draws text by was measured at 480 only - docs/theme-editor.md keeps that '
+             'plan and its cost')
 
 
 def scan() -> tuple:
@@ -74,15 +86,16 @@ def scan() -> tuple:
     never both answer for one name.
     """
     by_name: dict = {}
-    for root in roots():
-        for path in sorted(_glob.glob(os.path.join(root, "layouts", "**", "*.json"),
-                                      recursive=True)):
+    for root, pattern in roots():
+        for path in sorted(_glob.glob(os.path.join(root, pattern), recursive=True)):
             obj = load(path)
-            stem = os.path.splitext(os.path.basename(
-                (obj.get("background") or {}).get("mediaFile") or path))[0]
+            stem = os.path.splitext(os.path.basename(path))[0] if pattern == "*.json" \
+                else os.path.splitext(os.path.basename(
+                    (obj.get("background") or {}).get("mediaFile") or path))[0]
             rec = {"name": stem, "id": str(obj.get("id")), "ratio": str(obj.get("ratio")),
                    "w": int(obj.get("width") or 0), "h": int(obj.get("height") or 0),
                    "path": path, "root": root,
+                   "edited": pattern == "*.json",
                    "widgets": len((obj.get("osd") or {}).get("widget") or []),
                    "background": (obj.get("background") or {}).get("mediaFile") or ""}
             # first-winning root: `roots()` is already in order, and the vendor's own
@@ -151,8 +164,9 @@ def why_not(name: str) -> str:
             return RATIO_WHY.format(ratio=rec["ratio"], w=rec["w"], h=rec["h"])
     if want in render.THEMES:
         return "one of the five this program draws itself"
-    return (f"no layout named {name!r} under {' or '.join(roots())} "
-            f"(a user theme is one you save; docs/theme-editor.md keeps that plan)")
+    return (f"no layout named {name!r} under {' or '.join(r for r, _ in roots())} "
+            f"(--list-themes prints what those roots hold; a file in "
+            f"{user_root()} shadows a vendor layout of the same name)")
 
 
 # ---------------------------------------------------------------- sources --
@@ -281,12 +295,261 @@ def paint(record: dict, metrics: dict, when=None, scrim: int = 0, base=None) -> 
     return img, notes
 
 
+def origin(record: dict) -> str:
+    """One of three words for where a record's file came from."""
+    if record.get("edited"):
+        return "your copy"
+    return "checkout" if record["root"] == os.path.abspath(REPO_ROOT) else "package"
+
+
+def draw(obj: dict, metrics: dict, when=None, scrim: int = 0) -> tuple:
+    """Paint a layout object that did not arrive as a file: a generated export, an edited
+    buffer on its way to disk, the thing a preview pane needs.
+
+    Same doors as `paint` - same source table, one instant, the specials registry - so
+    what an editor shows and what the loop uploads cannot be two different pictures.
+    """
+    vals, absent = values(metrics, when)
+    vals["readings"] = render.clock_readings_line(metrics)
+    img, notes = layout.draw_theme(obj, vals,
+                                   canvas=(obj.get("width") or render.W,
+                                           obj.get("height") or render.H),
+                                   specials=SPECIALS)
+    if scrim:
+        img = render.scrim(img, max(1, min(255, int(scrim))))
+    notes["absent"] = absent
+    return img, notes
+
+
 def describe(record: dict) -> str:
     """One line: what `--theme <name>` will draw, and where the file came from."""
     return (f"  {record['name']:<12} {record['id']}  {record['w']}x{record['h']} "
             f"ratio {record['ratio']}  {record['widgets']} widgets  "
-            f"background {os.path.basename(record['background'])}  from "
-            f"{'checkout' if record['root'] == os.path.abspath(REPO_ROOT) else 'package'}")
+            f"background {os.path.basename(record['background'])}  from {origin(record)}")
+
+
+# ------------------------------------------------------- canonical file shape --
+#: Every one of the 27 copied layouts is, byte for byte, `canonical()` of its own parsed
+#: content - one indentation, sorted keys, no trailing whitespace - checked on all 27 by
+#: the suite.  The only thing the vendor's own files disagree with each other about is
+#: escaping: **18** write non-ASCII strings as `\uXXXX` and **9** keep them raw (the ones
+#: carrying a `宋体` family or CJK `content`), which is `json.dump`'s `ensure_ascii` switch
+#: and nothing else.  Measured, because it decides what "the round trip is the identity"
+#: can promise: a writer that always escaped would "change" 9 files it had not touched.
+CANON_INDENT, CANON_KEYS = 1, True
+
+
+def canonical(obj: dict, ensure_ascii: bool = True) -> str:
+    """The file shape this library is stored in, and the one the writer emits."""
+    return json.dumps(obj, indent=CANON_INDENT, sort_keys=CANON_KEYS,
+                      ensure_ascii=ensure_ascii)
+
+
+def shape_of(path: str) -> bool:
+    """The `ensure_ascii` that reproduces one file exactly - or None if neither does.
+
+    A copy for editing inherits its source's shape, so the diff between the vendor's file
+    and yours is only the fields you touched, and "did my editor corrupt this?" has an
+    answer that does not need a diff tool.
+    """
+    raw = open(path, encoding="utf-8").read()
+    obj = json.loads(raw)
+    for esc in (True, False):
+        if raw in (canonical(obj, esc), canonical(obj, esc) + "\n"):
+            return esc
+    return None
+
+
+# ------------------------------------------------------------- validation --
+#: The ten `fontSize` values the shipped library actually uses (counted across the 27
+#: layouts).  Outside that set is not wrong - it is untried, which is a different thing,
+#: and the report says which.
+MEASURED_FONT_SIZES = (12, 14, 16, 20, 24, 32, 40, 70, 100, 140)
+
+
+def validate(obj: dict) -> tuple:
+    """(hard, soft) about a layout object: what refuses to draw, and what is worth saying.
+
+    Hard means `layout.draw_theme` cannot walk it at all (no widgets to walk, a `property`
+    that is not the one-element list every vendor file uses).  Soft is everything else: an
+    unknown metric name, an off-canvas coordinate, a size outside the ten shipped ones, a
+    colour that is not `rgba(...)`, a `special` with no drawing, a font family not in the
+    table.  The rule of this repo is that a choice is *said*, not silently repaired, so the
+    writer accepts a soft problem and prints it, and the loop's own report at draw time
+    still carries the same facts in `notes`.
+    """
+    hard, soft = [], []
+    if not isinstance(obj, dict):
+        return ["not an object"], soft
+    w, h = int(obj.get("width") or 0), int(obj.get("height") or 0)
+    if not w or not h:
+        hard.append("no width/height declared")
+    widgets = ((obj.get("osd") or {}).get("widget"))
+    if not isinstance(widgets, list):
+        return hard + ["no `osd.widget` list"], soft
+    if not widgets:
+        return hard + ["an `osd.widget` list with nothing in it: there is nothing to "
+                       "draw, which is not the same as an empty canvas"], soft
+    seen_ids = set()
+    for i, wd in enumerate(widgets):
+        kind = str(wd.get("type") or "")
+        if kind not in layout.KINDS:
+            soft.append(f"widget {i}: unknown kind {kind!r}")
+            continue
+        prop = wd.get("property")
+        if not isinstance(prop, list) or not prop:
+            hard.append(f"widget {i} ({kind}): `property` must be a one-element list, "
+                        "like every vendor file")
+            continue
+        if len(prop) > 1:
+            hard.append(f"widget {i} ({kind}): `property` has {len(prop)} entries; "
+                        "every one of the 152 vendor widgets has exactly one, and "
+                        "`draw_theme` reads only `property[0]` - the rest would be "
+                        "silently unwritten")
+            continue
+        pr = prop[0]
+        wid = str(wd.get("id") or "")
+        if wid in seen_ids:
+            soft.append(f"widget {i}: id {wid!r} repeats inside this theme "
+                        "(vendor files reuse ids ACROSS themes - 152 widgets answer to 54 "
+                        "ids - so a row is keyed by theme and id, never by id alone)")
+        seen_ids.add(wid)
+        x, y = pr.get("x"), pr.get("y")
+        if x is None or y is None:
+            hard.append(f"widget {i} ({kind}): no x/y")
+        elif w and not (0 <= int(x) < w and 0 <= int(y) < h):
+            soft.append(f"widget {i} ({kind}): x={x} y={y} is outside the {w}x{h} canvas")
+        if pr.get("fontFamily") and str(pr["fontFamily"]).lower() not in layout.FONTS:
+            soft.append(f"widget {i} ({kind}): family {pr['fontFamily']!r} is not in "
+                        f"layout.FONTS ({' '.join(sorted(layout.FONTS))}) - its widgets "
+                        f"will be skipped at draw time and reported")
+        if pr.get("fontSize") and int(pr["fontSize"]) not in MEASURED_FONT_SIZES:
+            soft.append(f"widget {i} ({kind}): fontSize {pr['fontSize']} is outside the "
+                        f"ten sizes the shipped library uses "
+                        f"({' '.join(str(x) for x in MEASURED_FONT_SIZES)})")
+        if pr.get("textColor") and not str(pr["textColor"]).startswith("rgba("):
+            soft.append(f"widget {i} ({kind}): textColor {pr['textColor']!r} is not the "
+                        "`rgba(r, g, b, a)` spelling the library uses everywhere")
+        src = pr.get("source")
+        if src and src not in SOURCES and src not in CLOCKED and src not in UNMAPPED:
+            soft.append(f"widget {i} ({kind}): source {src!r} has no entry in "
+                        "themes.SOURCES - it will be reported as unanswered")
+        if kind == "special" and str(pr.get("name") or "") not in SPECIALS:
+            soft.append(f"widget {i}: special name {pr.get('name')!r} has no drawing "
+                        f"(--list-specials prints {' '.join(special_names())})")
+        if kind in ("text",) and pr.get("content") is None:
+            soft.append(f"widget {i} (text): no `content` string to draw")
+    return hard, soft
+
+
+# ------------------------------------------------------------- the file model --
+def user_theme_path(name: str) -> str:
+    """Where an edited or new theme of yours would live."""
+    return os.path.join(user_root(), f"{name}.json")
+
+
+def _safe_name(name: str) -> str:
+    """A theme name that cannot escape the user directory, and cannot shadow one of the
+    five names this program draws from code (those are generated, never stored: a saved
+    `gauge.json` would be a second source of truth for `theme_gauge`, which is the failure
+    mode docs/theme-editor.md's whole export design exists to avoid)."""
+    n = str(name or "").strip()
+    if not n or n != os.path.basename(n) or "/" in n or "\\" in n or n.startswith("."):
+        raise ValueError(f"unsafe theme name {name!r}: a name is one path element, no "
+                         "separators, no leading dot")
+    if len(n) > 64:
+        raise ValueError(f"theme name {name!r} is longer than 64 characters")
+    if n in render.THEMES:
+        raise ValueError(f"{n!r} is one of the five themes drawn from render.py; those are "
+                         "generated by --export-theme rather than saved, so the two cannot "
+                         "drift apart")
+    return n
+
+
+def copy_for_edit(name: str) -> tuple:
+    """Seed an editable copy of a library theme in the user directory.
+
+    Returns (record, path, soft warnings).  The copy keeps the shape of the file it came
+    from (`shape_of`), so the only difference between it and the vendor's file is what you
+    change afterwards, and the original is never written to: `themes/alpha` under a checkout
+    and `/usr/share/xigmalcd/themes/alpha` under a package are both read-only here.
+    """
+    rec = resolve(name) or next((r for r in scan()[1]
+                                 if name.lower() in (r["name"].lower(), r["id"].lower())),
+                                None)
+    if rec is None:
+        raise KeyError(f"no pickable layout named {name!r}: {why_not(name)}")
+    obj = load(rec["path"])
+    hard, soft = validate(obj)
+    if hard:
+        raise ValueError("; ".join(hard))
+    path = os.path.join(user_root(), rec["name"] + ".json")
+    os.makedirs(user_root(), exist_ok=True)
+    # byte for byte, not re-dumped: a copy that starts out different from its source makes
+    # every later diff a lie. `shape_of` is what says this is even possible - every vendor
+    # file is reproducible from its own parsed content, 27 of 27.
+    tmp = path + ".tmp"
+    with open(rec["path"], "rb") as src, open(tmp, "wb") as dst:
+        dst.write(src.read())
+    os.replace(tmp, path)
+    return rec, path, soft
+
+
+def save(obj: dict, name: str | None = None, root: str | None = None,
+         backup: bool = True, ensure_ascii: bool = True) -> tuple:
+    """Write one layout into the user theme directory, canonically and atomically.
+
+    Returns (path, soft_warnings).  Hard problems raise; soft ones come back with the path
+    and are also what `validate` reports at draw time.  Only `user_root()` is writable by
+    design: `/usr/share/xigmalcd/themes/alpha` is dpkg-owned and `debian/tests/smoke`
+    re-hashes 125/125 of its files on every install, and the checkout's copy is what every
+    figure in the docs was read from - an edit landing in either would be an edit that
+    breaks the evidence.  The previous copy of a name is kept as `<name>.json.bak` so
+    "undo my last save" is a file operation, and the write is tmp-then-`os.replace`, so a
+    crash cannot leave half a JSON where a working theme used to be.
+    """
+    hard, soft = validate(obj)
+    if hard:
+        raise ValueError("; ".join(hard))
+    root = root or user_root()
+    if os.path.abspath(root) != os.path.abspath(user_root()):
+        raise ValueError(f"only {user_root()} is written to; {root} is "
+                         + ("the vendor copy this program's figures were read from"
+                            if os.path.abspath(root).endswith("themes/alpha")
+                            else "not this program's directory to write in"))
+    fname = _safe_name(name or (obj.get("id") or ""))
+    path = os.path.join(root, fname + ".json")
+    os.makedirs(root, exist_ok=True)
+    if os.path.exists(path) and backup:
+        with open(path, "rb") as src, open(path + ".bak", "wb") as dst:
+            dst.write(src.read())
+    tmp = path + ".tmp"
+    # every one of the 27 vendor files ends with a newline; so does what we write, or a
+    # round trip through the editor would show up as a one-byte change in files nobody
+    # edited
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(canonical(obj, ensure_ascii) + "\n")
+    os.replace(tmp, path)
+    return path, soft
+
+
+def user_copies() -> list:
+    """Names of the layouts in the user directory, i.e. the edits that are live now."""
+    return sorted(os.path.splitext(os.path.basename(p))[0]
+                  for p in _glob.glob(os.path.join(user_root(), "*.json")))
+
+
+def delete_user_theme(name: str) -> str:
+    """Back to the vendor's own: drop your copy, and the installed one is what `--theme`
+    finds again.  Never touches anything outside the user directory."""
+    path = os.path.join(user_root(), _safe_name(name) + ".json")
+    if not os.path.exists(path):
+        return ""
+    os.unlink(path)
+    for extra in (path + ".bak", path + ".tmp"):
+        if os.path.exists(extra):
+            os.unlink(extra)
+    return path
 
 
 # ------------------------------------------------------- the specials registry --

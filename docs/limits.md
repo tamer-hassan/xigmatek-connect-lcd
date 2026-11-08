@@ -727,3 +727,42 @@ been looked at on glass yet**: the frame byte counts in docs/usage.md (3 558 B f
 `Theme_29` up to 8 115 B for `Theme_35`, one pinned fixture, one pinned instant) are
 offline figures from `--dry-run`, and the glass pass is stage 6 of
 [theme-editor.md](theme-editor.md).
+
+**The file model's limits: where a theme may live, and what a save refuses.** Reading your
+own copy is in the tree (stage 3 there); the window that writes one is not, and no flag
+writes a theme today. What the model does and does not allow, all of it gated:
+
+* **One directory is written to: `~/.config/xigmalcd/themes`** (`$XDG_CONFIG_HOME`), and
+  it is also scanned first - before the checkout and before `/usr/share/xigmalcd/themes/alpha`.
+  `--list-themes` and `--check-theme` print which root answered: "your copy", "checkout"
+  or "package". The two vendor trees are never written, for two different reasons: the
+  installed one is dpkg-owned and re-hashed 125/125 by `debian/tests/smoke` on every
+  install, and the checkout's is the file every number in these docs was read from - an
+  edit there would be an edit that breaks the evidence.
+* **The five drawn-from-code names cannot be saved as files.** A `gauge.json` would be a
+  second source of truth for `render.theme_gauge`, which is exactly the drift the export
+  design exists to avoid; a save that tried it is refused, and `--check-theme gauge` says
+  the export does not exist yet instead of failing.
+* **`property` is a one-element list, and that is a hard rule, not a style preference.**
+  All 152 vendor widgets use one entry, and `layout.draw_theme` reads `property[0]` only -
+  a second entry would be silently unwritten, which is the failure mode this repo's
+  "say the choice, never repair it" rule refuses. Same for an empty `osd.widget` list:
+  nothing to draw is not the same thing as an empty canvas.
+* **A round trip is byte-identical, with one measured bound.** All 27 shipped layouts
+  reproduce from their own parsed content, and `shape_of()` records the one thing the
+  vendor's files disagree about - 18 escape non-ASCII as `\uXXXX`, 9 keep it raw - so a
+  copy for editing starts out identical to its source (23/23) and a writer that always
+  escaped would "change" 9 files nobody opened. Unknown keys survive a save; the
+  `xigma.*` extension keys and a `special` kind are inert to anything but this program,
+  because the JSON never goes on the wire (PROTOCOL.md §11).
+* **`property[].time` is not written.** 82 of the 152 vendor widgets carry a timestamp, in
+  27 distinct values, and it is the vendor editor's own save stamp - there is nothing in
+  the drawing that reads it. The plan said derive it; building it showed there is nothing
+  to derive it *from*, so our exports omit it and a gate asserts that none carries one.
+  Export ids are `xigma-*`, never a random uuid, so a generated file is byte-stable.
+* **Sizes outside the ten the library ships are allowed and said, not repaired.** Those
+  ten are 12 14 16 20 24 32 40 70 100 140, counted out of the 27 files; our own generated
+  `clock` export uses 22 and 26, and `--check-theme clock` warns about both. That is
+  honest rather than wrong: the drawing is this repo's code, and its pixel-parity against
+  `render.py` is measured at a zero diff - but it is also a shape no vendor file has ever
+  been seen to use, and the warning says so.
