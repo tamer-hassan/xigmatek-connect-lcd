@@ -1782,8 +1782,10 @@ assert soft == [], soft
 assert not os.path.exists(path + ".tmp"), "a .tmp survived the atomic replace"
 assert os.path.exists(path + ".bak"), "the copy being overwritten left no backup"
 metrics = sensors.collect()
-img_v, notes_v = themes.draw(themes.load(rec["path"]), metrics)
-img_u, notes_u = themes.draw(obj, metrics)
+# pinned instant on purpose: two draws of one theme with a live clock could straddle a
+# second between them, and the difference would be a time, not an edit
+img_v, notes_v = themes.draw(themes.load(rec["path"]), metrics, WHEN)
+img_u, notes_u = themes.draw(obj, metrics, WHEN)
 assert len(notes_v["boxes"]) == len(notes_u["boxes"]), (notes_v["missing"],
                                                         notes_u["missing"])
 delta = [(b[2][0] - a[2][0], b[2][1] - a[2][1])
@@ -1864,10 +1866,34 @@ hit = sum(1 for n in named if any(n in s for s in soft + hard))
 assert hit == len(named) and len(soft) == 9 and len(hard) == 1, (hit, soft, hard)
 n_soft, n_hard = len(soft), len(hard)
 
-img_mem, notes_mem = themes.draw(themes.export("clock"), {})
+# and why every comparison above carries `WHEN`: a layout with a clock in it is not a
+# function of its file alone, it is a function of the instant too.  Measured on the way
+# through, because a parity gate that forgets this fails in CI once a second - literally.
+import time as _time
+from PIL import ImageChops as _Chops
+_t0, _ = themes.draw(themes.export("clock"), {}, None)
+_time.sleep(1.05)
+_t1, _ = themes.draw(themes.export("clock"), {}, None)
+_drift = sum(1 for q in _Chops.difference(_t0.convert("RGBA"),
+                                         _t1.convert("RGBA")).get_flattened_data()
+             if q != (0, 0, 0, 0))
+_p0, _ = themes.draw(themes.export("clock"), {}, WHEN)
+_time.sleep(1.05)
+_p1, _ = themes.draw(themes.export("clock"), {}, WHEN)
+_still = sum(1 for q in _Chops.difference(_p0.convert("RGBA"),
+                                         _p1.convert("RGBA")).get_flattened_data()
+             if q != (0, 0, 0, 0))
+assert _drift > 0 and _still == 0, (_drift, _still)
+print(f"  why every draw pins  the same `clock` layout drawn twice with no pinned instant "
+      f"differs by {_drift:,} px across 1.05 s of wall clock; drawn twice at one pinned "
+      f"instant it differs by {_still} px. That is why `themes.draw`, `themes.parity` and "
+      f"every gate above pass an instant: without it a pixel comparison is a stopwatch")
+
+img_mem, notes_mem = themes.draw(themes.export("clock"), {}, WHEN)
 path, soft = themes.save(themes.export("clock"), "clock-as-file")
-img_file, notes_file = themes.draw(themes.load(path), {})
-assert img_mem.tobytes() == img_file.tobytes() and notes_mem["boxes"] == notes_file["boxes"]
+img_file, notes_file = themes.draw(themes.load(path), {}, WHEN)
+assert img_mem.tobytes() == img_file.tobytes(), (notes_mem["boxes"], notes_file["boxes"])
+assert notes_mem["boxes"] == notes_file["boxes"], (notes_mem["boxes"], notes_file["boxes"])
 lit = sum(1 for v in img_mem.getchannel("A").get_flattened_data() if v)
 print(f"  validate            {hit}/{len(named)} named in one fixture "
       f"({n_soft} soft warnings + {n_hard} hard refusal on one fixture): an unknown "
