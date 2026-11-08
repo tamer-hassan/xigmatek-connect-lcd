@@ -1466,6 +1466,15 @@ for rec in ok:
         assert srcs == ["Pump Speed"], (rec["name"], srcs)
         assert "fanscan" in notes["absent"]["Pump Speed"], notes["absent"]
         skipped.append(rec["name"])
+# `--bg black` on a layout theme: the same shape it has for our own five, an opaque frame
+# that covers the panel's stored background rather than letting it through
+for rec in ok[:3]:
+    solid, _ = themes.paint(rec, PIN, when=WHEN, base=render.BLACK)
+    assert solid.getextrema()[3] == (255, 255), (rec["name"], solid.getextrema()[3])
+    clear, _ = themes.paint(rec, PIN, when=WHEN)
+    assert clear.getextrema()[3][0] == 0, (rec["name"], clear.getextrema()[3])
+print("  --bg black, a layout   opaque alpha (255, 255) and transparent (0, ...) on the "
+      "same layout, as with our own themes")
 assert len(skipped) == 9, skipped
 assert [r["name"] for r in ok if r["name"] in
         {n for n in need if need[n]}] and set(skipped) == {n for n in need if need[n]}, \

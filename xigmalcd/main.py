@@ -371,7 +371,7 @@ def paint(args, metrics, rec=None):
     if rec is None:
         return render.draw(metrics, args.theme, scrim=_scrim_for(args),
                            **_theme_kwargs(args))
-    img, notes = themes.paint(rec, metrics, scrim=_scrim_for(args))
+    img, notes = themes.paint(rec, metrics, scrim=_scrim_for(args), base=_canvas(args))
     report(rec, notes)
     return img
 

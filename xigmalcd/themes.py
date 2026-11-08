@@ -34,6 +34,8 @@ import glob as _glob
 import json
 import os
 
+from PIL import Image
+
 from . import layout
 from . import render
 
@@ -249,7 +251,7 @@ def values(metrics: dict, when=None) -> tuple:
     return out, absent
 
 
-def paint(record: dict, metrics: dict, when=None, scrim: int = 0) -> tuple:
+def paint(record: dict, metrics: dict, when=None, scrim: int = 0, base=None) -> tuple:
     """One 480x480 RGBA overlay for a library theme, plus the notes that explain it.
 
     Returns (image, notes) where notes come from `layout.draw_theme` - every font
@@ -270,6 +272,11 @@ def paint(record: dict, metrics: dict, when=None, scrim: int = 0) -> tuple:
     notes["absent"] = absent
     if scrim:
         img = render.scrim(img, max(1, min(255, int(scrim))))
+    if base is not None and base[3] == 255:
+        # `--bg black` means the same thing for a layout as for our own themes: the frame
+        # is opaque, so it covers the panel's stored background instead of letting it
+        # show through. Transparent is the vendor's shape and the default here.
+        img = Image.alpha_composite(Image.new("RGBA", img.size, base), img)
     return img, notes
 
 

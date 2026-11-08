@@ -132,9 +132,12 @@ claim:
   uses, which README's encode A/B measured on glass at 12 169-12 401 B per frame. So a library
   theme is cheaper on the wire than our own, and nothing about the rate changes.
 * A layout theme takes none of the render options (`--cold`, `--hot`, `--label`,
-  `--clock-size`, `--text-color`): its geometry, colours and sizes are inside its file.
-  `--scrim` is the one exception, because that plate is built from the layer's own alpha
-  and needs no per-theme geometry (docs/limits.md).
+  `--clock-size`, `--text-color`): its geometry, colours, sizes and font faces are inside
+  its file. Two flags do apply, because they are rules about the *layer* rather than about
+  a theme: `--scrim`, whose plate is built from the layer's own alpha and needs no
+  per-theme geometry (docs/limits.md), and `--bg black`, which makes the frame opaque so it
+  covers the panel's stored background - gated both ways in the suite, opaque alpha
+  (255, 255) against the same layout's transparent (0, ...)
 * Over the control socket the same names work - `{"cmd":"theme","value":"Theme_07"}` -
   because one name should mean one thing in all three doors. The **window's** picker still
   lists the five: the window previews what it lists, and it cannot preview a layout yet.
