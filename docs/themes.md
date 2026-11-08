@@ -67,6 +67,12 @@ the packaged unit's own path: `themes/alpha/clips/theme_47.mp4` at 1 211 106 B,
 nobody has looked at the glass to confirm, so the window's picker still lists MP4 rows
 only (docs/limits.md keeps that as an open item).
 
+All of that is about *this* program not sending those files, and it stays true: the panel
+is never handed a theme, and no plan here changes that. What is planned - reading those
+layouts in the display loop, and editing a copy of one under `~/.config`, with no new wire
+traffic of any kind - is written out, with the census it rests on and the parts that stay
+gaps, in [theme-editor.md](theme-editor.md). Nothing there is built yet.
+
 ## The `alpha` theme, and its rings
 
 `alpha` is the vendor theme made by redrawing, widget for widget, the theme the vendor app
