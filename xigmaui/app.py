@@ -1619,7 +1619,12 @@ class Window(QMainWindow):
             elif str(value) not in items:
                 items.insert(0, str(value))   # a value the vocabulary does not name
             self.ed_menu.addItems(items)
-            self.ed_menu.setCurrentText(items[0])
+            # select what the row actually holds, not the first entry of the vocabulary.
+            # The two agree only by luck: the ring's `arcPaint` reads "render" and the
+            # sorted menu starts with "render", but a `special` named `dual-status` sits
+            # second in a menu that starts `clock-readings`, and showing the first entry
+            # there would tell a reader the row draws a different picture than it does
+            self.ed_menu.setCurrentText(str(value) if value is not None else items[0])
             self.ed_menu.blockSignals(False)
         elif field in edit.number_fields():
             page = self.ed_num
@@ -1639,7 +1644,16 @@ class Window(QMainWindow):
         # the one thing a reader cannot infer from the value: `no arcPaint` is not
         # "unset", it is the vendor's ring
         why = themes.XIGMA_KEYS.get(field)
-        self.ed_note.setText(f"xigma.{field}: {why}" if why else "")
+        if why:
+            self.ed_note.setText(f"xigma.{field}: {why}")
+        else:
+            # a plain field can need a sentence too.  On a row that draws a *pair* of
+            # figures, `x` is the pair's centre and `width` the distance between the two
+            # figures' centres, not a box width - and which rows that is true of is asked
+            # of the registry's door (`themes.special_is_pair`), never remembered here
+            self.ed_note.setText(edit.field_note(
+                str(self.ed.selected().get("type") or ""), field,
+                str(self.ed.prop().get("name") or "")))
 
     def _editor_value(self):
         """What the on-screen editor currently holds for the selected field."""
@@ -1677,7 +1691,9 @@ class Window(QMainWindow):
         if self.ed is None:
             return
         if self.ed.undo():
-            self.ed_note.setText(f"back one step: {self.ed.steps} left in the history")
+            # the note line belongs to the selected field, so it is re-read after the
+            # undo: a sentence about a pair row must not outlive the row it described.
+            # What the undo *did* is said by `ed_state` and by the picture moving.
             self._editor_pick_field(self.ed_field.currentText())
             self._repaint()
         self._editor_state()

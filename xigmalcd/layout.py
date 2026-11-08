@@ -27,7 +27,8 @@ import json
 
 from PIL import Image, ImageDraw, ImageFont
 
-from .render import SS, _FONT_GLOBS, heat
+from .render import (A26_FAN_F, A26_FAN_MAX_W, SS, _FONT_GLOBS, fan_figures,
+                      heat)
 
 # Fonts the layouts name, and what this machine has.  No Microsoft fonts are
 # installed here, so every one of these is a substitution; Liberation Sans is
@@ -200,6 +201,42 @@ def draw_text(draw: ImageDraw.ImageDraw, prop: dict, value: str, face,
     draw.text((x, y), value, font=face, fill=fill, anchor=anchor)
     box = draw.textbbox((x, y), value, font=face, anchor=anchor)
     return tuple(v // SS for v in box)
+
+
+def draw_special_pair(draw: ImageDraw.ImageDraw, prop: dict, figures) -> tuple:
+    """A `special` row that draws a *pair* of code-built figures at one shared size.
+
+    The row's `x`,`y` is the **pair's** centre and its `width` the distance between the two
+    figures' centres, so the pair stays symmetric about the anchor the way `alpha` draws it
+    and a layout can move it and re-pitch it; `fontSize` is the size ceiling,
+    `xigma.autoFitMax` the width budget each figure gets, `textColor` the ink and `bold`
+    the weight - the same vocabulary a `text` row already uses, which is what keeps the
+    inspector's field list one list.  What stays in the drawing (`render.fan_figures`) is
+    the *joint* rule: each figure is walked down until it fits its budget and both draw at
+    the smaller of the two, with a floor of 16 and a step of 2.  Those are not per-row
+    numbers: they are the reason the two figures look like one row, and a layout that
+    could set them separately would be able to un-make the pair.
+
+    Returns (the shared size, the union ink box in panel px), so a caller can say what the
+    size came out to.  With a family that cannot be resolved, (None, None): the caller
+    reports it rather than substituting a face, as `draw_special_line` does.
+    """
+    ext = prop.get("xigma") or {}
+    face, fam, path = font_for(prop)
+    if face is None:
+        return None, None
+    x, y = int(prop["x"]), int(prop["y"])
+    half = int(prop.get("width") or 0) // 2
+    colour = rgba(prop["textColor"]) if prop.get("textColor") else (255, 255, 255, 255)
+    budget = int(ext.get("autoFitMax") or A26_FAN_MAX_W)
+    ceiling = int(prop.get("fontSize") or A26_FAN_F)
+    size, boxes = fan_figures(draw, tuple(figures), (x - half, x + half), y, colour,
+                              bold=bool(prop.get("bold")), max_w=budget,
+                              ceiling=ceiling, anchor=str(ext.get("anchor") or "ma"),
+                              face=(lambda px: ImageFont.truetype(
+                                  path, max(int(px), 1) * SS)) if path else None)
+    return size, (min(b[0] for b in boxes), min(b[1] for b in boxes),
+                  max(b[2] for b in boxes), max(b[3] for b in boxes))
 
 
 def draw_special_line(draw: ImageDraw.ImageDraw, prop: dict, text: str):
@@ -732,11 +769,12 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
 
     `specials` is the registry for the one added kind, `special`: {name: callable}.  A
     special is a picture that stays code-drawn and takes its position, size and reading
-    from the layout - today the clock's readings line and `dual`'s status line, and the two
-    fan figures `alpha` still needs.  It
-    exists so those elements can *move* without being baked into PNGs, and it is
-    injected rather than imported because those drawings live in `render.py`, which
-    this module must not import (render imports this one).  A name with no drawing is
+    from the layout - today the clock's readings line, `dual`'s status line and
+    `alpha`'s two fan figures.  It
+    exists so those elements can *move* without being baked into PNGs, and the table is
+    injected rather than imported here because it is the one place that joins a layout
+    kind to a theme drawing, and `themes` is the module that knows both sides.  A name with
+    no drawing is
     reported in `notes["missing"]` as `special:<name>`: an unknown name is said, not
     guessed at.
 
@@ -801,6 +839,15 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
             fn = (specials or {}).get(name)
             if fn is None:
                 notes["missing"].append(f"special:{name}")
+                continue
+            # a `special` needs a face like any text row does - both doors build one - so
+            # an unresolvable family is said here, in the same words the text kinds use,
+            # rather than drawing nothing.  A None box from the door is not an error: it
+            # means the drawing had nothing to say (a composite line with no readings),
+            # and `notes["missing"]` is for what the file asked for and this machine lacks
+            face, fam, path = font_for(prop)
+            if face is None:
+                notes["missing"].append(f"font:{fam or 'default'}")
                 continue
             notes["boxes"].append(("special", name, fn(draw, prop, values)))
         elif kind == "line":

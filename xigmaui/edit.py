@@ -39,6 +39,10 @@ def field_names(kind: str) -> tuple:
     and the vendor editor's own bookkeeping (`enableMove`, `screenStatus`) stays out of
     the form and survives a save untouched, because `themes.save` writes the widget's
     `property` back as it read it.
+
+    A `special` row that draws a *pair* edits `width`: `layout.draw_special_pair` reads it
+    as the distance between the two figures' centres, so it is a placeable number like any
+    other, and `field_note` below is where the row says what it means.
     """
     read = set(themes.keys_read()[0])
     per_kind = {
@@ -50,10 +54,44 @@ def field_names(kind: str) -> tuple:
                 "sizeHeight", "angleStart", "angleEnd", "bgColor", "startColor",
                 "endColor"),
         "line": ("width", "height", "rotate", "lineColor", "lineWidth"),
-        "special": ("name", "fontFamily", "fontSize", "bold", "textColor"),
+        "special": ("name", "width", "fontFamily", "fontSize", "bold", "textColor"),
     }
     out = ["x", "y"] + [k for k in per_kind.get(kind, ()) if k in read]
     return tuple(out)
+
+
+def field_note(kind: str, field: str, name: str = "") -> str:
+    """One sentence on what a field *means* for this row, when its name is not enough.
+
+    The `special` kind needs this more than any other, because its fields are read by a
+    drawing this repo wrote and not by a painter with one shape: a row that draws a *pair*
+    of figures reads `width` as the distance between the two figures' centres and `x` as
+    their shared centre, while a row that draws one line of built text reads `width` not at
+    all.  A field list cannot show that difference - both rows are `special` - so the note
+    line says it in both directions, rather than leaving a reader to set a number that
+    does nothing.  Which shape a name has is asked of the registry, whose entry knows the
+    door it draws through (`themes.special_is_pair`), because the door is what decides the
+    meaning: `layout.draw_special_pair` reads `width`, `draw_special_line` does not.
+    """
+    if kind != "special":
+        return ""
+    pair = themes.special_is_pair(name)
+    if field == "width":
+        return (("for this drawing, `width` is the distance between the two figures' "
+                 "centres: each is placed half this far to one side of x, so the pair "
+                 "stays centred on it. It is not a box width") if pair else
+                ("this drawing is one line of built text: it does not read `width`. What "
+                 "the line may be is `fontSize` with `xigma.autoFitMax`, and where it "
+                 "starts is x, y with `xigma.anchor`"))
+    if not pair:
+        return ""
+    if field in ("x", "y"):
+        return "the pair's own anchor point, not one figure's corner"
+    if field == "fontSize":
+        # a ceiling, not the size: the drawing walks down until both figures fit
+        return ("a ceiling. Both figures are fitted to `xigma.autoFitMax`, and the pair "
+                "draws at the smaller of the two fits, at or below this size")
+    return ""
 
 
 def extension_fields(kind: str) -> tuple:
@@ -65,7 +103,7 @@ def extension_fields(kind: str) -> tuple:
         "bar": ("barPaint", "colourRamp", "colourStops"),
         "arc": ("arcPaint", "colourRamp", "colourStops"),
         "line": (),
-        "special": ("anchor",),
+        "special": ("anchor", "autoFitMax"),
     }
     return tuple(k for k in applies.get(kind, ()) if k in sub)
 

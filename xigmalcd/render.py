@@ -251,10 +251,27 @@ def _text(img, xy, s, fnt, fill, anchor="mm"):
                              anchor=anchor)
 
 
-def _fit_size(img, s, max_w, size, bold=True):
-    """The largest size <= `size` at which `s` fits in `max_w` panel px."""
-    d = ImageDraw.Draw(img)
-    while size > 10 and d.textlength(s, font=font(size, bold)) > max_w * SS:
+def _fit_size(draw_or_img, s, max_w, size, bold=True):
+    """The largest size <= `size` at which `s` fits in `max_w` panel px.
+
+    Accepts an `ImageDraw` as well as an image: a probe that walks the sizes one at a
+    time should not have to allocate a canvas per string, and both doors have to walk
+    the same loop whatever they are handed."""
+    d = draw_or_img if hasattr(draw_or_img, "textlength") else ImageDraw.Draw(draw_or_img)
+    return _fit_draw(d, s, max_w, size, bold)
+
+
+def _fit_draw(draw, s, max_w, size, bold=True, mk=None):
+    """The same walk, on a caller's `ImageDraw`: the loop, the step of 2 and the floor of
+    10 are one function, so a picture drawn through a `special` and a picture drawn by a
+    theme cannot end up at two different sizes for one string.
+
+    `mk(size)` builds the face for one step of the walk; it defaults to this module's
+    `font(size, bold)` so a caller that passes a face factory measures with exactly the
+    faces it will draw with.
+    """
+    mk = mk or (lambda px: font(px, bold))
+    while size > 10 and draw.textlength(s, font=mk(size)) > max_w * SS:
         size -= 2
     return size
 
@@ -809,6 +826,47 @@ A26_BAR_WH = (280, 10)
 # That is the asymmetry this layout gives up.)
 
 
+def fan_figures(draw, figures, xs, y, colour=A26_WHITE, bold=False,
+                max_w=A26_FAN_MAX_W, ceiling=A26_FAN_F, floor=A26_FAN_MIN,
+                anchor="ma", face=None):
+    """Two figures, centred one under each of two columns, at **one** shared size.
+
+    This is `alpha`'s fan row, and the shared size is the whole point of it.  Each figure
+    is fitted against `max_w` panel px by `_fit_draw`'s walk, and the pair draws at the
+    smaller of the two fits, never below `floor`: the wider figure decides the size for
+    both, so the two columns always match.  Sized one at a time they would not - over the
+    30 reading pairs the suite walks, 25 come out at two different sizes and drawing each
+    at its own moves the row by 1 763 to 2 915 px on this bench (the suite prints the
+    counts beside its own machine, and docs/limits.md labels them as one bench's, because
+    both depend on the faces installed).  The pair is one drawing because the sizes are
+    not independent (docs/theme-editor.md).
+
+    `anchor` is the anchor of each figure, which the layout says (`xigma.anchor`) for the
+    same reason it says it for a text row: what an `x` means.  The theme's own row anchors
+    mid-top ("ma"), centring each figure on its column.  `face` is the face factory,
+    `face(size) -> font`: a theme leaves it alone and gets this module's own `font(size,
+    bold)`, a layout passes one built from the family its row names (as `draw_text` does),
+    so the walk and the drawing never disagree about which face a size means.
+
+    Returns the size it chose and the two ink boxes, in panel px: the caller can say what
+    the shared size came out to rather than leave a reader to measure it back off the
+    picture.  A layout reaches this through one `special` row (`themes.SPECIALS`), which
+    supplies the two anchors and the colour; the fit rule and the floors stay here, in the
+    drawing, because they are what makes the pair a pair.
+    """
+    mk = face or (lambda px: font(px, bold))
+    size = max(floor, min(_fit_draw(draw, s, max_w, ceiling, bold, mk)
+                          for s in figures))
+    fnt = mk(size)
+    boxes = []
+    for x, s in zip(xs, figures):
+        draw.text((x * SS, y * SS), s, font=fnt, fill=colour, anchor=anchor)
+        boxes.append(tuple(v // SS for v in
+                           draw.textbbox((x * SS, y * SS), s, font=fnt,
+                                         anchor=anchor)))
+    return size, boxes
+
+
 def theme_alpha(m, title=None, clock=True, clock_size=26, fan=True,
                 bg=OVERLAY, ink=None):
     """The theme ALPHA has selected, plus GPU temp, clock and fan figures."""
@@ -847,13 +905,8 @@ def theme_alpha(m, title=None, clock=True, clock_size=26, fan=True,
     # figure per column, sitting in the ring's open mouth, so each one is under
     # the temperature it belongs to rather than one line between them.
     if fan:
-        left, right = _cpu_fan_figure(m), _gpu_fan_figure(m)
-        size = max(A26_FAN_MIN, min(
-            _fit_size(img, s, A26_FAN_MAX_W, A26_FAN_F, bold=False)
-            for s in (left, right)))
-        for x, figure in zip(A26_FAN_X, (left, right)):
-            _text(img, (x, A26_FAN_Y), figure, font(size, False), fg,
-                  anchor="ma")
+        fan_figures(ImageDraw.Draw(img), (cpu_fan_figure(m), gpu_fan_figure(m)),
+                    A26_FAN_X, A26_FAN_Y, fg)
 
     # usage: vendor geometry, exact, its values left-aligned on their anchors
     (cpu_bar, gpu_bar), (bar_w, bar_h) = A26_BAR_XY, A26_BAR_WH
@@ -907,7 +960,7 @@ def _tach(m) -> tuple:
     return cpu_fan, pump, other
 
 
-def _cpu_fan_figure(m) -> str:
+def cpu_fan_figure(m) -> str:
     """The figure that sits under the CPU temperature: the board's CPU fan.
 
     The wording follows where the channel's identity came from.  A channel
@@ -933,7 +986,7 @@ def _cpu_fan_figure(m) -> str:
     return "CPU FAN -- RPM"           # no tach bound: the figure admits it
 
 
-def _gpu_fan_figure(m) -> str:
+def gpu_fan_figure(m) -> str:
     """The figure that sits under the GPU temperature: the card's fan.
 
     A percentage, not RPM: `nvidia-smi` reports `fan.speed` in percent and

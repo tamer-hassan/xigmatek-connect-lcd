@@ -930,7 +930,14 @@ def main(argv=None) -> int:
 
     if args.list_specials:
         for name in themes.special_names():
-            print(f"  {name}")
+            # which shape a row of this name will edit: read off the door the drawing goes
+            # through (`themes.special_is_pair`), because that call is what decides whether
+            # the row's `width` is a pitch or nothing at all
+            shape = ("draws a *pair* of figures at one shared size: `x` is their centre, "
+                     "`width` the distance between them"
+                     if themes.special_is_pair(name)
+                     else "draws one line of text built by code")
+            print(f"  {name}  - {shape}")
         print("  A special is drawn by code and placed by the layout: see "
               "xigmalcd/themes.SPECIALS and docs/theme-editor.md.")
         return 0

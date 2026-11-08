@@ -10,8 +10,8 @@ it needed, the determinism rules and both gates are in the tree, and three of th
 (`clock`, `gauge` and `dual`) generate to layouts that paint *exactly* what `render.py`
 paints - zero differing pixels on every reading that answers what they ask, worst channel
 delta 0. The other two do not generate yet, and what they still need is written out below:
-`alpha` is waiting on two fan figures and one question about text sizing, and `bars` on a
-question about the schema itself.
+`alpha` is waiting on one drawing (its temperature pair) and on the assembly, and `bars` on
+a question about the schema itself.
 Stage 3, the file model, is in - what it measured is written out under "What building the file model measured" below. **Stage 4's first half is in as well**: `xigmaui/edit.py` is the editor's model, and the window's layout-editor row is a shell over it - what that half measured is under "What the editor's first half measured". Its other half, the canvas you drag widgets around inside the existing pane, is not built. Stage 5 (docs and census) and stage 6 (the glass pass) are not built. Every census figure below is re-derived by `tools/selftest.sh`'s vendor-library
 section, so it cannot rot in place. The decisions are
 settled with the owner; the census is measured out of the files in this tree on the same
@@ -190,11 +190,13 @@ All of this is printed by `tools/selftest.sh` in the vendor-library section, on 
   `why_not`) or when the file cannot be walked.
 - Three kinds of extension, all of them inert to anything but this program, since the JSON
   never goes on the wire: a `special` kind whose `name` is one of a printed list
-  (`--list-specials`; two have landed - `clock-readings` and `dual-status`, the composite
-  lines - and the two still needed are `alpha`'s fan figures. The "segmented tick strip"
-  this row originally named does not exist: it was a guess about a drawing `render.py`
-  turned out not to make, and what `theme_alpha` actually draws is now printed from its own
-  source by the suite); `autoFit` on a `text`/`data` row, because `_fit`/`_fit_size` in
+  (`--list-specials`; three have landed - `clock-readings` and `dual-status`, the composite
+  lines, and `fan-figures`, `alpha`'s two tachometer figures placed by one row. What is
+  still needed is `temp-values`, the pair of temperature columns inside the rings. The
+  "segmented tick strip" this row originally named does not exist: it was a guess about a
+  drawing `render.py` turned out not to make, and what `theme_alpha` actually draws is now
+  printed from its own source by the suite); `autoFit` on a `text`/`data` row, because
+  `_fit`/`_fit_size` in
   `xigmalcd/render.py` shrink a face until the string fits and the vendor schema has a
   fixed `fontSize` with no such key; and one top-level `xigma` block for theme-level
   properties - ink halo, cold/hot scale, gauge source, scrim mode. The round-trip gate
@@ -389,8 +391,35 @@ is a claim about this source and not a memory of it.
 
 | theme | what is missing | why it is a decision, not a lookup |
 |---|---|---|
-| `alpha` | the two fan figures, and `_fit_arc` | the rings and the usage bars are widgets now: `xigma.arcPaint: render` for the two `temp_arc` rings, and `xigma.barPaint: hbar` for `render.hbar`'s per-**column** gradient - the case a vendor `bar` cannot spell, since it declares one flat fill and `render.bar` colours by value instead. That last one is measured, not hoped: 28 device-px pairs and 7 at 1x at **zero differing pixels** against `render.hbar` (docs/limits.md). What is left is the two fan figures, code-drawn by decision (no PNG assets), each needing a `special` in `themes.SPECIALS` - `clock-readings` and `dual-status` are the pattern, both at a zero diff - and `_fit_arc`, which picks **one** text size jointly for two columns so a three-digit reading takes both down together: a relationship *between* widgets, which the schema cannot hold without a group key that does not exist yet |
+| `alpha` | the temperature pair as one drawing, then the assembly | the rings and the usage bars are widgets: `xigma.arcPaint: render` for the two `temp_arc` rings, and `xigma.barPaint: hbar` for `render.hbar`'s per-**column** gradient - the case a vendor `bar` cannot spell, since it declares one flat fill and `render.bar` colours by value instead. That last one is measured, not hoped: 28 device-px pairs and 7 at 1x at **zero differing pixels** against `render.hbar` (docs/limits.md). The two fan figures are the row `fan-figures`: one `special`, because the pair shares one text size, and it lands at a zero diff against `theme_alpha`'s own row over 30 reading pairs. What is left is the temperature pair, which `_fit_arc` sizes jointly - see the sizing paragraph below - and then assembling the theme from rows that were each measured on their own |
 | `bars` | its shape, not a drawing | its row count and row pitch are functions of the machine: `row_h = min(56, max(28, 320 // len(rows)))`, and `rows` grows by up to four fan entries whose labels come from whatever `sensors` reports, truncated to 10 characters. One fixed widget list cannot be this theme's picture on every box, so either the schema gains a repeat group the vendor never had - the thing this plan decided not to invent - or `bars` stays code-drawn and is simply not editable as data. Said as the decision it is, rather than quietly resolved one way |
+
+**The second schema question `alpha` raised was joint text sizing, and it was measured
+before it was decided.** Three of the theme's drawings pick one face size for two readings
+at once: the fan pair, and the two temperature columns inside the rings. The vendor schema
+has no way to say "these rows are one size", so there were three candidate answers - one
+`special` per group, a `xigma.fitGroup` key, or a `fitText` list hung off the `arc` widget.
+The measurements (docs/limits.md, all printed by the suite):
+
+* the joint size is *exactly* the smaller of the members' own fits - 30 fan reading pairs
+  and 36 temperature reading pairs, no exception - so a group key would have been enough
+  arithmetic, not a guess;
+* sized apart, the pair is a different picture: on the author's bench, 25 of 30 fan pairs
+  and 26 of 36 value pairs land at two sizes, and the fan row moves by 1 763 to 2 915 px;
+* a width cannot do the ring's job. `xigma.autoFitMax` is the schema's only fit rule, and
+  it is a width in panel px. Of the 441 whole-pixel budgets this canvas can hold, none
+  reproduces the six sizes the ring's own rule picks; the best reaches five of six, and
+  the per-reading windows ask for at least 153 px and less than 148 px - an empty interval.
+
+So the fan pair is one `special` named `fan-figures`: the layout says where it is, how far
+apart the two figures stand, what size ceiling and what ink they use, and the rule that
+makes it a pair - the joint fit, the floor of 16, the step of 2 - stays in
+`render.fan_figures`, which is the same function `theme_alpha` draws through. `temp-values`
+follows the same shape, for the third bullet above and not for tidiness. What that costs is
+stated plainly: a reader cannot size or move one member of a group on its own, and the
+editor's inspector offers the row's own fields (`x`, `y`, `width` as the pitch, `fontSize`
+as the ceiling, `textColor`, `bold`, plus `xigma.autoFitMax` and `xigma.anchor`) rather than
+one field per figure.
 
 Two things that landing the ramp key made possible, before any theme needed it. A ramp is
 now data (`xigma.colourStops`), and it was tested against both ramps this repo draws rather
@@ -484,8 +513,9 @@ PROTOCOL.md §10 - so this needs the installed app off the Windows machine again
 This document was written before any of it existed, and it is now part record, part plan.
 What does **not** exist in this tree: the canvas half of stage 4 (widgets cannot be dragged
 or nudged, and the inspector edits one field at a time from the pinned fixture rather than
-from live readings); layout exports for `alpha` and `bars`; the `special` drawings for
-`alpha`'s two fan figures; any unit for the `space` the panel reports. What does: stages
+from live readings); layout exports for `alpha` and `bars`, and the `special` drawing for
+`alpha`'s temperature pair (`temp-values`) - its fan pair, `fan-figures`, has landed; any
+unit for the `space` the panel reports. What does: stages
 1-3 as their rows say, stage 4's model and the window's row over it, and
 `--export-theme`, `--list-specials`, `--check-theme` and `--print-theme-fields`, each gated
 in `tools/selftest.sh`.

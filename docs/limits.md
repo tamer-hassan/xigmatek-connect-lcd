@@ -868,6 +868,34 @@ writes a theme today. What the model does and does not allow, all of it gated:
   1 % and 2 % drew **no fill at all** as a layout widget while `render.bar` drew one. The
   parity gate that landed `dual` never stepped in that band, so nothing caught it until
   this gate did; `corner_floor` is a key of its own now.
+* **Two widgets can share one text size, and the schema has no way to say so.** `alpha`
+  draws its two fan figures at one size, and its two temperature values at one size, each
+  chosen from *both* readings at once. Measured, then decided (owner, 2026-11-08): each
+  pair stays one code-drawn `special` and the layout only places it, rather than a new
+  `xigma.fitGroup` key. The numbers behind that, all printed by the suite:
+  * the fan pair landed. It is one `special` named `fan-figures`, and painted through the
+    frame loop's door - `themes.SPECIALS` injected, the instant pinned through
+    `render._now` - it puts down the same pixels `theme_alpha` puts down for that row:
+    30 reading pairs, and for each one the row's painted-pixel set is exactly the set that
+    changes when `fan` switches off, every one of those bytes equal, with nothing reported
+    missing and no gaps. The shared size is spelled out again by the gate as
+    `max(A26_FAN_MIN, min(fits))`, walked through `render._fit_size` (the loop the other
+    themes use), and compared with what `layout.draw_special_pair` chose: equal in all 30.
+  * sized one at a time the two figures would not match each other: 25 of those 30 reading
+    pairs fit at two different sizes, and drawing each at its own size moves the row by
+    1 763 to 2 915 px - both counted on the author's bench, on its installed faces, which
+    is why the suite prints them beside the machine rather than pinning them. What is
+    pinned is the shape of it: the row differs from the joint sizing exactly when the two
+    fits disagree, so those pixel counts are a real drawing difference and not rounding.
+  * the value pair is the same problem with a harder limit. `render._fit_arc` takes **both**
+    strings and returns one size, and that size is exactly the smaller of the two columns'
+    own fits - 36 reading pairs, no exception (26 of them land at two sizes on the bench).
+    So it *could* have been a group key. What it cannot be is `xigma.autoFitMax`, which is
+    a width: of the 441 whole-pixel budgets this canvas can hold, not one reproduces the
+    sizes the ring picks for `--`, 5, 22, 57, 100 and 241 °C all together (the best
+    reaches five of the six), and the per-reading windows run from a floor of 153 px down
+    to a ceiling of 148 px - an empty interval. The ring's limit is its hole, not a width,
+    so `temp-values` becomes the second group special on measurement and not on taste.
 * **A ramp can be data, or it can be named - and both are now spelled, because they are
   not equally exact.** See the `xigma.colourStops` and `xigma.colourRamp` entries printed
   by `--print-theme-fields`: three stops reproduce `render.temp_colour` at all 100 sampled

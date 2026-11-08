@@ -387,7 +387,10 @@ XIGMA_KEYS = {
               "files anchor on the em box's top-left, so an export has to say which",
     "autoFitMax": "our five shrink a face until the line fits (`render._fit_size` walks "
                   "down in steps of 2 to a floor of 10); the vendor schema has a fixed "
-                  "`fontSize` and no such rule",
+                  "`fontSize` and no such rule.  On a `special` row that draws a pair it "
+                  "is the budget each figure gets on its own - the pair still draws at "
+                  "one size, the smaller of the two fits, which is the rule "
+                  "`xigma.autoFitMax` cannot express by itself (docs/limits.md)",
     "format": "our date and time shapes are ours (`render.date_str` writes "
               "`%A %d %B %Y`); the vendor `Date` shape in this repo is `%m/%d/%Y`; neither "
               "has been measured off the vendor's picture, so rewriting our theme to the "
@@ -714,9 +717,12 @@ def delete_user_theme(name: str) -> str:
 #: {name: callable(draw, prop, values) -> ink box}.  A special is a picture that stays
 #: code-drawn and takes its position, size, colour and reading from the layout - the
 #: decision that keeps `alpha`'s two fan figures and the two composite readings lines
-#: movable without baking PNGs (docs/theme-editor.md).  Injected into
-#: `layout.draw_theme` from here, because the drawings live in `render.py` and layout
-#: already imports render, not the other way round.
+#: movable without baking PNGs (docs/theme-editor.md).  Two doors, and the door is what
+#: decides what a row's fields mean: `layout.draw_special_line` for one line of built
+#: text, `layout.draw_special_pair` for two figures at one shared size.  Which one a name
+#: goes through is read out of the drawing (`themes.special_is_pair`), not kept in a table
+#: here.  Injected into `layout.draw_theme` from here, because the drawings live in
+#: `render.py` and layout already imports render, not the other way round.
 def _sp_clock_readings(draw, prop, values):
     """The clock theme's third line: built by `render.clock_readings_line`, placed here."""
     line = str(values.get("readings") or "")
@@ -733,27 +739,70 @@ def _sp_dual_status(draw, prop, values):
     return layout.draw_special_line(draw, prop, line)
 
 
-SPECIALS = {"clock-readings": _sp_clock_readings, "dual-status": _sp_dual_status}
+def _sp_fan_figures(draw, prop, values):
+    """`alpha`'s two fan figures: built and sized by code, placed by this one row.
 
-#: A `special` that draws a line of text this repo builds in code: name -> (the key it
-#: reads out of the values dict, the builder).  `draw` and `parity` fill those keys from
-#: the same metrics the widgets' own `source`s come from, so the line the code theme
-#: writes and the line the layout paints are one string built once - the composite cannot
-#: drift into two versions of what the theme says.
-SPECIAL_LINES = {"clock-readings": ("readings", render.clock_readings_line),
-                 "dual-status": ("status", render.dual_status_line)}
+    One row and not two, because the two figures share a single text size - each is fitted
+    to its own budget and both draw at the smaller of the two fits, so a long CPU figure
+    takes the GPU figure down with it.  Sized separately they would not match: the suite
+    walks 30 reading pairs and finds 25 of them landing at two different sizes, the row
+    moving 1 763 to 2 915 px on the bench that draws with these faces (printed by the
+    `the fan pair, apart` line, and labelled as one machine's measurement in
+    docs/limits.md).  The vendor schema has no way to say "these two rows are one size",
+    and the owner's decision (2026-11-08) was to keep the pair one code drawing rather than
+    invent a group key.  The row can be moved, re-pitched, recoloured and resized; what
+    stays in `render.fan_figures` is the rule that makes it a pair, which is the same
+    function `theme_alpha` draws with.
+    """
+    pair = (str(values.get("fan-cpu") or ""), str(values.get("fan-gpu") or ""))
+    if not any(pair):
+        return None
+    return layout.draw_special_pair(draw, prop, pair)[1]
+
+
+#: The door decides the meaning of the row's fields, so the marker lives on the drawing
+#: (`themes.special_is_pair` reads it) and not in a table beside it.
+_sp_fan_figures.pair = True
+
+
+SPECIALS = {"clock-readings": _sp_clock_readings, "dual-status": _sp_dual_status,
+            "fan-figures": _sp_fan_figures}
+
+#: A `special` that draws text this repo builds in code: name -> the (key, builder) pairs
+#: it needs.  `draw` and `parity` fill those keys from the same metrics the widgets' own
+#: `source`s come from, so the line the code theme writes and the line the layout paints
+#: are one string built once - the composite cannot drift into two versions of what the
+#: theme says.  A row that draws a pair lists both of its strings.
+SPECIAL_LINES = {"clock-readings": (("readings", render.clock_readings_line),),
+                 "dual-status": (("status", render.dual_status_line),),
+                 "fan-figures": (("fan-cpu", render.cpu_fan_figure),
+                                 ("fan-gpu", render.gpu_fan_figure))}
 
 
 def fill_lines(vals: dict, metrics: dict) -> dict:
-    """Add every composite line a `special` needs, built from this frame's readings."""
-    for _name, (key, builder) in SPECIAL_LINES.items():
-        vals[key] = builder(metrics)
+    """Add every composite string a `special` needs, built from this frame's readings."""
+    for _name, builders in SPECIAL_LINES.items():
+        for key, builder in builders:
+            vals[key] = builder(metrics)
     return vals
 
 
 def special_names() -> tuple:
     """Every name a `special` widget may carry. `--list-specials` prints this."""
     return tuple(sorted(SPECIALS))
+
+
+def special_is_pair(name: str) -> bool:
+    """Does this `special` draw a pair of figures rather than one line?
+
+    Asked of the registry entry itself: the drawing function carries the marker, because
+    the function is the thing that decides it - `_sp_fan_figures` places its two figures
+    from the row's `x` and `width` (`layout.draw_special_pair`), so those two fields mean
+    something else there than they do on a box, and the editor says so
+    (`xigmaui/edit.py:field_note`).  A table kept here would be a second opinion about
+    someone else's drawing, and this repo's rule is that it has no second opinions.
+    """
+    return bool(getattr(SPECIALS.get(str(name)), "pair", False))
 
 
 # ------------------------------------------------------------------ exports --

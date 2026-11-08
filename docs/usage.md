@@ -94,7 +94,7 @@ Put the module in `/etc/modules-load.d/` if you want it at every boot.
 | `--export-theme NAME` | print the generated layout for one of the five drawn-from-code themes as JSON on stdout - sorted keys, byte-identical between runs. Three have a generator today (`clock`, `gauge`, `dual`); asking for one that does not prints which are in and what the others still need. Nothing is written to disk, and what it prints is a layout this program draws, never something sent to the panel |
 | `--check-theme NAME` | report one theme exactly as the loop will meet it: which root answered the name (ALPHA's file, or your copy of it), the file's own accounting, then what this machine's readings actually draw - boxes, lit pixels, which widgets were skipped and why, which shapes are this repo's choice rather than measured off the vendor's picture, and the sources *that theme* asks for split into answered and not. Plus the warnings worth hearing before an edit: a metric name with no entry, a font family `layout.FONTS` does not know, a `fontSize` outside the ten the shipped library uses, a colour outside `rgba()`, a widget off the canvas, an `id` repeated inside one theme, a `property` that is not the one-element list every vendor file uses. Exit 2 if the name resolves to nothing, or if the file cannot be walked at all |
 | `--print-theme-fields` | print the field census an inspector is built from: all 152 widgets of ALPHA's 27 layouts answered key by key, per kind, and for each key whether `xigmalcd/layout.py` reads it, carries it without reading it (with the reason, and how many values it is ever set to), or reads it with no vendor file to show. Counted over the vendor's own trees, so an edit of yours cannot move the numbers. No port is opened |
-| `--list-specials` | print the names a `special` widget may carry: the parts of our own themes that stay code-drawn and take position, size and colour from a layout |
+| `--list-specials` | print the names a `special` widget may carry, each with the shape it draws - one line of code-built text, or a **pair** of figures at one shared size where `x` is the pair's centre and `width` the distance between them: the parts of our own themes that stay code-drawn and take position, size and colour from a layout |
 | `--list-themes` | print everything `--theme` accepts: the five drawn from `render.py`, then ALPHA's 23 `1:1` layouts with their widget counts and which tree the file came from, then the four refused and the reason. No port is opened
 | `-v, --verbose` | log every frame in both directions |
 
@@ -211,7 +211,10 @@ claim:
   `render.heat` is off from its own stop spelling by one unit at 8 of those 100 and
   changing it would re-render three themes whose figures were read off the current
   drawing). `dual`'s middle line is a `special`, not a widget: `CPU 62%    4101 / 15625 GB`
-  is a composite of three readings in one string. An export that cannot be driven to a diff
+  is a composite of three readings in one string, and `alpha`'s two fan figures are the
+  other kind of `special` - one row that draws a *pair* at one shared text size, measured
+  at a zero diff against the theme's own row over 30 reading pairs (docs/limits.md). An
+  export that cannot be driven to a diff
   of 0 is not shipped, so `alpha` and `bars` stay code-drawn for now, and
   docs/theme-editor.md says what each of them is still waiting on - `bars` being the
   interesting one, because its row count depends on which sensors the machine answers.

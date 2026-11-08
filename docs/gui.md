@@ -262,6 +262,18 @@ things an editor commonly gets wrong:
   more, each with its reason printed by `--print-theme-fields`) are never offered, and the
   writer keeps them in the file exactly as it found them, because an editor that drops
   keys it does not understand is an editor that corrupts the vendor's own files.
+* **And what a field means, when the drawing is what decides it.** A `special` row whose
+  drawing is a *pair* of figures reads `width` as the distance between the two figures'
+  centres, and `x` as their shared centre; a row whose drawing is one line of built text
+  reads `width` not at all. The field list cannot show that difference - both rows are
+  `special` - so the note line says it in both directions rather than leaving a reader to
+  set a number that does nothing. Which shape a name has is read out of the registry:
+  `themes.special_is_pair` is checked against the door each drawing function actually
+  calls (`layout.draw_special_pair` or `draw_special_line`), found in its own source, so
+  the window keeps no list of which drawings are pairs. The gate also measures the claim
+  instead of trusting the prose: a declared pitch and the two figures' ink-box centres
+  agree to within 2 px on the painted frame, and narrowing the pitch moves each figure
+  half the difference inboard.
 * **The pane shows the file, at pinned readings.** `themes.draw` - the door
   `--check-theme` uses and the frame loop uses for a layout theme - with the fixture every
   documented figure in this repo was read at (CPU 57.0 °C, GPU 47.0 °C, 2026-02-17
@@ -273,9 +285,18 @@ things an editor commonly gets wrong:
   declares"), and the picture, the dirty flag and the undo history do not move. Six
   attempts at one widget leave zero undo steps.
 
+One display bug in that row, caught by the gate that landed with the pair row: a value
+menu selected the **first** entry of its vocabulary instead of the value the row holds. The
+two agree by luck in the case that was already gated - the ring's `arcPaint` reads `render`,
+and `render` sorts first - but a `special` drawing `dual-status` was shown as
+`clock-readings`, and a `data` row was shown as whichever source sorts first rather than the
+one it reads. The menu now selects the row's own value, and the gate checks the claim on
+both shapes: on `name`, whose vocabulary starts elsewhere, and on `source`, where the widget
+picked for the check is deliberately not the one that sorts first.
+
 What one edit is worth, in pixels: the literal text widget in `Theme_28` moved 20 px in x
 over twenty spinbox keystrokes is **one** undo step; exactly one ink box moves, by
-(20, 0), the other five stay put, and 905 of 230 400 pixels change. Saving puts the file
+(20, 0), the other five stay put, and 1 163 of 230 400 pixels change. Saving puts the file
 in `~/.config/xigmalcd/themes/`, after which `--theme Theme_28` reads *that* file and
 paints a byte-identical frame; one undo returns the first frame byte for byte; revert
 removes the copy and the vendor's picture is back. A colour typed as `#ff4040` is stored

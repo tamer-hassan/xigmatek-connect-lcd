@@ -142,7 +142,7 @@ def demo(path: str) -> None:
 
 def fan_figures(m: dict) -> tuple:
     """The two figures the alpha theme draws, in the order it draws them."""
-    return (render._cpu_fan_figure(m), render._gpu_fan_figure(m))
+    return (render.cpu_fan_figure(m), render.gpu_fan_figure(m))
 
 
 def watch(seconds: float) -> None:
