@@ -1451,9 +1451,11 @@ for rec in ok:
             if pr.get("fontFamily"):
                 used_faces.add((str(pr["fontFamily"]).lower(), bool(pr.get("bold")),
                                 int(pr.get("fontSize") or 12)))
-faces = {f"{fam}{'b' if bold else ''}/{size}":
-         bool(layout.font_for({"fontFamily": fam, "bold": bold, "fontSize": size}))
-         for fam, bold, size in sorted(used_faces)}
+probe = {t: bool(layout.font_for({"fontFamily": t[0], "bold": t[1],
+                                  "fontSize": t[2]}))
+         for t in used_faces}
+faces = {f"{fam}{'b' if bold else ''}/{size}": v
+         for (fam, bold, size), v in sorted(probe.items())}
 missing_faces = sorted(k for k, v in faces.items() if not v)
 print(f"  faces on this machine {len(faces)} family/bold/size combinations asked for by "
       f"the {len(ok)} layouts, {len(faces) - len(missing_faces)} installed"
@@ -1561,9 +1563,21 @@ print(f"  --list-themes           {len(lines)} lines, {len(pick)} of them the ca
 off = sorted((n, b, BENCH_BOXES[n]) for n, b in boxes_per.items()
              if BENCH_BOXES.get(n) != b)
 if off:
-    det = "; ".join(f"{n} {b} here, {w} there (skipped: "
-                    f"{', '.join(skips_per[n][0] + skips_per[n][1]) or 'nothing'})"
-                    for n, b, w in off)
+    # and the probe's own answer for the triples that theme asks for, so a draw-time skip
+    # the probe did not predict is visible as a disagreement, not as a mystery total
+    tri = {rec["name"]: sorted({(str(pr.get("fontFamily") or "").lower(),
+                                 bool(pr.get("bold")), int(pr.get("fontSize") or 12))
+                                for wd in (themes.load(rec["path"]).get("osd") or {}).get(
+                                    "widget") or []
+                                for pr in wd.get("property") or [] if pr.get("fontFamily")}
+                               ) for rec in ok}
+    det = "; ".join(
+        f"{n} {b} here, {w} there (skipped: "
+        f"{', '.join(skips_per[n][0] + skips_per[n][1]) or 'nothing'}; probe for this "
+        f"theme's faces: "
+        + " ".join(f"{f}{'b' if bo else ''}/{sz}={'yes' if probe.get((f, bo, sz)) else 'NO'}"
+                   for f, bo, sz in tri.get(n, [])) + ")"
+        for n, b, w in off)
     print("  box counts vs the bench " + det)
 else:
     print(f"  box counts vs the bench  identical for all {len(boxes_per)} layouts")
