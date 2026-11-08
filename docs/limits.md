@@ -948,16 +948,21 @@ writes a theme today. What the model does and does not allow, all of it gated:
   and every figure recorded for those three themes was read off the drawing as it is. That
   keeps the recorded evidence intact and puts the inconsistency on the record in
   `render.heat`'s docstring rather than in a doc nobody re-reads.
-* **`bars` may not be expressible as one layout file at all, and that is a limit rather
-  than a to-do.** Its rows are built at draw time: six fixed readings plus up to four fan
-  entries taken from whatever `sensors.collect()` reports (labels truncated to 10
-  characters), and the row pitch is `min(56, max(28, 320 // len(rows)))` - so the vertical
-  geometry of the theme changes with the machine. A vendor-shape layout is a fixed widget
-  list, and making this theme one would mean inventing a repeat group ALPHA's schema never
-  had, which is the one thing the export plan decided against. So either that construct
-  gets designed on purpose, with its own reasons, or `bars` stays code-drawn and is not
-  editable as data. Said here so the choice is visible; nothing about the wire changes
-  either way (docs/theme-editor.md carries the same note in the plan's own table).
+* **`bars` needs a construct the vendor never had, and the decision is to build it.** Its
+  rows are built at draw time: six fixed readings plus up to four fan entries taken from
+  whatever `sensors.collect()` reports (labels truncated to 10 characters), and the row pitch
+  is `min(56, max(28, 320 // len(rows)))` - so the vertical geometry of the theme changes
+  with the machine. A vendor-shape layout is a fixed widget list. The owner's decision
+  (2026-11-08) is to design the repeat group on purpose rather than leave this theme
+  uneditable, which reverses the earlier stance in this document that it was the one thing
+  the export plan would not invent. Two things follow, and both are measurements rather than
+  taste: the construct has to say *which* readings it repeats over (so a file names a source
+  list and a per-row pitch rule, not a frozen set of rows), and every figure recorded for
+  `bars` has to be re-derived on the machine drawing it, because a fixed widget list would
+  have described this bench's fan inventory and nobody else's. Until a generated `bars`
+  reaches a zero pixel diff on the box that asks for it, it stays code-drawn - the standing
+  rule is that an export which cannot be held to zero is not shipped. Nothing about the wire
+  changes either way (docs/theme-editor.md carries the same note in the plan's own table).
   A related fact came out of the same work: the one colour pair with a measured ramp is
   ALPHA's *declared* pair, (0,247,255) to (0,255,113), and the plateau that curve ends at
   is (0,251,184) - which is what `render.ALPHA_HOT` is. Our theme took the far end of
