@@ -967,11 +967,16 @@ writes a theme today. What the model does and does not allow, all of it gated:
   reading now leaves a gap where the rows used to close up, and the `bars` preview clip had
   to be re-rendered from the recorded series in the same change - not for tidiness, because
   the preview gate re-draws the layer from `docs/videos/readings-2026-11-08.json` and scores
-  the tracked file against it, so a stale clip is a failing gate. What is still open: the
-  four `Fan N` sources and four `Fan N Label` strings (the name comes from the box at run
-  time, cut to the same 10 characters the drawing cuts), the three fixed readings nobody
-  answers today, and the recipe - and `bars` stays code-drawn until a generated file reaches
-  a zero pixel diff on the box drawing it. Nothing about the wire changes either way
+  the tracked file against it, so a stale clip is a failing gate. The sources followed on
+  2026-11-09: `themes.BARS_ROWS` names the ten rows, four of them per-sensor fan slots
+  (`Fan N Speed`, `Fan N Name`) - which the vendor's own vocabulary has no word for, since it
+  offers the aggregates `cpuFansSpeed` "CPU Fans Speed" and `gpuFansSpeed` and never a row per
+  tachometer (PROTOCOL.md 10) - while `RAM Rate` and `Used RAM` come out of that record's
+  `RAMRate` and `UsedRAM`. A reading that is a division rather than a field is marked as one,
+  because `sensors` also reports a `memory.load` which is not the number the drawing divides
+  on this box, and a 424 px meter cannot be handed the wrong tenth of a percent. What is still
+  open is the recipe: `bars` stays code-drawn until a generated file reaches a zero pixel diff
+  on the box drawing it. Nothing about the wire changes either way
   (docs/theme-editor.md carries the decision and the order it is built in, in the plan's own
   table).
   A related fact came out of the same work: the one colour pair with a measured ramp is

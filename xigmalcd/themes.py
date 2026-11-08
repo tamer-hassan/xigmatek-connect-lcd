@@ -188,7 +188,62 @@ SOURCES = {
     "Download Speed": ("network", "download"),       # ours: unused by the shipped library
     "Upload Speed": ("network", "upload"),           # ours
     "Memory Usage": ("memory", "load"),              # ours: unused by the shipped library
+    # The three readings `bars` needs that no source name covered yet.  The first two carry
+    # the names the vendor's own editor vocabulary uses (PROTOCOL.md 10: `RAMRate`, `UsedRAM`,
+    # read out of its uncompiled renderer bundle on 2026-11-06), spelled in the display style
+    # every other source here uses; `Motherboard Temperature` has no entry in that record, so
+    # it is ours, and the GPU-memory pair below has none either.
+    "Used RAM": ("memory", "used"),
+    "Used GPU Memory": ("gpu", "memoryUsage"),
+    "Motherboard Temperature": ("motherboard", "temperature"),
 }
+
+#: Sources whose number comes out of two fields rather than one, and the arithmetic is the
+#: drawing's own: `render.theme_bars` divides `used / total * 100` itself, so a source that
+#: read the separate `memory.load` field instead would hand the meter a different float - they
+#: agree to a tenth of a percent on this box (62.8 against 62.82), which is exactly the kind
+#: of difference that moves a 424 px fill by a pixel.  A derived source takes the metrics dict
+#: and returns a value or None, and a None is reported like any other unanswered source.
+DERIVED = {
+    "RAM Rate": lambda m: _ratio(m.get("memory"), "used", "total"),
+    "GPU Memory Rate": lambda m: _ratio(m.get("gpu"), "memoryUsage", "dedicatedTotal"),
+}
+
+
+def _ratio(part, numerator, denominator):
+    """`numerator / denominator * 100` the way `theme_bars` works it out, or None."""
+    part = part or {}
+    if not part.get(denominator):
+        return None
+    val = part.get(numerator)
+    return None if val is None else val / part[denominator] * 100
+
+
+#: The per-sensor fan rows `bars` draws, and the reason they are ours to name: the vendor's
+#: editor offers no fan per sensor at all, only the aggregate `cpuFansSpeed` "CPU Fans Speed"
+#: and `gpuFansSpeed` "GPU Fans Speed" (PROTOCOL.md 10), while this theme paints one row per
+#: tachometer with that sensor's own name beside it.  The slots are positional, in the order
+#: `sensors` reports the rows and `theme_bars` reserves them - `fans[0]` through
+#: `fans[render.BARS_SLOTS - 1]` - and a name that no such row carries is answered like any
+#: other missing reading, with the reason printed rather than a zero painted in its place.
+FAN_SLOTS = tuple((f"Fan {i} Speed", f"Fan {i} Name")
+                  for i in range(1, render.BARS_SLOTS + 1))
+
+#: `bars`'s rows in the order the drawing lays them out: the label it prints - a literal for
+#: the six fixed rows, `None` for a fan slot, whose label is its `Fan N Name` source - then
+#: the source the meter divides, the source the number beside it prints, and the scale.  One
+#: table, because the gate compares it row for row against where `render`'s own drawing puts
+#: ink, and `bars_recipe()` will build its rows out of it rather than a second copy of it.
+BARS_FIXED_ROWS = (
+    ("CPU", "CPU Temperature", "CPU Temperature", 30, 90),
+    ("GPU", "GPU Temperature", "GPU Temperature", 30, 90),
+    ("BOARD", "Motherboard Temperature", "Motherboard Temperature", 25, 80),
+    ("LOAD", "CPU Usage", "CPU Usage", 0, 100),
+    ("RAM", "RAM Rate", "Used RAM", 0, 100),
+    ("VRAM", "GPU Memory Rate", "Used GPU Memory", 0, 100),
+)
+BARS_ROWS = BARS_FIXED_ROWS + tuple(
+    (None, speed, speed, 0, 3000) for speed, _name in FAN_SLOTS)
 
 #: Sources that want a wall clock, and get one instant per frame - the same rule
 #: `render._now()` exists for (a frame that calls `time.strftime` twice shows two
@@ -202,6 +257,14 @@ CLOCKED = ("Time", "Date", "Week")
 # the widget is skipped and the reason is printed instead.
 UNMAPPED = {"Pump Speed": "no pump tachometer has been measured on this box "
                           "(tools/fanscan.py has never looked for one)"}
+
+
+def source_names() -> tuple:
+    """Every `source` name this program can put a reading behind: the flat fields, the
+    derived ratios, the clock, and the positional fan slots.  `answerable` in the suite is
+    asked through this so a new source cannot be invisible to the gates that count them."""
+    return (tuple(SOURCES) + tuple(DERIVED) + CLOCKED
+            + tuple(n for pair in FAN_SLOTS for n in pair))
 
 
 def formats_measured() -> tuple:
@@ -260,6 +323,25 @@ def values(metrics: dict, when=None) -> tuple:
             out[src] = val
     for src in CLOCKED:
         out[src] = when
+    for src, fn in DERIVED.items():
+        val = fn(metrics)
+        if val is None:
+            absent[src] = ("no pair to divide" if src == "RAM Rate"
+                           else "no GPU memory fields to divide")
+        else:
+            out[src] = val
+    fans = metrics.get("fans") or []
+    for (speed, name) in FAN_SLOTS:
+        slot = int(speed.split()[1]) - 1
+        fan = fans[slot] if slot < len(fans) else None
+        for src, key in ((speed, "value"), (name, "name")):
+            val = (fan or {}).get(key)
+            if val is None:
+                absent[src] = (f"this box reports {len(fans)} fan row"
+                               f"{'s' if len(fans) != 1 else ''}; slot {slot + 1} has "
+                               f"no {key}")
+            else:
+                out[src] = val
     for src, why in UNMAPPED.items():
         absent[src] = why
     return out, absent

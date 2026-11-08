@@ -539,8 +539,8 @@ measuring what `bars` actually is justified that for a reason nobody had written
 obstacle was never the row list.
 
 **The construct: optional fan slots, and no new structure.** `Fan 1` through `Fan 4`, each a
-row that draws only when that slot has a reading, and each with a `Fan N Label` source so the
-name printed is the box's own. The reason that is smaller than a repeat group is a count:
+row that draws only when that slot has a reading, and each with a `Fan N Name` source so
+the name printed is the box's own. The reason that is smaller than a repeat group is a count:
 the 23 library layouts this canvas can select ask for **7** `source` names between them -
 `CPU Temperature` in 17 widgets, `Time` in 11, `Pump Speed` in 9, and then `CPU Usage`,
 `GPU Usage`, `GPU Temperature` and `CPU Frequency` - and not one of them is a fan. So a fan slot adds a name
@@ -571,15 +571,30 @@ re-draws the layer and scores the tracked file, so a stale clip fails rather tha
 The per-machine cost this document recorded an hour ago shrinks with it: the pitch no longer
 depends on this box's fan inventory, and what still varies per box is which slots draw.
 
-The order that remains, each step green on its own:
+**The sources are in** (2026-11-09): `themes.BARS_ROWS` names all ten rows in the order the
+drawing lays them out - label, meter source, number source, scale - and `themes.values()`
+answers them. Four are per-sensor fan slots (`Fan 1 Speed`..`Fan 4 Speed`, `Fan 1 Name`..
+`Fan 4 Name`), which the vendor's vocabulary has no word for: it offers `cpuFansSpeed`
+"CPU Fans Speed" and `gpuFansSpeed` "GPU Fans Speed", aggregates only, never a row per
+tachometer (PROTOCOL.md 10) - and the two RAM names come straight out of that record
+(`RAMRate`, `UsedRAM`), spelled in the display style this tree already uses. Where a reading
+is a division rather than a field, it is marked as one: `RAM Rate` divides `used / total` the
+way the drawing does, because `sensors` also reports a separate
+`memory.load`, which is not the same number as that division on this box, and a meter 424 px
+wide cannot afford to be handed the wrong tenth of a percent.
 
-1. the sources - four `Fan N` numbers and four `Fan N Label` strings, and the three fixed
-   rows nobody answers today (`BOARD`, and the two memory rows, whose *text* is gigabytes
-   while their *bar* is a percentage - one row, two readings, and something the vendor's
-   `bar` widget has no way to say);
-2. `bars_recipe()`, reading the geometry out of the `BARS_*` constants the drawing now names
-   rather than repeating them;
-3. shipped only at a zero pixel diff on the machine drawing it - the rule `alpha` met by
+What the suite holds: the strings `bars` paints are taken out of the drawing itself - an
+`ImageDraw.text` spy while the frame is painted - and compared, row for row, against what
+`layout.text_for` produces from those sources, over four boxes and all ten rows, and the rows
+the sources answer are the rows ink lands in (including a fan reporting 0, which the drawing
+shows and the old one hid). And every source this program can answer has a display shape, so
+a text row can never reach the painter for want of one.
+
+What remains, each step green on its own:
+
+1. `bars_recipe()`, building the rows out of `themes.BARS_ROWS` and the geometry out of the
+   `BARS_*` constants rather than repeating either;
+2. shipped only at a zero pixel diff on the machine drawing it - the rule `alpha` met by
    earning `xigma.fitArc` (docs/limits.md).
 
 ## The surface, and the geometry it must not break

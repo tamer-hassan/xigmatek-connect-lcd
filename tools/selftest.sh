@@ -1444,7 +1444,7 @@ assert themes.resolve("gauge") is None and "five" in themes.why_not("gauge")
 used = themes.sources_used(ok)
 assert used == {"CPU Temperature": 17, "CPU Usage": 15, "Time": 11, "Pump Speed": 9,
                 "GPU Usage": 6, "GPU Temperature": 3, "CPU Frequency": 2}, used
-answerable = set(themes.SOURCES) | set(themes.CLOCKED)
+answerable = set(themes.source_names())
 need = {}
 for rec in ok:
     srcs = {p.get("source") for w in (layout and themes.load(rec["path"])
@@ -2417,7 +2417,7 @@ print(f"  not exported yet      "
       f" (`row_h = min(56, max(28, 320 // len(rows)))`, and `rows` grew with whatever fan"
       f" entries `sensors` reported), so one fixed widget list could not be its picture on"
       f" every box.  The owner's decision (2026-11-08) is optional"
-      f" positional fan slots - `Fan 1` through `Fan 4`, each with a `Fan N Label` source so"
+      f" positional fan slots - `Fan 1` through `Fan 4`, each with a `Fan N Name` source so"
       f" the name comes from the box at run time - rather than a repeat group, because the"
       f" library's selectable layouts ask for seven `source` names and not one of them is a"
       f" fan: a new name in our own table invents less than a new structure in a file whose"
@@ -2518,6 +2518,85 @@ assert "min(56, max(28, 320 // len(rows)))" in _d_lim, \
     "docs/limits.md stopped quoting the pitch it is held to"
 assert f"{_pitch} px" in _d_plan and f"{_pitch} px" in _d_lim, (
     _pitch, "neither document quotes the pitch that no longer moves between boxes")
+# ---- and the same rows from the other side: the source names a layout file would put behind
+# ---- them.  Nothing below restates what `bars` prints - the strings are taken out of the
+# ---- drawing itself, by handing `ImageDraw.text` a spy while the frame is painted - and the
+# ---- formatter's output has to agree with them row for row, and agree about *which* rows.
+# ---- That is the claim a generated `bars` will stand or fall on, gated a change before the
+# ---- generator exists.
+from PIL import ImageDraw as _ID
+
+_seen_text = []
+_real_text = _ID.ImageDraw.text
+_FAN_NAME_OF = {speed: name for speed, name in themes.FAN_SLOTS}
+_WHEN_BARS = datetime.datetime(2026, 2, 17, 9, 30, 12)
+
+
+def _spy(self, xy, txt, *args, **kw):
+    _seen_text.append((int(xy[0] // render.SS), int(xy[1] // render.SS), str(txt)))
+    return _real_text(self, xy, txt, *args, **kw)
+
+
+def _drawn_rows(m):
+    """Every string `bars` paints in its label and value columns, in draw order."""
+    del _seen_text[:]
+    _ID.ImageDraw.text = _spy
+    try:
+        img = render.draw(m, "bars", bg=render.OVERLAY)
+    finally:
+        _ID.ImageDraw.text = _real_text
+    return [t for x, _y, t in _seen_text
+            if x in (render.BARS_LBL_X, render.BARS_VAL_X)], img
+
+
+def _want_rows(m):
+    """What the source table says those rows show, and which of the ten it answers."""
+    vals, _gone = themes.values(m, _WHEN_BARS)
+    want, answered = [], []
+    for label, bar_src, text_src, _lo, _hi in themes.BARS_ROWS:
+        if bar_src not in vals or text_src not in vals:
+            answered.append(False)
+            continue
+        answered.append(True)
+        if label is None:                    # a fan slot: the name is a reading too
+            name = _FAN_NAME_OF[bar_src]
+            label = layout.text_for(name, vals[name])
+        want.append(label)
+        want.append(layout.text_for(text_src, vals[text_src]))
+    return want, answered
+
+
+_pairs = []
+for _tag, _m in (("all six answered, no fans", _ALL6),
+                 ("three of the fixed six", _PART),
+                 ("six plus six reported fans", dict(
+                     _ALL6, fans=[{"name": f"Fan {i} on this box", "value": 900 + i,
+                                   "type": "Fan"} for i in range(6)])),
+                 ("two fans, the second reporting zero", dict(
+                     _PART, fans=[{"name": "Fan CPU", "value": 2000, "type": "Fan"},
+                                  {"name": "Fan System 5", "value": 0, "type": "Fan"}]))):
+    _drawn, _img = _drawn_rows(_m)
+    _want, _answered = _want_rows(_m)
+    assert _drawn == _want, (_tag, "the strings `bars` paints are not the ones the source "
+                                   "table would print", _drawn, _want)
+    assert _slots(_img) == _answered, (_tag, _slots(_img), _answered,
+                                       "the rows the source table answers are not the rows "
+                                       "the drawing leaves ink in")
+    _pairs.append(len(_answered))
+
+_no_fmt = [n for n in themes.source_names() if n not in layout.VENDOR_FORMAT]
+assert not _no_fmt, (_no_fmt, "every source this program answers needs a display shape")
+print(f"  the same rows as data   `themes.BARS_ROWS` names all {len(themes.BARS_ROWS)}: the "
+      f"{len(themes.BARS_FIXED_ROWS)} fixed rows and the {len(themes.FAN_SLOTS)} reserved fan "
+      f"slots - `Fan N Speed` and `Fan N Name`, with `Motherboard Temperature` ours because "
+      f"the app's vocabulary has no entry for it, and `RAM Rate`/`Used RAM` taken from that "
+      f"record's own `RAMRate`/`UsedRAM` (PROTOCOL.md 10). Spied out of the drawing: across "
+      f"{len(_pairs)} boxes and {sum(_pairs)} rows, every string `bars` paints is the string "
+      f"`layout.text_for` produces from those sources, and the rows it answers are the rows "
+      f"ink lands in - including a fan reporting 0, which the drawing now shows and the "
+      f"source answers. {len(themes.source_names())} answerable sources, "
+      f"{len(layout.VENDOR_FORMAT)} display shapes, none missing")
+
 print(f"  what bars rows are    {_n_fixed + render.BARS_SLOTS} rows on every box - "
       f"{_n_fixed} fixed ones plus {render.BARS_SLOTS} reserved fan slots taken by position, "
       f"which is what makes the pitch {_pitch} px here whether the box reports no fans or "
@@ -4999,7 +5078,7 @@ assert win.ed_menu.currentText() == win.ed.value("name") == "dual-status", \
     (win.ed_menu.currentText(), win.ed.value("name"))
 # and the same claim on a `data` row, whose `source` vocabulary is long: pick one whose
 # source is not the menu's first entry, so the check below cannot pass by luck
-first_source = sorted(set(themes.SOURCES) | set(themes.CLOCKED))[0]
+first_source = sorted(themes.source_names())[0]
 data_at = next(i2 for i2, w in enumerate(win.ed.widgets())
                if w["type"] == "data" and w["property"][0].get("source")
                and str(w["property"][0]["source"]) != first_source)

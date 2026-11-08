@@ -126,8 +126,35 @@ VENDOR_FORMAT = {
     "CPU Frequency": lambda v: f"{v:.2f}",
     "GPU Frequency": lambda v: f"{v:.2f}",
     "Pump Speed": lambda v: f"{int(round(v))}",
-    "Fan Speed": lambda v: f"{int(round(v))}",
-    "GPU Fan Speed": lambda v: f"{int(round(v))}",
+    # the two fan entries carry the vendor's own display names now: the app's metric
+    # vocabulary was read out of its uncompiled renderer bundle (`cpuFansSpeed` "CPU Fans
+    # Speed", `gpuFansSpeed` "GPU Fans Speed", PROTOCOL.md §10, 2026-11-06), and the shorter
+    # names these had were ours.  Note what that vocabulary does *not* offer: a row per fan
+    # sensor.  It has one aggregate CPU-fan metric and one GPU-fan metric, which is why
+    # `bars`'s per-sensor rows need source names the vendor never had (docs/theme-editor.md).
+    "CPU Fans Speed": lambda v: f"{int(round(v))}",
+    "GPU Fans Speed": lambda v: f"{int(round(v))}",
+    # `bars`'s rows, and the rule the suite holds them to: every `source` this program can
+    # answer has a display shape here, so a text row can never reach the painter and die for
+    # want of one.  The two gigabyte shapes are what the theme's own text prints - a
+    # percentage meter with a gigabyte number beside it, which is why one row reads two
+    # sources - and the per-sensor fan names cut the label to the same 10 characters the
+    # drawing cuts, because the shape that hides a long `sensors` name belongs with the row,
+    # not with the reading.  None of these five is measured off the vendor's picture:
+    # `draw_theme` reports them as gaps, and `formats_measured()` says which four are.
+    "RAM Rate": _pct,
+    "GPU Memory Rate": _pct,
+    "Used RAM": lambda v: f"{int(v) // 1024} GB",
+    "Used GPU Memory": lambda v: f"{int(v) // 1024} GB",
+    "Motherboard Temperature": _deg,
+    "Fan 1 Speed": lambda v: f"{int(round(v))}",
+    "Fan 2 Speed": lambda v: f"{int(round(v))}",
+    "Fan 3 Speed": lambda v: f"{int(round(v))}",
+    "Fan 4 Speed": lambda v: f"{int(round(v))}",
+    "Fan 1 Name": lambda v: str(v)[:10],
+    "Fan 2 Name": lambda v: str(v)[:10],
+    "Fan 3 Name": lambda v: str(v)[:10],
+    "Fan 4 Name": lambda v: str(v)[:10],
     "Memory Usage": _pct,
     "Upload Speed": lambda v: f"{v:.1f}",
     "Download Speed": lambda v: f"{v:.1f}",
