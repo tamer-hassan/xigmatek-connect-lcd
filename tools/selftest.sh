@@ -1451,8 +1451,11 @@ for rec in ok:
             if pr.get("fontFamily"):
                 used_faces.add((str(pr["fontFamily"]).lower(), bool(pr.get("bold")),
                                 int(pr.get("fontSize") or 12)))
-probe = {t: bool(layout.font_for({"fontFamily": t[0], "bold": t[1],
-                                  "fontSize": t[2]}))
+# `font_for` answers (face, family, path) - a three-tuple that stays truthy even when
+# the face is None, which is how this probe reported "16 installed" on a runner that
+# then skipped a `simsun` widget.  Ask the face, not the tuple.
+probe = {t: layout.font_for({"fontFamily": t[0], "bold": t[1],
+                             "fontSize": t[2]})[0] is not None
          for t in used_faces}
 faces = {f"{fam}{'b' if bold else ''}/{size}": v
          for (fam, bold, size), v in sorted(probe.items())}
@@ -1634,7 +1637,8 @@ for name, recipe in themes.EXPORTS.items():
             export_faces.add((str(pr["fontFamily"]).lower(), bool(pr.get("bold")),
                               int(pr.get("fontSize") or 12)))
 no_face = sorted(f"{f}{'b' if b else ''}/{sz}" for f, b, sz in export_faces
-                 if not layout.font_for({"fontFamily": f, "bold": b, "fontSize": sz}))
+                 if layout.font_for({"fontFamily": f, "bold": b,
+                                     "fontSize": sz})[0] is None)
 for name in sorted(themes.EXPORTS):
     for m in CASES:
         r = themes.parity(name, m, WHEN)
