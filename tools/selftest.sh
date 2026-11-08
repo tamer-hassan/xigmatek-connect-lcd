@@ -1891,6 +1891,48 @@ print(f"                        rotate: the 90-degree widget draws at {report[0]
 PY
 
 echo
+# ---- the field census an inspector is built from, counted over the vendor's own trees
+python3 - <<'PY' || { echo "theme field census FAILED"; exit 1; }
+import subprocess, sys
+from xigmalcd import themes
+cen = themes.field_census()
+read, sub = themes.keys_read()
+assert cen["widgets"] == 152, cen["kinds"]
+assert cen["kinds"] == {"data": 66, "text": 66, "bar": 15, "line": 4, "arc": 1}, cen["kinds"]
+assert len(cen["keys"]) == 33, sorted(cen["keys"])
+assert set(cen["keys"]["x"]) == {"data", "text", "bar", "line", "arc"}, cen["keys"]["x"]
+assert sorted(set(read) - set(cen["keys"])) == ["lineColor", "lineWidth", "name", "xigma"], \
+    sorted(set(read) - set(cen["keys"]))
+assert sorted(set(cen["keys"]) - set(read)) == sorted(themes.UNREAD_WHY), \
+    sorted(set(cen["keys"]) - set(read))
+assert set(sub) == {"anchor", "autoFitMax", "format"}, sub
+assert cen["values"]["enableMove"] == {"False": 152}
+assert cen["values"]["italic"] == {"False": 132}, cen["values"]["italic"]
+assert cen["values"]["underline"] == {"False": 132}
+assert len(cen["values"]["time"]) == 27 and set(cen["time_per_file"].values()) == {1} \
+    and len(cen["time_per_file"]) == 27, cen["time_per_file"]
+assert "rotate" in read and "xigma" in read, read
+fields = subprocess.run([sys.executable, "-m", "xigmalcd", "--print-theme-fields"],
+                        capture_output=True, text=True, check=True)
+assert "ttyACM" not in fields.stdout
+missing = [k for k in cen["keys"] if f"  {k}" not in fields.stdout and
+           f"    {k} " not in fields.stdout]
+assert not missing, missing
+print(f"  field census          {cen['widgets']} widgets in 27 layouts answer to "
+      f"{len(cen['keys'])} distinct `property` keys: {len(set(read) & set(cen['keys']))} "
+      f"are read by layout.py (the list comes out of layout.py's own source with `ast`, "
+      f"not from a hand-kept table, so the painter and the census cannot drift), "
+      f"{len(cen['keys']) - len(set(read) & set(cen['keys']))} are carried and never read "
+      f"(each with a stated reason), and {len(set(read) - set(cen['keys']))} are read with "
+      f"no vendor file to show ({', '.join(sorted(set(read) - set(cen['keys'])))})")
+print(f"                        the two text looks-keys this program ignores - italic and "
+      f"underline - are one value deep on every widget that carries them "
+      f"({cen['values']['italic']['False']} each: never set), so nothing is missing from "
+      f"the picture; and `time` is 27 distinct values over 152 widgets with every file "
+      f"answering exactly one inside itself, which is a save stamp per theme rather than "
+      f"a reading - the reason our exports omit it")
+PY
+
 echo "== decoder round-trip: encode -> decode -> re-encode"
 python3 - <<'PY' || { echo "decoder round-trip FAILED"; exit 1; }
 from xigmalcd import protocol as p

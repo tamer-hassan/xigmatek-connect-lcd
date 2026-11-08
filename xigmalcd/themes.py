@@ -328,6 +328,102 @@ def describe(record: dict) -> str:
             f"background {os.path.basename(record['background'])}  from {origin(record)}")
 
 
+# ------------------------------------------------------------ field census --
+#: Which layouts the census counts: the vendor's own trees, never the user directory.
+#: The numbers in docs are measurements of the vendor's library, so an edit of yours must
+#: not be able to move them.
+CENSUS_ROOTS = ("layouts",)
+
+
+def field_census() -> dict:
+    """Every key the vendor's `property` objects carry, and who reads it.
+
+    Counted over the shipped layouts only (the checkout's tree, or the installed one), so
+    it is a measurement of the vendor's library and not of this machine or of your edits:
+    152 widgets in 27 files answer to **33** distinct property keys.  The split that
+    matters for an inspector: 21 of the 33 are read by `layout.py`, and 12 are carried by
+    vendor files and never read at all - they are the vendor editor's own bookkeeping
+    (`enableMove`, `screenStatus`, `coordBoundary`...).  Values are counted as well,
+    because "we ignore this key" is only honest when you can say what it would have done:
+    `italic` and `underline` are False on every one of the 132 widgets that carry them, so
+    nothing is missing from our drawing by dropping them.
+    """
+    per_kind: dict = {}
+    keys: dict = {}
+    values: dict = {}
+    time_per_file: dict = {}
+    pickable, refused = scan()          # first-winning, so one file per layout name
+    for path in sorted(r["path"] for r in pickable + refused):
+        if not path.endswith(".json"):
+            continue
+        if True:
+            obj = load(path)
+            seen_times = set()
+        for wd in (obj.get("osd") or {}).get("widget") or []:
+            kind = str(wd.get("type") or "")
+            per_kind[kind] = per_kind.get(kind, 0) + 1
+            for prop in wd.get("property") or []:
+                for k, v in prop.items():
+                    keys.setdefault(k, {}).setdefault(kind, 0)
+                    keys[k][kind] += 1
+                    if isinstance(v, (dict, list)):
+                        v = json.dumps(v, sort_keys=True)
+                    values.setdefault(k, {}).setdefault(str(v), 0)
+                    values[k][str(v)] += 1
+                    if k == "time":
+                        seen_times.add(str(v))
+        time_per_file[os.path.basename(path)] = len(seen_times)
+    return {"widgets": sum(per_kind.values()), "kinds": per_kind, "keys": keys,
+            "values": values, "time_per_file": time_per_file}
+
+
+#: Why each key we do not read is safe to leave unread.  The *counts* are deliberately not
+#: written here: `--print-theme-fields` prints them out of the census, so a claim like
+#: "nothing is lost by dropping this one" is re-measured on every run instead of aging.
+UNREAD_WHY = {
+    "canvasProperties": "mirrors the file's own width/height",
+    "controlName": "the vendor editor's own widget label; `id` is the key this program keys on",
+    "coordBoundary": "mirrors the canvas bounds, which the `ratio` gate already reads",
+    "enableMove": "the vendor editor's drag lock; nothing moves at draw time",
+    "italic": "a text slant this program does not apply",
+    "italicAngle": "the same slant, as a degree",
+    "screenStatus": "which screen of the vendor app the widget was on",
+    "time": "the vendor editor's save stamp - and our exports omit it, because a generated "
+            "file has no save event to stamp",
+    "type": "the widget's kind a second time, as a number",
+    "underline": "a text underline this program does not apply",
+    "valueChangeType": "how the vendor app animated a value between samples",
+}
+
+
+def keys_read() -> tuple:
+    """The `property` keys this program actually reads - taken out of `layout.py`'s own
+    source with `ast`, not from a hand-kept list.
+
+    A hand-written list here would be a second source of truth, and the way it goes stale
+    is the way the census goes wrong: the painter gains or drops a key and the table keeps
+    claiming the old set.  This asks the module instead - every `prop["k"]` and
+    `prop.get("k")` in it - so the two cannot disagree.
+    """
+    import ast
+    import inspect
+    tree = ast.parse(inspect.getsource(layout))
+    found, sub = set(), set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) \
+                and node.value.id in ("prop", "ext") \
+                and isinstance(node.slice, ast.Constant) \
+                and isinstance(node.slice.value, str):
+            (sub if node.value.id == "ext" else found).add(node.slice.value)
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
+                and node.func.attr == "get" and isinstance(node.func.value, ast.Name) \
+                and node.func.value.id in ("prop", "ext") and node.args \
+                and isinstance(node.args[0], ast.Constant) \
+                and isinstance(node.args[0].value, str):
+            (sub if node.func.value.id == "ext" else found).add(node.args[0].value)
+    return tuple(sorted(found)), tuple(sorted(sub))
+
+
 # ------------------------------------------------------- canonical file shape --
 #: Every one of the 27 copied layouts is, byte for byte, `canonical()` of its own parsed
 #: content - one indentation, sorted keys, no trailing whitespace - checked on all 27 by

@@ -795,6 +795,12 @@ def build_parser() -> argparse.ArgumentParser:
                          "committed - a committed gauge.json goes stale the first time "
                          "anyone edits theme_gauge. Nothing is written to disk and "
                          "nothing here goes near the panel")
+    ap.add_argument("--print-theme-fields", action="store_true",
+                    help="print the field census an inspector is built from: every key "
+                         "the vendor's widgets carry, per kind, and for each one whether "
+                         "this program reads it, does not read it, or reads it with no "
+                         "vendor file to show. Counted over the vendor's own trees, so "
+                         "your copies cannot move these numbers. No port is opened")
     ap.add_argument("--check-theme", metavar="NAME",
                     help="report one theme the way the loop will see it: the file's own "
                          "accounting (widgets, what draws, what is skipped and why), plus "
@@ -818,6 +824,56 @@ def main(argv=None) -> int:
 
     if args.overlay:                          # kept for old command lines
         args.bg = "clear"
+
+    if args.print_theme_fields:
+        cen = themes.field_census()
+        read, sub = themes.keys_read()
+        kinds = sorted(cen["kinds"])
+        ok_n, out_n = len(themes.scan()[0]), len(themes.scan()[1])
+        by_count = sorted(kinds, key=lambda k: (-cen["kinds"][k], k))
+        print(f"  field census        {cen['widgets']} widgets in the vendor's "
+              f"{ok_n + out_n} layouts (" +
+              ", ".join(f"{k} {cen['kinds'][k]}" for k in by_count) + "); "
+              f"{len(cen['keys'])} distinct `property` keys")
+        head = "  " + "key".ljust(20) + "".join(k.rjust(6) for k in kinds)
+        print(head + "   read by layout.py")
+        both = sorted(set(read) & set(cen["keys"]))
+        for k in both:
+            row = "  " + k.ljust(20)
+            row += "".join(str(cen["keys"][k].get(kk, 0)).rjust(6) for kk in kinds)
+            print(row + "   yes")
+        print(f"  read by this program, carried by no vendor file "
+              f"({len(set(read) - set(cen['keys']))}): " + ", ".join(
+                  sorted(set(read) - set(cen["keys"]))) +
+              " - `name` picks a drawing out of --list-specials, `xigma` is our own "
+              "theme-level block, and lineColor/lineWidth are the line ink measured off "
+              "the two overlays that have a line rather than out of a file")
+        print("  our own keys inside `xigma`: " + ", ".join(sub) +
+              " (an anchor, a format, a fit ceiling - docs/theme-editor.md says why each "
+              "one had to be added)")
+        unread = sorted(set(cen["keys"]) - set(read))
+        print(f"  carried by vendor files, never read here ({len(unread)}), with what the "
+              f"value would have done:")
+        tpf = cen["time_per_file"]
+        for k in unread:
+            vals = cen["values"][k]
+            if k == "time":
+                # the interesting fact is not which timestamps, it is that every widget in
+                # one file answers the same one, and no two files answer the same
+                top = (f"{len(vals)} distinct over {cen['widgets']} widgets, and "
+                       f"{sum(1 for n in tpf.values() if n == 1)} of the {len(tpf)} files "
+                       f"answer exactly one of them inside itself")
+            else:
+                top = ", ".join(f"{v!r} on {n}" for v, n in
+                                sorted(vals.items(), key=lambda kv: -kv[1])[:3])
+                top += f" (+{len(vals) - 3} more)" if len(vals) > 3 else ""
+            print(f"    {k:<18} {top}   - {themes.UNREAD_WHY[k]}")
+        print(f"  why the counts matter  a key this program does not read still survives a "
+              f"save untouched, so an edited file keeps every field the vendor's own editor "
+              f"put in it; and the two that would change how text looks (`italic`, "
+              f"`underline`) are one value deep on every widget that carries them, so "
+              f"nothing is missing from the picture by leaving them unread")
+        return 0
 
     if args.check_theme:
         # report one theme exactly as the loop will meet it: the file's own accounting,

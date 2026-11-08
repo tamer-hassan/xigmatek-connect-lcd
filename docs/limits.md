@@ -550,11 +550,13 @@ What has been measured on glass, by whom, with how many frames - and what has no
     the CI runner has **15** - there is no CJK face in that image, so the one `simsun`
     widget in `Theme_01` draws nothing there. That is the whole of the difference between
     this bench's box count and the runner's: **114 boxes** painted here, **113** there,
-    and the lit-pixel totals of the same 23 layouts move with it. CI 42463128743, the
-    first run after the probe was fixed, printed `15 installed; MISSING: simsun/20` and
-    the pair 114 / 314 169 here against 113 / 313 249 there; the suite prints the count
-    for the machine it ran on, this bench's record beside it, and the layout, widget and
-    stored `fontFamily`/`fontSize`/`bold` triple that went missing.
+    and the lit pixels with them - 315 287 against 314 367, both measured after the
+    `line` fix below (CI 42467173421 prints that pair, and the same section prints `15
+    installed; MISSING: simsun/20` on the runner; the earlier run 42463128743 printed the
+    pair before that fix, 114 / 314 169 against 113 / 313 249 - 1 118 px lower in both,
+    which is the whole of the delta and one widget's worth of text). The suite prints the
+    count for the machine it ran on, this bench's record beside it, and the layout, widget
+    and stored `fontFamily`/`fontSize`/`bold` triple that went missing.
     Getting to that number took four commits, because the guard was not measuring what it
     claimed: it asked `bool(layout.font_for(prop))`, and `font_for` answers the three-tuple
     `(face, family, path)` - truthy **even when the face is None** - so the probe reported

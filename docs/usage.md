@@ -93,6 +93,7 @@ Put the module in `/etc/modules-load.d/` if you want it at every boot.
 | `--list` | list candidate ports with their USB descriptions |
 | `--export-theme NAME` | print the generated layout for one of the five drawn-from-code themes as JSON on stdout - sorted keys, byte-identical between runs. Nothing is written to disk, and what it prints is a layout this program draws, never something sent to the panel |
 | `--check-theme NAME` | report one theme exactly as the loop will meet it: which root answered the name (ALPHA's file, or your copy of it), the file's own accounting, then what this machine's readings actually draw - boxes, lit pixels, which widgets were skipped and why, which shapes are this repo's choice rather than measured off the vendor's picture, and the sources *that theme* asks for split into answered and not. Plus the warnings worth hearing before an edit: a metric name with no entry, a font family `layout.FONTS` does not know, a `fontSize` outside the ten the shipped library uses, a colour outside `rgba()`, a widget off the canvas, an `id` repeated inside one theme, a `property` that is not the one-element list every vendor file uses. Exit 2 if the name resolves to nothing, or if the file cannot be walked at all |
+| `--print-theme-fields` | print the field census an inspector is built from: all 152 widgets of ALPHA's 27 layouts answered key by key, per kind, and for each key whether `xigmalcd/layout.py` reads it, carries it without reading it (with the reason, and how many values it is ever set to), or reads it with no vendor file to show. Counted over the vendor's own trees, so an edit of yours cannot move the numbers. No port is opened |
 | `--list-specials` | print the names a `special` widget may carry: the parts of our own themes that stay code-drawn and take position, size and colour from a layout |
 | `--list-themes` | print everything `--theme` accepts: the five drawn from `render.py`, then ALPHA's 23 `1:1` layouts with their widget counts and which tree the file came from, then the four refused and the reason. No port is opened
 | `-v, --verbose` | log every frame in both directions |
@@ -146,6 +147,12 @@ claim:
   lists the five: the window previews what it lists, and it cannot preview a layout yet.
   That is the editor plan in [theme-editor.md](theme-editor.md), and it is the one thing
   here that is not built.
+* **The field census behind that plan is printed, not remembered**: `--print-theme-fields`.
+  Its numbers go into the inspector design - 33 distinct keys across 152 widgets, 22 read,
+  11 carried by the vendor's files and never read, 4 read with no vendor example - and one
+  of its findings is worth knowing before anyone asks why a theme looks the same here as in
+  the vendor app: the two keys that would change how text looks, `italic` and `underline`,
+  are set on none of the 132 widgets that carry them.
 * **`--check-theme NAME` is how you read one of these files before touching it.** It runs
   the same code path the loop runs (`themes.draw`, which is also what an editor's preview
   pane would use), and its lines are the accounting rather than a pretty print:
