@@ -576,6 +576,18 @@ What has been measured on glass, by whom, with how many frames - and what has no
     the export names the face its own code uses (`layout.FONTS["dejavu"]`, built out of
     `render._FONT_GLOBS`) instead of a vendor family that resolves to the same files here by
     luck.
+  * **A gate that compares two pictures has to say *when*, and the suite now measures that
+    rule as well as following it.** The file-model section draws one layout from memory and
+    the same layout written to disk and read back, and asserts the two pictures are
+    byte-identical. Run 42472937258 is the first CI failure of the night and it is a method
+    bug, not a restless runner: the two `themes.draw` calls took their "now" from the wall
+    clock, so the pair that disagreed differed **because a second went by**, not because of
+    anything about the file model. Measured inside the suite now, so the rule cannot be
+    forgotten again: the same `clock` layout drawn twice with no pinned instant differs by
+    **2 819 px** across 1.05 s of wall clock (the count moves with which digits change), and
+    drawn twice at one pinned instant it differs by **0** - the assertion being `drift > 0`
+    and `pinned == 0`. Every pixel comparison in that section, and `themes.parity`, carry an
+    instant for exactly this reason.
   * **The scrim plate, measured on the animated path.** Over the bright clip
     (`Theme_07.mp4`, luma 176.2 of 255): with no plate, glyph 244.8 against its own halo
     191.3, a gap of 53.5; with the plate the window's auto rule puts there (150/255), glyph
