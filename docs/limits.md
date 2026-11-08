@@ -550,7 +550,8 @@ What has been measured on glass, by whom, with how many frames - and what has no
     the CI runner has **15** - there is no CJK face in that image, so the one `simsun`
     widget in `Theme_01` draws nothing there. That is the whole of the difference between
     this bench's 114 boxes / 314 169 lit pixels and the runner's 113 / 313 249
-    (CI 42463562433 and the runs before it print the count of the machine they ran on,
+    (CI 42463128743, the first run after the probe was fixed, prints `15 installed;
+    MISSING: simsun/20`; the runs around it print the count of the machine they ran on,
     this bench's record beside it, and the layout, widget and stored
     `fontFamily`/`fontSize`/`bold` triple that went missing).
     Getting to that number took four commits, because the guard was not measuring what it
