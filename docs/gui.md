@@ -73,7 +73,7 @@ one of them (see "How the three columns get their sizes", after the table):
 | preview | preview | the background with `render.draw`'s OSD layer composited on top - playing, via one streaming ffmpeg, or as one mid-loop frame (`playing` box, see "The preview plays" below), refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How the three columns get their sizes" below | nothing |
 | theme | controls | the five themes, clock size, **the colour of the text it draws**, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
 | layout editor | controls, advanced | opens one of the layouts this machine can select (or one of the 5 generated ones), shows its widgets, and edits one field at a time; the pane under the picture then shows *that file* rather than the live theme | nothing, ever: the panel is never handed a layout file (PROTOCOL.md §11). What `save` changes is what this machine's own daemon draws next time it names that theme |
-| clips | library | every MP4 the roots hold, listed once per **distinct file** - **40 rows here out of 161 files**: 3 vendored here and 37 from the vendor's library; the other 121 are copies (69 in the Windows app's upload history, 43 in its static media, 9 left by the installed packages), 35 of them under a different name; the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. One thing that is **not** a root: this checkout's own `themes/alpha/clips` - a clone reaches the vendor's library by installing the themes package, which is why a bare checkout lists 3 clips and an installed box lists 40, while `tools/preview_gif.py --clip themes/alpha/clips/Theme_30.mp4` reaches the tree's copy directly (that is how all five README previews are made). Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
+| clips | library | every MP4 the roots hold, listed once per **distinct file** - **40 rows out of the 46 mp4 files this repository tracks** (204 files on the author's bench, where the installed package and a mounted Windows partition add themselves; still 40 rows): 3 rows from the clips vendored here and 37 from the vendor's library on any of those boxes, the rest of the files being copies that collapse by content - 6 among the 46 tracked here (3 of them under another name), 164 on the bench, and the dated audit of all of it is written out under "Cost, measured on this box" below. This checkout's own `themes/alpha/clips` is one of the roots the list walks: 43 clip files, byte-identical to what `xigmatek-connect-lcd-themes` installs (the suite re-hashes every one against that package's manifest), which is what lets a clone pair all 23 layouts `--list-themes` prints and why the same 40 rows turn up on a CI runner with nothing installed. `tools/preview_gif.py --clip themes/alpha/clips/Theme_30.mp4` reaches those files by path, which is how all five README previews are made. Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
 | background state | library | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the gate refuses says so, in the gate's words, before the button is pressed | nothing: it is a readout |
 | `One frame now` | library | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
 | `Send frames for 30 s` | library, advanced | the picture loop, so you can watch the real glass | `STATE all 1` twice, then 60 uploads at 2 fps |
@@ -110,7 +110,9 @@ number in that shape comes from a measurement, most of them of a failure:
   `Fixed` with uniform rows. Measured afterwards, and printed by the suite:
   **66 px rows, and room for 7 clips at the fresh 1180×780 window, 12 at
   1919×1055** — rows in view, which is capacity: this bench has 40 distinct clips to
-  put in them (161 files behind them), a CI checkout with no themes package has 3;
+  put in them (204 files behind them on the author's bench), while a checkout of this
+  repository on its own - no installed package, no second partition - walks the 46 mp4 files
+  it tracks and gets the same 40 rows;
 * **the log sits under the picture**, in the preview column, because that is the one
   place with height to spare: the frame is 480 px and is never scaled up, so a tall
   window leaves room there nothing else can honestly fill - while every pixel of the
@@ -512,7 +514,8 @@ Both halves of that are load-bearing, and the window now shows the ring (under
 because a socket `upload` answers `ok` in milliseconds and that `ok` only means
 the file got into the loop's one action slot. The verdict is the second line.
 In the list itself, the row for that clip is drawn **bold**: in a 40-row library
-(161 files behind it, before the copies were collapsed) that is the fastest way to see whether the
+(204 files behind it on this bench, 46 of them tracked here, before the copies were
+ collapsed) that is the fastest way to see whether the
 row you are looking at is the picture the panel is storing under our frame, and no
 row is bold when the display has not reported one.
 
@@ -553,7 +556,12 @@ than left to be inferred:
 
 The pairing changes nothing about the wire: it decides what the *preview* composites
 under our layer, and the upload button is still the only thing that sends a file to the
-panel (docs/themes.md, PROTOCOL.md §11).
+panel (docs/themes.md, PROTOCOL.md §11). One asymmetry to keep straight: the window's
+list walks more roots than the daemon resolves a **name** through. `--mp4 NAME` and the
+loop's default come from `xigmalcd.main.media_roots()` - `media/`, `/usr/share/xigmalcd/media`,
+`$XIGMA_MEDIA` - and that set is unchanged, because which file a name means on the wire is
+a different question from which clips this box can show you. A row the window lists is
+handed to the upload as an absolute path, so the wider list costs nothing there.
 
 
 The twice-per-session metrics blob is not decoration: PROTOCOL.md §8 measures that
@@ -976,7 +984,8 @@ socket, still logged.
 
 Cost, measured on this box and re-measured by `tools/selftest.sh` (it prints the
 numbers it just got, so these cannot quietly go stale). The picker lists every clip the
-roots hold, and lists each **distinct file** once: **40 rows here, out of 161 mp4
+roots hold, and lists each **distinct file** once: **40 rows out of the 46 mp4 files this
+repository tracks
 files** - 3 vendored in `media/` and 37 from the vendor's library. The other 121 files are
 copies, and where they live is worth naming, because they are three different kinds of
 copy: **69** in the Windows app's own upload history (`AppData/Roaming/alpha/media/`),
@@ -986,7 +995,8 @@ installed packages left next to files already listed.
 **35 of those copies have a different filename from the row they duplicate**, and that is
 the whole reason the rule is length-plus-content rather than name-plus-length. The first
 pass at this - keyed on `(name, size)`, added when the two packages started overlapping
-the checkout - left **69 rows for 161 files**, because the Windows app re-copies a library
+the checkout - left **69 rows for 161 files** on this bench (that count predates the
+checkout's own clip root), because the Windows app re-copies a library
 clip into its `media/background/` under a millisecond name every time a theme is applied:
 `1757491589240.mp4` *is* `Theme_25.mp4`, and **all 26** `175749*.mp4` files there are
 byte-identical (whole-file sha256, audited 2026-11-07) to a `Theme_NN`/`theme_NN` clip.
@@ -1005,10 +1015,15 @@ How the comparison works, since it decides what disappears: same length first, t
 sha256 of the first and last MiB. For anything up to 2 MiB those two windows *are* the
 whole file, so 27 of the 40 distinct clips here are matched exactly; the 13 larger ones
 are matched on length plus both edges, and nothing in this library differs only in its
-middle. The audit that produced the figures above used whole-file sha256 on all 161 files,
-which is also how the 40 was cross-checked: the list the window builds has exactly as many
-rows as that audit found distinct contents - no more (nothing hidden) and no fewer (no
-false merges). Two things the row-keeping rule does: the roots are walked in precedence
+middle. The audit that produced the figures above used whole-file sha256 over the files
+the roots held that day, and the same audit over the 46 tracked files finds 40 distinct contents:
+the three `media/` clips the README figures were rendered from, and three pairs the vendor
+library repeats inside its own tree (`Theme_26`/`Theme_31`, `Theme_27`/`theme_38`,
+`Theme_29`/`theme_51`). That is what makes 40 rows the exactly right answer rather than merely
+a smaller one - the list the window builds has as many rows as the audit found distinct
+contents, no more (nothing hidden) and no fewer (no false merges) - and the suite re-derives
+the four digits from the tree itself, in the section that lists the rows:
+46 files, 40 rows, 6 copies dropped, 3 of them renamed. Two things the row-keeping rule does: the roots are walked in precedence
 order, so the survivor is the file `find_media()` would have chosen anyway; and within one
 root, the copy with a name a person would recognise wins, because the app's timestamp
 names sort *before* `Theme_*` (digits before letters) - a test of the dedupe found

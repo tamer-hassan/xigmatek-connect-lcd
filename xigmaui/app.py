@@ -495,7 +495,8 @@ class Window(QMainWindow):
         # library column does not
         self._adv_boxes: list = []
         # A third column, used when the window is wide: the clip library wants
-        # *height* (40 distinct clips here, out of 161 files in the roots) and at
+        # *height* (40 distinct clips, out of the 46 mp4 files this repository tracks,
+        # 204 where an installed copy and a mounted partition add theirs) and at
         # 1 919 px it was sharing one long column with the display status, the
         # theme box, the panel hello and the log - measured, the list got 190 px
         # of viewport, which is two rows of 114 px.  Two columns give it the
@@ -853,7 +854,8 @@ class Window(QMainWindow):
 
         media = QGroupBox("Background: the layer under our frame")
         mlay = QVBoxLayout(media)
-        # the library is 40 rows on this box - 161 files, 121 of them copies
+        # the library is 40 rows - 46 mp4 files tracked here, 6 of them copies of a
+        # row already standing; 204 files on a bench that has the .deb installed and the
         # mounted, and the row you want is a scroll wheel and a search away:
         # one filter field, matching what a row already shows (name, size, loop
         # length, where it came from), so finding a clip does not need a terminal
@@ -1502,7 +1504,9 @@ class Window(QMainWindow):
 
         One row per *distinct file*, not one per path: `clipdb.list_clips()` walks
         the roots and collapses copies by length and content (see its docstring).
-        Measured on this bench, where the Windows partition is mounted: **161 mp4
+        Measured where the roots are only this repository: **46 mp4 files, 40 distinct
+        contents** (whole-file sha256). On this bench, where the Windows partition is
+        mounted and the .deb is installed, the same rule walks **204 mp4
         files across the roots, 40 distinct contents, 121 copies not listed** - 26
         of them the Windows app's own upload history, which re-adds a library clip
         under a millisecond timestamp name (`1757491589240.mp4` is `Theme_25.mp4`,

@@ -1284,11 +1284,15 @@ with tempfile.TemporaryDirectory() as envdir:
 print("  $XIGMA_MEDIA       first root, and the clip library lists it alongside the rest")
 
 # ---- one row per distinct clip, whatever it is called ---------------------------
-# The roots hold far more files than there are clips.  Measured on the author's
-# bench, Windows partition mounted: 161 mp4 files, 40 distinct contents, 121 copies -
-# 69 of them the Windows app's own upload history, which copies a library clip into
-# `media/background/` under a millisecond name every time a theme is applied (all 26
-# `175749*.mp4` there are byte-identical to a `Theme_NN` or `theme_NN` clip), and 3 of
+# The roots hold far more files than there are clips.  Two censuses, and only one of
+# them depends on the machine: this repository tracks **46 mp4 files** in `media/` and
+# `themes/alpha/clips`, holding **40 distinct contents** (whole-file sha256, re-derived
+# by the GUI section), and on the author's bench - Windows partition mounted, the .deb
+# installed - the same walk sees 204 files, drops 166 copies and still stands at 40 rows
+# (the 2026-11-07 audit of the 161 files then visible found the same 40 contents, 121
+# copies - 69 of them the Windows app's own upload history, which copies a library clip
+# into `media/background/` under a millisecond name every time a theme is applied (all
+# 26 `175749*.mp4` there are byte-identical to a `Theme_NN` or `theme_NN` clip), and 3 of
 # them the vendor library repeating itself inside its own tree (`Theme_31.mp4` ==
 # `Theme_26.mp4`, `theme_38.mp4` == `Theme_27.mp4`, `theme_51.mp4` == `Theme_29.mp4`,
 # sha256, 2026-11-07).  A rule keyed on (name, length) cannot see a renamed copy,
@@ -4553,17 +4557,21 @@ if missing:
     raise SystemExit(1)
 found = clipdb.list_clips()
 assert found, "no clips found at all"
+_scan0 = dict(clipdb.LAST_SCAN)        # this machine's walk, quoted beside the machine
 byname = {c.name: c for c in found}
 # No two rows may be the same clip.  The roots overlap on purpose: the .deb installs
 # its own copy of each vendored clip, the themes package carries clips this project
 # also vendors, and the Windows app's upload history repeats files it pushed more than
 # once.  `realpath` catches none of that - separate files with the same bytes - and a
 # (name, length) rule could not either, because the app renames what it copies: it
-# measured 69 rows for 40 clips, 161 rows on disk.  The rule is length, then sha256 of
-# both 2 MiB edges, and the numbers this bench reports are 161 files walked -> 40 rows,
-# 121 copies dropped, 35 of them under a different name (whole-file sha256 audit,
-# 2026-11-07: 40 distinct contents among those 161, which is what makes the 40 rows
-# exactly right rather than merely fewer).
+# measured 69 rows for 40 clips, 161 files on disk.  The rule is length, then sha256 of
+# both 2 MiB edges.  Two censuses are quoted, and only one of them is machine-dependent:
+# the 46 mp4 files this repository tracks hold **40 distinct contents** - the gate below
+# re-derives 46 / 40 / 6 copies / 3 of them renamed, from the tree, on any machine - and
+# on this bench, with the .deb installed and the Windows partition mounted, the same
+# walk sees 204 files and still stands at 40 rows (the 2026-11-07 audit of the 161 files
+# then visible found 40 distinct contents, whole-file sha256, which is what makes the 40
+# rows exactly right rather than merely fewer).
 shapes = {}
 for cl in found:
     k = (cl.name.casefold(), cl.bytes)
@@ -4586,6 +4594,68 @@ with _tf.TemporaryDirectory() as _t:
         _m.SYSTEM_THEMES = _saved
 print(f"  clip library       {len(found)} rows, each a distinct name+length; the same "
       f"bytes under another root add no row and do not displace the checkout's file")
+
+# The census every machine can reproduce: the clip files this repository *tracks*.  The
+# bench numbers (204 files walked, 40 rows) depend on what else is mounted and installed,
+# so docs quote them beside the machine; the tracked ones do not depend on anything, and
+# they are also the ones the pairing and the README figures rest on.  Re-derived here, with
+# the roots that are not this checkout pointed away, and the distinct count verified the way
+# the older docs claim it was verified - whole-file sha256 over every tracked clip - rather
+# than trusting the length-plus-two-edges rule the window uses to decide it cheaply.
+import glob as _cg
+import hashlib as _ch
+import xigmalcd.main as _m
+_tracked = sorted(_cg.glob("media/*.mp4")) + sorted(_cg.glob("themes/alpha/clips/*.mp4"))
+assert _tracked, "no tracked clips: media/ and themes/alpha/clips are both empty"
+_solo = {k: getattr(_m, k) for k in ("SYSTEM_MEDIA", "SYSTEM_THEMES",
+                                     "WIN_STATIC", "WIN_UPLOADS")}
+_solo_env = os.environ.pop("XIGMA_MEDIA", None)
+try:
+    for _k in _solo:
+        setattr(_m, _k, "/nonexistent-root")
+    _alone = clipdb.list_clips()
+    _alone_scan = dict(clipdb.LAST_SCAN)
+finally:
+    for _k, _v in _solo.items():
+        setattr(_m, _k, _v)
+    if _solo_env is not None:
+        os.environ["XIGMA_MEDIA"] = _solo_env
+clipdb.list_clips()      # put the module's scan counters back to this box's own roots:
+                         # the assertions below read LAST_SCAN as a fact about this bench
+_digests = {}
+for _f in _tracked:
+    _h = _ch.sha256()
+    with open(_f, "rb") as _fh:
+        for _chunk in iter(lambda: _fh.read(1 << 20), b""):
+            _h.update(_chunk)
+    _digests.setdefault(_h.hexdigest(), []).append(_f)
+assert _alone_scan["files"] == len(_tracked), (
+    _alone_scan["files"], len(_tracked),
+    "the window's walk no longer sees exactly the clip files this repository tracks - "
+    "a root was added or dropped, and every quoted census moved with it")
+assert len(_alone) == len(_digests), (
+    len(_alone), len(_digests),
+    "the rows the window lists are not the distinct contents the tracked files hold - the "
+    "length-plus-edges rule and a whole-file sha256 audit disagree")
+_census = (f"{_alone_scan['files']} files, {len(_alone)} rows, "
+           f"{_alone_scan['copies']} copies dropped, {_alone_scan['renamed']} of them "
+           "renamed")
+_gui_doc = open("docs/gui.md", encoding="utf-8").read()
+_readme = open("README.md", encoding="utf-8").read()
+assert f"{_alone_scan['files']} mp4 files this repository tracks" in _gui_doc, (
+    _census, "docs/gui.md does not state the tracked census this gate just derived")
+assert f"{_alone_scan['files']} mp4 files this repository tracks" in _readme, (
+    "README does not state the tracked census")
+assert f"{len(_alone)} distinct contents" in _gui_doc, (
+    len(_alone), "docs/gui.md does not state the audited distinct count")
+assert _census in _gui_doc, (_census, "docs/gui.md quotes a different census than this run "
+                                      "measured")
+_copy_files = sum(len(v) for v in _digests.values() if len(v) > 1)
+print(f"  tracked clips      {len(_tracked)} mp4 files in media/ and themes/alpha/clips, "
+      f"{len(_digests)} distinct contents by whole-file sha256 ({_copy_files} of the "
+      f"files are one of those copies), and the window's own walk over a bare checkout "
+      f"agrees: {_census}. docs/gui.md and README state those digits; this bench's "
+      f"larger walk ({_scan0['files']} files) is quoted beside the machine")
 for name, size in (("Theme_25.mp4", 214_917), ("Theme_11.mp4", 3_402_098),
                    ("theme_48.mp4", 1_333_649)):
     assert byname[name].bytes == size, (name, byname[name].bytes)
@@ -4893,9 +4963,13 @@ assert all(win.clips.item(i).sizeHint().height() <= app.CLIP_ICON.height() + 8
 # a thumbnail never distorts the file it came from: the row states the measured
 # pixel size, and the picture keeps its own aspect ratio, letterboxed into the
 # square.  Tested on the fit itself rather than on a clip that happens to be 4:3,
-# because the selftest job runs against a checkout with only the three vendored
+# because the selftest job used to run against a checkout with only the three vendored
 # clips - the themes package is a separate .deb - and a search for a 320x240 file
-# there died with StopIteration on the runner (run 42350703043) while passing here.
+# there died with StopIteration on the runner (run 42350703043) while passing here.  The
+# window now walks this checkout's own `themes/alpha/clips` too, so the runner sees the
+# same 40 rows, three of them 320x240; the fit is still tested on a made-to-measure
+# image rather than by hunting for a 4:3 row, because a test that depends on which clips
+# a machine happens to hold fails on one machine and proves nothing on another.
 from PIL import Image as _PILImage
 _box = clipdb.letterbox(_PILImage.new("RGBA", (320, 240), (255, 0, 0, 255)), 64)
 assert _box.size == (64, 64), _box.size
@@ -4914,8 +4988,9 @@ for _ in range(10):
 wide_visible = win.clips.viewport().height() // max(1, row_h)
 assert wide_visible >= 8, (wide_visible, "the full-HD window is back to two rows")
 # "rows in view" is capacity, not a claim about how many clips a machine has: the
-# selftest job runs against a checkout with the three vendored clips and no themes
-# package, while the bench lists 40 distinct clips out of 161 files.
+# selftest job runs against a checkout, whose own `themes/alpha/clips` root carries 43
+# of the 46 tracked mp4 files (40 distinct contents), and the bench adds an installed
+# copy and a mounted partition around the same 40 rows.
 print(f"  clip list               rows {row_h} px: {visible} rows in view at "
       f"{settings.DEFAULTS['size'][0]}x{settings.DEFAULTS['size'][1]}, "
       f"{wide_visible} at 1919x1055, where it used to be 2 "
@@ -5099,7 +5174,8 @@ assert "320x240" in odd_detail and "not measured" in odd_detail, odd_detail
 print(f"  clip rows carry size   {len(sized)}/{len(win.all_clips)} probed, "
       f"480x480 stated on the row, an odd size called a guess")
 
-# the picker's filter: 40 rows here out of 161 files, 3 on a CI checkout
+# the picker's filter: 40 rows, from 46 tracked files in a bare checkout and 204 on a
+# bench that has the .deb installed and a Windows partition mounted
 # mounted, and no way to find one short of a scroll wheel
 win.clip_filter.setText("theme_48")
 appq.processEvents()
@@ -6484,21 +6560,70 @@ _pw = app.Window("/dev/xigma-no-such-port", 1.0, restore=False)
 assert _pw.clip_custom is False, (
     "a window that nobody touched claims the background as its reader's - populating the "
     "clip list selects a row, and that is not a choice")
-_moved, _rows_ok, _missed = 0, 0, []
+# What a box can honour is derived from the rows it actually lists, not assumed from this
+# bench: a clip can be genuinely absent (a checkout with nothing installed), and the honest
+# rule is "pair it when the file is here, say so when it is not".  Both halves are checked.
+_avail = {os.path.splitext(os.path.basename(_c.path))[0].lower() for _c in _pw.all_clips}
+_here = [_r for _r in pick
+         if os.path.splitext(str(_r["background"]).rsplit("/", 1)[-1])[0].lower() in _avail]
+_absent = [_r for _r in pick if _r not in _here]
+_moved, _rows_ok = 0, 0
 for _rec in pick:
     _want = _rec["background"].rsplit("/", 1)[-1]
     _pw.ed_name.setCurrentText(_rec["name"])
     _base = os.path.basename(_pw.mp4)
-    if _base == _want:
-        _moved += 1
+    if _rec in _here:
+        _moved += _base == _want
+        if _pw.all_clips and 0 <= _pw.clips.currentRow() < len(_pw.all_clips):
+            _rows_ok += _pw.all_clips[_pw.clips.currentRow()].path == _pw.mp4
     else:
-        _missed.append((_rec["name"], _want, _base))
-    if _pw.all_clips and 0 <= _pw.clips.currentRow() < len(_pw.all_clips):
-        if _pw.all_clips[_pw.clips.currentRow()].path == _pw.mp4:
-            _rows_ok += 1
-assert not _missed, (_moved, _missed, "the pairing did not follow these layouts' own clips")
-assert _rows_ok == len(pick), (_rows_ok, len(pick),
-                               "the library column does not show the row it paired to")
+        # the pair is not on this box: the clip must not move, and the pane must say which
+        # file it is missing rather than leaving the picture unexplained
+        assert _base != _want, (_rec["name"], _want, "a clip this box lacks became current")
+        assert "does not have" in _pw.pair_note, (_rec["name"], _pw.pair_note)
+assert _moved == len(_here), (_moved, len(_here),
+                              "the pairing did not follow the clips this box does have")
+assert _rows_ok == len(_here), (_rows_ok, len(_here),
+                                "the library column does not show the row it paired to")
+# A checkout on its own - nothing installed, no Windows partition mounted - is what a CI
+# runner and a source install are.  The pairing has to be honourable there, which is why
+# `list_clips` walks this repository's own `themes/alpha/clips`: the 44 files it tracks are
+# byte-identical to what the themes package installs (the library section re-hashes every
+# one of them), so the window is not being pointed at a library it does not have.
+import xigmalcd.main as _mm
+_saved_roots = {k: getattr(_mm, k) for k in ("SYSTEM_MEDIA", "SYSTEM_THEMES",
+                                             "WIN_STATIC", "WIN_UPLOADS")}
+_env_media = os.environ.pop("XIGMA_MEDIA", None)
+try:
+    for _k in _saved_roots:
+        setattr(_mm, _k, "/nonexistent-root")
+    _alone = clipdb.list_clips()
+    _alone_stems = {os.path.splitext(os.path.basename(_c.path))[0].lower()
+                    for _c in _alone}
+    _gap = [_r["name"] for _r in pick
+            if os.path.splitext(str(_r["background"]).rsplit("/", 1)[-1])[0].lower()
+            not in _alone_stems]
+    assert not _gap, (len(_alone), _gap,
+                      "a checkout of this repository alone cannot pair these layouts - its "
+                      "own tracked clips are no longer reachable from the window")
+    # and the missing case, driven rather than waited for: a window whose list holds none
+    # of the pairs has to name the file it is missing and leave the picture alone
+    _keep, _pw.all_clips = _pw.all_clips, []
+    try:
+        _missing_at = _pw.mp4
+        _pw.ed_name.setCurrentText(pick[0]["name"])
+        assert _pw.mp4 == _missing_at, (
+            _pw.mp4, _missing_at, "a window with no rows paired to a file it does not have")
+        assert "does not have" in _pw.pair_note and "keeping" in _pw.pair_note, _pw.pair_note
+    finally:
+        _pw.all_clips = _keep
+finally:
+    for _k, _v in _saved_roots.items():
+        setattr(_mm, _k, _v)
+    if _env_media is not None:
+        os.environ["XIGMA_MEDIA"] = _env_media
+    _alone_n = len(_alone)
+    clipdb.list_clips()      # leave the module's scan counts as this box actually has them
 # a reader's click wins over the pairing, from then on and across a restart
 _other = next(i for i, _c in enumerate(_pw.all_clips)
               if os.path.basename(_c.path) != os.path.basename(_pw.mp4))
@@ -6537,12 +6662,19 @@ _pw.close()
 _doc = open("docs/gui.md", encoding="utf-8").read()
 for _claim in (f"all {len(pick)} selectable layouts", "Use this layout's own clip"):
     assert _claim in _doc, (_claim, "docs/gui.md does not describe the pairing this drives")
-print(f"  the pairing in the window  opening each of the {len(pick)} selectable layouts put "
-      f"its own clip under the preview, and marked that row in the library column "
-      f"({_rows_ok} of {len(pick)}); one click on another row made the background the "
-      f"reader's and the next {_stayed} layouts could not walk over it; the button handed "
-      f"the layout its own clip back and re-armed the pairing; and all {len(render.THEMES)} "
-      f"drawn themes left the clip where it was and said why in the same place.")
+_missing_note = ("and each said so instead of pretending" if _absent else
+                 "(0 here: the branch was driven by emptying the row list, so the "
+                 "sentence is proven even on a box that has every clip)")
+print(f"  the pairing in the window  of the {len(pick)} selectable layouts, "
+      f"{len(_here)} name a clip this box lists and every one of those moved under the "
+      f"preview with its row marked ({_rows_ok}/{len(_here)}); {len(_absent)} name a clip "
+      f"this box does not have {_missing_note}; one click on another row made the "
+      f"background the reader's and the next {_stayed} layouts could not walk over it; the "
+      f"button handed the layout its own clip back and re-armed the pairing; and all "
+      f"{len(render.THEMES)} drawn themes left the clip where it was and said why in the "
+      f"same line. On a bare checkout - no installed package, no Windows partition - the "
+      f"{_alone_n} rows this repository's own files give the window cover all {len(pick)} "
+      f"pairs.")
 PY
 
 echo

@@ -1,13 +1,14 @@
 """clips.py - the background clips this box can offer, and frames out of them.
 
-Clip roots, in the order the app lists them.  The first three are this project's
-own clips (`xigmalcd.main.media_roots()` says which of them exist); the last two
-are the vendor's copies, reachable only from a box that has the Windows volume
-mounted or the themes package installed.  Every root that exists is scanned, and a
-clip found twice is listed once: the same file under two spellings, or the same bytes
-under two roots - a checkout on a box that also has the .deb installed holds both
-copies of all three vendored clips.  The root that comes first in the order below is
-the row that stays, because that is the file `find_media()` would have picked:
+Clip roots, in the order the app lists them.  The first three are this project's own
+clips (`xigmalcd.main.media_roots()` says which of them exist); the last three carry the
+vendor's library - reachable from a box with the Windows volume mounted, with the themes
+package installed, or with nothing but this repository, which tracks the same files.
+Every root that exists is scanned, and a clip found twice is listed once: the same file
+under two spellings, or the same bytes under two roots - a checkout on a box that also
+has the .deb installed holds both copies of all three vendored clips.  The root that
+comes first in the order below is the row that stays, because that is the file
+`find_media()` would have picked:
 
   the checkout's media/    the clips vendored into this repository. `Theme_25.mp4`
                            is the one ALPHA pairs with the theme it has selected
@@ -15,6 +16,18 @@ the row that stays, because that is the file `find_media()` would have picked:
                            and it is the daemon's default background.  `$XIGMA_MEDIA`
                            replaces this root with a clip set of your own.
   /usr/share/xigmalcd/media where the .deb installs those three clips.
+  this checkout's library  `themes/alpha/clips`: the 43 clip files the themes package's
+                           source tree tracks, byte-identical to what installing
+                           `xigmatek-connect-lcd-themes` puts in the root below (the
+                           suite re-hashes every one against the manifest).  Added
+                           because the layout side already reads this directory -
+                           `themes.py` resolves a theme from your config, then this
+                           checkout, then `/usr/share` - so a bare clone could name a
+                           layout and print `background Theme_07.mp4` while the window
+                           could not find a file the repository itself carries.  A
+                           layout and the clip it declares have to resolve from the
+                           same place, or `themes.pair()` is a sentence about a
+                           library the reader does not have.
   ALPHA's installed library `/usr/share/xigmalcd/themes/alpha/clips`, which the
                            `xigmatek-connect-lcd-themes` package puts there: all
                            43 clips of the 27 themes, not just the three this
@@ -25,15 +38,20 @@ the row that stays, because that is the file `find_media()` would have picked:
   ALPHA's uploads          `%APPDATA%/alpha/media/...`, the clips the Windows app
                            actually pushed to this panel at some point.
 
-  Not a root: this checkout's own `themes/alpha/clips`.  A clone reaches the vendor's
-  library by installing `xigmatek-connect-lcd-themes`, which is what puts it at
-  `/usr/share/xigmalcd/themes/alpha/clips` above; the copy in the working tree is that
-  package's source, hashed by its manifest, and what reads it today is
-  `tools/preview_gif.py --clip themes/alpha/clips/<name>.mp4` - which is how all five of
-  README's previews are made.  Said here because "in the repository" and "in the roots
-  this walks" are different claims, and a bare checkout offering three clips while README
-  shows pictures over five backgrounds reads, correctly, like a bug until it is written
-  down.
+  Before that root existed a bare checkout offered **three** clips while README showed
+  pictures over five backgrounds and the themes package's own 43 sat in the working
+  tree - correctly, since the supported route to that library was the package, and
+  wrong for anything that wanted to follow a layout's declared background.  Both
+  sentences are measured now: a checkout on its own walks 46 tracked mp4 files into the
+  same **40 rows** this bench walks out of 204 files, and the suite asserts that all 23
+  selectable layouts can pair there (docs/gui.md).
+
+  Wider than the daemon's name lookup, and deliberately so: `main.media_roots()` -
+  what `--mp4 NAME` and `find_media()` search - is still `media/`, `$XIGMA_MEDIA`
+  and `/usr/share/xigmalcd/media`, with no theme directory in it.  Which file a
+  *name* means on the wire is a separate question from which clips this box can
+  show, and a row the window offers reaches an upload as an absolute path either
+  way.
 
 Frames come out of ffmpeg, one frame per call, because decoding a whole clip to
 pick a mid-loop frame (what tools/previews.py does once per run) is far too slow
@@ -327,7 +345,9 @@ def list_clips(extra: str = "") -> list[Clip]:
     Duplicates are collapsed **by content, not by name**, and the row that stays is
     the one the roots' precedence order would have chosen anyway (a clip this repo
     vendors, then the installed copy, then the vendor library, then what the Windows
-    app left behind).  Measured on the author's bench, 161 files in those roots hold
+    app left behind).  Measured on the files this repository tracks - 46 of them - the
+    rule keeps **40 distinct clips** (whole-file sha256, so the count is an audit and not a
+    guess); on the author's bench the same walk sees 204 files and still lists 40 rows.
     **40 distinct clips**: the Windows app's own upload history repeats the vendor's
     library under a timestamp name - all 26 `175749*.mp4` files are byte-identical
     copies of a `Theme_NN.mp4` / `theme_NN.mp4` - and a name-keyed rule cannot see
@@ -344,6 +364,7 @@ def list_clips(extra: str = "") -> list[Clip]:
     """
     from xigmalcd.main import (MEDIA_ENV, SYSTEM_MEDIA, SYSTEM_THEMES,
                                WIN_STATIC, WIN_UPLOADS, media_roots)
+    from xigmalcd.themes import REPO_ROOT as _repo_themes_dir
 
     found: list[Clip] = []
     seen = set()          # realpaths: one file, several spellings
@@ -412,7 +433,7 @@ def list_clips(extra: str = "") -> list[Clip]:
         vendors that the themes package also carries, the vendor library repeating
         itself inside its own tree, and the Windows app's upload history re-adding what
         its static media already is.  `realpath` alone caught none of that: on the
-        author's bench 161 files stood where 40 clips exist.
+        author's bench 204 files stood where 40 clips exist (46 of them tracked here).
         """
         real = os.path.realpath(path)
         scan["files"] += 1
@@ -457,6 +478,16 @@ def list_clips(extra: str = "") -> list[Clip]:
                for _root in media_roots()]
     sources += [(os.path.join(SYSTEM_THEMES, "clips"), "*.mp4", "vendor library",
                  "installed with xigmatek-connect-lcd-themes"),
+                # The same library this repository tracks, in the checkout: 44 clip files
+                # under `themes/alpha/clips`, byte-identical to what the themes package
+                # installs (the suite re-hashes every one of them against the manifest).
+                # Without this root a *checkout* sees three clips - only what `media/`
+                # vendors for the README figures - while `themes.pair()` reports that a
+                # layout names `Theme_07.mp4`, a file the repository itself carries.  That
+                # is what a CI runner or a source install hits, and it made the pairing a
+                # sentence about files the window could not see.
+                (os.path.join(_repo_themes_dir, "clips"), "*.mp4", "vendor library",
+                 "this checkout's themes/alpha/clips"),
                 (WIN_STATIC, "*.mp4", "vendor library",
                  "mounted from the Windows partition"),
                 (WIN_UPLOADS, "**/*.mp4", "app upload",

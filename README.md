@@ -102,7 +102,7 @@ editor changes is what a loop on *this* machine draws the next time it names tha
 ![xigmaui, the window in three columns: the playing preview and the log on the left,
 the display's status, the theme picker and the text-colour row in the middle, and the
 background clip library on the right listing this machine's clips once per distinct
-file - 40 of them, from 161 mp4 files in the roots it walks](docs/screenshot-xigmaui.png)
+file - 40 of them, from the 46 mp4 files this repository tracks](docs/screenshot-xigmaui.png)
 
 And these are real captures from live system (simple vs advanced mode):
 
