@@ -690,8 +690,11 @@ class Window(QMainWindow):
                                    "playing its stored background behind it. "
                                    "What the vendor does, and the default.",
                                 Qt.ItemDataRole.ToolTipRole)
-        self.canvas.setItemData(1, "opaque black frame: covers the stored "
-                                   "background completely (`--bg black`)",
+        self.canvas.setItemData(1, "black canvas: the frame is opened on opaque "
+                                   "black. A layout theme goes fully opaque this way; "
+                                   "three of our five keep their own translucent fills "
+                                   "and still show the stored background through them "
+                                   "(`--bg black`, docs/usage.md)",
                                 Qt.ItemDataRole.ToolTipRole)
         self.canvas.setCurrentIndex(1 if self.cfg["canvas"] == "black" else 0)
         self.canvas.currentIndexChanged.connect(self._changed)

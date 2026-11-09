@@ -54,6 +54,7 @@ python3 - <<'PY' || { echo "encoder choice FAILED"; exit 1; }
 import math
 from io import BytesIO
 from PIL import Image, ImageChops
+
 from xigmalcd import render
 
 m = {"cpu": {"temperature": 57.0, "load": 42.0},
@@ -1937,8 +1938,124 @@ if partial:
             f"stand side by side - an export translates a theme's drawing, not its "
             f"fallback behaviour (docs/limits.md)")
 
+
 # ---- why `xigma.arcPaint` exists at all: one arc, painted both conventions, measured
 from PIL import Image, ImageChops
+
+# ---- "`--bg black` makes the frame opaque" is two different answers in the two doors, and
+# ---- only one of them was gated.  The opacity assert above is about a *layout*: there the
+# ---- plate goes under the finished layer (`themes.paint(..., base=BLACK)`), so the frame is
+# ---- opaque everywhere.  A `theme_*` body instead opens its image with the canvas already in
+# ---- it - `Image.new("RGBA", (W * SS, H * SS), bg)`, one use of the argument in every body -
+# ---- and PIL's `ImageDraw` *replaces* a pixel for a translucent fill rather than blending it
+# ---- with what is underneath.  So every translucent thing a drawn theme paints - a ring's
+# ---- track, the grey plate behind two figures - leaves the frame's own alpha below 255, and
+# ---- the panel's stored background keeps showing through it.  That is not a bug to fix here
+# ---- (it is what makes a `--bg black` frame's palette small and the vendor's frames
+# ---- transparent), but the sentence about it was over-broad, and the split is worth pinning:
+# ---- which themes leak is derived from the exports' own colour keys, not remembered.
+_missing_by_theme = {}
+for _n, _i, *_rest in partial:
+    _missing_by_theme.setdefault(_n, set()).add(_i)
+
+
+def _px_gap(a, b):
+    return sum(1 for q in ImageChops.difference(a.convert("RGBA"),
+                                                b.convert("RGBA")).get_flattened_data()
+               if q != (0, 0, 0, 0))
+
+
+def _translucent(obj):
+    """Every colour key in one export whose alpha is below 1, as `row kinds`."""
+    out = {}
+    for w in obj["osd"]["widget"]:
+        for key, val in w["property"][0].items():
+            if "color" not in key.lower() or "(" not in str(val):
+                continue
+            try:
+                alpha = float(str(val).rsplit(",", 1)[-1].strip(" )"))
+            except ValueError:
+                continue
+            if alpha < 1:
+                out.setdefault(key, []).append(w["type"])
+    return out
+
+
+def _leak(img):
+    hist = img.getchannel("A").histogram()
+    return sum(hist[:255]), (min(v for v in range(256) if hist[v]) if sum(hist[:255]) else 255)
+
+
+_declared = {name: _translucent(themes.export(name)) for name in sorted(themes.EXPORTS)}
+_leaky = sorted(n for n, keys in _declared.items() if keys)
+_opaque_here = sorted(set(themes.EXPORTS) - set(_leaky))
+_gaps, _leaks, _canvas_skipped = {}, {}, []
+_now_real = render._now
+render._now = lambda: WHEN.timetuple()      # one instant on both sides: `themes.draw` is
+try:                                        # handed WHEN, `render.draw` reads the clock
+    for _name in sorted(themes.EXPORTS):
+        _usable = [i for i in range(len(CASES)) if i not in _missing_by_theme.get(_name, ())]
+        if not _usable:
+            _canvas_skipped.append(_name)     # no reading where the two doors agree at all here,
+            continue                          # so a canvas figure for this theme would be noise
+        _m_case = CASES[_usable[0]]
+        _layer, _ = themes.draw(themes.export(_name), _m_case, WHEN)
+        _plate = Image.alpha_composite(Image.new("RGBA", _layer.size, render.BLACK), _layer)
+        _code_layer = render.draw(_m_case, _name)
+        _code_solid = render.draw(_m_case, _name, bg=render.BLACK)
+        # the file door: a plate under a layer is opaque, and that is the whole claim
+        assert _plate.getextrema()[3] == (255, 255), (_name, "a plate left the frame partly clear")
+        assert _leak(_plate)[0] == 0, (_name, _leak(_plate))
+        # the code door: opaque exactly where it has nothing translucent to paint
+        _leaked, _lowest = _leak(_code_solid)
+        if _name in _leaky:
+            assert _leaked > 0, (_name, _declared[_name],
+                                 "a theme whose file declares a translucent fill went fully "
+                                 "opaque on a black canvas: the replace-not-blend rule broke")
+            assert _lowest < 255, (_name, _lowest)
+        else:
+            assert _leaked == 0, (_name, _leaked, _lowest,
+                                  "a theme with no translucent colour key leaks on `--bg black`: "
+                                  "the split between the two doors is no longer about the file")
+        _leaks[_name] = (_leaked, _lowest)
+        # and the two doors' opaque frames are not one picture: the plate's *order* is what parts
+        # them, since compositing under the code drawing's own layer gives the same counts
+        _gap = _px_gap(_code_solid, _plate)
+        _plate_over_code = Image.alpha_composite(
+            Image.new("RGBA", _code_layer.size, render.BLACK), _code_layer)
+        assert _gap == _px_gap(_code_solid, _plate_over_code), (
+            _name, _gap, _px_gap(_code_solid, _plate_over_code),
+            "the black-canvas gap is no longer only the plate's order: the two doors disagree "
+            "*underneath* the plate, so this sentence and the parity gate above are about "
+            "different pictures")
+        _gaps[_name] = _gap
+        assert _px_gap(_code_layer, _layer) == 0, (
+            _name, "at the default transparent canvas the two doors are not one picture, and "
+                   "every parity claim in the documents is about exactly that case")
+finally:
+    render._now = _now_real
+    # the documents have to say the same split, in the same derived words
+    _usage = open("docs/usage.md", encoding="utf-8").read()
+    _want = (f"{len(_leaky)} of the five drawn themes "
+             f"(`{'`, `'.join(_leaky)}`)")
+    assert _want in _usage, (_want, sorted(_leaky),
+                             "docs/usage.md does not state which drawn themes stay translucent "
+                             "on `--bg black`, which this gate derives from their own files")
+    assert f"(`{'`, `'.join(_opaque_here)}`)" in _usage, (_opaque_here,
+                                                          "docs/usage.md does not name the drawn "
+                                                          "themes that do go opaque")
+print(f"  --bg black, both doors  the file door's plate goes under the layer, so a layout "
+      f"frame is opaque everywhere (0 of {render.W * render.H:,} px below alpha 255). The "
+      f"code door's canvas goes in before the draw, and `ImageDraw` replaces rather than "
+      f"blends, so the themes whose own files declare a translucent colour keep leaking: "
+      f"{_want} leak " + ", ".join(f"{n} {_leaks[n][0]:,} px (lowest alpha {_leaks[n][1]})"
+                                  for n in _leaky) + f"; {len(_opaque_here)} of them "
+      f"(`{'`, `'.join(_opaque_here)}`) have no translucent key and go opaque. With an opaque "
+      f"plate the two doors still part by " + ", ".join(f"{k} {v:,}" for k, v in sorted(_gaps.items()))
+      + " px at glyph edges, the same counts when the plate goes under the code drawing's own "
+      "layer - order, not drawing"
+      + (f"; not measured for {', '.join(_canvas_skipped)} (no reading where the two doors "
+         f"agree)" if _canvas_skipped else ""))
 _arc = themes.export("gauge")["osd"]["widget"][0]["property"][0]
 
 

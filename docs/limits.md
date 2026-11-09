@@ -57,8 +57,11 @@ What has been measured on glass, by whom, with how many frames - and what has no
 * **The picture is transparent, because ALPHA's is.** Its `.osd` frames paint 4.6 % of the
   230 400 pixels and leave the rest fully transparent, which is how the stored background
   keeps playing behind its gauge (`data/vendor_frames`, measured in PROTOCOL.md §9). So the
-  daemon's canvas is transparent by default now; `--bg black` is the old opaque picture,
-  which covers the background layer completely. `--mp4 [PATH]` uploads a background the way
+  daemon's canvas is transparent by default now; `--bg black` fills that canvas with opaque
+  black, which for a layout theme means the frame covers the background layer completely -
+  and for three of our five drawn themes does not, because their own translucent fills are
+  replaced rather than blended and keep the stored background visible (the `--bg` row in
+  docs/usage.md, and the suite derives which themes from the exports' colour keys). `--mp4 [PATH]` uploads a background the way
   ALPHA does at session start - `media/Theme_25.mp4` (215 KB, the vendor's own pairing for
   this theme) by default, which the panel holds across session renewals (only `recovery`
   clears it); `--no-mp4` skips the upload and leaves the panel's stored file playing.

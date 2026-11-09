@@ -309,9 +309,19 @@ def _canvas(args):
 
     Transparent is what the vendor does and therefore what we do: its `.osd`
     frames carry only 4.6 % painted pixels - the arc, the digits, the clock -
-    and the panel's stored background keeps playing behind them.  An opaque
-    frame covers that layer completely, which is why our first runs over a
-    stored MP4 showed a black background (`--bg black` is the old behaviour).
+    and the panel's stored background keeps playing behind them.  `black` is the
+    old behaviour, and our first runs over a stored MP4 showed a black field.
+
+    Worth being exact about the word *opaque*: this is a **canvas**, the colour
+    a `theme_*` body opens its image with, and PIL's `ImageDraw` *replaces* a
+    pixel for a translucent fill instead of blending it with the canvas.  So a
+    theme that paints something translucent - the ring's track, the grey plate
+    behind two figures in `alpha`, `dual` and `gauge` - still carries those
+    pixels at alpha below 255 into the frame, and the panel's stored background
+    shows through them.  `bars` and `clock` have nothing translucent and really
+    do go opaque, and a layout theme always does because `themes.paint` lays its
+    plate *under* the finished layer.  The suite derives the split from the
+    exports' own colour keys; docs/usage.md states it.
     """
     return render.BLACK if getattr(args, "bg", "clear") == "black" else render.OVERLAY
 

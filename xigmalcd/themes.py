@@ -372,9 +372,14 @@ def paint(record: dict, metrics: dict, when=None, scrim: int = 0, base=None) -> 
     if scrim:
         img = render.scrim(img, max(1, min(255, int(scrim))))
     if base is not None and base[3] == 255:
-        # `--bg black` means the same thing for a layout as for our own themes: the frame
-        # is opaque, so it covers the panel's stored background instead of letting it
-        # show through. Transparent is the vendor's shape and the default here.
+        # `--bg black` is *stronger* here than for our own five: a layout's plate goes
+        # under the finished layer, so every pixel of the frame comes out at alpha 255
+        # and the panel's stored background is covered completely.  A `theme_*` body
+        # instead opens its image with the canvas (`Image.new("RGBA", (W * SS, H * SS), bg)`)
+        # and `ImageDraw` replaces a translucent fill rather than blending it with the canvas,
+        # so `alpha`, `dual` and `gauge` keep leaking at their own translucent parts.  The
+        # suite measures both halves; docs/usage.md's `--bg` row states the split.  Both
+        # doors keep transparent as the default, because that is the vendor's shape.
         img = Image.alpha_composite(Image.new("RGBA", img.size, base), img)
     return img, notes
 

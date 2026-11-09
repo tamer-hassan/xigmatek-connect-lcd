@@ -7,8 +7,10 @@ The flag table, what goes to the panel and when, and the arrangement that lets a
 The default run uploads the theme background first (`media/Theme_25.mp4`, 215 KB) and
 then draws on a **transparent** canvas, so that background keeps playing behind the picture
 - which is how the vendor's own app does it, and the pair is what its own config names, so
-the default glass is what ALPHA showed you on Windows. `--bg black` paints an opaque field
-over the background instead; `--no-mp4` skips the upload and uses whatever the panel already
+the default glass is what ALPHA showed you on Windows. `--bg black` puts an opaque black
+**canvas** behind the picture instead - which is not the same thing as an opaque *frame*,
+and the `--bg` row of the flag table below says where the two part; `--no-mp4` skips the
+upload and uses whatever the panel already
 has stored. Two other vendored clips are one flag away: `--mp4 media/Theme_11.mp4` (3.4 MB,
 the quietest loop in the vendor's library) and `--mp4 media/theme_48.mp4` (1.33 MB, nearly
 white under white glyphs, which is why a `--scrim` plate is drawn automatically for it).
@@ -64,7 +66,7 @@ Put the module in `/etc/modules-load.d/` if you want it at every boot.
 | `--duration N` | stop after N seconds |
 | `--once` | push one frame and exit |
 | `--dry-run DIR` | render to PNGs in DIR, never touch the port (test a theme) |
-| `--bg clear\|black` | `clear` (default) draws on a transparent canvas, so the panel's own background layer keeps playing behind our glyphs - the way ALPHA's `.osd` files do, which paint 4.6 percent of their pixels. `black` is the old opaque picture, which covers that layer completely |
+| `--bg clear\|black` | `clear` (default) draws on a transparent canvas, so the panel's own background layer keeps playing behind our glyphs - the way ALPHA's `.osd` files do, which paint 4.6 percent of their pixels. `black` fills the canvas opaquely, and that is **not** the same as an opaque frame: 3 of the five drawn themes (`alpha`, `dual`, `gauge`) paint their own translucent fills - a ring's track, the grey plate behind two figures - and PIL's `ImageDraw` replaces those pixels instead of blending them with the canvas, so they keep letting the stored background through even with `--bg black`. Two of them (`bars`, `clock`) declare nothing translucent and go opaque across the whole frame, and so does a layout theme, because there the plate is composited *under* the finished layer. The suite derives the split from the exports' own colour keys and prints the leaking counts beside the machine rather than quoting them here |
 | `--mp4 [PATH]` | upload a 480×480 H.264 MP4 as the panel's background layer at session start, as ALPHA does with its theme background. **On by default**, with `media/Theme_25.mp4` from this repo (214 917 B, 23 frames at 24 fps, a 0.96 s loop, byte-identical to the copy `currentThemeBg` names in `%APPDATA%/alpha`, mean luma 18.7 of 255 so it is dark under white glyphs, 0 black frames). Its measured weakness is the loop join: 2.50 against 1.51 typical frame-to-frame motion, i.e. a small jump once per second. It is the default because it is the vendor's own pairing, not because it measures best; the two measured-quieter vendored clips are one flag away - `--mp4 media/Theme_11.mp4` (3 402 098 B, 363 frames at 24 fps, a 15.1 s loop, luma 13.3-24.1, 0 black frames, join 0.11 against 2.54 - the smoothest loop in the vendor's library, taken in **2.4 s**) and `--mp4 media/theme_48.mp4` (1 333 649 B, 10.85 s, luma 227.3, a near-white field for white text and a join of 4.50 against 0.60, hence the automatic `--scrim`). All figures come from decoding all 40 vendor clips, not from sampling ("Where the defaults come from"). `Theme_24.mp4` in the vendor tree is the smallest upload that still reads seamless (0.94 MB, 4.04 s, join 1.55 vs 2.93) |
 | `--no-mp4` | skip the upload and leave the panel's stored background playing. The panel plays the last media file it took, so what is stored now is whatever the last run uploaded (`Theme_25.mp4` after the 11:04 run); only a reset clears it — `xigmalcd-reset --yes` on an installed system, `tools/reset_panel.py --yes` in a checkout — which puts the still logo back |
 | `--text-color COLOUR` | the ink of the text this program draws: a name from this program's own palette (`amber`, `mint`, `cyan`, `white`, `dim`…), `#rgb`/`#rrggbb`, or anything PIL's colour table names. Unset keeps each theme's own skin - and for `alpha` that skin is the white measured in its layout file (6 of 6 text colours, PROTOCOL.md §10), which is why unset is the default and not a guess. It changes **our layer only**: the vendor's themes keep their text colour inside their own files - 106 `textColor` values across the 23 480×480 layouts, 88 of them `rgba(255, 255, 255, 1)`, 5 of those themes using other colours at all - and nothing here sends one, so a vendor theme's lettering is whatever that theme's file says, whatever this says (docs/themes.md has the table). The colour is baked into the frame before it is uploaded, so the panel is never told a colour and is never asked one (§11). Measured off-glass by the suite: a chosen ink comes back within **1/255 per channel** after the default 256-colour palette encoding, and choosing one leaves the frame's painted area unchanged (gauge 6 087 px before and after) - the ink moves the ink, not the composition |
@@ -139,14 +141,20 @@ claim:
   `--clock-size`, `--text-color`): its geometry, colours, sizes and font faces are inside
   its file. Two flags do apply, because they are rules about the *layer* rather than about
   a theme: `--scrim`, whose plate is built from the layer's own alpha and needs no
-  per-theme geometry (docs/limits.md), and `--bg black`, which makes the frame opaque so it
-  covers the panel's stored background - gated both ways in the suite, opaque alpha
-  (255, 255) against the same layout's transparent (0, ...)
+  per-theme geometry (docs/limits.md), and `--bg black`, which for a layout is composited
+  *under* the finished layer, so the frame really is opaque and covers the panel's stored
+  background - the drawn five are not the same case, because their canvas goes in before
+  the drawing (`--bg` in the table above). Gated both ways in the suite, opaque alpha
+  (255, 255) against the same layout's transparent (0, ...), and the alpha tally of every
+  drawn theme on a black canvas
 * Over the control socket the same names work - `{"cmd":"theme","value":"Theme_07"}` -
-  because one name should mean one thing in all three doors. The **window's** picker still
-  lists the five: the window previews what it lists, and it cannot preview a layout yet.
-  That is the editor plan in [theme-editor.md](theme-editor.md), and it is the one thing
-  here that is not built.
+  because one name should mean one thing in all three doors. The **window** now offers both
+  halves of the vocabulary: its theme picker is the five this repo draws, and its layout
+  editor opens any layout the canvas can select - the vendor's 27 minus the four refused at
+  480x480 - and paints each through `themes.draw`, the same door `--check-theme` and the
+  frame loop use (docs/gui.md, [theme-editor.md](theme-editor.md)).  What is still not built
+  is sending one: no layout file goes to the panel, and the glass keeps taking an overlay
+  from our drawings or a `.thm` from the vendor's own app.
 * **The field census behind that plan is printed, not remembered**: `--print-theme-fields`.
   Its numbers go into the inspector design - 33 distinct keys across 152 widgets, 22 read,
   11 carried by the vendor's files and never read, 4 read with no vendor example - and one
