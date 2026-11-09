@@ -182,7 +182,7 @@ names, so the default glass is what `ALPHA` showed you on Windows.
 | [PROTOCOL.md](PROTOCOL.md) | the wire: the handshake, the frame format, the media upload, the session limit — every claim from a capture |
 
 Everything in those files is measured on the author's bench or read out of a kept log,
-and the gaps are named as gaps. `tools/selftest.sh` runs the twenty-one offline sections
+and the gaps are named as gaps. `tools/selftest.sh` runs the twenty-two offline sections
 that hold the claims which do not need hardware — it is what CI runs first, on a machine
 that has never seen a panel.
 

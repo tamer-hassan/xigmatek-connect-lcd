@@ -4000,6 +4000,134 @@ print(f"  README                names all {len(render.THEMES)} drawn themes "
       f"section that measures the six video files")
 PY
 
+echo "== what a layout file can and cannot answer, option by option"
+# All five drawn themes also exist as generated layout files, so the file door *could* draw
+# them - and the question of whether it should is answered per option, not per theme, by
+# tools/knobmap.py: one pinned reading dict, one pinned clock instant, the best row-level
+# edit of that theme's own export for each option its signature accepts, and the pixels
+# between the two doors.  Nothing is sent anywhere; no port is opened.
+#
+# What this section holds is the structure of the answer, which is the part that does not
+# depend on which fonts are installed:
+#   * every option in every drawn theme's signature is accounted for - it is either a row in
+#     the map or it is in the unread list, and the unread list is derived here from the bodies
+#     with `ast` so the tool cannot quietly drop an option and make the map look clean;
+#   * exactness is binary.  A row is either 0 px with a worst channel of 0, or it is past a
+#     floor this section picks from the run and asserts - so "the file door nearly answers it"
+#     is not a state the map can be in;
+#   * two invariants that would each be a bug if they ever moved: the reader's text colour and
+#     the default transparent canvas are exact for all five (the ink goes through
+#     `themes.with_ink`, the canvas is the case every parity claim in the docs is about);
+#   * docs/limits.md states the counts, the black-canvas share and the unread option in the
+#     same derived words, so the paragraph cannot drift from the measurement.
+python3 - <<'PY' || { echo "knobmap FAILED"; exit 1; }
+import ast
+import inspect
+import json
+import os
+import subprocess
+import sys
+import tempfile
+
+sys.path.insert(0, ".")
+from xigmalcd import render, themes
+
+if not os.path.isfile("tools/knobmap.py"):
+    raise SystemExit("tools/knobmap.py is missing: this section is a gate over that tool")
+tmp = tempfile.mktemp(suffix=".json")
+r = subprocess.run([sys.executable, "tools/knobmap.py", "--json", tmp],
+                   capture_output=True, text=True)
+assert r.returncode == 0, (r.stdout[-800:], r.stderr[-800:])
+data = json.load(open(tmp, encoding="utf-8"))
+os.unlink(tmp)
+rows, knobs_of = data["rows"], data["knobs"]
+unread = [u[0:2] for u in data["unread"]]
+
+# every signature option is a row or an unread note - derived from the bodies, here
+expect_unread, expect_rows = [], 0
+for name in sorted(render.THEMES):
+    sig = inspect.signature(render.THEMES[name])
+    opts = [k for k in sig.parameters if k not in ("m", "metrics")]
+    assert knobs_of.get(name) == sorted(opts), (name, knobs_of.get(name), sorted(opts))
+    tree = ast.parse(inspect.getsource(render.THEMES[name]))
+    for knob in opts:
+        uses = sum(1 for node in ast.walk(tree)
+                   if isinstance(node, ast.Name) and node.id == knob)
+        # `bg` arrives as two rows (`bg clear`, `bg black`) and `title` as two values, so a
+        # row belongs to an option when its knob is that name or `<name> <something>` - and
+        # only then: prefix matching alone would count `clock_size`'s row under `clock` too.
+        n_rows = len([r for r in rows if r["theme"] == name
+                      and (r["knob"] == knob or r["knob"].startswith(knob + " "))])
+        if uses == 0:
+            expect_unread.append((name, knob))
+            assert n_rows == 0, (name, knob, "an unread option is in the map anyway")
+        else:
+            expect_rows += n_rows
+            assert n_rows >= 1, (name, knob, "an option the body reads has no row")
+assert sorted(tuple(u) for u in unread) == sorted(expect_unread), (
+    unread, expect_unread, "the unread list is not what the bodies say it is")
+assert len(rows) == expect_rows, (len(rows), expect_rows)
+
+# exactness is binary, and the floor is taken from this run rather than remembered
+zero = [r for r in rows if r["exact"]]
+apart = [r for r in rows if not r["exact"]]
+assert all(r["diff_px"] == 0 and r["worst_channel"] == 0 for r in zero), zero
+assert all(r["diff_px"] > 0 for r in apart), [r for r in apart if r["diff_px"] == 0]
+floor = min(r["diff_px"] for r in apart)
+assert floor > 900, (floor, "a non-exact pair is close enough to 0 that 'exactly 0 or clearly "
+                            "not' stops being a decision: the map's line has moved under it")
+
+# the two invariants
+for name in sorted(render.THEMES):
+    ink = [r for r in rows if r["theme"] == name and r["knob"] == "ink"]
+    clear = [r for r in rows if r["theme"] == name and r["knob"] == "bg clear"]
+    assert len(ink) == 1 and ink[0]["exact"], (name, ink,
+                                               "`themes.with_ink` no longer matches the code "
+                                               "drawing: the pane's two doors disagree about "
+                                               "the reader's own colour")
+    assert len(clear) == 1 and clear[0]["exact"], (
+        name, clear, "at the default transparent canvas the file door and the code door are "
+                     "not one picture, and every parity figure in the docs is about that case")
+black = [r for r in rows if r["knob"] == "bg black"]
+assert len(black) == len(render.THEMES) and all(not r["exact"] for r in black), (
+    black, "the black canvas is expected to differ between the doors (a plate under a layer "
+           "is not a canvas drawn on); if it stopped differing, docs/usage.md's `--bg` row "
+           "and docs/limits.md's map paragraph are both wrong")
+
+# and the documents, in the same derived words
+_lim = open("docs/limits.md", encoding="utf-8").read()
+_claims = [f"{len(zero)} of the {len(rows)} (theme, option) pairs",
+           f"{len(apart)} of them are far from 0",
+           f"{sum(1 for r in black if not r['exact'])} of them are the black canvas",
+           "above 900 px"]
+for name, knob in sorted(expect_unread):
+    _claims.append(f"`{name}` takes `{knob}` and never reads it")
+    # and the reader-facing half: the flag table has to say so where the flag is listed
+    _usage_doc = open("docs/usage.md", encoding="utf-8").read()
+    assert f"`theme_{name}` never reads `{knob}`" in _usage_doc, (
+        name, knob, "docs/usage.md lists the flag that reaches this option without saying "
+                    "that the theme ignores it")
+_missing = [c for c in _claims if c not in _lim]
+assert not _missing, (_missing, "docs/limits.md does not state what this run measured, so the "
+                                "paragraph is prose again rather than a claim held to the map")
+print(f"  the map                {len(render.THEMES)} drawn themes x their own signatures = "
+      f"{len(rows)} (theme, option) pairs; {len(zero)} land at 0 px (worst channel 0) and "
+      f"{len(apart)} are far from 0, the closest being {floor:,} px, which is above the 900 px "
+      f"the documents quote; {len(black)} of the non-exact pairs are the black canvas alone")
+print(f"                       options a body never reads: "
+      + (", ".join(f"{n}.{k}" for n, k in sorted(expect_unread)) or "none")
+      + "; the routes are taken from `main._theme_kwargs` with `ast`, so an option nobody can "
+        f"ask for is said as such ({len([r for r in rows if 'Python only' in r['route']])} "
+        f"pairs have no CLI or socket route)")
+_other = sorted({f"{r['theme']}.{r['knob']} {r['diff_px']:,} px" for r in apart
+                 if r["knob"] != "bg black"})
+_lo, _hi = min(x["diff_px"] for x in black), max(x["diff_px"] for x in black)
+print("  what cannot be routed  " + "; ".join(_other)
+      + f"; bg black on {len(black)} themes ({_lo:,}-{_hi:,} px). Those figures walk glyph "
+        "edges and installed faces, so they are printed beside the machine and the documents "
+        "carry only the split and the floor")
+PY
+
 echo "== decoder round-trip: encode -> decode -> re-encode"
 python3 - <<'PY' || { echo "decoder round-trip FAILED"; exit 1; }
 from xigmalcd import protocol as p
@@ -4321,6 +4449,18 @@ assert not _stray, (
     _sizes, _total, _stray,
     "docs/packaging.md's picture accounting no longer matches the files it counts")
 assert f"{len(_all)} files" in _pkg_doc, (len(_all), "the file count moved")
+# docs/tools.md quotes the same six previews individually ("the README's set, as the suite
+# prints it"), and that list had already drifted: `bars` was 802 310 B there where the file is
+# 779 905 B since its fan slots were re-rendered on 2026-11-08 - the same 22 405 B that moved
+# the group total, noticed here only because the total was being re-derived.  So the per-file
+# figures are held too, in the spaced style that page writes them in.
+_tools_doc = open("docs/tools.md", encoding="utf-8").read()
+_stray_files = [os.path.basename(_f) for _f in _pics["the MP4s"]
+                if _spaced(os.path.getsize(_f)) not in _tools_doc]
+assert not _stray_files, (_stray_files,
+                          "docs/tools.md quotes a preview size that the file does not have")
+assert _spaced(_sizes["the MP4s"]) in _tools_doc, (
+    _sizes["the MP4s"], "docs/tools.md's six-preview total is not this tree's total")
 print(f"  what is not packaged   {len(_all)} files, {_spaced(_total)} B, all of it outside "
       f"the .deb: " + ", ".join(
           f"{k} {_spaced(_sizes[k])} B ({len(_pics[k])} file"

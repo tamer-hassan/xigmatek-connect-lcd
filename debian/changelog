@@ -149,7 +149,7 @@ xigmatek-connect-lcd (0.3) resolute; urgency=medium
     plate, 93.0 with the rule's plate, 1.74x - the glyphs do not get brighter,
     the ring around them gets darker, which is what _scrim hugging the drawn
     pixels is for.
-  * tools/selftest.sh, twenty-one offline sections; tools/screenshot.py frames
+  * tools/selftest.sh, twenty-two offline sections; tools/screenshot.py frames
     the window at 1380x860 and finishes probing the rows a picture can show;
     tools/display_glass.py's Apply phase sends the colour command along with the
     rest, so the next bench run can settle the glass half.  The new section

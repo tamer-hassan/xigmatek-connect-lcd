@@ -508,6 +508,9 @@ What has been measured on glass, by whom, with how many frames - and what has no
     cell cannot.  **The bytes:** the six URLs README and docs/gui.md hold were fetched with
     `curl -L` on 2026-11-08, and every one came back byte-identical to the file in the tree -
     908 420, 1 930 104, 214 113, 802 310, 278 884 and 927 752 B, each `cmp` clean, sha256
+    (that record is as-of the tree at `22563ad`: `bars-theme_52.mp4` was re-rendered the
+    same day in `06de272` and is 779 905 B now, and the six sizes today are the ones the
+    launcher section re-stats from the files rather than any figure in these pages)
     `e3c272ec…`, `99c8005b…`, `5117a5c0…`, `cfe8d640…`, `0f73b6be…`, `731cb1a7…`.  What that
     proves is about the link: the URL in the markdown resolves to the tree's own bytes, so a
     reader who opens or saves it gets the measured file.  Whether GitHub's embedded player
@@ -746,7 +749,41 @@ under the picture: open one of the five themes this repo draws from code and `th
 writes the reader's text colour into a **copy** of that theme's generated layout, over the
 colours `render.SKIN` declares, so the pane's two doors agree at that ink. A vendored or
 saved layout is never touched by it - measured at 0 px - and neither is the file a save would
-write. And **none of this has
+write.
+
+**Why the five drawn themes are still drawn from code.**  All five also exist as generated
+layout files (`themes.export`, printed by `--export-theme NAME`), so the file door could draw
+them, and `main.paint` already prefers a file for any other name.  Whether that is free is a
+measurement per option, not per theme, and `tools/knobmap.py` makes it: one pinned reading
+dict at one pinned instant, every option each `theme_*` signature accepts (read with
+`inspect`), the best row-level edit of that theme's own export for each, and the pixels
+between the two doors.  On this run 27 of the 36 (theme, option) pairs land at zero differing
+pixels with a worst channel of 0 - the reader's text colour (through `themes.with_ink`), a
+clock or fan row switched off by deleting it, `--clock-size` as the Time row's `fontSize`,
+`--cold`/`--hot` as `minValue`/`maxValue`, `--label` and `--title` as a text row's `content`,
+and the default transparent canvas.  9 of them are far from 0 rather than near it, and the
+smallest non-zero gap in the whole map is above 900 px, so the split is a line a machine can
+check rather than a judgement: nothing sits between 0 and the floor.  5 of them are the black canvas alone: compositing a plate under a finished layer is a different frame from opening one
+on a black canvas before the supersampled draw and the resample, and it is the *more* opaque
+of the two (see the `--bg` row in docs/usage.md - a layout seals every pixel at alpha 255,
+while three of our five keep their own translucent fills).  The rest are structural, not
+antialiasing: `alpha`'s heading is not a text row a `content` edit can reach, `gauge`'s
+`source` moves the arc's ramp and ticks as well as its reading, and `gauge`'s `gradient` has
+no key in the file model at all.
+
+One option is in a signature and nowhere in a body: `clock` takes `clock` and never reads it,
+and `main._theme_kwargs` routes `--no-clock` straight to it - so that flag leaves that theme
+at 0 px, which is said here rather than fixed quietly, because honouring it would redraw a
+theme on the glass.  Two more options - `clock`'s `big` and `gauge`'s `gradient` - are read by
+the body but have no entry in `_theme_kwargs` at all, so no flag or socket message can set
+them; `big` is a *size* (`theme_clock(big=140)`), not a flag, and the first version of this
+map mistook it for one and asked with `True`.
+
+What belongs to the machine: the non-zero pixel counts walk glyph edges and installed faces,
+so the suite prints them beside the machine and this page carries only the counts, the sets
+and the floor.  What does not: which pairs are exactly 0, and that the unread option is
+unread - both are re-derived on every run by the section that runs the tool, and it asserts
+the words above against the run. And **none of this has
 been looked at on glass yet**: the frame byte counts in docs/usage.md (3 558 B for
 `Theme_29` up to 8 115 B for `Theme_35`, one pinned fixture, one pinned instant) are
 offline figures from `--dry-run`, and the glass pass is stage 6 of
