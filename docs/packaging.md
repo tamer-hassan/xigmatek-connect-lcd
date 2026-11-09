@@ -37,10 +37,12 @@ build stopping at "PEP517 plugin dependencies are not available" without it.
 | `xigmatek-connect-lcd-themes_0.2_all.deb` | ALPHA's own library under `/usr/share/xigmalcd/themes/alpha`: 27 `.thm` files, their decrypted layouts, 44 background clips (43 MP4 and one PNG), 27 baked overlay PNGs, and `manifest.json`, which hashes all 152 entries of the 125 distinct files | 146 MB | 129 files |
 
 Both rows are one build on the author's bench, 2026-11-07, of the tree at the `v0.2` tag.
-A build of this tree names the files `_0.3_` instead, and that build is measured in its own
-section below, "What the 0.3 tree packages, measured" - the themes package changed shape on
-the way here, because the vendor's `.thm` containers are no longer packaged, so that file is
-a good deal smaller than the 146 137 362 B above while holding the same library. The version
+A build of the tree at the `v0.3` tag names the files `_0.3_` instead, and that build is
+measured in its own section below, "What the 0.3 tree packages, measured" - the themes
+package changed shape on the way here, because the vendor's `.thm` containers are no longer
+packaged, so that file is a good deal smaller than the 146 137 362 B above while holding the
+same library. **The tree is at `0.4` now**, and no 0.4 build is recorded in this page: every
+byte count below is the `v0.3` tag's, and a 0.4 record belongs with the tag. The version
 number is spelled the same in three places - the top `debian/changelog` stanza,
 `pyproject.toml` and `xigmalcd.__version__` - and the CI job that builds the packages fails
 if those spellings ever part company (`debian/README.source` says why).

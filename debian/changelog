@@ -1,3 +1,131 @@
+xigmatek-connect-lcd (0.4) resolute; urgency=medium
+
+  * The vendor's own layouts are pictures this program can draw.  `--theme
+    Theme_07`, `{"cmd":"theme","value":"Theme_07"}` over the control socket,
+    and the window's layout editor all name one file.  23 of ALPHA's 27
+    layouts are selectable; the four 320x240 ones are refused on their own
+    `ratio` field rather than stretched onto a 480x480 glass, and
+    `--list-themes` prints the split with the reason beside it.
+    `--check-theme NAME` prints what every widget of one layout would do -
+    painted, skipped because no reading answers its `source`, or skipped
+    because a font face is not installed - and the counts account for every
+    widget in the file, so nothing vanishes uncounted.  No layout file is
+    ever sent to the panel: it is drawn here and uploaded as the same `.osd`
+    frame a picture of `alpha` already is.
+
+  * All five of this project's own themes now export to that file format at
+    zero differing pixels (`--export-theme NAME`), which is what the format
+    is for.  Getting there meant naming two things the vendor's renderer
+    never had to write down: `xigma.arcPaint`, because one arc painted with
+    the vendor's convention is a different picture from the same arc painted
+    with ours (measured both ways in the suite), and `xigma.colourStops`,
+    because `gauge`'s ramp is a colour rule rather than a gradient somebody
+    remembered.  `--list-specials` prints the five composite rows
+    (`fan-figures`, `temp-values`, `temp-labels`, `dual-status`,
+    `clock-readings`) that no single vendor widget stands for.
+
+  * `bars` lays out ten tachometer slots on every box instead of compacting
+    the list to whatever one machine reports, so a layout file can say where
+    a row goes; the two bar conventions it needed are held to the functions
+    they name.  The readings that go behind those rows were checked against
+    what the drawing prints, row for row.
+
+  * A theme you edit is a file, and a file you write shadows the vendor's.
+    `$XDG_CONFIG_HOME/xigmalcd/themes` is read before the checkout and
+    before `/usr/share/xigmalcd/themes/alpha`, so your copy wins without
+    anyone unpacking a package, and `--list-themes` says which root
+    answered.  The two vendor trees are never written, and the five
+    drawn-from-code names cannot be saved as files: a `gauge.json` would be
+    a second source of truth for `render.theme_gauge`, which is the drift
+    the export design exists to avoid.  `--check-theme gauge` says that in
+    words.
+
+  * The window's layout editor.  Pick one of the 23 selectable layouts and
+    it is drawn by the same code the loop uses, from a pinned fixture, so
+    the picture does not move under your cursor while you edit it; point at
+    a row's ink box to select it, drag it, nudge it with the arrow keys.
+    Applying is live to the preview only - nothing about an edit reaches the
+    panel except through the buttons that already sent frames, and the
+    guarded factory reset is still never folded away.
+
+  * A layout names its own background, and the window follows it.  Every
+    selectable layout declares a clip in `background.mediaFile`; choosing
+    the layout puts that clip under the preview and marks its row, and the
+    line under the picture says which file it chose and from where.  It is a
+    preview rule, not a wire rule: the upload button is still the only thing
+    that sends a file to the panel.  One click on another row makes the
+    background yours, and from then on no layout can walk over it until the
+    `Use this layout's own clip` button hands it back.
+
+  * `media_roots()` gained the vendor's theme library, so a bare clip name
+    is looked up in four roots instead of two: `$XIGMA_MEDIA`, this
+    checkout's `media/`, `/usr/share/xigmalcd/media`, then the library - the
+    checkout's `themes/alpha/clips`, then the copy
+    `xigmatek-connect-lcd-themes` installs.  That is what makes `--mp4
+    Theme_07.mp4` mean the file `--list-themes` printed beside that layout:
+    23 of the 23 resolve, where 2 of 23 did before.  The media roots still
+    come first, so the session default is `media/Theme_25.mp4` on every box,
+    and no file is uploaded that a flag did not ask for.
+
+  * The two doors made to agree about a frame.  A generated layout and the
+    code drawing it came from are compared at one pinned reading dict and
+    one pinned instant - 15 of the 19 sources a layout asks for are answered
+    by that one dict, and the reader's own text colour reaches a generated
+    file through declared skin roles (`render.SKIN`, `themes.with_ink`)
+    rather than an `ink` argument, which is what lets the ink comparisons
+    land at zero differing pixels at all.
+
+  * `--bg black` is a canvas, not a promise about the finished frame, and
+    the documents said the promise.  For a layout theme the plate is
+    composited *under* the finished layer, so every pixel comes out at alpha
+    255 and the panel's stored background is covered.  For three of the five
+    drawn themes (`alpha`, `dual`, `gauge`) it is not: a `theme_*` body
+    opens its image on the canvas, PIL replaces a translucent fill instead
+    of blending it, and those themes keep letting the stored background
+    through their own ring tracks and plates.  Which themes leak is derived
+    from the exports' colour keys by the suite, which prints the pixel
+    counts beside the machine instead of quoting them.
+
+  * `--no-clock` does what it says on the theme that is mostly a clock.
+    `theme_clock` took a `clock` argument and never read it, so the flag
+    moved zero pixels; it now drops the big time line and leaves the date
+    and the readings line where they are.  That is a frame change on the
+    glass for anyone using the flag - every frame drawn *without* it is
+    byte-identical to before, and the suite measures that rather than
+    asserting it.
+
+  * Two questions that used to be argued are now measured by a tool.
+    `--print-theme-fields` prints the field census over the vendor's files
+    and `layout.py`'s own source: 33 keys across 152 widgets, 22 of them
+    read, 11 carried by the vendor's files and never read, 4 read with no
+    vendor example.  `tools/knobmap.py` answers, option by option, what a
+    layout file can do in place of a `theme_*` body: 28 of the 37 (theme,
+    option) pairs land at zero differing pixels and 9 do not, and the suite
+    holds the floor above 900 px on any machine - which is the recorded
+    reason the five stay drawn from code.
+
+  * An installed library is read back now, not only hashed.  With the themes
+    package present, `debian/tests/smoke` runs `themes.scan()` against the
+    installed tree, paints every selectable layout through `themes.paint()`
+    from one pinned dict at one pinned instant, holds the per-layout
+    accounting identity, agrees with `--list-themes` on the same split, and
+    resolves each layout's declared clip through the loop's own name lookup.
+    The themes `.deb` is built, uploaded and installed on every CI run
+    rather than only on a tag: before that, the whole section printed
+    SKIPPED on a push and the figures rested on one bench.
+
+  * Gates for the things that had quietly drifted.  `tools/selftest.sh`,
+    twenty-two offline sections, now reads the width of debian/changelog (a
+    line over 80 columns is a lintian *warning*, which fails the .deb job
+    while the python suite stays green), re-derives the clip census from the
+    files this repository tracks (46 mp4 files, 40 distinct contents, 6
+    copies, 3 of them renamed) instead of quoting an audit of one machine's
+    mounted partitions, holds the pairing rule to the layout files
+    themselves, and re-prints every sentence in the documents that quotes a
+    number a tool prints - including the numbers in docs/tools.md, two of
+    which had gone stale a day after they were written.
+
+ -- Tamer Hassan <thameruddin@gmail.com>  Mon, 09 Nov 2026 09:35:57 +0200
 xigmatek-connect-lcd (0.3) resolute; urgency=medium
 
   * xigmaui in three columns instead of one long scroll, at the author's own
@@ -149,8 +277,8 @@ xigmatek-connect-lcd (0.3) resolute; urgency=medium
     plate, 93.0 with the rule's plate, 1.74x - the glyphs do not get brighter,
     the ring around them gets darker, which is what _scrim hugging the drawn
     pixels is for.
-  * tools/selftest.sh, twenty-two offline sections; tools/screenshot.py frames
-    the window at 1380x860 and finishes probing the rows a picture can show;
+  * tools/selftest.sh, twenty offline sections; tools/screenshot.py frames the
+    window at 1380x860 and finishes probing the rows a picture can show;
     tools/display_glass.py's Apply phase sends the colour command along with the
     rest, so the next bench run can settle the glass half.  The new section
     checks the README videos as documents: 240 frames at the length and rate the
