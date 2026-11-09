@@ -212,22 +212,26 @@ What has been measured on glass, by whom, with how many frames - and what has no
   `background` record names the same bytes as one of the clips).
    **Reading it back is part of that test now:** on a system with the package installed,
    `debian/tests/smoke` runs `themes.scan()` and paints all 23 selectable layouts with one
-   pinned dict at one pinned instant - 114 widget boxes, the accounting identity holding on
-   every layout (painted plus source-skipped plus font-skipped equals the manifest's widget
-   count), 9 of them asking for `Pump Speed`, which no reading on that box answers, and no
-   port opened.  It also measures the lookup a pairing
-cannot work without: the themes package installs the clip every one of those 23
-layouts names (`/usr/share/xigmalcd/themes/alpha/clips`), and since 0.4 the loop's own
-   rule for turning a bare name into a file searches that library too, so **all 23 resolve by name** -
-   `--mp4 Theme_07.mp4` means the background that layout declares.  Before that change it
+   pinned dict at one pinned instant - **114 widget boxes** on this bench, **113** on a GitHub
+   runner, and the one-box difference is a face: the runner lacks `simsun/20`, so one widget
+   is font-skipped there and the test prints that skip instead of pinning a count.  What the
+   test holds on both machines is the accounting identity, per layout: painted plus
+   source-skipped plus font-skipped equals the manifest's widget count.  9 layouts ask for
+   `Pump Speed`, which no reading on either box answers, and no port is opened.  It also
+   measures the lookup a pairing cannot work without: the themes package installs the clip
+   every one of those 23 layouts names (`/usr/share/xigmalcd/themes/alpha/clips`), and
+   since 0.4 the loop's own rule for turning a bare name into a file searches that library
+   too, so **all 23 resolve by name** - `--mp4 Theme_07.mp4` means the background that
+   layout declares.  Before that change it
    resolved **2 of the 23**, because only the three clips the *main*
    package vendors were roots: `--theme Theme_07` drew the layout while `--mp4
    Theme_07.mp4` could not name the file sitting beside it in the package installed next
    door.  The media roots still come first, so the session default is `media/Theme_25.mp4`
    on every box; the installed test pins the 23 and the clip-roots section of
-   `tools/selftest.sh` pins the order, with a planted name that both kinds of root hold.  The
-  `.thm` containers are not in the package: they were in the 0.1 and 0.2 packages, and
-  since 0.3 the manifest records them by vendor path, byte count and sha256 only.  The
+   `tools/selftest.sh` pins the order, with a planted name that both kinds of root
+   hold.  The vendor's encrypted `.thm` containers are not in the package: they were in
+   the 0.1 and 0.2 packages, and
+   since 0.3 the manifest records them by vendor path, byte count and sha256 only.  The
   smoke test is what keeps that honest in both directions - it walks the installed tree
   and fails on any file the manifest does not name, so a `.thm` cannot sneak back into the
   .deb unnoticed. None of it is a theme this program can select: the window's theme
