@@ -323,7 +323,110 @@ for ent in man["files"]:
     kinds[ent["kind"]] = kinds.get(ent["kind"], 0) + 1
 print(f"  kinds             {kinds}")
 PY
-    say "themes" "$lib, every manifest entry re-hashed"
+    # Bytes on disk are only half of an installed library: the other half is whether the
+    # program that ships beside it can *read* it on this machine.  So the same doors the loop
+    # uses - `themes.scan()`, `themes.paint()`, `--list-themes` - run here against the
+    # installed tree, with a pinned metrics dict and one pinned instant, and no port in
+    # sight.  Nothing is asserted about the pixels themselves (the fonts an installed system
+    # has are its own business, and the suite holds the pixel figures in a checkout); what is
+    # asserted is the accounting identity, the refusal rule, and the pairing.
+    python3 - "$lib" <<'PY'
+import datetime, json, os, subprocess, sys
+
+from xigmalcd import themes
+
+PIN = {"cpu": {"temperature": 61, "load": 42, "power": 88.5, "speedAverage": 4338},
+       "gpu": {"temperature": 55, "load": 63, "power": 37.0, "speed": 1500},
+       "network": {"upload": 12.3, "download": 45.6}, "memory": {"load": 7}}
+WHEN = datetime.datetime(2026, 11, 8, 3, 40, 0)
+
+pick, rej = themes.scan()
+lib = sys.argv[1]               # `python3 - "$lib"`, so the path arrives as argv
+man = json.load(open(os.path.join(lib, "manifest.json")))
+layouts = [e for e in man["files"] if e["path"].endswith(".json")
+           and e["path"].startswith("layouts/")]
+assert len(pick) + len(rej) == len(layouts), (
+    len(pick), len(rej), len(layouts),
+    "the installed library's layouts are not all accounted for by `themes.scan()`")
+assert all(r["ratio"] == "1:1" for r in pick), [r["ratio"] for r in pick]
+assert all(r["ratio"] != "1:1" for r in rej), [r["ratio"] for r in rej]
+print(f"  installed selection {len(pick)} of the {len(layouts)} layouts in the manifest are "
+      f"selectable here, {len(rej)} refused on their own `ratio` field "
+      f"({', '.join(sorted({r['ratio'] for r in rej}))})")
+
+painted, asks, faces = 0, {}, set()
+for rec in pick:
+    img, notes = themes.paint(rec, PIN, when=WHEN, scrim=0)
+    src_skips = [m for m in notes["missing"] if not str(m).startswith("font:")]
+    face_skips = [m for m in notes["missing"] if str(m).startswith("font:")]
+    assert len(notes["boxes"]) + len(src_skips) + len(face_skips) == rec["widgets"], (
+        rec["name"], rec["widgets"], notes["boxes"], notes["missing"],
+        "a widget of an installed layout neither drew nor was reported: the accounting "
+        "identity the checkout's suite holds does not hold on an installed system")
+    assert notes["boxes"], (rec["name"], "an installed layout painted nothing at all")
+    painted += len(notes["boxes"])
+    for m in src_skips:
+        asks[m] = asks.get(m, 0) + 1
+    for m in face_skips:
+        faces.add(str(m))
+    assert img.size == (rec["w"], rec["h"]), (rec["name"], img.size, rec["w"],
+                                             rec["h"])
+print(f"  installed painting  {painted} widget boxes painted across the {len(pick)} "
+      f"selectable layouts, from one pinned dict at one pinned instant, no port opened")
+print(f"                      sources with no reading here: "
+      + (", ".join(f"{k} in {v} layouts" for k, v in sorted(asks.items(),
+                                                            key=lambda kv: -kv[1]))
+         or "none") + f"; faces this machine lacks: {len(faces)}"
+      + (f" ({', '.join(sorted(faces))})" if faces else ""))
+
+# The pairing, on the machine that installed the themes package - and here the two lookups
+# part, which is worth stating in digits rather than leaving to be discovered.  Every
+# selectable layout names one clip, and the themes package really does install it: the file
+# sits beside the layout that names it.  But the *loop's* rule for turning a bare name into a
+# file (`main.media_roots()`, what `--mp4 NAME` and the default background use) searches the
+# media roots - the three clips the main package vendors - and not `themes/alpha/clips`.  So
+# on a box with the themes package installed, `--theme Theme_07` can draw the layout while
+# `--mp4 Theme_07.mp4` cannot resolve its own declared background by name.  Nothing is
+# asserted about that split beyond the count: it is a decision about the wire side, and the
+# figures are printed for it.
+from xigmalcd.main import find_media
+beside, resolvable = 0, []
+for rec in pick:
+    name, why = themes.pair(rec["name"])
+    assert name and not why, (rec["name"], name, why)
+    if os.path.isfile(os.path.join(lib, "clips", name)):
+        beside += 1
+    if os.path.basename(find_media(name)) == name and os.path.isfile(find_media(name)):
+        resolvable.append(rec["name"])
+assert beside == len(pick), (beside, len(pick),
+                             "an installed layout names a clip the themes package did not "
+                             "install beside it")
+# the count is pinned, not printed-and-hoped: the loop's roots hold the three clips the main
+# package vendors, two of which are named by a selectable layout, so 2 of the 23 resolve by
+# bare name on an installed system and 21 do not.  If that number moves, a package's file set
+# moved, and docs/limits.md's sentence about it has to move with it.
+assert len(resolvable) == 2, (
+    sorted(resolvable), len(pick),
+    "the loop's own name lookup no longer resolves exactly two of the layouts' declared "
+    "clips on an installed system - check what each package installs under "
+    "/usr/share/xigmalcd/media, and update docs/limits.md")
+print(f"  installed pairing   all {len(pick)} selectable layouts name one clip and the themes "
+      f"package installs {beside} of them under {lib}/clips; the loop's own name lookup "
+      f"(`--mp4 NAME`) resolves {len(resolvable)} of those {len(pick)} by name, because "
+      f"`main.media_roots()` searches the media roots and not the theme library "
+      f"(docs/gui.md keeps the same asymmetry for the window's list)")
+
+# and the CLI's own door says the same thing in the same digits
+out = subprocess.run(["xigmalcd", "--list-themes"], capture_output=True, text=True)
+assert out.returncode == 0, out.stderr[-400:]
+for want in (f"{len(pick)}", f"{len(rej)}"):
+    assert want in out.stdout, (want, out.stdout[:300])
+for rec in pick[:5] + rej:
+    assert rec["name"] in out.stdout, (rec["name"], out.stdout[:400])
+print(f"  --list-themes       {len(out.stdout.splitlines())} lines, and it names the same "
+      f"{len(pick)} + {len(rej)} split this run measured")
+PY
+    say "themes" "$lib, every manifest entry re-hashed, all of it read back by the shipped code"
 fi
 
 echo

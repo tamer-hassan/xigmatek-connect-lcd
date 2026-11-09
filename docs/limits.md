@@ -209,7 +209,20 @@ What has been measured on glass, by whom, with how many frames - and what has no
   background and 27 foreground images, 43 clips, a manifest and a README - under
   `/usr/share/xigmalcd/themes/alpha/`, every manifest entry re-hashed by
   `debian/tests/smoke` (125 entries over 98 distinct paths, because each theme's
-  `background` record names the same bytes as one of the clips).  The vendor's encrypted
+  `background` record names the same bytes as one of the clips).
+   **Reading it back is part of that test now:** on a system with the package installed,
+   `debian/tests/smoke` runs `themes.scan()` and paints all 23 selectable layouts with one
+   pinned dict at one pinned instant - 114 widget boxes, the accounting identity holding on
+   every layout (painted plus source-skipped plus font-skipped equals the manifest's widget
+   count), 9 of them asking for `Pump Speed`, which no reading on that box answers, and no
+   port opened.  It also measures where the two lookups part: the themes package installs the
+   clip every one of those 23 layouts names (`/usr/share/xigmalcd/themes/alpha/clips`), while
+   the loop's own rule for turning a bare name into a file resolves **2 of the 23** -
+   `main.media_roots()` searches the three clips the *main* package vendors, not the theme
+   library, so `--theme Theme_07` draws that layout while `--mp4 Theme_07.mp4` cannot name the
+   background it declares.  Both halves are asserted by the installed test, and closing that
+   split is a decision about what the loop should resolve rather than something to fix in
+   passing: the roots decide which file a bare name means on the upload path.  The
   `.thm` containers are not in the package: they were in the 0.1 and 0.2 packages, and
   since 0.3 the manifest records them by vendor path, byte count and sha256 only.  The
   smoke test is what keeps that honest in both directions - it walks the installed tree
