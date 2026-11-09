@@ -126,9 +126,10 @@ WIN_STORE = "/media/windows-c/Users/Tamer/AppData/Roaming/alpha/store.json"
 #
 # `media_dir()` is the first that exists, so a clone on a box that also has the
 # .deb installed still draws from the clone: otherwise the numbers README quotes
-# would depend on what happened to be packaged last.  The clip *library* lists
-# every root that exists (xigmaui/clips.py), so an installed themes package is
-# not hidden from a display running out of a checkout.
+# would depend on what happened to be packaged last.
+#
+# The theme library is in this list too, behind the media roots - see
+# `REPO_CLIP_LIB` below for why a *name* has to resolve there.
 MEDIA_ENV = "XIGMA_MEDIA"
 SYSTEM_MEDIA = "/usr/share/xigmalcd/media"
 REPO_MEDIA = _repo("media")
@@ -144,14 +145,39 @@ REPO_MEDIA = _repo("media")
 # media/, so removing either package leaves the other's files intact.
 SYSTEM_THEMES = "/usr/share/xigmalcd/themes/alpha"
 
+#: The clip library, in both places it can stand: this checkout's
+#: `themes/alpha/clips` (the themes package's own source, tracked here and
+#: re-hashed byte for byte against that package's manifest), and the copy
+#: `xigmatek-connect-lcd-themes` installs.  They are roots of `media_roots()`,
+#: *behind* the media roots, for one reason: a layout and the background it
+#: declares have to resolve from the same place.  `themes.pair()` reads a
+#: layout's `background.mediaFile` and `--list-themes` prints it, so a clone
+#: that could name `Theme_07.mp4` while `--mp4 Theme_07.mp4` answered "no such
+#: file" was making a promise about a library the loop could not see.  Nothing
+#: is uploaded because a root exists: the roots decide which file a *name* this
+#: box holds means, and an upload still needs the flag (docs/limits.md, the
+#: pairing section of docs/gui.md).
+REPO_CLIP_LIB = os.path.join(os.path.abspath(themes.REPO_ROOT), "clips")
+SYSTEM_CLIP_LIB = os.path.join(SYSTEM_THEMES, "clips")
+
 
 def media_roots() -> tuple:
-    """Every clip root that exists, first-winning order, no repeats."""
+    """Every directory a bare clip name is looked up in, first-winning, no repeats.
+
+    The order is the rule and the set belongs to the machine: `$XIGMA_MEDIA`
+    first if set, then the checkout's `media/` and the .deb's copy, then the
+    theme library - checkout first, installed second, the same precedence
+    `xigmalcd/themes.py` uses to find the layout that named the clip.  Media
+    roots come before the library so that every name that resolved before still
+    resolves to the same file, `Theme_25.mp4` included: that is why the session
+    default does not move on any box (the clip-roots section of
+    `tools/selftest.sh` holds both halves).
+    """
     roots = []
     env = os.environ.get(MEDIA_ENV)
     if env:
         roots.append(os.path.abspath(env))
-    for root in (REPO_MEDIA, SYSTEM_MEDIA):
+    for root in (REPO_MEDIA, SYSTEM_MEDIA, REPO_CLIP_LIB, SYSTEM_CLIP_LIB):
         if os.path.isdir(root):
             roots.append(os.path.abspath(root))
     return tuple(dict.fromkeys(roots))

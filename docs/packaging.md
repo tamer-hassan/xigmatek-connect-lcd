@@ -325,10 +325,18 @@ passed` on a runner - including the half the bench install exercised and this jo
 exercises too: `manifest 152/152 files hashed clean under
 /usr/share/xigmalcd/themes/alpha`.
 
-Before that run, the push-only job (`42335665086`) had installed only the code package -
-a pull-request run does not upload the 146 MB - with apt printing
+Before that run, the push-only job (`42335665086`) had installed only the code package - the
+146 MB themes `.deb` was uploaded on a tag only - with apt printing
 `Recommended packages: xigmatek-connect-lcd-themes` and planning anyway, and smoke's
-themes section saying SKIPPED because there was nothing installed to hash.
+themes section saying SKIPPED because there was nothing installed to hash.  **That gap is
+closed as of 0.4:** the themes `.deb` is built, uploaded and installed on every run, so the
+runner is now the machine that reads the installed library back - manifest re-hash,
+`themes.scan()`, all 23 selectable layouts painted, and `--mp4 NAME` resolving the clip each
+layout declares (23 of 23, through four roots: the checkout's `media/`, the installed
+`media/`, then the theme library in the checkout and in `/usr/share`).  The cost is stated in
+the workflow's own comment: 146 MB up and down per run, for 14 days, in a repository that
+already tracks 43 of those clips.  What it buys is the difference between a figure one bench
+measured once and a figure CI re-measures on every push.
 
 Two numbers in the runner's smoke transcript differ from the bench one, and both now
 have a reason rather than a shrug:

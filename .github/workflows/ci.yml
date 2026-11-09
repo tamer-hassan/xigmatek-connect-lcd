@@ -296,10 +296,16 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-      # Only on a tag, and only because the install job below then gets to check the
-      # 146 MB against manifest.json on a machine that has never seen this tree.
+      # Uploaded on every run, not only on a tag, because the install job below is the only
+      # place the *installed* library is read back rather than re-hashed from a checkout:
+      # manifest bytes, `themes.scan()`, all 23 selectable layouts painted through
+      # `themes.paint()`, and `--mp4 NAME` resolving the clip each layout declares.  With the
+      # themes .deb absent that whole section of debian/tests/smoke prints SKIPPED, which is
+      # what it did on every push until now - green, and silent about the half it skipped.
+      # Cost: 146 MB uploaded and downloaded per run (retained 14 days), against a repository
+      # that already tracks 43 of the same clips.  Worth it: the alternative is documenting
+      # installed-system figures that only one machine has ever measured.
       - uses: actions/upload-artifact@v7
-        if: github.ref_type == 'tag'
         with:
           name: deb-themes
           path: pkg-themes/
@@ -320,7 +326,6 @@ jobs:
           path: debs
 
       - uses: actions/download-artifact@v8
-        if: github.ref_type == 'tag'
         with:
           name: deb-themes
           path: debs

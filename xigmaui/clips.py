@@ -1,9 +1,10 @@
 """clips.py - the background clips this box can offer, and frames out of them.
 
-Clip roots, in the order the app lists them.  The first three are this project's own
-clips (`xigmalcd.main.media_roots()` says which of them exist); the last three carry the
-vendor's library - reachable from a box with the Windows volume mounted, with the themes
-package installed, or with nothing but this repository, which tracks the same files.
+Clip roots, in the order the app lists them.  Everything except the last two comes
+straight out of `xigmalcd.main.media_roots()` - the same list the daemon resolves a
+bare name through, so the window and the loop cannot disagree about which file a name
+means.  The last two carry the vendor's copies from a mounted Windows partition, which
+the daemon also falls back to but which are not a root of their own.
 Every root that exists is scanned, and a clip found twice is listed once: the same file
 under two spellings, or the same bytes under two roots - a checkout on a box that also
 has the .deb installed holds both copies of all three vendored clips.  The root that
@@ -46,12 +47,12 @@ comes first in the order below is the row that stays, because that is the file
   same **40 rows** this bench walks out of 204 files, and the suite asserts that all 23
   selectable layouts can pair there (docs/gui.md).
 
-  Wider than the daemon's name lookup, and deliberately so: `main.media_roots()` -
-  what `--mp4 NAME` and `find_media()` search - is still `media/`, `$XIGMA_MEDIA`
-  and `/usr/share/xigmalcd/media`, with no theme directory in it.  Which file a
-  *name* means on the wire is a separate question from which clips this box can
-  show, and a row the window offers reaches an upload as an absolute path either
-  way.
+  Wider than the daemon's name lookup in one direction only, and that is the whole
+  reason the list is built from `media_roots()`: every root the loop searches is a
+  root the window lists, and the window adds the two Windows-partition roots on top.
+  A layout resolved from the checkout therefore gets its clip from the checkout, in
+  both doors, and `--mp4 Theme_07.mp4` means the file `--list-themes` printed beside
+  the layout's name.
 
 Frames come out of ffmpeg, one frame per call, because decoding a whole clip to
 pick a mid-loop frame (what tools/previews.py does once per run) is far too slow
@@ -362,9 +363,9 @@ def list_clips(extra: str = "") -> list[Clip]:
     verifies every byte against it - but the list shows one row for them, and
     `scan["library_dups"]` says how many.
     """
-    from xigmalcd.main import (MEDIA_ENV, SYSTEM_MEDIA, SYSTEM_THEMES,
-                               WIN_STATIC, WIN_UPLOADS, media_roots)
-    from xigmalcd.themes import REPO_ROOT as _repo_themes_dir
+    from xigmalcd.main import (MEDIA_ENV, REPO_CLIP_LIB, SYSTEM_CLIP_LIB,
+                               SYSTEM_MEDIA, SYSTEM_THEMES, WIN_STATIC,
+                               WIN_UPLOADS, media_roots)
 
     found: list[Clip] = []
     seen = set()          # realpaths: one file, several spellings
@@ -467,28 +468,34 @@ def list_clips(extra: str = "") -> list[Clip]:
         seen.add(real)
         found.append(Clip(path=path, origin=origin, bytes=size, note=note))
 
-    # (root, pattern, origin). The root is checked with isdir rather than the
-    # pattern's own dirname: for a recursive pattern that dirname is the `**`
-    # component, which never exists, and that silently hid every clip the
-    # Windows app had ever pushed - 69 of them on this machine, 40 distinct
-    sources = [(_root, "*.mp4", "vendored",
-                "installed with the package" if _root == SYSTEM_MEDIA else
-                ("chosen with $XIGMA_MEDIA" if _root == os.path.abspath(
-                    os.environ.get(MEDIA_ENV, "-")) else ""))
-               for _root in media_roots()]
-    sources += [(os.path.join(SYSTEM_THEMES, "clips"), "*.mp4", "vendor library",
-                 "installed with xigmatek-connect-lcd-themes"),
-                # The same library this repository tracks, in the checkout: 44 clip files
-                # under `themes/alpha/clips`, byte-identical to what the themes package
-                # installs (the suite re-hashes every one of them against the manifest).
-                # Without this root a *checkout* sees three clips - only what `media/`
-                # vendors for the README figures - while `themes.pair()` reports that a
-                # layout names `Theme_07.mp4`, a file the repository itself carries.  That
-                # is what a CI runner or a source install hits, and it made the pairing a
-                # sentence about files the window could not see.
-                (os.path.join(_repo_themes_dir, "clips"), "*.mp4", "vendor library",
-                 "this checkout's themes/alpha/clips"),
-                (WIN_STATIC, "*.mp4", "vendor library",
+    def _role(root: str) -> tuple:
+        """Which library a root of `media_roots()` is, and what to say under the list.
+
+        The two theme-library roots are named apart because their provenance differs:
+        one is this checkout's copy (43 files, byte-identical to what the themes
+        package installs, every one re-hashed against that package's manifest by the
+        suite), the other is what `xigmatek-connect-lcd-themes` put there.  Before
+        `media_roots()` carried them, a *checkout* saw three clips while
+        `themes.pair()` reported that a layout names `Theme_07.mp4`, a file the
+        repository itself carries - which is what a CI runner or a source install hit,
+        and it made the pairing a sentence about files only the window could see.
+        """
+        if root == REPO_CLIP_LIB:
+            return "vendor library", "this checkout's themes/alpha/clips"
+        if root == SYSTEM_CLIP_LIB:
+            return "vendor library", "installed with xigmatek-connect-lcd-themes"
+        return "vendored", (
+            "installed with the package" if root == SYSTEM_MEDIA else
+            ("chosen with $XIGMA_MEDIA" if root == os.path.abspath(
+                os.environ.get(MEDIA_ENV, "-")) else ""))
+
+    # (root, pattern, origin, note).  Every root but the two Windows ones comes from
+    # `media_roots()`, so the window and the loop share one order and one set.  A root is
+    # checked with isdir rather than the pattern's own dirname: for a recursive pattern
+    # that dirname is the `**` component, which never exists, and that silently hid every
+    # clip the Windows app had ever pushed - 69 of them on this machine, 40 distinct.
+    sources = [(_root, "*.mp4", *_role(_root)) for _root in media_roots()]
+    sources += [(WIN_STATIC, "*.mp4", "vendor library",
                  "mounted from the Windows partition"),
                 (WIN_UPLOADS, "**/*.mp4", "app upload",
                  "pushed to this panel by the Windows app, on the Windows partition")]

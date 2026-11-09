@@ -379,17 +379,15 @@ print(f"                      sources with no reading here: "
          or "none") + f"; faces this machine lacks: {len(faces)}"
       + (f" ({', '.join(sorted(faces))})" if faces else ""))
 
-# The pairing, on the machine that installed the themes package - and here the two lookups
-# part, which is worth stating in digits rather than leaving to be discovered.  Every
-# selectable layout names one clip, and the themes package really does install it: the file
-# sits beside the layout that names it.  But the *loop's* rule for turning a bare name into a
-# file (`main.media_roots()`, what `--mp4 NAME` and the default background use) searches the
-# media roots - the three clips the main package vendors - and not `themes/alpha/clips`.  So
-# on a box with the themes package installed, `--theme Theme_07` can draw the layout while
-# `--mp4 Theme_07.mp4` cannot resolve its own declared background by name.  Nothing is
-# asserted about that split beyond the count: it is a decision about the wire side, and the
-# figures are printed for it.
-from xigmalcd.main import find_media
+# The pairing, on the machine that installed the themes package.  Every selectable
+# layout names one clip, and the themes package installs that file beside the layout that
+# names it - so the question an installed user actually hits is the other half: does
+# the loop's rule for turning a bare name into a file (`main.media_roots()`, which is
+# what `--mp4 NAME` and the session default go through) find it?  Since 0.4 the theme
+# library is a root of that lookup, behind the media roots, so the answer is yes for
+# all of them, and that is what this part of the test now checks.  Before the change the
+# same code resolved 2 of the 23 by name.
+from xigmalcd.main import find_media, media_roots
 beside, resolvable = 0, []
 for rec in pick:
     name, why = themes.pair(rec["name"])
@@ -401,20 +399,20 @@ for rec in pick:
 assert beside == len(pick), (beside, len(pick),
                              "an installed layout names a clip the themes package did not "
                              "install beside it")
-# the count is pinned, not printed-and-hoped: the loop's roots hold the three clips the main
-# package vendors, two of which are named by a selectable layout, so 2 of the 23 resolve by
-# bare name on an installed system and 21 do not.  If that number moves, a package's file set
-# moved, and docs/limits.md's sentence about it has to move with it.
-assert len(resolvable) == 2, (
-    sorted(resolvable), len(pick),
-    "the loop's own name lookup no longer resolves exactly two of the layouts' declared "
-    "clips on an installed system - check what each package installs under "
-    "/usr/share/xigmalcd/media, and update docs/limits.md")
+# Pinned at the count rather than printed and hoped: `media_roots()` carries the theme
+# library - the installed copy, and this checkout's where a source tree is around - so
+# a name `--list-themes` printed resolves through the loop as well.  The media roots
+# still win where both kinds of root hold the same name, which is what keeps the
+# session default exactly where it has always been.
+assert len(resolvable) == len(pick), (
+    sorted({r["name"] for r in pick} - set(resolvable)), len(pick),
+    "an installed layout's declared clip no longer resolves by bare name through "
+    "`main.media_roots()` - check that the theme library is still a root of it, and "
+    "what each package installs under /usr/share/xigmalcd")
 print(f"  installed pairing   all {len(pick)} selectable layouts name one clip and the themes "
       f"package installs {beside} of them under {lib}/clips; the loop's own name lookup "
-      f"(`--mp4 NAME`) resolves {len(resolvable)} of those {len(pick)} by name, because "
-      f"`main.media_roots()` searches the media roots and not the theme library "
-      f"(docs/gui.md keeps the same asymmetry for the window's list)")
+      f"(`--mp4 NAME`) resolves {len(resolvable)} of {len(pick)}, through: "
+      + ", ".join(media_roots()))
 
 # and the CLI's own door says the same thing in the same digits
 out = subprocess.run(["xigmalcd", "--list-themes"], capture_output=True, text=True)

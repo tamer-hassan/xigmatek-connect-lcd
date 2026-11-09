@@ -556,12 +556,13 @@ than left to be inferred:
 
 The pairing changes nothing about the wire: it decides what the *preview* composites
 under our layer, and the upload button is still the only thing that sends a file to the
-panel (docs/themes.md, PROTOCOL.md §11). One asymmetry to keep straight: the window's
-list walks more roots than the daemon resolves a **name** through. `--mp4 NAME` and the
-loop's default come from `xigmalcd.main.media_roots()` - `media/`, `/usr/share/xigmalcd/media`,
-`$XIGMA_MEDIA` - and that set is unchanged, because which file a name means on the wire is
-a different question from which clips this box can show you. A row the window lists is
-handed to the upload as an absolute path, so the wider list costs nothing there.
+panel (docs/themes.md, PROTOCOL.md §11). One thing to keep straight about the two
+lookups: they share one root list. `--mp4 NAME` and the loop's default come from
+`xigmalcd.main.media_roots()`, and the window's list walks those same roots and adds the two Windows ones
+on top - so a layout resolved from the checkout gets its clip from
+the checkout in both doors, and `--mp4 Theme_07.mp4` means the very file `--list-themes`
+printed beside that layout's name.  A row the window lists is handed to the upload as an
+absolute path either way, so the pairing changes nothing on the wire by itself.
 
 
 The twice-per-session metrics blob is not decoration: PROTOCOL.md §8 measures that

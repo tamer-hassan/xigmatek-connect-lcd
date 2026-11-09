@@ -1215,11 +1215,14 @@ PY
 echo "== where clips are looked up: the roots a package install has to get right"
 
 # A checkout is not the only place this code runs.  `pip install .` and the .deb
-# built from debian/ put the modules where the repository tree is not, so the
-# three roots of xigmalcd.main (env, checkout, /usr/share/xigmalcd/media) are what
-# decides whether a user gets the shipped background or a missing-file message.
-# Checked against fake roots: no root, no installed package, nothing written
-# outside a temp directory.
+# built from debian/ put the modules where the repository tree is not, so the roots
+# of xigmalcd.main - env, the checkout's media/, /usr/share/xigmalcd/media, and then
+# the vendor's theme library in its two spellings - decide whether a user gets the
+# shipped background, the clip a layout declares, or a missing-file message.  The
+# library half is what the pairing gate in the GUI section depends on: `--list-themes`
+# prints `background Theme_07.mp4` from a layout file, and `--mp4 Theme_07.mp4` has to
+# mean that file on the same box.  Checked against fake roots: no root, no installed
+# package, nothing written outside a temp directory.
 python3 - <<'PY' || { echo "clip roots FAILED"; exit 1; }
 import hashlib, os, shutil, sys, tempfile
 sys.path.insert(0, ".")
@@ -1238,36 +1241,103 @@ assert not os.environ.get(m.MEDIA_ENV), \
     f"{m.MEDIA_ENV} is set; unset it to check the checkout's own roots"
 roots = m.media_roots()
 assert roots[0] == repo, roots
-assert set(roots[1:]) <= {os.path.abspath(m.SYSTEM_MEDIA)}, roots
+repo_lib, sys_lib = os.path.abspath(m.REPO_CLIP_LIB), os.path.abspath(m.SYSTEM_CLIP_LIB)
+# Every root in the list has to be one this code named, in the order it named them: the
+# media roots first, then the library, checkout before installed.  Which of the four exist
+# belongs to the machine; the order of the ones that do is the rule.
+_named = [r for r in (repo, os.path.abspath(m.SYSTEM_MEDIA), repo_lib, sys_lib) if r in roots]
+assert [r for r in roots if r in _named] == _named, (roots, _named)
+assert repo_lib in roots, (roots, "this checkout's `themes/alpha/clips` is not a root, so a "
+                                  "layout's declared background cannot be named by the loop")
 for p in (m.DEFAULT_MP4, m.QUIET_MP4, m.BRIGHT_MP4):
     assert os.path.dirname(p) == repo, p
     assert os.path.exists(p), p
-extra = "" if len(roots) == 1 else f" (+ {roots[1]}, the installed package's copy)"
-print(f"  checkout           default, quiet and bright all resolve inside {repo}{extra}")
+print(f"  checkout           default, quiet and bright all resolve inside {repo}; roots: "
+      + ", ".join(roots))
+
+# 1b. and the claim those extra roots exist for, taken from the library rather than from a
+#     remembered example: every layout this canvas can select names one clip, and that name
+#     has to resolve, through `find_media` (the very function `--mp4` and the session default
+#     go through), to a file that is really there.  A bare clone passes this the same way an
+#     installed box does, because the checkout carries the same 43 files the themes package
+#     installs - which is exactly the case the CI runner hit once, from the other side.
+from xigmalcd import themes as _t
+_sel, _rej = _t.scan()
+_where, _bad = {}, []
+for _rec in _sel:
+    _name, _why = _t.pair(_rec["name"])
+    assert _name and not _why, (_rec["name"], _name, _why)
+    _got = m.find_media(_name)
+    if os.path.basename(_got) != _name or not os.path.isfile(_got):
+        _bad.append((_rec["name"], _name, _got))
+        continue
+    assert os.path.dirname(_got) in roots, (_rec["name"], _got, roots,
+                                            "a clip resolved outside the root list")
+    _where[os.path.dirname(_got)] = _where.get(os.path.dirname(_got), 0) + 1
+assert not _bad, (_bad[:6], len(_sel),
+                  "a selectable layout names a clip the loop cannot find by name")
+_vendored = {os.path.basename(p) for p in (m.DEFAULT_MP4, m.QUIET_MP4, m.BRIGHT_MP4)}
+_overlap = sorted({r["name"] for r in _sel if _t.pair(r["name"])[0] in _vendored})
+for _n in _overlap:
+    assert os.path.dirname(m.find_media(_t.pair(_n)[0])) == repo, (
+        _n, "a clip this repository vendors in `media/` resolved in the theme library: the "
+            "media roots have to win, or the session default moves on some box")
+print(f"  name lookup        all {len(_sel)} selectable layouts' own clips resolve by bare "
+      f"name: " + ", ".join(f"{v} from {k}" for k, v in sorted(_where.items())))
+if _overlap:
+    print(f"                       media first, unchanged: {_overlap} name a clip `media/` also "
+          f"holds, and those still resolve in {repo} - so `Theme_25.mp4` means the same file "
+          f"as before the library became a root")
 
 with tempfile.TemporaryDirectory() as tmp:
     sysroot = os.path.join(tmp, "usr-share-xigmalcd-media")
-    os.makedirs(sysroot)
+    syslib = os.path.join(tmp, "usr-share-themes-clips")
+    replib = os.path.join(tmp, "checkout-themes-clips")
+    for d in (sysroot, syslib, replib):
+        os.makedirs(d)
     for n in ("Theme_25.mp4", "Theme_11.mp4", "theme_48.mp4"):
         open(os.path.join(sysroot, n), "wb").write(b"stand-in")
+    # the case a layout file produces: a name `media/` does not hold at all, in the library
+    # in both spellings, and a name both kinds of root hold so the order can be seen
+    open(os.path.join(syslib, "Theme_probe_07.mp4"), "wb").write(b"installed copy")
+    open(os.path.join(replib, "Theme_probe_07.mp4"), "wb").write(b"checkout copy")
+    open(os.path.join(replib, "Theme_25.mp4"), "wb").write(b"checkout library copy")
 
     # 2. a box with both: the checkout still answers, so the README figures do not
     #    depend on what happens to be installed on the machine reading them
     real = m.SYSTEM_MEDIA
+    real_replib, real_syslib = m.REPO_CLIP_LIB, m.SYSTEM_CLIP_LIB
     m.SYSTEM_MEDIA = sysroot
+    m.REPO_CLIP_LIB, m.SYSTEM_CLIP_LIB = replib, syslib
     try:
-        assert m.media_roots() == (repo, os.path.abspath(sysroot)), m.media_roots()
+        assert m.media_roots() == (repo, os.path.abspath(sysroot), os.path.abspath(replib),
+                                   os.path.abspath(syslib)), m.media_roots()
         assert m.media_dir() == repo
         assert m.find_media("Theme_25.mp4") == os.path.join(repo, "Theme_25.mp4")
+        # the checkout's library beats the installed one, and a library-only name resolves
+        assert (m.find_media("Theme_probe_07.mp4")
+                == os.path.join(replib, "Theme_probe_07.mp4"))
+        assert (m.find_media("Theme_25.mp4") != os.path.join(replib, "Theme_25.mp4"),
+                "the media roots must win over a library copy of the same name")
+        saved_lib = m.REPO_CLIP_LIB
+        m.REPO_CLIP_LIB = os.path.join(tmp, "no-such-library")
+        try:
+            assert (m.find_media("Theme_probe_07.mp4")
+                    == os.path.join(syslib, "Theme_probe_07.mp4")), "the installed library"
+        finally:
+            m.REPO_CLIP_LIB = saved_lib
 
         # 3. the same question with no checkout in the picture: the installed root
         #    is what answers it, which is the whole point of installing to /usr/share
         saved = m.REPO_MEDIA
         m.REPO_MEDIA = os.path.join(tmp, "no-such-checkout")
         try:
-            assert m.media_roots() == (os.path.abspath(sysroot),), m.media_roots()
+            assert m.media_roots() == (os.path.abspath(sysroot), os.path.abspath(replib),
+                                       os.path.abspath(syslib)), m.media_roots()
             got = m.find_media("Theme_25.mp4")
             assert got == os.path.join(sysroot, "Theme_25.mp4"), got
+            assert m.find_media("Theme_probe_07.mp4") == os.path.join(
+                replib, "Theme_probe_07.mp4"), got
         finally:
             m.REPO_MEDIA = saved
 
@@ -1281,9 +1351,12 @@ with tempfile.TemporaryDirectory() as tmp:
         assert nowhere.endswith("Theme_99.mp4") and not os.path.exists(nowhere), nowhere
     finally:
         m.SYSTEM_MEDIA = real
+        m.REPO_CLIP_LIB, m.SYSTEM_CLIP_LIB = real_replib, real_syslib
 print("  installed root     behind the checkout when both exist, first when only it does;")
-print("                     the Windows copies still answer, and a clip that is nowhere")
-print("                     local is reported as the file that was asked for")
+print("                     the theme library sits behind both media roots, its checkout")
+print("                     copy ahead of the installed one; the Windows copies still")
+print("                     answer, and a clip that is nowhere is reported as the file")
+print("                     that was asked for")
 
 # 5. $XIGMA_MEDIA replaces the checkout root, and the window's clip library scans
 #    every root that exists rather than only the first: an installed themes set is
@@ -1301,6 +1374,28 @@ with tempfile.TemporaryDirectory() as envdir:
     finally:
         del os.environ[m.MEDIA_ENV]
 print("  $XIGMA_MEDIA       first root, and the clip library lists it alongside the rest")
+
+# Which file a name means is a rule, and three documents state it.  They are held to the
+# words this run derived - the root list, the count of layouts whose own clip resolves, and
+# the fact that the media roots still win - because "the library is a root now" is the kind
+# of sentence a later refactor quietly un-does.
+_DOCS = {
+    "docs/usage.md": f"then the vendor's theme library - this checkout's `themes/alpha/clips`",
+    "docs/gui.md": "the window's list walks those same roots and adds the two Windows ones",
+    "docs/limits.md": f"so **all {len(_sel)} resolve by name**",
+}
+_absent = {f: w for f, w in _DOCS.items() if w not in open(f, encoding="utf-8").read()}
+assert not _absent, (_absent, "these documents describe the old root set: `media_roots()` "
+                              "carries the theme library now, and the wording above is what "
+                              "the code does")
+for _stale in ("`main.media_roots()` searches the three clips the *main* package vendors",
+               "walks more roots than the daemon resolves a **name** through",
+               "with no theme directory in it"):
+    assert all(_stale not in open(_f, encoding="utf-8").read() for _f in _DOCS), (
+        _stale, "a document still says the loop does not search the theme library")
+print(f"  the documents      usage.md's `--mp4` row, gui.md's pairing section and limits.md's "
+      f"themes-package bullet all state {len(roots)} roots in this order, with "
+      f"{len(_sel)}/{len(_sel)} layouts' own clips resolving and the media roots first")
 
 # ---- one row per distinct clip, whatever it is called ---------------------------
 # The roots hold far more files than there are clips.  Two censuses, and only one of
@@ -4906,13 +5001,15 @@ from xigmalcd import main as _m
 with _tf.TemporaryDirectory() as _t:
     _planted = os.path.join(_t, "Theme_25.mp4")
     _sh.copyfile(byname["Theme_25.mp4"].path, _planted)
-    _saved, _m.SYSTEM_THEMES = _m.SYSTEM_THEMES, _t
+    _saved = {k: getattr(_m, k) for k in ("SYSTEM_THEMES", "SYSTEM_CLIP_LIB")}
+    _m.SYSTEM_THEMES = _m.SYSTEM_CLIP_LIB = _t
     try:
         again = clipdb.list_clips()
         got = [c for c in again if c.name == "Theme_25.mp4"]
         assert len(got) == 1 and got[0].path == byname["Theme_25.mp4"].path, got
     finally:
-        _m.SYSTEM_THEMES = _saved
+        for _k, _v in _saved.items():
+            setattr(_m, _k, _v)
 print(f"  clip library       {len(found)} rows, each a distinct name+length; the same "
       f"bytes under another root add no row and do not displace the checkout's file")
 
@@ -4928,8 +5025,24 @@ import hashlib as _ch
 import xigmalcd.main as _m
 _tracked = sorted(_cg.glob("media/*.mp4")) + sorted(_cg.glob("themes/alpha/clips/*.mp4"))
 assert _tracked, "no tracked clips: media/ and themes/alpha/clips are both empty"
-_solo = {k: getattr(_m, k) for k in ("SYSTEM_MEDIA", "SYSTEM_THEMES",
-                                     "WIN_STATIC", "WIN_UPLOADS")}
+# Which roots to point away is not a list to keep by hand: it is read out of
+# `media_roots()` itself, because this is the third place a hand-written version of it fell
+# behind a root that had just been added (the pairing gate, this census, and the simulation
+# of a runner all got it wrong in the same way).
+import ast as _ast
+import inspect as _insp
+_fn_src = _insp.getsource(_m.media_roots)
+_KNOWN_ROOTS = sorted({n.id for n in _ast.walk(_ast.parse(_fn_src))
+                       if isinstance(n, _ast.Name) and n.id.isupper()})
+_SKIP_ROOTS = {"MEDIA_ENV", "REPO_MEDIA", "REPO_CLIP_LIB"}   # the checkout's own roots stay
+# Two different sets of roots have to be pointed away for a box to be bare: the ones the
+# loop searches (`media_roots`' own names, derived above) and the two Windows volumes the
+# *window's* list walks on top of that.  Naming them apart is the point - a root added to
+# either place joins the hide-list here without anyone remembering.
+_WINDOW_ONLY = [k for k in ("WIN_STATIC", "WIN_UPLOADS") if isinstance(getattr(_m, k), str)]
+_solo = {k: getattr(_m, k) for k in
+         [n for n in _KNOWN_ROOTS if n not in _SKIP_ROOTS] + _WINDOW_ONLY}
+assert set(_solo) >= {"SYSTEM_MEDIA", "SYSTEM_CLIP_LIB", "WIN_STATIC", "WIN_UPLOADS"}, _solo
 _solo_env = os.environ.pop("XIGMA_MEDIA", None)
 try:
     for _k in _solo:
@@ -6912,8 +7025,19 @@ assert _rows_ok == len(_here), (_rows_ok, len(_here),
 # byte-identical to what the themes package installs (the library section re-hashes every
 # one of them), so the window is not being pointed at a library it does not have.
 import xigmalcd.main as _mm
-_saved_roots = {k: getattr(_mm, k) for k in ("SYSTEM_MEDIA", "SYSTEM_THEMES",
-                                             "WIN_STATIC", "WIN_UPLOADS")}
+# The same derived hide-list as the census pass in the GUI section - a separate heredoc, so
+# the derivation is repeated rather than assumed to survive from the other one.
+import ast as _ast2
+import inspect as _insp2
+_roots_src = _insp2.getsource(_mm.media_roots)
+_KNOWN_ROOTS = sorted({n.id for n in _ast2.walk(_ast2.parse(_roots_src))
+                       if isinstance(n, _ast2.Name) and n.id.isupper()})
+_SKIP_ROOTS = {"MEDIA_ENV", "REPO_MEDIA", "REPO_CLIP_LIB"}
+_WINDOW_ONLY = [k for k in ("WIN_STATIC", "WIN_UPLOADS") if isinstance(getattr(_mm, k), str)]
+_saved_roots = {k: getattr(_mm, k) for k in
+                [n for n in _KNOWN_ROOTS if n not in _SKIP_ROOTS] + _WINDOW_ONLY}
+assert set(_saved_roots) >= {"SYSTEM_MEDIA", "SYSTEM_CLIP_LIB", "WIN_STATIC",
+                             "WIN_UPLOADS"}, _saved_roots
 _env_media = os.environ.pop("XIGMA_MEDIA", None)
 try:
     for _k in _saved_roots:
@@ -6927,17 +7051,41 @@ try:
     assert not _gap, (len(_alone), _gap,
                       "a checkout of this repository alone cannot pair these layouts - its "
                       "own tracked clips are no longer reachable from the window")
-    # and the missing case, driven rather than waited for: a window whose list holds none
-    # of the pairs has to name the file it is missing and leave the picture alone
+    # Two states the row list alone cannot drive, and both are worth pinning now that the
+    # theme library is a root of the loop's own lookup:
+    #   * no row, file in a root - the window follows the layout's clip anyway and *says* no
+    #     row holds those bytes, rather than pretending the picker is the whole filesystem;
+    #   * no row and no clip root anywhere, this checkout's included - the only state in
+    #     which "this box does not have it" is true, so that is the state the branch has to
+    #     be driven in.  Emptying the list is not that state any more, and an earlier
+    #     version of this gate asserted as if it were.
     _keep, _pw.all_clips = _pw.all_clips, []
     try:
-        _missing_at = _pw.mp4
         _pw.ed_name.setCurrentText(pick[0]["name"])
+        _want = os.path.basename(str(pick[0]["background"]))
+        assert os.path.basename(_pw.mp4) == _want, (_pw.mp4, _want,
+                                                   "with no rows but the file in a root the "
+                                                   "window should still follow the layout's "
+                                                   "own clip")
+        assert "No row of the library holds these bytes" in _pw.pair_note, _pw.pair_note
+    finally:
+        _pw.all_clips = _keep
+
+    _bare = {k: getattr(_mm, k) for k in ("REPO_MEDIA", "REPO_CLIP_LIB")}
+    _keep, _pw.all_clips = _pw.all_clips, []
+    try:
+        for _k, _v in _bare.items():
+            setattr(_mm, _k, "/nonexistent-checkout-root")
+        _missing_at = _pw.mp4
+        _pw.ed_name.setCurrentText(pick[1]["name"] if len(pick) > 1 else pick[0]["name"])
         assert _pw.mp4 == _missing_at, (
-            _pw.mp4, _missing_at, "a window with no rows paired to a file it does not have")
+            _pw.mp4, _missing_at, "a window with no rows and no clip root paired to a file "
+                                  "this box cannot resolve")
         assert "does not have" in _pw.pair_note and "keeping" in _pw.pair_note, _pw.pair_note
     finally:
         _pw.all_clips = _keep
+        for _k, _v in _bare.items():
+            setattr(_mm, _k, _v)
 finally:
     for _k, _v in _saved_roots.items():
         setattr(_mm, _k, _v)
@@ -6984,8 +7132,9 @@ _doc = open("docs/gui.md", encoding="utf-8").read()
 for _claim in (f"all {len(pick)} selectable layouts", "Use this layout's own clip"):
     assert _claim in _doc, (_claim, "docs/gui.md does not describe the pairing this drives")
 _missing_note = ("and each said so instead of pretending" if _absent else
-                 "(0 here: the branch was driven by emptying the row list, so the "
-                 "sentence is proven even on a box that has every clip)")
+                 "(0 here: that branch is driven instead by taking the rows *and* every "
+                 "clip root away from a live window, so the sentence is proven even on a "
+                 "box that has every clip)")
 print(f"  the pairing in the window  of the {len(pick)} selectable layouts, "
       f"{len(_here)} name a clip this box lists and every one of those moved under the "
       f"preview with its row marked ({_rows_ok}/{len(_here)}); {len(_absent)} name a clip "
