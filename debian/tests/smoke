@@ -68,7 +68,16 @@ import hashlib, os
 from xigmalcd import main as m
 
 assert m.SYSTEM_MEDIA == "/usr/share/xigmalcd/media", m.SYSTEM_MEDIA
-assert m.media_roots() == ("/usr/share/xigmalcd/media",), m.media_roots()
+# The rule, not one box's directory list: the media root first, and the theme library after
+# it if the themes package put it there.  This line used to read
+# `media_roots() == ("/usr/share/xigmalcd/media",)`, and it went red on CI the day this
+# section started actually running - which was the day the themes .deb began being installed
+# on a push as well as on a tag.  An assert that describes a box with no themes package, in
+# the section whose subject is a box that has one, was always waiting to fail.
+_want_roots = [m.SYSTEM_MEDIA]
+if os.path.isdir(m.SYSTEM_CLIP_LIB):
+    _want_roots.append(m.SYSTEM_CLIP_LIB)
+assert list(m.media_roots()) == _want_roots, (m.media_roots(), _want_roots)
 want = {"Theme_25.mp4": (214_917, "b818b7d3294b3625e9f143e920ccc9b0"),
         "Theme_11.mp4": (3_402_098, "4a515a8a17204ffb5a23d2ac34dd37ee"),
         "theme_48.mp4": (1_333_649, "51701687804f60875da872c7f27ad673")}
@@ -84,6 +93,21 @@ for const, name in (("DEFAULT_MP4", "Theme_25.mp4"), ("QUIET_MP4", "Theme_11.mp4
     path = getattr(m, const)
     assert path == os.path.join(m.SYSTEM_MEDIA, name), (const, path)
     print(f"  {const:11s} {path}")
+# A library name answers through the same function, on the box that installed the package:
+# `--mp4 Theme_07.mp4` is the background the layout of that name declares.  The three clips
+# the main package vendors still resolve in media/, which is the precedence the default
+# depends on - both halves are checked here, not just the one that got easier.
+_lib = sorted(n for n in os.listdir(m.SYSTEM_CLIP_LIB) if n.endswith(".mp4")) \
+    if os.path.isdir(m.SYSTEM_CLIP_LIB) else []
+if _lib:
+    _only = [n for n in _lib if not os.path.exists(os.path.join(m.SYSTEM_MEDIA, n))]
+    assert _only, "every clip in the installed theme library is also a vendored one"
+    _got = m.find_media(_only[0])
+    assert _got == os.path.join(m.SYSTEM_CLIP_LIB, _only[0]), (_only[0], _got)
+    for name in want:
+        assert m.find_media(name) == os.path.join(m.SYSTEM_MEDIA, name), name
+    print(f"  name lookup   {len(_lib)} clips in the installed library: {_only[0]} answers "
+          f"from {_want_roots[-1]}, and the three vendored clips still answer from media/")
 print(f"  roots         {m.media_roots()}")
 PY
 say "vendored clips" "3 clips, sizes and md5 as pinned in tools/selftest.sh"
