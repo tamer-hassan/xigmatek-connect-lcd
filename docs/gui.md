@@ -549,7 +549,9 @@ than left to be inferred:
 * **a clip you picked is yours.** Choosing a row in the library sets `clip_customized`
   in the settings file - a stored bool, because "I picked this" is a fact about a human
   that no path on disk can recover - and from then on opening a layout leaves the
-  background alone and says which clip that layout would have used.  **Use this layout's own clip**
+  background alone and says which clip that layout would have used - in the note line under
+  the picture **and** in the log, because a preview that refuses to move looks exactly like a
+  broken window and a line of small print is easy to miss.  **Use this layout's own clip**
   clears the flag, takes the pair back, and re-arms the pairing. Populating
   the list also selects a row; that is the window answering its own question, and the
   gate checks that it does *not* set the flag, because it looked exactly like a choice.
@@ -1073,7 +1075,22 @@ defaults instead of stopping the window, out-of-range values are dropped, and a 
 path that is not there (the Windows partition is not always mounted) falls back to
 `media/Theme_25.mp4` rather than drawing a blank preview. `--device` and
 `--preview-fps` on the command line win over the file, and `--fresh` ignores and
-overwrites it. Nothing about the *panel* is stored, because the panel cannot be asked
+overwrites it.
+
+**A window that was started without that file does not write one.** `save_settings`
+defaults to `restore`, so a normal session and `--fresh` (whose help promises to
+overwrite) both write, while an offline check or a throwaway script - a `Window` built
+against a device that does not exist, at a rate nobody asked for - cannot replace a
+person's session file, and says once in its own log that it is not writing. That rule is
+here because one of this project's own test sections did exactly that: it set
+`XDG_CONFIG_HOME=$cfgtmp` from a variable assigned 600 lines earlier in a different
+section, which expands to nothing when the section is run on its own, so the write landed
+in `~/.config/xigmaui/config.json`. The next `python3 -m xigmaui` by hand opened on a clip
+nobody had chosen, pointed at `/dev/xigma-no-such-port`, and carried
+`clip_customized: true` - which is the flag that stops the window following any layout's
+own background. Two things were wrong with that: the section was not self-contained, and
+the window had no rule about writing a file it had refused to read. Nothing about the
+*panel* is stored, because the panel cannot be asked
 what it remembers (§11): the file describes the window, not the glass.
 
 Still not wired: a tray icon, and a live-to-glass toggle that keeps running after you

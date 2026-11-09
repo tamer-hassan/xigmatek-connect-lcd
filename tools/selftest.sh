@@ -6,6 +6,19 @@
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+# The one file a suite has no business touching: a person's own session file.  A section
+# that *means* to isolate its settings root but whose variable expands to nothing writes
+# ~/.config/xigmaui/config.json, and this suite has done exactly that - the 0.4 changelog
+# records it - leaving the author's next `python3 -m xigmaui` pointed at
+# /dev/xigma-no-such-port with a clip nobody had chosen.  So the guard belongs to the
+# whole suite, not to one section's good intentions: snapshot here, compare at the end.
+HOME_CFG="$HOME/.config/xigmaui/config.json"
+if [ -e "$HOME_CFG" ]; then
+    HOME_CFG_BEFORE="$(sha256sum "$HOME_CFG")"
+else
+    HOME_CFG_BEFORE=""
+fi
+
 echo "== protocol round-trip against the Windows captures"
 # data/ is gitignored, so a clone has no captures to re-encode.  Say that out loud
 # rather than reporting a pass: the figures below are what the same command printed
@@ -4942,7 +4955,16 @@ echo "== the GUI, offscreen and with no panel: window, clips, and the reset gate
 # XIGMA_SOCKET points at nothing on purpose: if a real display happened to be
 # running while this ran, the window would be a remote and these port-side
 # assertions would be testing the wrong mode
-QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME=$cfgtmp XIGMA_SOCKET=$cfgtmp/no-display.sock \
+# Its own temp settings root, not `$cfgtmp` from the settings section 600 lines above: run
+# this section on its own - which is exactly what a developer does while fixing it - and that
+# variable is unset, `XDG_CONFIG_HOME=` expands to nothing, and every window below writes the
+# author's real ~/.config/xigmaui/config.json.  That is how a session file here ended up with
+# device `/dev/xigma-no-such-port`, `preview_fps 1.0` and `clip_customized true`: the next
+# `python3 -m xigmaui` by hand opened on a clip nobody had chosen and stopped following any
+# layout's own background.  The window now refuses to write when it was started without a
+# session file (app.py:_save_now), and this root is asserted below rather than trusted.
+gui_cfg=$(mktemp -d)
+QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME=$gui_cfg XIGMA_SOCKET=$gui_cfg/no-display.sock \
     python3 - <<'PY' || { echo "gui FAILED"; exit 1; }
 import inspect
 import os
@@ -5126,7 +5148,11 @@ print(f"  sources: {byorigin}")
 # a window against a port that does not exist: it must build, preview every
 # theme, and report the failed action in its log rather than raising
 bad = "/dev/xigma-no-such-port"
-win = app.Window(bad, 1.0, restore=False)
+# `save_settings=True` because this is the section that exercises saving.  The default for a
+# `restore=False` window is *not* to write the session file, and that default gets its own
+# check below - which is the rule that keeps a script or an offline check from replacing a
+# person's `~/.config/xigmaui/config.json` with this window's fake device and rates.
+win = app.Window(bad, 1.0, restore=False, save_settings=True)
 assert win.clips.count() >= 3, win.clips.count()
 for theme in sorted(render.THEMES):
     win.theme.setCurrentText(theme)
@@ -5191,16 +5217,65 @@ for name in ("theme_48.mp4", "Theme_25.mp4"):
     assert (want > 0) == (CLIP_LUMA[name] > 128), (name, want)
     print(f"  scrim auto on {name:14s} -> {want}")
 
+# A window built the way a script builds one - `restore=False`, a device that does not
+# exist, a rate nobody asked for - must not write the session file.  Not a hypothetical
+# hazard: this very section, run on its own, did that to the author's real
+# ~/.config/xigmaui/config.json (the header above says how), and the next
+# `python3 -m xigmaui` by hand came up on a clip nobody had chosen, pointed at
+# `/dev/xigma-no-such-port`, at 1 fps, with `clip_customized` set - the flag that stops
+# the window following any layout's own background.  A pairing complaint traced to a test
+# with no manners, which is why the check is here rather than only in the section header.
+_here = settings.path()
+_xdg = os.environ.get("XDG_CONFIG_HOME", "")
+assert _xdg, ("XDG_CONFIG_HOME is empty or unset in this section: `settings.path()` is "
+              f"{_here}, which is somebody's real session file")
+assert _here.startswith(_xdg + os.sep), (_here, _xdg,
+                                         "the settings root this section believes it writes "
+                                         "to is not the one `settings.path()` resolves")
+assert _here != os.path.expanduser("~/.config/xigmaui/config.json"), _here
+_before_txt = open(_here, encoding="utf-8").read() if os.path.exists(_here) else None
+quiet = app.Window(bad, 1.0, restore=False)              # the default: it does not write
+quiet.theme.setCurrentText("dual")
+quiet.save_timer.start()
+_q_deadline = time.time() + 1.5                          # past the 500 ms debounce
+while time.time() < _q_deadline:
+    appq.processEvents()
+    time.sleep(0.02)
+_after_txt = open(_here, encoding="utf-8").read() if os.path.exists(_here) else None
+assert _after_txt == _before_txt, (
+    _here, "a window started without the session file rewrote it:",
+    (_after_txt or "")[:160])
+# and it says so where a reader will still see it a minute later.  Not the status bar: a
+# port error like "cannot open /dev/xigma-no-such-port" pushes that line out within a
+# second, which is how this assert first came to fail on its own message.
+assert "does not write" in quiet.log_view.text(), (
+    quiet.log_view.text()[-400:],
+    "the window kept the file and said nothing: a reader cannot tell a throwaway window "
+    "from their own session")
+quiet.close()                            # closeEvent -> _save_now, still no write
+assert (open(_here, encoding="utf-8").read() if os.path.exists(_here) else None
+        ) == _before_txt, _here
+print(f"  no session write     restore=False left {_here} exactly as it found it, "
+      f"timer and close included")
+
 # settings through the widgets: a picker moved is a debounced write, and the
 # next window has to come back up the same way it was closed
 win.clock_size.setValue(44)
 win.theme.setCurrentText("gauge")
 win._load_background(byname["Theme_11.mp4"].path)
 win.save_timer.start()
+# Wait for the state this block asked for, not for one field of it.  An earlier pending
+# write can land first and satisfy a one-field condition by accident: the theme loop above
+# leaves `gauge` on the picker (sorted(THEMES)[-1]) and the scrim loop arms the same
+# debounced timer, so "the file says gauge" was true before a single new value was written.
+_want = (44, "gauge", byname["Theme_11.mp4"].path)
 deadline = time.time() + 3
-while time.time() < deadline and settings.load()["theme"] != "gauge":
+while time.time() < deadline:
     appq.processEvents()
     time.sleep(0.02)
+    _now = settings.load()
+    if (_now["clock_size"], _now["theme"], _now["clip"]) == _want:
+        break
 saved = settings.load()
 assert saved["theme"] == "gauge" and saved["clock_size"] == 44, saved
 assert saved["clip"] == byname["Theme_11.mp4"].path, saved["clip"]
@@ -7104,6 +7179,13 @@ for _rec in pick[:6]:
     _pw.ed_name.setCurrentText(_rec["name"])
     _stayed += os.path.basename(_pw.mp4) == _chosen
 assert _stayed == 6, (_stayed, "opening a layout walked over a background a reader chose")
+# and it said so.  This is the state that reads like a broken window: a layout declares a
+# clip, the preview refuses to move, and nothing else about the picture changed.  The note
+# line is one sentence of small print; the log has to carry the same sentence with the way
+# back named in it.
+_txt = _pw.log_view.text()
+assert "the background is yours" in _txt and "Use this layout's own clip" in _txt, (
+    _txt[-500:], "the window declined a layout's clip and never said why in the log")
 assert _pw.btn_pair.isEnabled(), ("a layout names its own clip and the window offers no way "
                                   "back to it")
 _pw.btn_pair.click()
@@ -7129,7 +7211,9 @@ assert settings._clean(_pw._state())["clip_customized"] == _pw.clip_custom, (
 assert "Use this layout's own clip" in _pw.btn_pair.text(), _pw.btn_pair.text()
 _pw.close()
 _doc = open("docs/gui.md", encoding="utf-8").read()
-for _claim in (f"all {len(pick)} selectable layouts", "Use this layout's own clip"):
+for _claim in (f"all {len(pick)} selectable layouts", "Use this layout's own clip",
+               "does not write one",            # the save_settings rule, above
+               "in the note line under"):       # a declined pairing has to be said twice
     assert _claim in _doc, (_claim, "docs/gui.md does not describe the pairing this drives")
 _missing_note = ("and each said so instead of pretending" if _absent else
                  "(0 here: that branch is driven instead by taking the rows *and* every "
@@ -8116,6 +8200,21 @@ else
     echo "  cut short may only be cited for the phases it reached.  It passed there"
     echo "  at the time of this commit; run the driver above against your own logs to"
     echo "  see it work."
+fi
+
+# the promise the header made, kept: nothing here wrote or created a session file.  This
+# is the check that would have caught the GUI section that did, and it catches the next one
+# whoever writes it, in whichever section.
+if [ -n "$HOME_CFG_BEFORE" ]; then
+    if [ "$HOME_CFG_BEFORE" != "$(sha256sum "$HOME_CFG")" ]; then
+        echo "FAILED: $HOME_CFG was changed by this suite, and no section asked to write it"
+        ls -l --time-style=full-iso "$HOME_CFG"
+        exit 1
+    fi
+    echo "  session file           $HOME_CFG is byte-identical to what it was at start"
+elif [ -e "$HOME_CFG" ]; then
+    echo "FAILED: this suite created $HOME_CFG, which did not exist when it started"
+    exit 1
 fi
 
 echo

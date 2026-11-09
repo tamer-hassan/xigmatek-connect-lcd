@@ -285,16 +285,29 @@ class Window(QMainWindow):
     """
 
     def __init__(self, port: str | None = None, preview_fps: float | None = None,
-                 restore: bool = True, socket: str = "", tray: bool | None = None):
+                 restore: bool = True, socket: str = "", tray: bool | None = None,
+                 save_settings: bool | None = None):
         """`port` and `preview_fps` passed in win over what was saved: they come
         from the command line, and a command line that says `/dev/ttyACM1`
         should not be overruled by a file. `restore=False` starts from the
         defaults (`--fresh`), which is also what the offline checks use.
 
+        `save_settings` says whether this window may **write** that file, and it
+        defaults to `restore`: a window that was told to ignore your session is
+        not a window that should replace it.  That is not a hypothetical - an
+        offline check or a throwaway script builds a `Window` with a device path
+        that does not exist and a rate nobody asked for, the save timer fires
+        500 ms later like it does for a person, and the author's real
+        `~/.config/xigmaui/config.json` ends up holding `/dev/xigma-no-such-port`
+        and a clip nobody chose.  `--fresh` passes `save_settings=True`
+        because its own help promises to "ignore and overwrite".
+
         `socket` says where to look for a running display (default: the same
         place `xigmalcd` puts it), and `tray` overrides whether closing the
         window hides it instead of quitting (`--tray` / `--no-tray`)."""
         super().__init__()
+        self.autosave = restore if save_settings is None else save_settings
+        self._said_no_save = False
         self.cfg = settings.load() if restore else settings._clean({})
         self.setWindowTitle(TITLE)
         self.port = port or self.cfg["device"]
@@ -1484,6 +1497,19 @@ class Window(QMainWindow):
                         else self.cfg["split"]}
 
     def _save_now(self) -> str | None:
+        if not self.autosave:
+            # A window that was told to ignore the session file does not write one.  Said
+            # once, in the log (where a reader looks) and in the status bar (where a port
+            # error will push it out a second later), and never as an error: this is what
+            # `--fresh` and every offline check asked for.
+            if not self._said_no_save:
+                self._said_no_save = True
+                self._log(f"this window does not write {settings.path()}: it was started "
+                          f"without your session file (`--fresh` is the one that does)")
+                self.statusBar().showMessage(
+                    f"this window does not write {settings.path()} "
+                    "(started without your session file)", 5000)
+            return None
         where = settings.save(self._state())
         if where:
             self.statusBar().showMessage(f"settings saved to {where}", 2500)
@@ -1640,6 +1666,16 @@ class Window(QMainWindow):
         if self.clip_custom:
             self.pair_note = (f"background is yours: {os.path.basename(self.mp4)}. This "
                               f"layout names {clip} - the button below takes it back.")
+            # The reader needs more than a changed line of small print here.  This is the
+            # case where a layout declares a clip, the preview does not move, and nothing
+            # else about the window looks different - so say it in the log too, in the same
+            # words the note uses, and say which button undoes it.  Only when the two clips
+            # actually differ: opening the layout whose clip is already under the layer is
+            # not a refusal, and logging it would be noise.
+            if clip and clip != os.path.basename(self.mp4):
+                self._log(f"{name} names {clip}; the background is yours "
+                          f"({os.path.basename(self.mp4)}), so the window kept it. "
+                          f"\"Use this layout's own clip\" puts it back.")
             self._refresh_pair()
             return
         path, how = clipdb.find(clip, self.all_clips)
@@ -2706,7 +2742,8 @@ def main(argv=None) -> int:
         # it is the only way to find us
         app.setWindowIcon(icon)
     win = Window(a.device, a.preview_fps, restore=not a.fresh,
-                 socket=a.socket, tray=a.tray)
+                 socket=a.socket, tray=a.tray,
+                 save_settings=True)      # `--fresh` says "ignore and overwrite"
     if a.hidden and win.tray is not None:
         # no window, tray only: everything the tray menu can do goes over the
         # control socket, so this works with the display running and without it

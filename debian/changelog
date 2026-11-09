@@ -55,7 +55,10 @@ xigmatek-connect-lcd (0.4) resolute; urgency=medium
     preview rule, not a wire rule: the upload button is still the only thing
     that sends a file to the panel.  One click on another row makes the
     background yours, and from then on no layout can walk over it until the
-    `Use this layout's own clip` button hands it back.
+    `Use this layout's own clip` button hands it back.  That refusal is now
+    said in the log as well as in the line under the picture: a preview that
+    will not move, with nothing else about the window changed, is otherwise
+    indistinguishable from a broken one.
 
   * `media_roots()` gained the vendor's theme library, so a bare clip name
     is looked up in four roots instead of two: `$XIGMA_MEDIA`, this
@@ -114,6 +117,21 @@ xigmatek-connect-lcd (0.4) resolute; urgency=medium
     rather than only on a tag: before that, the whole section printed
     SKIPPED on a push and the figures rested on one bench.
 
+  * A test section that wrote the author's session file, and the rule it
+    taught.  The suite's GUI section set `XDG_CONFIG_HOME=$cfgtmp` from a
+    variable assigned 600 lines earlier in a different section, so run on its
+    own that expanded to nothing and every window in it wrote
+    `~/.config/xigmaui/config.json`: device `/dev/xigma-no-such-port`,
+    `preview_fps 1.0`, and `clip_customized` true, which is the flag that
+    stops the window following any layout's own background - so the next
+    `python3 -m xigmaui` by hand opened on a clip nobody had chosen.  That
+    section now makes its own settings root and asserts the file it writes is
+    inside it and not in a home directory; and `Window` gained
+    `save_settings`, which defaults to `restore`, because a window told to
+    ignore a session file is not a window that should replace one.  `--fresh`
+    still writes, since its help promises to overwrite, and a window that
+    declines says so once in its own log.
+
   * Gates for the things that had quietly drifted.  `tools/selftest.sh`,
     twenty-two offline sections, now reads the width of debian/changelog (a
     line over 80 columns is a lintian *warning*, which fails the .deb job
@@ -125,7 +143,7 @@ xigmatek-connect-lcd (0.4) resolute; urgency=medium
     number a tool prints - including the numbers in docs/tools.md, two of
     which had gone stale a day after they were written.
 
- -- Tamer Hassan <thameruddin@gmail.com>  Mon, 09 Nov 2026 09:35:57 +0200
+ -- Tamer Hassan <thameruddin@gmail.com>  Mon, 09 Nov 2026 10:41:42 +0200
 xigmatek-connect-lcd (0.3) resolute; urgency=medium
 
   * xigmaui in three columns instead of one long scroll, at the author's own
