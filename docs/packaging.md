@@ -168,11 +168,11 @@ Two measurements decided how the package carries them:
   costs about 90 KB and buys a doc set that reads on an installed machine.
 
 What the pictures do **not** do is get packaged, and since 0.3 there are two kinds of
-them. The images: `docs/logo.png` and `docs/screenshot-xigmaui.png` (1 077 877 B), the two
+them. The images: `docs/logo.png` and `docs/screenshot-xigmaui.png` (1 070 024 B), the two
 theme contact sheets in `docs/previews/` (1 596 454 B). The videos: the six MP4s in
-`docs/videos/` (5 061 583 B - the README's five previews plus the amber-ink figure
-docs/gui.md carries) and the readings JSON that drives them (13 916 B). **7 749 830 B**
-across eleven files, part of it rendered from XIGMATEK's own theme library, which is the
+`docs/videos/` (5 039 178 B - the README's five previews plus the amber-ink figure
+docs/gui.md carries) and the readings JSON that drives them (13 916 B). **7 719 572 B**
+across 11 files, part of it rendered from XIGMATEK's own theme library, which is the
 other package's files and its own licence question - and the videos are also not package
 material for a second reason: what README links is GitHub's copy of them - the editor
 uploads the file to its CDN and writes that URL into the cell - and a URL is not a path this
@@ -180,6 +180,13 @@ package could install. The files themselves stay in `docs/videos/` as the measur
 originals, byte-identical to what those URLs serve (docs/limits.md keeps that comparison).
 So an installed README shows prose with repo-relative links that point at nothing on disk,
 and that is said here rather than discovered by a reader.
+
+Those five numbers are not kept by hand any more: the launcher section of
+`tools/selftest.sh` re-derives them from the files themselves (logo, the window capture,
+the two contact sheets, the six MP4s and the readings JSON) and fails if this page
+disagrees.  That gate earned its place the slow way - the video total had drifted by
+22 405 B when the amber-ink figure was re-rendered and nothing noticed, and re-shooting
+the window picture for the layout editor's new row moved the image total by 7 853 B more.
 
 Checked on the unpacked 0.3 packages, in that layout: **11** markdown files with no `.gz`
 next to any of them, **43** links from one document to another resolving (none dead),

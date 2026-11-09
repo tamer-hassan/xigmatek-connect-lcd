@@ -4171,6 +4171,41 @@ assert f'"{logo}"' in open("README.md", encoding="utf-8").read(), "README: no lo
 print(f"  logo                   {logo} {lg.size[0]}x{lg.size[1]} {lg.mode} "
       f"{os.path.getsize(logo)} B")
 
+# docs/packaging.md closes its packaging argument with an accounting of what the pictures
+# and videos cost in the repository and stay out of the .deb: four group sizes, a file
+# count and a total.  Five numbers someone has to remember, and two of them had already
+# drifted - the video total by 22 405 B when the amber-ink figure was re-rendered, and the
+# image total the moment the window was re-shot for the layout editor's new row.  So the
+# arithmetic is done here, against the same files the document counts, and the document is
+# held to it in the spaced style it writes them in.
+import glob as _pglob
+
+
+def _spaced(n):
+    return f"{n:,}".replace(",", " ")
+
+
+_pics = {"the images": sorted(["docs/logo.png", "docs/screenshot-xigmaui.png"]),
+         "theme contact sheets": sorted(_pglob.glob("docs/previews/*.png")),
+         "the MP4s": sorted(_pglob.glob("docs/videos/*.mp4")),
+         "readings JSON": sorted(_pglob.glob("docs/videos/*.json"))}
+_sizes = {k: sum(os.path.getsize(f) for f in v) for k, v in _pics.items()}
+_all = [f for v in _pics.values() for f in v]
+_total = sum(_sizes.values())
+assert all(os.path.isfile(f) for f in _all), [f for f in _all if not os.path.isfile(f)]
+_pkg_doc = open("docs/packaging.md", encoding="utf-8").read()
+_stray = {k: _spaced(v) for k, v in list(_sizes.items()) + [("total", _total)]
+          if _spaced(v) not in _pkg_doc}
+assert not _stray, (
+    _sizes, _total, _stray,
+    "docs/packaging.md's picture accounting no longer matches the files it counts")
+assert f"{len(_all)} files" in _pkg_doc, (len(_all), "the file count moved")
+print(f"  what is not packaged   {len(_all)} files, {_spaced(_total)} B, all of it outside "
+      f"the .deb: " + ", ".join(
+          f"{k} {_spaced(_sizes[k])} B ({len(_pics[k])} file"
+          f"{'s' if len(_pics[k]) != 1 else ''})" for k in _pics) +
+      f" - and docs/packaging.md states each of those five numbers as measured here")
+
 # The unit is the always-on path, and it is a template.  Three things are checked
 # against the code rather than against a copy of the list: that the only holes in
 # it are the ones install.sh fills, that the theme install.sh defaults to is one
