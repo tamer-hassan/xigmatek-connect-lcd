@@ -725,14 +725,22 @@ class Window(QMainWindow):
         self.ed_name.addItem(NO_EDITOR)
         self.ed_name.addItems(sorted(themes.EXPORTS))
         self.ed_name.addItems([r["name"] for r in themes.scan()[0]])
+        # The counts in this sentence are read out of the library rather than remembered:
+        # it said "three generated layouts" after `alpha` and `bars` joined the exports, and
+        # nothing noticed, because the numbers were typed in prose.  The GUI section asserts
+        # every number in it against `themes.EXPORTS` and `themes.scan()`, and it is the same
+        # pair `--list-themes` prints, so the window and the CLI cannot disagree about how
+        # many layouts there are.
+        _pick, _reject = themes.scan()
         self.ed_name.setToolTip(
-            "the three generated layouts (`clock`, `dual`, `gauge`: JSON written out of "
-            "`render.py` on demand, also printed by `--export-theme NAME`) and every "
-            "layout file this canvas can select - 23 of the vendor's 27 today, the other "
-            "four are 4:3 and refused on a 480x480 panel (docs/themes.md). A name you "
-            "have already edited opens your copy. No layout file is ever sent to the "
-            "panel and nothing is read back from it (PROTOCOL.md \u00a711): what a save "
-            "changes is what *this machine's* daemon draws next time it names that theme")
+            f"the {len(themes.EXPORTS)} generated layouts ({', '.join(sorted(themes.EXPORTS))}: "
+            "JSON written out of `render.py` on demand, also printed by `--export-theme NAME`) "
+            f"and every layout file this canvas can select - {len(_pick)} of the "
+            f"vendor's {len(_pick) + len(_reject)} today, the other {len(_reject)} are 4:3 and "
+            "refused on a 480x480 panel (docs/themes.md). A name you have already edited "
+            "opens your copy. No layout file is ever sent to the panel and nothing is read "
+            "back from it (PROTOCOL.md \u00a711): what a save changes is what *this "
+            "machine's* daemon draws next time it names that theme")
         self.ed_name.currentTextChanged.connect(self._editor_open)
         self.ed_state = QLabel("not editing: the pane shows the theme above, drawn from "
                                "this machine's readings")
@@ -1125,7 +1133,15 @@ class Window(QMainWindow):
             # machine's readings would make it impossible to tell an edit from a
             # temperature, and the whole claim of the editor is that a field change is
             # the only thing that can move a pixel.
-            img, self._ed_notes = self.ed.paint(*self.ed.fixture())
+            #
+            # `ink` goes to the same door the code drawing uses, and only `Editor.paint`
+            # decides whether it can be honoured: for one of the five names generated from
+            # `render.py` the theme has a declared skin and the preview follows the
+            # reader's colour, for a vendored or saved file the colours are the file's.
+            # Both halves of that are measured, not asserted - the suite paints each of
+            # the five both ways at every ink choice this combo offers and asks for zero
+            # differing pixels (docs/theme-editor.md).
+            img, self._ed_notes = self.ed.paint(*self.ed.fixture(), ink=self._ink())
         else:
             img = render.draw(m, theme, **self._render_kw())
         self._osd = img
@@ -1210,6 +1226,12 @@ class Window(QMainWindow):
                 "this machine's, so an edit is the only thing that can move a pixel "
                 "here."
                 + (f" No reading for: {miss}." if miss else "")
+                + (f" {self.ed.ink_note} - a preview of a theme this repo draws from "
+                   "code, not a change to the file: Save writes the colours the file "
+                   "declares." if self.ed.ink_note else "")
+                + ("" if self.ed.theme or self._ink() is None else
+                   " This file's colours are its own: the text-colour row is a "
+                   "setting of our drawings, not of a vendor's layout.")
                 + " This pane sends nothing: the panel is never handed a layout file "
                   "(PROTOCOL.md \u00a711), so what Save changes is what this machine's "
                   "daemon draws next time it names that theme.")

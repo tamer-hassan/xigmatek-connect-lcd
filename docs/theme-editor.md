@@ -640,6 +640,59 @@ report's own "cannot answer" half. And `--check-theme bars` no longer warns that
 new sources are unknown: `themes.source_names()` is one vocabulary, consulted by the painter,
 the checker, the editor's menus and the gates.
 
+## What the preview's two doors had to agree about
+
+The window paints a theme two ways: from code (`render.draw`, this machine's live readings)
+and from a file (`themes.draw`, the editor's pinned fixture).  Pictures of `bars` from those
+two doors looked unrelated - 46 535 differing pixels on this bench's readings - and the
+export was not the reason.  The pane was comparing a **live** frame against a **pinned** one,
+and the pinned dict had gone stale: it answered **5 of the 19 sources** the five generated
+layouts ask, while carrying four keys nothing in the library reads (`gpu.usage`,
+`cpu.frequency`, `gpu.frequency`, `memory.used_percent`).  At that fixture the file door
+painted `bars` with 14 of its 32 rows against a code drawing of 26, and `alpha`'s GPU row was
+missing from one door and `--%` in the other: 4 587 px at one clock instant.
+
+So the preview was fixed by fixing the fixture, not the layout.  `edit.FIXTURE` now answers
+15 of the 19 sources, and the four it leaves are `Fan 3`/`Fan 4` name and speed - the
+slots past the two tachometers this shape reports, empty in **both** doors, which is `bars`'s
+reserved-slots rule being visible rather than hidden.  Three claims about it are gated, in the
+section that already holds the editor's model:
+
+* **every key is a key a box reports.**  The group-and-field set is checked against the
+  metrics sample `sensors.py` prints at the top of its own module, so an unread key cannot sit
+  in a fixture pretending to be a reading - which is precisely how this one did.
+* **coverage is what the exports need.**  The sources the five generated layouts ask, minus
+  what the fixture answers, must equal exactly the fan slots past its reported tachometers.
+  A new reading in a new export has to be pinned here before the preview may be quiet about
+  it.
+* **the two doors put down the same pixels.**  All five themes at that fixture, at seven ink
+  choices: zero differing pixels, worst channel 0.  Measured through the pane's own door
+  (`Editor.paint(*Editor.fixture(), ink=...)`), not a hand-built call - and the row counts
+  with it, in `bars`: 26 of its 32 rows at the completed fixture, where the same door painted
+  14 of its 32 rows before, those two frames differing by 34 362 px (61 790 lit px against
+  28 860).
+
+That last claim needed a rule the library did not have.  `themes.draw` takes no `ink` and is
+right not to: a layout's colours are its own, which is why a vendored theme looks here the way
+it looks in the vendor's app.  An ink moved the code drawing by 18 475 px on this bench and
+the file door by **0 px** - the window's text-colour row simply did not reach a generated
+layout.  `themes.with_ink` closes it for the five names drawn from code: it copies the layout
+and moves the colours `render.SKIN` declares, and `render.SKIN` is now the one table both
+doors read, because a `theme_*` body calls `_skin(ink, *SKIN[theme])`.  The substitution is
+**key-scoped**, and that is not a detail: `bars` uses `CYAN` both as a heading glyph and as
+the `startColor` of all ten of its meters, and only the 22 `textColor` roles may move.  The
+gate measures ink through the file door at every colour the parser itself knows - the ten
+palette names read out of `parse_ink`, plus a hex and a tuple, 13 inks x 5 layouts, all 65
+comparisons at zero pixels - because a preview of *our* theme follows the reader's colour
+while a vendor's file never does: open `Theme_28` and the ink row moves it 0 px and says
+nothing about it.
+
+What the completed fixture costs is measured as a relation rather than as an absolute, because
+this bench is not quiet while it runs: drawing each theme at the completed fixture and at the
+same dict with those answers taken back out, alternating in one process, 60 draws each, is
+**+0.02 to +0.47 ms** a frame - `bars` the largest, with its 12 extra rows.  The absolute
+per-theme milliseconds in docs/gui.md stay labelled as owed a quiet-box re-measurement.
+
 ## The surface, and the geometry it must not break
 
 - The preview pane today is a `QLabel` in the left column, capped at `render.W +

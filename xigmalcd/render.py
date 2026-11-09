@@ -491,7 +491,7 @@ def theme_gauge(m, title="Smart Display", clock=True, label="CPU TEMP",
     tracks CPU busy percent instead, which does move every second.
     """
     img = Image.new("RGBA", (W * SS, H * SS), bg)
-    fg, mid, acc = _skin(ink, WHITE, ALPHA_LABEL, ALPHA_MINT)
+    fg, mid, acc = _skin(ink, *SKIN["gauge"])
     cpu = m.get("cpu") or {}
     val = cpu.get(source) if source in ("temperature", "load") else None
     if val is None:
@@ -520,7 +520,7 @@ def theme_dual(m, title="CPU  /  GPU", clock=True, cold=30.0, hot=90.0,
                bg=OVERLAY, ink=None):
     """Two arc gauges side by side, plus a load bar and the clock."""
     img = Image.new("RGBA", (W * SS, H * SS), bg)
-    fg, mid, acc = _skin(ink, WHITE, DIM, CYAN)
+    fg, mid, acc = _skin(ink, *SKIN["dual"])
     cpu = m.get("cpu") or {}
     gpu = m.get("gpu") or {}
     for cx, dev, name in ((128, cpu, "CPU TEMP"), (352, gpu, "GPU TEMP")):
@@ -617,7 +617,7 @@ def dual_status_line(m: dict) -> str:
 def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY, ink=None):
     """Mostly a clock: huge time, one line of readings underneath."""
     img = Image.new("RGBA", (W * SS, H * SS), bg)
-    fg, mid, acc = _skin(ink, WHITE, DIM, CYAN)
+    fg, mid, acc = _skin(ink, *SKIN["clock"])
     t = clock_str()
     # One budget for every line in this theme: 440 panel px, which is what the big
     # time line already used and what the other two did not.
@@ -695,7 +695,7 @@ def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
     row where the file says it is.
     """
     img = Image.new("RGBA", (W * SS, H * SS), bg)
-    fg, mid, acc = _skin(ink, WHITE, DIM, CYAN)
+    fg, mid, acc = _skin(ink, *SKIN["bars"])
     cpu = m.get("cpu") or {}
     gpu = m.get("gpu") or {}
     mem = m.get("memory") or {}
@@ -1037,7 +1037,7 @@ def theme_alpha(m, title=None, clock=True, clock_size=26, fan=True,
     # the theme has no secondary ink to preserve: an override lands on all of
     # it uniformly.  That is a departure from the measured replica, and the GUI
     # says so rather than leaving the reader to notice.
-    fg, mid, acc = _skin(ink, A26_WHITE, A26_WHITE, A26_WHITE)
+    fg, mid, acc = _skin(ink, *SKIN["alpha"])
     cpu = m.get("cpu") or {}
     gpu = m.get("gpu") or {}
 
@@ -1172,6 +1172,35 @@ def gpu_fan_figure(m) -> str:
 
 THEMES = {"gauge": theme_gauge, "dual": theme_dual, "clock": theme_clock,
           "bars": theme_bars, "alpha": theme_alpha}
+
+#: The three glyph colours each drawn theme owns - primary, secondary, accent - in one
+#: place, so that **both** doors read the same declaration.  `_skin` above applies a
+#: reader's ink to a triple; a layout file bakes the *default* triple into its
+#: `textColor` fields, and `themes.with_ink` moves exactly those fields by way of this
+#: table.  Before it existed the ink question could only be answered by looking inside
+#: five theme functions, and the window's text-colour row moved the code drawing by
+#: thousands of pixels while a generated layout, painted by `themes.draw`, did not move
+#: at all: the pane's two doors disagreed about the reader's own colour choice.  The
+#: suite now holds the two doors to zero differing pixels at five inks across all five
+#: themes, which is what makes this table a fact rather than a list.
+#:
+#: `alpha` repeats one colour three times deliberately: its measured skin is white text
+#: on a mostly-transparent picture (PROTOCOL.md 10), and the copy of that theme the
+#: vendor's own frames show has no dimmer second role.
+SKIN = {"gauge": (WHITE, ALPHA_LABEL, ALPHA_MINT),
+        "dual": (WHITE, DIM, CYAN), "clock": (WHITE, DIM, CYAN),
+        "bars": (WHITE, DIM, CYAN),
+        "alpha": (A26_WHITE, A26_WHITE, A26_WHITE)}
+
+
+def skin(theme: str, ink=None) -> tuple:
+    """The three glyph colours of one drawn theme, a reader's ink applied.
+
+    One accessor for both doors: `theme_*` calls `_skin(ink, *SKIN[theme])` and
+    `themes.with_ink` calls this, so a theme cannot change its skin in one door and keep
+    the other at the old colours.
+    """
+    return _skin(ink, *SKIN[theme])
 
 
 def scrim(img: Image.Image, alpha: int, grow: int = 6) -> Image.Image:

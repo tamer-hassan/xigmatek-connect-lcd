@@ -737,7 +737,13 @@ substitution, because no Microsoft fonts are installed here (`arial` -> Liberati
 picture is what `tools/theme_check.py` measures, with `themes/alpha/README.md` keeping
 those figures. A layout theme ignores `--text-color`, `--cold`/`--hot`, `--label` and
 `--clock-size`: its colours, sizes and geometry are inside its file - which is the same
-reason the window's picker does not list what it cannot preview. And **none of this has
+reason the window's picker does not list what it cannot preview. Nothing about that has
+changed on the wire. The window makes exactly one exception to it, in a preview, and says so
+under the picture: open one of the five themes this repo draws from code and `themes.with_ink`
+writes the reader's text colour into a **copy** of that theme's generated layout, over the
+colours `render.SKIN` declares, so the pane's two doors agree at that ink. A vendored or
+saved layout is never touched by it - measured at 0 px - and neither is the file a save would
+write. And **none of this has
 been looked at on glass yet**: the frame byte counts in docs/usage.md (3 558 B for
 `Theme_29` up to 8 115 B for `Theme_35`, one pinned fixture, one pinned instant) are
 offline figures from `--dry-run`, and the glass pass is stage 6 of

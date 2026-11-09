@@ -516,6 +516,89 @@ for name in ("amber", "mint", "cyan", "green", "red", "#ff4040"):
                         "the palette path moved a chosen ink by more than a count")
 print(f"  through the palette   a chosen ink returns within {worst}/255 per channel "
       f"on the default 256-colour upload path")
+
+# ---- the same reader's colour, through the *file* door.  `themes.draw` has no `ink`
+# ---- argument and is right not to have one: a layout's colours are its own, which is why a
+# ---- vendored theme looks here the way it looks in the vendor's app.  So the window's text
+# ---- colour could not reach a generated layout at all, and the pane's two doors disagreed
+# ---- about the reader's own choice - measured on this bench's readings, one ink moved the
+# ---- code drawing by 18 475 px and the file door by 0.  `themes.with_ink` closes that by
+# ---- writing the ink into a *copy* of a generated layout, over the colours `render.SKIN`
+# ---- declares, and the claim proved here is the strong one: the two doors end up the same
+# ---- picture, at every colour the parser itself knows.
+import ast
+import datetime
+from PIL import ImageChops
+from xigmalcd import themes as T
+
+
+def palette_names():
+    """Every colour name `parse_ink` knows, taken out of the module instead of remembered,
+    so the window's combo cannot offer a colour this gate did not measure."""
+    tree = ast.parse(open("xigmalcd/render.py", encoding="utf-8").read())
+    node = next(n for n in ast.walk(tree)
+                if isinstance(n, ast.Assign)
+                and getattr(n.targets[0], "id", "") == "named")
+    return [k.value for k in node.value.keys]
+
+
+def differ(a, b):
+    """(pixels that disagree in any channel, worst single-channel delta)"""
+    flat = ImageChops.difference(a.convert("RGBA"),
+                                 b.convert("RGBA")).get_flattened_data()
+    return (sum(1 for q in flat if q != (0, 0, 0, 0)),
+            max((max(q) for q in flat), default=0))
+
+
+def keyed(obj, key):
+    """One colour key, in widget order: positional rather than sorted, because the whole
+    point is to compare the same widget against itself and many widgets do not carry a key."""
+    return [(w["property"][0] or {}).get(key) for w in obj["osd"]["widget"]]
+
+
+INKS = [None] + palette_names() + ["#ff4040", (10, 200, 120, 255)]
+WHEN_DT = datetime.datetime(*WHEN[:6])
+per_theme, bars_moved, bars_total = {}, 0, 0
+for theme in ("gauge", "dual", "clock", "bars", "alpha"):
+    base = T.export(theme)
+    cells = []
+    for ink in INKS:
+        inked, note = T.with_ink(base, theme, ink)
+        gap, chan = differ(R.draw(M, theme, ink=ink),
+                           T.draw(inked, M, WHEN_DT)[0])
+        assert gap == 0 and chan == 0, (
+            theme, ink, gap, chan,
+            "a generated layout and the code drawing disagree at this ink: the skin table, "
+            "the recipe and the export no longer say the same thing")
+        cells.append(sum(1 for a, b in zip(keyed(base, "textColor"),
+                                           keyed(inked, "textColor")) if a != b))
+    per_theme[theme] = (cells, len(base["osd"]["widget"]))
+    assert T.export(theme) == base, (theme, "`with_ink` wrote through its copy")
+    # colours that are graphics rather than glyphs never move, and `bars` is where that
+    # distinction has teeth: its heading glyph and its ten meter tracks are the same CYAN
+    if theme == "bars":
+        inked, _n = T.with_ink(base, theme, "amber")
+        for key in ("startColor", "endColor", "bgColor"):
+            assert keyed(base, key) == keyed(inked, key), (
+                key, "an ink moved a graphic's colour, not a glyph's")
+        bars_moved = cells[-1] if cells[-1] else cells[INKS.index("amber")]
+        bars_total = len(base["osd"]["widget"])
+        assert bars_moved == 22, (bars_moved, "the glyph roles an ink may move are no "
+                                              "longer 22 of 32 widgets")
+
+_refused, refuse_note = T.with_ink(T.export("bars"), "Theme_28", "amber")
+assert "no drawn theme named" in refuse_note and _refused == T.export("bars"), (
+    refuse_note, "a layout that is not one of the five must come back untouched")
+_alpha_obj, alpha_note = T.with_ink(T.export("alpha"), "alpha", "amber")
+assert "all three glyph roles together" in alpha_note, alpha_note
+print(f"  ink through the file   {len(INKS)} inks (`parse_ink`'s own {len(palette_names())} "
+      f"names, plus a hex and a tuple) x 5 generated layouts: zero differing pixels, worst "
+      f"channel 0, against `render.draw` at one instant; only `textColor` moves "
+      f"({bars_moved} of {bars_total} widgets in `bars`, its 10 cyan meter tracks left "
+      f"alone); a name outside the five comes back unchanged with a sentence; `alpha` "
+      f"reports that its three roles are one colour.  Per theme, glyphs re-inked at the "
+      f"amber stop: " + " ".join(f"{t}={per_theme[t][0][INKS.index('amber')]}/"
+                                 f"{per_theme[t][1]}" for t in per_theme))
 PY
 
 echo "== pinned metrics: the cases the sensors will not produce, drawn without putting them on the wire"
@@ -5252,9 +5335,143 @@ print(f"  editor model          opened {len(opened)} of the {len(pick)} layouts 
       f"your theme directory still holds {len(themes.user_copies())} files. The row may "
       f"offer {len(offered)} fields across {len(kinds)} kinds ({' '.join(kinds)}), and "
       f"every one is a key `layout.py` is proven to read - none of the {len(inert)} keys "
-      f"the vendor carries without reading is offered, so those survive a save "
-      f"untouched. The picture comes from a pinned fixture, not live sensors "
-      f"({fx[:78]}...)")
+       f"the vendor carries without reading is offered, so those survive a save "
+       f"untouched. The picture comes from a pinned fixture, not live sensors "
+       f"({fx[:78]}...)")
+
+# ---- and what that fixture owes: the key names of a real box, the coverage the five
+# ---- generated layouts need, and a preview that therefore *is* the same picture as the
+# ---- theme the loop draws.  All three are held here because none of them was held before,
+# ---- and the failure mode was invisible: this dict answered 5 of the 19 sources the five
+# ---- exports ask, while carrying four keys nothing in the library reads (`gpu.usage`,
+# ---- `cpu.frequency`, `gpu.frequency`, `memory.used_percent`).  The pane then showed a
+# ---- `bars` layout with 14 of its 32 rows beside a code drawing of 26 and the two looked
+# ---- unrelated, and `alpha`'s GPU row was missing from one door and `--%` in the other.
+# ----
+# ---- What the completion buys is measured rather than asserted: the same file door at the
+# ---- fixture with those answers taken back out, against the fixture as it stands.  Both
+# ---- frames come from this tree, so the figures are relations and not a bench inventory.
+import json as _json
+from xigmalcd import sensors as _sens
+
+_shape, _end = _json.JSONDecoder().raw_decode(_sens.__doc__, _sens.__doc__.index("{"))
+assert _shape, "sensors.py's own documented metrics shape did not parse"
+_stray = {}
+for _group, _fields in gui_edit.FIXTURE.items():
+    if _group not in _shape:
+        _stray[_group] = "a metrics group no box reports"
+        continue
+    _spec = _shape[_group]
+    if isinstance(_spec, list):          # `fans` is a list of rows, not a group of keys
+        _extra = [k for _row in _fields for k in _row if k not in _spec[0]]
+    else:
+        _extra = [k for k in _fields if k not in _spec]
+    if _extra:
+        _stray[_group] = _extra
+assert not _stray, (
+    _stray, "the editor's fixture carries a key no machine reports - which is how it once "
+            "answered `gpu.usage` while the library asked for `gpu.load`")
+asked = {w["property"][0]["source"] for e in generated
+         for w in e.widgets()
+         if (w["property"][0] or {}).get("source")}
+_fx_vals, _fx_absent = themes.values(gui_edit.FIXTURE, gui_edit.FIXTURE_WHEN)
+_short = sorted(asked - set(_fx_vals))
+_fans = len(gui_edit.FIXTURE.get("fans") or [])
+_fan_src = {src for src in asked if src.startswith("Fan ")}
+_slots = _fan_src - {src for src in _fan_src if int(src.split()[1]) - 1 < _fans}
+assert _short == sorted(_slots), (
+    _short, _slots, _fans,
+    "the fixture leaves a source unanswered that is not a fan slot past this shape's "
+    "reported tachometers - a new reading in a new export needs a pinned value")
+# the same fixture, less what the completion added: what the pane used to look like
+_DROPPED = {"cpu": ("usage", "speedAverage"),
+            "gpu": ("load", "speed", "fan", "memoryUsage", "dedicatedTotal"),
+            "memory": ("used", "total", "load")}
+_THIN = {k: {kk: vv for kk, vv in v.items() if kk not in _DROPPED.get(k, ())}
+         for k, v in gui_edit.FIXTURE.items() if k not in ("fans", "motherboard")}
+_thin_vals, _ = themes.values(_THIN, gui_edit.FIXTURE_WHEN)
+assert asked - set(_thin_vals), (sorted(asked - set(_thin_vals)),
+                                 "the fixture's coverage is no longer what this gate calls "
+                                 "completed, so the comparison below is hollow")
+_real_now = render._now
+INKS = [None, "amber", "red", "mint", "cyan", "#ff4040", (10, 200, 120, 255)]
+render._now = lambda: gui_edit.FIXTURE_WHEN.timetuple()
+try:
+    _rows, _gaps, _lit = {}, {}, {}
+    for _ed in generated:
+        _name = _ed.name
+        _n_all = len(_ed.widgets())
+        _cells = []
+        for _ink in INKS:
+            _lay, _notes = _ed.paint(*_ed.fixture(), ink=_ink)
+            _code = render.draw(gui_edit.FIXTURE, _name, ink=_ink)
+            _diff = ImageChops.difference(_code.convert("RGBA"),
+                                          _lay.convert("RGBA")).get_flattened_data()
+            _gap = sum(1 for q in _diff if q != (0, 0, 0, 0))
+            _chan = max((max(q) for q in _diff), default=0)
+            assert _gap == 0 and _chan == 0, (
+                _name, _ink, _gap, _chan,
+                "the pane's two doors disagree at the fixture: an export, a recipe and the "
+                "skin table no longer describe one picture")
+            _cells.append(_gap)
+        _full, _full_notes = _ed.paint(*_ed.fixture())
+        _thin_img, _thin_notes = themes.draw(_ed.obj, _THIN, gui_edit.FIXTURE_WHEN)
+        _rows[_name] = (len(_thin_notes["boxes"]), len(_full_notes["boxes"]), _n_all)
+        _lit[_name] = (px_differ(_full, _thin_img),
+                       sum(1 for v in _full.getchannel("A").get_flattened_data() if v),
+                       sum(1 for v in _thin_img.getchannel("A").get_flattened_data() if v))
+        _gaps[_name] = _cells
+    # the row counts are the part a reader can check by eye, so they are said out loud
+    assert _rows["bars"][0] < _rows["bars"][1], (
+        _rows["bars"], "the completed fixture no longer paints more of `bars` than the thin "
+                       "one, so the gate below has nothing to hold the documents to")
+    # and a layout that is not one of ours keeps its own colours: the ink row is a setting
+    # of our drawings, not a re-colour of somebody else's file
+    _vend = opened[0]
+    _plain, _ = _vend.paint(*_vend.fixture())
+    _tinted, _ = _vend.paint(*_vend.fixture(), ink="amber")
+    assert _vend.ink_note == "" and px_differ(_plain, _tinted) == 0, (
+        _vend.name, _vend.ink_note, px_differ(_plain, _tinted),
+        "an ink reached a vendored layout: its colours are its own (docs/themes.md)")
+finally:
+    render._now = _real_now
+
+# the pixel distance between the two fixtures is the number a reader can use to judge what
+# the completion bought, so it is quoted in the documents in the same digits this gate counts
+_thin_px = f"{_lit['bars'][0]:,}".replace(",", " ")
+_doc_gui = open("docs/gui.md", encoding="utf-8").read()
+_doc_plan = open("docs/theme-editor.md", encoding="utf-8").read()
+for _want in (f"{len(asked) - len(_short)} of the {len(asked)} sources",
+              f"{_rows['bars'][1]} of its {_rows['bars'][2]} rows",
+              f"{_rows['bars'][0]} of its {_rows['bars'][2]} rows",
+              f"{_thin_px} px"):
+    assert _want in _doc_gui or _want in _doc_plan, (
+        _want, "no document states this measurement, so it is only a gate talking to itself")
+print(f"  the fixture, and both doors  every key is one `sensors.collect()` reports (the "
+      f"module's own sample), and the fixture answers {len(asked) - len(_short)} of the "
+      f"{len(asked)} sources the {len(generated)} generated layouts ask - the "
+      f"{len(_short)} it leaves are the fan slots past its {_fans} reported tachometers, "
+      f"empty in both doors. At that fixture the pane's two doors put down the same pixels "
+      f"for all {len(generated)} themes at {len(INKS)} ink choices (worst channel 0). "
+      f"Taken back to what the dict answered before, `bars` paints {_rows['bars'][0]} of "
+      f"its {_rows['bars'][2]} rows against {_rows['bars'][1]}, and those two pictures differ "
+      f"by {_thin_px} px - {_lit['bars'][1]:,} lit px "
+      f"completed against {_lit['bars'][2]:,} thin. A vendored file does not move at all "
+      f"under an ink: 0 px, and no note.")
+
+# The layout combo's tooltip counts layouts out in prose, and it was wrong for a while: it
+# said "three generated layouts" after the fifth export landed.  So its numbers are read back
+# out of the widget and held to `themes.EXPORTS` and `themes.scan()` - the same pair
+# `--list-themes` prints, which the doc-doors section already holds the documents to.
+_tip = win.ed_name.toolTip()
+for _want in (f"the {len(generated)} generated layouts",
+              f"{len(pick)} of the vendor's {len(pick) + len(_rej)}"):
+    assert _want in _tip, (_want, _tip[:120],
+                           "the window and the library disagree about how many layouts there "
+                           "are, in a sentence written to answer that question")
+print(f"  the window's own words   its layout tooltip states {len(generated)} generated "
+      f"layouts and {len(pick)} of the vendor's {len(pick) + len(_rej)} - the counts "
+      f"`themes.EXPORTS` and `themes.scan()` report, read back off the widget")
 
 # ---- a run of keystrokes, one undo, and a picture that moves by exactly the edit ----
 KEYS, NUDGE = 20, 20
@@ -5521,11 +5738,23 @@ print(f"                        who needs that sentence is not remembered either
 # ---- a drag and an arrow key both end in.  What is pinned below is the shape of the answer,
 # ---- not one window's pixels.
 cv = gui_edit.Editor.open_theme("alpha")
-_cv_img, cv_notes = cv.paint(*cv.fixture())
+_full_img, _full_notes = cv.paint(*cv.fixture())
+_full_gaps = [x for x in _full_notes["missing"] if not str(x).startswith("font:")]
+assert not _full_gaps, (_full_gaps, "the completed fixture leaves an `alpha` row unanswered")
+# The completed fixture answers every row `alpha` declares - which is the whole point of the
+# preview gate above, and it takes *this* gate's evidence away: with nothing skipped, a list
+# of painted boxes and a list of declared rows are the same length and `hit` could be reading
+# the file instead of the paint.  So the canvas door is driven at the same file with readings
+# taken back out of the fixture, and the print below says which.  The two gates are the two
+# halves of one claim: at the fixture the doors agree to the pixel, and a door that answers a
+# paint still reports fewer boxes than the file has rows.
+_cv_img, cv_notes = cv.paint(_THIN, gui_edit.FIXTURE_WHEN)
 drawn = cv_notes["boxes"]
 skipped = sorted(set(cv_notes["missing"]))
-assert skipped, ("this gate needs a layout with rows the fixture cannot answer, so that "
-                 "`boxes` is provably not a list of rows", skipped)
+assert skipped and len(drawn) < len(cv.widgets()), (
+    len(drawn), len(cv.widgets()), skipped,
+    "this gate needs a layout with rows the readings cannot answer, so that `boxes` is "
+    "provably not a list of rows")
 row_of = {b[3]: b for b in drawn}
 clock_row = next(b for b in drawn if b[0] == "data" and b[1] == "Time")
 cx = (clock_row[2][0] + clock_row[2][2]) // 2
@@ -5586,7 +5815,8 @@ hard, soft = themes.validate(cv.obj)
 assert not hard and not any("canvas" in w for w in soft), (hard, soft)
 print(f"  pointing at a row      `hit` answers the file's row index, not a position: "
       f"{len(drawn)} boxes for {len(cv.widgets())} rows ({', '.join(skipped)} unanswered "
-      f"at the fixture), and the clock line's index is {clock_row[3]} while it sits "
+      f"at the thinned readings this door is driven at; none of them is unanswered at the "
+      f"fixture itself), and the clock line's index is {clock_row[3]} while it sits "
       f"{drawn.index(clock_row)} boxes in.  Overlaps resolve to the later row: "
       f"{len(covering)} boxes cover the CPU ring's centre and the figure inside it wins. "
       f"A move is one step and returns every pixel on undo; a move off the canvas is "

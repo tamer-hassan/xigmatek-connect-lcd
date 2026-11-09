@@ -29,6 +29,7 @@ bearing one:
 """
 from __future__ import annotations
 
+import copy
 import datetime
 import glob as _glob
 import json
@@ -1010,6 +1011,64 @@ def special_is_pair(name: str) -> bool:
 
 
 # ------------------------------------------------------------------ exports --
+def with_ink(obj: dict, theme: str, ink) -> tuple:
+    """A copy of one generated layout, its glyph colours moved to a reader's ink.
+
+    **Only a generated layout.**  A layout's colours are its own - that is the rule
+    `layout.py` states at the top of the module and the reason a vendored theme looks the
+    same here as in the vendor's app - so this function is for the five names this repo
+    draws from `render.py`, and it is what lets the window preview one of those *as a file*
+    without losing the text-colour the reader picked.  Measured before it existed: the
+    window's ink row moved the code drawing by 18 475 px on this bench's readings and the
+    file door by **0 px**, because `themes.draw` has no ink argument and was right not to
+    have one.
+
+    The rule is key-scoped, not colour-scoped, and that distinction is load-bearing:
+    `bars` uses `CYAN` both as a heading glyph and as the `startColor` of all ten of its
+    meters, and only the `textColor` fields follow an ink.  Arcs, bars, tracks and rings
+    keep their colours - several of those colours are measurements off the vendor's own
+    frames, and `_skin`'s docstring already says graphics are not ink.
+
+    `theme` names the drawn theme the layout was generated from, and the colours come from
+    `render.SKIN`, the one table both doors read.  When a theme declares the same colour
+    for two roles - `alpha` declares white three times - the roles cannot be told apart by
+    colour alone; every glyph then takes the ink, which is what the code door does for
+    `alpha` too, and the count is reported rather than hidden.  The suite proves the whole
+    thing at five inks across all five themes to zero differing pixels.
+
+    Returns `(copy, note)`; `note` is "" when nothing was applied.
+    """
+    if theme not in render.SKIN:
+        return copy.deepcopy(obj), (f"no drawn theme named {theme!r}: a layout's colours "
+                                    f"are its own, and only {' '.join(sorted(render.SKIN))}"
+                                    f" have a declared skin to move")
+    baked = render.SKIN[theme]
+    inked = render.skin(theme, ink)
+    if inked == baked:
+        return copy.deepcopy(obj), ""
+    table, ambiguous = {}, []
+    for from_c, to_c in zip(baked, inked):
+        key, want = rgba_str(from_c), rgba_str(to_c)
+        if table.get(key, want) != want:
+            ambiguous.append(key)         # two roles, one colour: see the docstring
+        table.setdefault(key, want)
+    for key in ambiguous:
+        table[key] = rgba_str(inked[0])   # the primary, which is what `alpha` paints
+    out = copy.deepcopy(obj)
+    moved = 0
+    for widget in out.get("osd", {}).get("widget") or []:
+        for prop in widget.get("property") or []:
+            current = prop.get("textColor")
+            if current in table and table[current] != current:
+                prop["textColor"] = table[current]
+                moved += 1
+    note = (f"{moved} of {len(out.get('osd', {}).get('widget') or [])} widgets re-inked to "
+            f"{render.ink_hex(inked[0])}"
+            + (f", all three glyph roles together ({', '.join(ambiguous)})"
+               if ambiguous else ""))
+    return out, note
+
+
 def rgba_str(colour: tuple) -> str:
     """A render colour as the `rgba(...)` spelling every vendor widget uses."""
     r, g, b = colour[:3]

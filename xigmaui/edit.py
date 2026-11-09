@@ -190,10 +190,18 @@ def number_fields() -> tuple:
 class Editor:
     """One layout being edited: its widgets, the selected one, and an undo stack."""
 
-    def __init__(self, obj: dict, origin: str = "", path: str = "", name: str = ""):
+    def __init__(self, obj: dict, origin: str = "", path: str = "", name: str = "",
+                 theme: str | None = None):
         self.obj = obj
         self.origin = origin                    # "your copy", "checkout", "package"
         self.path = path                        # where a save would go, "" if new
+        # Which drawn theme this layout was generated from, or None if it came from a
+        # file.  It is what decides whether the window's text colour may move the
+        # preview at all: a layout's colours are its own (`layout.py` says so at the top
+        # of the module, and it is why a vendored theme looks the same here as in the
+        # vendor's app), while one of the five names this repo draws from `render.py` has
+        # a *declared* skin - `render.SKIN` - that `themes.with_ink` can move.
+        self.theme = theme
         # a vendor file's top-level `id` is a number (the theme id), so the *name* is
         # carried separately: it is what `--theme <name>` and `themes.resolve` speak
         self.name = name or str(obj.get("id") or "theme")
@@ -208,6 +216,7 @@ class Editor:
         # and the vendor's file is what the loop will read again.
         self._baseline = copy.deepcopy(obj)
         self._saved = copy.deepcopy(obj)
+        self.ink_note = ""        # what `paint(..., ink=)` did, for the caption
 
     @property
     def dirty(self) -> bool:
@@ -238,7 +247,7 @@ class Editor:
         """
         if name in themes.EXPORTS:
             return cls(themes.export(name), origin="generated from render.py", path="",
-                       name=name)
+                       name=name, theme=name)
         rec = themes.resolve(name)
         if rec is None:
             raise KeyError(f"no layout named {name!r}: {themes.why_not(name)}")
@@ -513,9 +522,22 @@ class Editor:
 
     # -------------------------------------------------------------- render --
     def paint(self, metrics: dict | None = None, when: datetime.datetime | None = None,
-              scrim: int = 0) -> tuple:
-        """The layout as the loop would draw it.  Same door as `--check-theme`."""
-        return themes.draw(self.obj, metrics or {}, when, scrim=scrim)
+              scrim: int = 0, ink=None) -> tuple:
+        """The layout as the loop would draw it.  Same door as `--check-theme`.
+
+        `ink` is the window's text colour, and it is honoured **only while this editor
+        holds a generated layout** - one of the five names this repo draws from code.  It
+        goes in by copying the object and moving its glyph colours
+        (`themes.with_ink`), never by editing `self.obj`: the file a save would write
+        keeps its own colours, and a reader's colour choice is a property of this view.
+        A vendored or user-saved layout ignores the argument, which is the rule that
+        theme's file already states about itself.  `self.ink_note` carries what happened,
+        for the caption under the picture.
+        """
+        obj, self.ink_note = ((themes.with_ink(self.obj, self.theme, ink)
+                               if self.theme else (self.obj, ""))
+                              if ink is not None else (self.obj, ""))
+        return themes.draw(obj, metrics or {}, when, scrim=scrim)
 
     def fixture(self) -> tuple:
         """The metrics and the instant this editor draws with - always the same pair.
@@ -538,10 +560,42 @@ class Editor:
 #: The pinned fixture: the same readings every documented figure in this repo was read
 #: at (docs/limits.md), so an edit shown here is judged against the picture the docs
 #: describe rather than against whatever this machine is doing right now.
-FIXTURE = {"cpu": {"temperature": 57.0, "load": 62.0, "frequency": 3.4,
-                   "power": 18.0},
-           "gpu": {"temperature": 47.0, "usage": 22.0, "frequency": 1.2,
-                   "power": 90.0},
-           "memory": {"used_percent": 41.0},
+#:
+#: Its **shape is a machine's**, and that is not incidental.  The five generated layouts
+#: ask 19 sources between them; the numbers below answer 15 of them - the same 15 a box
+#: with two reported tachometers answers, leaving `Fan 3`/`Fan 4` slots empty in **both**
+#: doors, which is the reserved-slots rule of `bars` being visible rather than hidden.
+#: When this dict answered only 5, the pane showed a `bars` layout with 14 of its 32 rows
+#: next to a code drawing of 26 and the two pictures looked unrelated: 46 535 differing
+#: pixels, none of them about the file.  The suite now holds the two doors to **zero
+#: differing pixels at this fixture** for all five themes, at the window's ink choices
+#: too, and it asserts the coverage: every source a real box can answer for these five
+#: files has a pinned value here, so a new reading in a new export has to be answered
+#: here before the preview is allowed to be quiet about it.
+#:
+#: **Every key here is a key a real box reports** - the set is a subset of the metrics
+#: shape `sensors.py` documents at the top of the module and PROTOCOL.md 10 records, and
+#: the suite asserts that against the module's own sample rather than against this
+#: comment.  It used to be otherwise, and that is how the pane went wrong quietly: this
+#: dict carried `gpu.usage`, `cpu.frequency`, `gpu.frequency` and `memory.used_percent`,
+#: which **nothing in the library reads** (`themes.values` asks `gpu.load`,
+#: `cpu.speedAverage`, `gpu.speed`, and `memory.used`/`total`), while the keys that are
+#: read were missing.  A fixture can be wrong in both directions at once, and only a gate
+#: over the key names sees it: at that fixture the pane's file door left `alpha`'s GPU row
+#: out altogether while its code door drew `--%` and the ring's track - 4 587 px between
+#: them at one instant - and it showed `bars` with 14 of its 32 rows.
+#:
+#: `memory.used`/`total` are MB as that sample spells them, chosen so the derived ratio
+#: and the printed gigabytes agree (53 740 of 131 072 is 41 %, which reads `52 GB`);
+#: `cpu.usage` sits beside `cpu.load` because that is what `sensors.collect()` emits.
+FIXTURE = {"cpu": {"temperature": 57.0, "load": 62.0, "usage": 62.0,
+                   "speedAverage": 3400, "power": 18.0},
+           "gpu": {"temperature": 47.0, "load": 22.0, "speed": 1200, "fan": 45.0,
+                   "power": 90.0, "memoryUsage": 2458, "dedicatedTotal": 8192},
+           "memory": {"load": 41.0, "used": 53740, "total": 131072},
+           "motherboard": {"temperature": 44.0},
+           "fans": [{"onBoard": True, "type": "Fan", "name": "Fan CPU", "value": 1180},
+                    {"onBoard": True, "type": "Chassis", "name": "Fan System 5",
+                     "value": 890}],
            "timestamp": {}}
 FIXTURE_WHEN = datetime.datetime(2026, 2, 17, 9, 30, 12)

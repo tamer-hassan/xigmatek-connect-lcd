@@ -294,9 +294,16 @@ editor commonly gets wrong:
 * **The pane shows the file, at pinned readings.** `themes.draw` - the door
   `--check-theme` uses and the frame loop uses for a layout theme - with the fixture every
   documented figure in this repo was read at (CPU 57.0 °C, GPU 47.0 °C, 2026-02-17
-  09:30:12). The line under the picture says so (`pane: pinned fixture | this machine: …`)
-  because a preview that moved with the sensors would make it impossible to tell an edit
-  from a temperature.
+  09:30:12), and that fixture is shaped like a machine: it answers 15 of the 19 sources the
+  five generated layouts ask, the four it leaves being the `Fan 3`/`Fan 4` slots past its two
+  reported tachometers. The line under the picture says so (`pane: pinned fixture | this
+  machine: …`) because a preview that moved with the sensors would make it impossible to tell
+  an edit from a temperature. Because both doors read that one dict, a generated layout and
+  the theme it was generated from put down the same picture here: zero differing pixels for
+  all five, at seven ink choices, worst channel 0, gated. The text-colour row therefore
+  reaches a generated layout - by `themes.with_ink`, into a copy, so what Save writes keeps
+  the file's own colours - and does not reach anybody else's: open `Theme_28` and an ink moves
+  it 0 px (docs/theme-editor.md).
 * **The picture can be pointed at, and what a point means is the paint's answer.** The
   ink box `themes.draw` records for the selected row is marked on the pane. Press inside a
   box and that row is selected; where two boxes overlap the **later** row wins, because
@@ -1000,7 +1007,12 @@ on a quiet box, `render.draw` with the pinned fixture: `alpha` 12.7 ms, `dual` 9
 inside that). `bars` at 8.1 ms is the drawing from before its fan slots landed on
 2026-11-08 - its row list went from this box's eight to ten - and that row is owed a
 re-measurement on a quiet box, which is said here rather than quietly quoted from a run
-with the display daemon drawing at 2 fps in the background. The `clock` theme's two newly-fitted lines cost nothing measurable: the
+with the display daemon drawing at 2 fps in the background. What the editor's completed
+fixture costs *is* measurable on a busy box, because it is a relation and both halves were
+timed in one process, alternating, 60 draws each: **+0.02 to +0.47 ms** a frame, `bars`
+the largest with the 12 rows its fan slots and memory readings now answer
+(docs/theme-editor.md). The five numbers above are still labelled, because they are
+absolute and no run of them has had a quiet machine yet. The `clock` theme's two newly-fitted lines cost nothing measurable: the
 same draw with `_fit` swapped for fixed sizes is 8.23 ms off and 8.00 ms on, and fitting
 moves the other four themes by 0.02 ms or less - a `textlength` loop over a handful of
 sizes is not where a frame's time goes. Either way a 2 fps preview is a few percent of
