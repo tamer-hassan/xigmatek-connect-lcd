@@ -2920,10 +2920,73 @@ for _dep in sorted(_depends & _cannot_set):
         _dep, sorted(_skip_set), "this box cannot answer a dependency the file names, and "
                                  "the report said nothing about the rows that depend on it")
 assert _cannot_set <= _asked_src, sorted(_cannot_set - _asked_src)
+# ...and the identity both doors already rely on for the vendor library: every widget in the
+# file is either painted or reported, one note each.  A dependency that silences a row has to
+# cost exactly one note, or a reader comparing the two halves gets a count that does not close
+_skipped_all = [x.strip() for x in _msk[1].split(",")] if _msk[1].strip() != "nothing" else []
+_boxes_n = int(re.search(r"([0-9,]+) boxes,", _skipped)[1].replace(",", ""))
+assert _boxes_n + len(_skipped_all) == len(_w_bars), (
+    _boxes_n, len(_skipped_all), len(_w_bars),
+    "a widget was drawn, skipped and reported twice, or not reported at all")
+# and one note per skipped widget, named the way the widget should name it: its own `source`
+# when the draw got that far, its dependency when a `showIf` silenced the row first
+_notes_own, _want_own = {}, {}
+for _n in _skipped_all:
+    if _n in _asked_src:
+        _notes_own[_n] = _notes_own.get(_n, 0) + 1
+for _w in _w_bars:
+    _pr = _w["property"][0]
+    _src, _dep = _pr.get("source"), (_pr.get("xigma") or {}).get("showIf")
+    if _src in _cannot_set and (_dep is None or _dep not in _cannot_set):
+        _want_own[_src] = _want_own.get(_src, 0) + 1
+assert _notes_own == _want_own, (
+    sorted(_notes_own.items()), sorted(_want_own.items()),
+    "a row was reported under the wrong name, or a different number of times than the "
+    "widgets asking for it")
+_dep_notes, _silenced_rows, _silent_src = {}, 0, {}
+for _n in _skipped_all:
+    if _n.startswith("showIf:"):
+        _dep_notes[_n[7:]] = _dep_notes.get(_n[7:], 0) + 1
+for _w in _w_bars:
+    _dep = (_w["property"][0].get("xigma") or {}).get("showIf")
+    if _dep and _dep in _cannot_set:
+        _silenced_rows += 1
+        _own = _w["property"][0].get("source")
+        if _own in _cannot_set:
+            _silent_src[_own] = _silent_src.get(_own, 0) + 1
+# one `showIf:<source>` note per row a dependency silenced, and the sources that end up in
+# `cannot:` with no note of their own are exactly those rows' own readings, where the box
+# lacks both - which is the case a bench with a GPU never shows
+assert sum(_dep_notes.values()) == _silenced_rows, (
+    _dep_notes, _silenced_rows, "the rows a dependency silenced are not the notes standing "
+                                "in for them")
+assert set(_silent_src) == _silent, (
+    sorted(_silent_src), sorted(_silent),
+    "the readings `cannot:` names with nothing behind them are not the ones a `showIf` "
+    "hid the row for")
 _silent_note = ("" if not _silent else
                 f" - of those, {len(_silent)} never reach the skip list because a "
                 f"`showIf` dependency silences the row before its own reading is asked "
                 f"({', '.join(sorted(_silent))})")
+# The door's answer for a drawn theme with no export is unreachable today - the assert in
+# the parity section holds every drawn theme exported - so it is driven by taking an export
+# away in a child process rather than left to rot as an untested message.  It pins the branch
+# order too: a theme that does have an export must not land in the "no export yet" wording.
+_noexp = subprocess.run(
+    [sys.executable, "-c",
+     "import sys; sys.path.insert(0, '.');"
+     "from xigmalcd import main, themes;"
+     "themes.EXPORTS = {k: v for k, v in themes.EXPORTS.items() if k != 'gauge'};"
+     "sys.exit(main.main(['--check-theme', 'gauge']))"],
+    capture_output=True, text=True)
+assert _noexp.returncode == 0, (_noexp.returncode, _noexp.stderr[:400])
+_line = next((ln for ln in _noexp.stdout.splitlines() if "no layout export" in ln), "")
+assert _line.strip().startswith("gauge:"), (_line, _noexp.stdout[:300])
+for _other in sorted(set(themes.EXPORTS) - {"gauge"}):
+    assert _other in _line, (_line, _other,
+                             "the refusal names the exports that do exist - a reader has to "
+                             "be able to see what is missing and what is not")
+
 print(f"  bars as a file        {len(_w_bars)} rows in the generated layout - the heading, "
       f"the clock line and three widgets for each of the {len(themes.BARS_ROWS)} rows in "
       f"`themes.BARS_ROWS`, every one at y={render.BARS_Y0}+i*{_pitch_bars} with the meter's "
@@ -2934,6 +2997,13 @@ print(f"  bars as a file        {len(_w_bars)} rows in the generated layout - th
       f"{len(_bars_holes)} leave rows unanswered and are skipped the same way both doors), "
       f"and this box answers all but {' '.join(sorted(_cannot_set)) or 'none of them'}"
       f"{_silent_note}.")
+print(f"                        the report closes on itself: {_boxes_n} boxes drawn and "
+      f"{len(_skipped_all)} skip notes for {len(_w_bars)} widgets - one note per row that "
+      f"did not paint, repeats and all, because `skipped:` is per widget while `and cannot:` "
+      f"is per source ({len(_cannot_set)} of them, {len(_silent)} of those named only there "
+      f"because a `showIf` took the row out before its own reading was asked). And a drawn "
+      f"theme with its export taken away is still answered in words, not an error: "
+      f"{_line.strip()[:88]}...")
 print(f"                        what `xigma.showIf` buys, measured: the same file with the "
       f"key stripped from its two memory number rows sits {_shownif_px} px and a worst "
       f"channel of {_shownif_worst}/255 away from the drawing at a reading where a GPU "
@@ -3102,6 +3172,11 @@ _box = re.search(r"(\d+) boxes, [\d, ]+ lit px, skipped: (.*)$", drawn)
 assert _box, drawn
 n_boxes, skipped = int(_box[1]), _box[2].strip()
 skip_set = set() if skipped == "nothing" else {s.strip() for s in skipped.split(",")}
+assert not any((w["property"][0].get("xigma") or {}).get("showIf")
+               for w in themes.EXPORTS["alpha"]()["osd"]["widget"]), (
+    "`alpha` gained a row silenced by a dependency, and this equality between the report's "
+    "two halves only holds while no widget is skipped before its own `source` is consulted - "
+    "the `bars` gate above holds the relations that stay true either way")
 assert skip_set == can_set, (skip_set, can_set, drawn)
 _dropped = sum(1 for w in themes.EXPORTS["alpha"]()["osd"]["widget"]
                if w["property"][0].get("source") in can_set)

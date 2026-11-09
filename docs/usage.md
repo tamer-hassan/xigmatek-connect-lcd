@@ -170,8 +170,15 @@ claim:
   count), `skipped: Pump Speed` for those 9 themes is gated on every machine, and the box
   and pixel counts are this bench's - 19 253 lit px is from 2026-11-08, printed next to the
   machine name for exactly that reason. For one of the five it says where the drawing comes
-  from: `clock: generated from render.py, 3 widgets`, and for a theme whose export is not
-  built yet it says so instead of failing.
+  from: `clock: generated from render.py, 3 widgets`. And the two halves of that report answer
+  for different things, which the suite holds in that direction rather than as one count:
+  `skipped:` is **per widget** - one note each, repeats and all, where a row silenced by its
+  dependency is named by what it depends on (`showIf:GPU Memory Rate`) instead of by its own
+  reading - while `and cannot:` is **per source**, from what `sensors.collect()` left
+  unanswered. On a box with no GPU the two differ by exactly those silenced rows, and the
+  suite asserts that difference instead of pretending it is not there. A drawn theme with no
+  export - none today, and the wording is driven in a gate by taking one away - is still
+  answered in words rather than an error.
 * **One theme directory is read, and one is writable, and they are the same one:**
   `~/.config/xigmalcd/themes` (`$XDG_CONFIG_HOME`). A `<name>.json` there is scanned
   **before** the checkout and before `/usr/share/xigmalcd/themes/alpha`, so an edited copy
