@@ -191,14 +191,18 @@ claim:
   (docs/gui.md); the CLI has no writer.  Neither writes anything to the panel: a
   layout file never goes over the wire (§11), so an edit changes what a loop *on
   this machine* draws when it names that theme.
-* **Four of the five can be exported as data, and all four are pixel-identical to the
-  code.** `--export-theme clock` generates 3 widgets and 1 448 characters, `--export-theme
-  gauge` 5 and 2 314, `--export-theme dual` 10 and 4 677, `--export-theme alpha` 12 and
-  6 312, each byte-identical between runs, and the suite's parity gate paints each one both
-  ways - through `render.py` and through `layout.draw_theme` - on every reading that answers
-  what the theme asks: **zero differing pixels, worst channel delta 0**, at 25 548 / 25 545 /
+* **All five export as data, and all five are pixel-identical to the code.** What
+  `--export-theme NAME` writes, widgets and characters, per theme, each byte-identical
+  between two runs: `clock` 3 and 1 448, `gauge` 5 and 2 314,
+  `dual` 10 and 4 677, `alpha` 12 and 6 312, `bars` 32 and 14 121. The parity gate paints
+  each one both ways -
+  through `render.py` and through `layout.draw_theme` - on every reading that answers what
+  the theme asks: **zero differing pixels, worst channel delta 0**, at 25 530 / 25 343 /
   22 944 / 25 010 / 21 003 lit pixels for `clock`, 20 608 / 21 391 / 20 498 / 20 743 for
-  `gauge`, 40 006 / 40 549 for `dual` and 40 874 / 40 226 for `alpha`. Getting
+  `gauge`, 40 006 / 41 842 for `dual`, 40 426 / 39 186 for `alpha` and 76 916 / 76 022 for
+  `bars`. `bars` is the one that could not be exported as it was drawn: its rows had to stop
+  moving with the box first, and it needed a key the schema had never had (`xigma.showIf`)
+  for a meter that divides two readings beside a number that prints one. Getting
   those to zero forced five keys into the schema, each with a measured reason and each
   printed by `--print-theme-fields`: `xigma.arcPaint` (our ring is 3-degree segments
   sampled at their start, ALPHA's measured ring is 1-degree segments sampled at their
@@ -224,10 +228,13 @@ claim:
   stroke). Between them the two temperature rows cover the rings' clear hole exactly, and
   the labels are a row rather than two `text` widgets because the size that hole decides is
   a face metric of the machine drawing it (docs/limits.md). An export that cannot be
-  driven to a diff of 0 is not shipped, so `bars` stays code-drawn for now and
-  docs/theme-editor.md says what it is still waiting on - the row count and row pitch of a
-  theme whose rows are named by whatever `sensors` answers, which no fixed widget list can
-  say. `alpha` cleared its list and exports today.
+  driven to a diff of 0 is not shipped, and all five clear that bar today. `alpha` had to
+  earn its keys to get there; `bars` had to change its own drawing first, because its row
+  count and pitch were functions of whatever `sensors` answered - no fixed widget list can
+  say where a row goes when the theme moves it - so it reserves four fan slots and lets a row
+  with no reading keep its place, and its memory rows needed a key the vendor's schema never
+  had, `xigma.showIf`, for a meter that divides two readings beside a number that prints one
+  (docs/theme-editor.md).
 * **Nothing in the CLI writes a theme today.** The writer is in the library -
   `copy_for_edit`, `save`, `delete_user_theme` - and it is gated, not shipped as a flag:
   a save is atomic (tmp then `os.replace`), keeps the previous file as `<name>.json.bak`,

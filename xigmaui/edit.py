@@ -107,12 +107,12 @@ def extension_fields(kind: str) -> tuple:
     """Which `xigma` keys apply to this kind, with their reasons (printed by the tool)."""
     _read, sub = themes.keys_read()
     applies = {
-        "text": ("anchor", "autoFitMax"),
-        "data": ("anchor", "autoFitMax", "format"),
-        "bar": ("barPaint", "colourRamp", "colourStops"),
-        "arc": ("arcPaint", "colourRamp", "colourStops"),
-        "line": (),
-        "special": ("anchor", "autoFitMax", "fitArc"),
+        "text": ("anchor", "autoFitMax", "showIf"),
+        "data": ("anchor", "autoFitMax", "format", "showIf"),
+        "bar": ("barPaint", "colourRamp", "colourStops", "showIf"),
+        "arc": ("arcPaint", "colourRamp", "colourStops", "showIf"),
+        "line": ("showIf",),
+        "special": ("anchor", "autoFitMax", "fitArc", "showIf"),
     }
     return tuple(k for k in applies.get(kind, ()) if k in sub)
 
@@ -125,8 +125,10 @@ def extension_fields(kind: str) -> tuple:
 def choices(field: str) -> tuple:
     if field == "fontFamily":
         return tuple(sorted(layout.FONTS))
-    if field == "source":
-        return tuple(sorted(set(themes.SOURCES) | set(themes.CLOCKED)))
+    if field in ("source", "showIf"):
+        # both name a reading, so both get the same vocabulary - every source this program
+        # can put a value behind, including the derived ratios and the positional fan slots
+        return tuple(sorted(themes.source_names()))
     if field == "name":
         return themes.special_names()
     if field == "arcPaint":

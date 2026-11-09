@@ -5,15 +5,14 @@ and stages 1-3 are in the tree: `xigmalcd/themes.py` finds the library and the f
 under `~/.config/xigmalcd/themes`, `--list-themes` and `--check-theme` print
 it with the counts, `--theme <background name>` selects a layout, the canvas refusal is a
 gate on each file's own `ratio` field, and the same names work over the control socket.
-Stage 2 is **built except for one theme**: the export machinery, the `special` kind, the
-extension keys it needed, the determinism rules and both gates are in the tree, and four of
-the five themes (`alpha`, `clock`, `dual` and `gauge`) generate to layouts that paint
-*exactly* what `render.py` paints - zero differing pixels on every reading that answers what
-they ask, worst channel delta 0. `alpha` is the one that had to earn its keys, and what is
-left on this stage is `bars`, which is waiting on
-one change to our own drawing and four new names in our own source table: the fan slots the
-owner chose on 2026-11-08, and the compaction in `theme_bars` that measuring them exposed
-(docs/limits.md).
+Stage 2 is **built**: the export machinery, the `special` kind, the extension keys it
+needed, the determinism rules and both gates are in the tree, and all five drawn themes
+(`alpha`, `bars`, `clock`, `dual`, `gauge`) generate to layouts that paint *exactly* what
+`render.py` paints - zero differing pixels on every reading that answers what they ask,
+worst channel delta 0. `alpha` was the one that had to earn its keys; `bars` was the one
+that had to earn a change to its own drawing, and what that took is written out under
+"The last theme, and the shape it turned out to need" below.
+
 Stage 3, the file model, is in - what it measured is written out under "What building the file model measured" below. **Stage 4 is in, in the two changes the plan named**: `xigmaui/edit.py` is the editor's model, and the window's layout-editor row is a shell over it - what that half measured is under "What the editor's first half measured". Then the canvas in that same pane: press a row's ink box to select it, drag it, nudge it with the arrow keys - under "What the canvas half measured". What is still missing there is the pane drawing live readings instead of the pinned fixture, and any way to resize or reorder a row. Stage 5 (docs and census) and stage 6 (the glass pass) are not built. Every census figure below is re-derived by `tools/selftest.sh`'s vendor-library
 section, so it cannot rot in place. The decisions are
 settled with the owner; the census is measured out of the files in this tree on the same
@@ -180,12 +179,14 @@ All of this is printed by `tools/selftest.sh` in the vendor-library section, on 
   to avoid), a name with a path separator or a leading dot, an empty `osd.widget` list,
   and a `property` with more than one entry - because `draw_theme` reads only
   `property[0]`, so the rest would be silently unwritten. The soft list, one fixture
-  covering all 11: an unknown `source`, a family outside `layout.FONTS`, a `fontSize`
+  covering all 12: an unknown `source`, a family outside `layout.FONTS`, a `fontSize`
   outside the **ten** the library ships (12 14 16 20 24 32 40 70 100 140), a colour
   outside `rgba(r, g, b, a)`, a widget off the canvas, an `id` repeated inside one theme,
   a `special` with no drawing, a `special` row that draws a pair with no `width` to place
   the two figures by, a `values` row with no `xigma.fitArc` to size itself against, a
-  `text` with no `content`, a repeated `property` entry.
+  `text` with no `content`, a repeated `property` entry, and an `xigma.showIf` naming a
+  source this program cannot answer - a row whose dependency can never be satisfied never
+  draws at all, so a mistyped key there would look like a missing sensor.
 * **`--check-theme NAME` is the review door** for all of it: the file's own accounting,
   which root answered, the warnings, then what this machine's readings draw - boxes, lit
   pixels, what was skipped and why, which shapes are this repo's choice rather than
@@ -232,7 +233,7 @@ GUI section under a temp `XDG_CONFIG_HOME`, so every save, revert and refusal be
 happens somewhere that cannot touch the reader's own `~/.config`. The window's group is a
 shell over that model, and the gates say so in counts.
 
-* **Opening writes nothing.** 3 library layouts and 4 generated ones opened, and
+* **Opening writes nothing.** 3 library layouts and 5 generated ones opened, and
   the user theme directory still holds 0 files. This was not the first version: an
   earlier `open_theme` copied the file on open, which left a shadow of `Theme_28` behind
   whenever a later assertion failed - and a shadow is not inert, because `--theme
@@ -267,7 +268,7 @@ shell over that model, and the gates say so in counts.
   byte-identically to the start and leaves 2 undo steps with `dirty` **false**: that flag
   answers "does memory disagree with the file?", not "was anything typed?", so it is
   derived from two snapshots rather than a counter.
-* **The row does not lie about the model.** The combo offers 27 names (4 generated + 23
+* **The row does not lie about the model.** The combo offers 28 names (5 generated + 23
   files), the field list for a `bar` is the model's 14, an `x` of 9999 sits in the
   spinbox refused in words while the picture stays put, and the one library layout that
   carries an `arc` shows `(not set)` for `arcPaint` rather than picking a default to
@@ -367,6 +368,16 @@ finding that out before an editor is built on top of it:
   no such rule. The generated file carries the same loop, with the same step and the same
   floor, because a different step is a different glyph size on the glass at the same
   reading.
+* **`xigma.showIf`**. One row's drawing depends on a reading other than its own. The shape
+  that needed it is `bars`'s memory rows: their meter divides two fields (`used / total`)
+  while the number beside it prints one of them (`Used RAM`), and the theme behind the file
+  draws *neither* when the division cannot be made - which an integrated GPU does, reporting
+  used memory and no dedicated total. A `data` row on `Used RAM` would otherwise print `4 GB`
+  beside an absent meter, because the file's own source answers and the theme's does not. So
+  the number row names the meter's source here; a row whose dependency is unanswered is
+  reported in the skip list as `showIf:<source>`, the same way an unanswered source is, and
+  the difference the key makes is measured rather than asserted (the gate strips the key from
+  a generated `bars` and counts the pixels it then differs by).
 * **`xigma.fitArc`**. A width budget is the schema's only fit rule, and it cannot express
   what `alpha`'s two temperature columns are sized by: the ring's hole, measured as ink,
   both strings against it at once. So a `special` row that draws that pair names the ring
@@ -393,12 +404,12 @@ because `layout` already imports `render` and not the other way round; an unknow
 back in `notes["missing"]` as `special:<name>`, so a typo in a layout is reported instead of
 drawn as something else.
 
-With those in place, `clock` generates to 3 widgets and 1 448 characters, `gauge` to 5 and
-2 314, `dual` to 10 and 4 677, and `alpha` to 12 and 6 312 - each byte-identical across runs -
-and parity reports the same painted count both ways on every reading that answers what the
-theme asks for: 25 548, 25 545, 22 944, 25 010 and 21 003 lit pixels for `clock`, 20 608,
-21 391, 20 498 and 20 743 for `gauge`, 40 006 and 40 549 for `dual`, 40 874 and 40 226 for
-`alpha`, every one of them **zero** differing pixels and a worst channel delta of 0. The diff is taken over all four channels on purpose: an alpha-only comparison
+With those in place, all five generate: `clock` 3 and 1 448 characters, `gauge` 5 and
+2 314, `dual` 10 and 4 677, `alpha` 12 and 6 312, `bars` 32 and 14 121 - each byte-identical
+across runs - and parity reports the same painted count both ways on every reading that
+answers what the theme asks for: 25 530, 25 343, 22 944, 25 010 and 21 003 lit pixels for
+`clock`, 20 608, 21 391, 20 498 and 20 743 for `gauge`, 40 006 and 41 842 for `dual`, 40 426
+and 39 186 for `alpha`, 76 916 and 76 022 for `bars`, every one of them **zero** differing pixels and a worst channel delta of 0. The diff is taken over all four channels on purpose: an alpha-only comparison
 would not see a colour that had drifted, and colour is exactly what a layout carries in
 `textColor`. The same gate watches the vendor side from the other direction: all 23
 pickable layouts still paint **114 boxes and 315 287 lit pixels** (the total moved by
@@ -529,7 +540,8 @@ generator, nothing shipped: a file somebody edited, held to the same standard as
 themes. That is stage 4's premise, demonstrated a stage early.
 
 The plan's rule holds while all of this happens: **an export that cannot be driven to a zero
-diff is not shipped**, and the suite prints which of the five are in and which are out.
+diff is not shipped**, and the suite prints all five in, with each one's pixel diff
+counted at every reading it can be given.
 
 ### The last theme, and the shape it turned out to need
 
@@ -579,23 +591,54 @@ answers them. Four are per-sensor fan slots (`Fan 1 Speed`..`Fan 4 Speed`, `Fan 
 tachometer (PROTOCOL.md 10) - and the two RAM names come straight out of that record
 (`RAMRate`, `UsedRAM`), spelled in the display style this tree already uses. Where a reading
 is a division rather than a field, it is marked as one: `RAM Rate` divides `used / total` the
-way the drawing does, because `sensors` also reports a separate
-`memory.load`, which is not the same number as that division on this box, and a meter 424 px
-wide cannot afford to be handed the wrong tenth of a percent.
+way the drawing does, because `sensors` also reports a separate `memory.load`, which is not
+the same number as that division on this box, and a meter 424 px wide cannot afford to be
+handed the wrong tenth of a percent.
 
-What the suite holds: the strings `bars` paints are taken out of the drawing itself - an
-`ImageDraw.text` spy while the frame is painted - and compared, row for row, against what
-`layout.text_for` produces from those sources, over four boxes and all ten rows, and the rows
-the sources answer are the rows ink lands in (including a fan reporting 0, which the drawing
-shows and the old one hid). And every source this program can answer has a display shape, so
-a text row can never reach the painter for want of one.
+**And `bars` is a file now** (2026-11-09): `themes.bars_recipe()` generates 32 widgets out of
+that table and those constants - the heading, the clock line, and three rows per reading -
+and it reaches **zero differing pixels at all 13 readings** the parity gate gives it, the ones
+that answer everything and the ones that answer almost nothing. Two things it needed that the
+plan had not foreseen:
 
-What remains, each step green on its own:
+* **`xigma.showIf`, a key nobody had.** Eight of the nine readings in the first pass agreed as
+  soon as the slots were in place; the ninth did not, and the case is a normal machine rather
+  than a corner - a GPU reporting used memory with no dedicated total, which an integrated GPU
+  does. The theme draws neither number nor meter there, because it decides the whole row by the
+  division; the file had `Used GPU Memory` as its own source, so it printed `4 GB` beside an
+  absent meter: **706 px and a worst channel of 255**. The key is what makes that dependency
+  sayable, and the suite measures it rather than taking my word for it: it strips the key from
+  a generated `bars`, paints it at that reading, and counts what the file is then off by - and
+  holds that number against all three places it is quoted.
+* **Two defects in the theme's own ratio code, found by chasing that number.** `theme_bars`
+  read `mem["used"]` outright, so a dict reporting a total with no used raised `KeyError`
+  inside the frame loop; and it formed its two memory meters by different tests - the GPU row
+  needed its numerator to be *truthy*, so a reading of exactly 0 dropped the row, while the
+  memory row kept it. Both are one function now, `render.pct_pair`, called from both doors
+  (the drawing for its meters, the source table for `RAM Rate` and `GPU Memory Rate`), and a
+  zero numerator is a reading: the row exists, at nothing filled. `bars` was the only theme
+  that could see either, because it is the only one that reads those fields - which is worth
+  saying out loud about the value of pushing every theme through the export door.
 
-1. `bars_recipe()`, building the rows out of `themes.BARS_ROWS` and the geometry out of the
-   `BARS_*` constants rather than repeating either;
-2. shipped only at a zero pixel diff on the machine drawing it - the rule `alpha` met by
-   earning `xigma.fitArc` (docs/limits.md).
+What the labels do also moved: a row's **label belongs to its subject and its number to the
+reading**, so `BOARD` prints even where the board metric answers nothing, and a fan slot's
+name prints only where `sensors` reported a tachometer at that position. That is the same
+split the file makes - a literal `text` row for the six fixed labels, a `data` row on
+`Fan N Name` for the four slots - and it is what let one drawing and one file agree at every
+reading instead of only at the complete ones: a fan slot whose position exists but reports no
+RPM, or no name, is exactly such a reading, and the suite's own case list is what keeps that
+from being a claim.
+
+What the suite holds, all of it measured: an `ImageDraw.text` spy runs while the frame is
+painted, and the label-and-value strings it captures equal, row for row, what
+`layout.text_for` produces from `themes.BARS_ROWS` - over four boxes and all ten rows - and
+the rows the sources answer are the rows ink lands in. The generated file's row count, kinds
+and `y` values are compared against `BARS_ROWS` and the `BARS_*` constants rather than
+against remembered numbers, `xigma.showIf` appears on exactly the two rows whose number and
+meter read different sources, and the review door's skip list is checked against the same
+report's own "cannot answer" half. And `--check-theme bars` no longer warns that its own
+new sources are unknown: `themes.source_names()` is one vocabulary, consulted by the painter,
+the checker, the editor's menus and the gates.
 
 ## The surface, and the geometry it must not break
 
@@ -645,7 +688,7 @@ number gated, the docs updated in the same change.
 |---|---|---|---|
 | 0 | this document, plus the schema written out properly: the `special` list, `autoFit`, the `xigma` block, the determinism rules, and how `--theme` opens past `choices=sorted(render.THEMES)` | 1 | 3 |
 | 1 | **landed 2026-11-08.** the 23 `1:1` layouts selectable in the loop: name→layout resolver, human names from `background.mediaFile`, the source→`sensors.collect()` table, `--list-themes`, `notes["missing"]` printed as "no pump tachometer here, widget skipped" and again over the socket's `status`, the four `4:3` themes excluded by a gate on `ratio` so a future 480 layout cannot be dropped by a filter, and a `--theme` name that is canonicalised once at parse time so the CLI, the log and the socket all spell it the same | 1-1½ | 3-4½ |
-| 2 | **machinery landed 2026-11-08,** `--export-theme NAME`, `--list-specials`, the `special` kind and its injected registry, the `xigma` extension keys, byte-stability and parity gates over four readings; four of five generate today: `alpha` (12 widgets, 6 312 chars), `clock` (3, 1 448), `gauge` (5, 2 314) and `dual` (10, 4 677) each reach a **zero-pixel diff** on every reading that answers what they ask; `bars` does not, and the table under "What settled the ring and the bar" says what it still needs - including that `bars` may not be expressible as one file at all. (`--print-theme-fields`, listed here as unbuilt, landed with stage 3.) | 2-2½ | 6-7½ |
+| 2 | **machinery landed 2026-11-08,** `--export-theme NAME`, `--list-specials`, the `special` kind and its injected registry, the `xigma` extension keys, byte-stability and parity gates over four readings; four of five generate today: `alpha` (12 widgets, 6 312 chars), `clock` (3, 1 448), `gauge` (5, 2 314) and `dual` (10, 4 677) each reach a **zero-pixel diff** on every reading that answers what they ask; `bars` does not, and the table under "What settled the ring and the bar" says what it still needs - including that `bars` may not be expressible as one file at all. (`--print-theme-fields`, listed here as unbuilt, landed with stage 3.) | 2-2½ | 6-7½ **Completed 2026-11-09:** `bars` joined them - 32 widgets, zero differing pixels at all 13 readings the gate gives it - which took a change to that theme's own drawing (ten reserved rows, a row with no reading keeping its place) and one key the schema had never had, `xigma.showIf`. |
 | 3 | **landed 2026-11-08.** the file model: the user root `~/.config/xigmalcd/themes` read before the checkout and before `/usr/share`, so an edited copy shadows the vendor's by file operation alone and deleting it puts the vendor's back; `canonical()`/`shape_of()`, `validate()` split into hard (will not draw) and soft (worth saying), `save()` (atomic tmp + `os.replace`, `.bak`, trailing newline, user root only, the five code names refused, traversal names refused), `copy_for_edit()`, `delete_user_theme()`, `user_copies()`, `themes.draw()` for an object that never touched a disk, and `--check-theme NAME` as the review door. The round-trip gate is in: **27/27 layouts reproduce byte for byte** and **23/23 copies are byte-identical to their source**. Not built: the window that drives it | 1-1½ | 3-4½ |
 | 4 | **landed 2026-11-08, in the two changes the plan named.** First the model (`xigmaui/edit.py`, no Qt, driven headless by the suite) and the window's layout-editor row over it: one layout combo (3 generated + 23 files), one widget, one field, one value; opening writes nothing; the field list is derived from `themes.keys_read()`; colours are stored in the vendor's `rgba()` spelling; refusals move nothing; 20 keystrokes are 1 undo step; the saved file redraws byte-identically what was on screen (1 163 px for the `(20, 0)` nudge, through both doors). Then the canvas inside that same pane: press a row's ink box to select it (the file's row index, later row wins an overlap), drag to move it - one drag, one undo step, the row follows the cursor and the pane repaints as it goes - and the arrow keys nudge 1 px / 10 px. Still to build: drawing the editor from live readings, and resizing or reordering rows | 3-3½ | 9-10½ |
 | 5 | docs and gates: docs/themes.md's "not in the picker, and that is not an oversight" section brought up to date, docs/usage.md's CLI table, docs/gui.md's window census, README's five-theme claims, the window's own theme tooltip (it still says the vendor files are for the panel's firmware, which §11 contradicts), `smoke` rendering every installed layout offline against a pinned values dict. The suite grows by at least one section - stage 1's gates belong in the vendor-library section that already re-derives docs/themes.md's colour census, not in a new one - and then every place `twenty` is a gate moves with it: README, docs/tools.md, docs/packaging.md, the top changelog stanza, and the count `.github/workflows/ci.yml` compares against | 1 | 3 |

@@ -642,7 +642,7 @@ sys.path.insert(0, ".")
 sys.path.insert(0, "tools")
 from PIL import Image, ImageChops, ImageFilter, ImageStat
 import preview_gif
-from xigmalcd import render
+from xigmalcd import render, themes
 
 EDGE = 480                      # the panel's own size, which is what these draw at
 MIN_S, MAX_S = 9.9, 12.6        # the 10-12 s README promises, plus muxer slack
@@ -826,6 +826,37 @@ print(f"  it moves          {len(changed)} of {len(fields)} fields changed: "
       + ", ".join(f"{k} {min(v):g}->{max(v):g}" for k, v in sorted(changed.items())))
 print(f"  in span           cpu {min(temps)}-{max(temps)} C, cpu fans "
       f"{min(cpu_fans)}-{max(cpu_fans)} RPM, load {min(loads):g}-{max(loads):g} %")
+
+# ---- the recorded series against `bars`'s row table.  This is why the tracked `bars` clip
+# ---- outlived 2026-11-09's changes to that drawing.  What those changes move is a row whose
+# ---- *subject* exists while its reading does not, or whose pair cannot be divided - so what
+# ---- has to hold is that this real machine answers both readings of every row it can
+# ---- actually have: the six fixed ones, and the fan slots within the count its sensors
+# ---- reported.  A slot past that count is empty in the old drawing and in the new one alike,
+# ---- which is why the row set below is scoped to what the box has rather than to all ten
+# ---- reserved slots.  Measured, not assumed: if it stops holding, the clip is stale and the
+# ---- section above says so with pixels.
+_bars_fixed = themes.BARS_FIXED_ROWS
+_bars_gaps = []
+_fans_reported = sorted({len(_s["metrics"].get("fans") or []) for _s in series})
+for _s in series:
+    _sv, _ = themes.values(_s["metrics"], preview_gif.series_clock(_s, TZOFF))
+    _mine = list(_bars_fixed) + [
+        _r for _r in themes.BARS_ROWS[len(_bars_fixed):]
+        if int(_r[1].split()[1]) - 1 < len(_s["metrics"].get("fans") or [])]
+    _bars_gaps.append(sorted({src for _lab, _b, _t, _lo, _hi in _mine
+                              for src in (_b, _t) if src not in _sv}))
+assert not any(_bars_gaps), (
+    [(_k, _g) for _k, _g in enumerate(_bars_gaps) if _g],
+    "the published series leaves a row this box has unanswered, so the tracked clip is no "
+    "longer what the current drawing would paint at it")
+assert len(_fans_reported) == 1 and _fans_reported[0] <= len(themes.FAN_SLOTS), _fans_reported
+print(f"  bars, and its clip    every row this box can have - the {len(_bars_fixed)} fixed "
+      f"ones and the {_fans_reported[0]} fan slots its sensors reported, out of "
+      f"{len(themes.FAN_SLOTS)} reserved - is answered at all {len(series)} samples of the "
+      f"series, so the changes that moved rows with no subject or no pair to divide cannot "
+      f"move a frame of docs/videos/bars-theme_52.mp4: re-rendering it wrote the same "
+      f"{os.path.getsize(VIDEOS['bars'][0]):,} B it already held")
 
 # ---- the files README links ---------------------------------------------------
 readme = open("README.md", encoding="utf-8").read()
@@ -1668,20 +1699,41 @@ print(f"  export shape          {'; '.join(shapes)} - ids derived from the theme
       f"validate-clean, each one byte-identical over two runs")
 
 # Parity: the generated layout painted by layout.py against the same theme painted by
-# render.py, one pinned instant and one pinned metrics dict, four different readings.
+# render.py, one pinned instant and one pinned metrics dict, five different readings.
 # The diff is over all four channels - an alpha-only comparison would not see a colour
 # that had drifted, and colour is exactly what `xigma.textColor` carries.
-# the first two answer every source an export asks for (temperatures, load, memory); the
-# last three deliberately do not, and what happens then is reported, not hidden - the
-# second-to-last one only leaves `load` out, which is the case where the two doors still
-# land on the same pixels, because the reading gates a whole widget rather than a fallback
+# the first two answer every source every export asks for; the last three deliberately do
+# not, and what happens then is reported, not hidden - the second-to-last one only leaves
+# `load` out, which is the case where the two doors still land on the same pixels, because
+# the reading gates a whole widget rather than a fallback
+#
+# What "every source" came to mean once `bars` was exported (2026-11-09): a board
+# temperature, a GPU memory pair, and **four fan rows** - `bars` reserves four slots, so a
+# box reporting one fan leaves three of them unanswered by construction.  And the second
+# reading used to say `memory: {used: 0, total: 0}`, which is not a pair to divide; the
+# zero is now in the numerator, where it is a measurement (a meter at nothing filled, a
+# number reading `0 GB`) rather than an absent reading.  Both readings still sit at the
+# ends of every scale: 100 degrees, 0 % load, 12 345 RPM on a 0..3000 meter.
 CASES = ({"cpu": {"temperature": 57, "load": 62}, "gpu": {"temperature": 47,
-                                                     "load": 22},
+                                                          "load": 22,
+                                                          "memoryUsage": 2_100_000,
+                                                          "dedicatedTotal": 8_000_000},
+          "motherboard": {"temperature": 41},
           "memory": {"used": 4_200_000, "total": 16_000_000},
-          "fans": [{"value": 1957}]},
+          "fans": [{"value": 1957, "name": "Fan CPU"},
+                   {"value": 1102, "name": "Fan System 5"},
+                   {"value": 800, "name": "Fan Pump"},
+                   {"value": 640, "name": "Fan Chassis 2"}]},
          {"cpu": {"temperature": 100, "load": 0}, "gpu": {"temperature": 100,
-                                                          "load": 0},
-          "memory": {"used": 0, "total": 0}, "fans": [{"value": 12345}]},
+                                                          "load": 0,
+                                                          "memoryUsage": 0,
+                                                          "dedicatedTotal": 8_000_000},
+          "motherboard": {"temperature": 0},
+          "memory": {"used": 0, "total": 16_000_000},
+          "fans": [{"value": 12345, "name": "Fan CPU"},
+                   {"value": 0, "name": "Fan System 5"},
+                   {"value": 1, "name": "Fan Pump"},
+                   {"value": 3000, "name": "Fan Chassis 2"}]},
          {"cpu": {"temperature": 24}},
          {"cpu": {"temperature": 40}, "gpu": {"temperature": 55}},
          {})
@@ -1705,8 +1757,20 @@ for name in sorted(themes.EXPORTS):
         if no_face:      # an export's own face is not installed here: say so, don't fail
             break
         if r["missing"]:
-            assert set(r["missing"]) <= set(asked[name]), (name, r["missing"],
-                                                           sorted(asked[name]))
+            # `xigma.showIf` reports an unmet dependency as `showIf:<source>`, and the
+            # source it names is one this export already asks for by name (the meter of the
+            # row whose number is guarded).  So the note is checked through that name, and
+            # each one has to arrive beside the plain note for the same reading: a
+            # dependency said without its cause would be a hole with no reason next to it
+            _said = {m[len("showIf:"):] if m.startswith("showIf:") else m
+                     for m in r["missing"]}
+            assert _said <= set(asked[name]), (name, r["missing"], sorted(asked[name]))
+            _dep = {m[len("showIf:"):] for m in r["missing"]
+                    if m.startswith("showIf:")}
+            assert _dep <= set(r["missing"]), (name, sorted(_dep),
+                                               "a row named a dependency this machine "
+                                               "cannot answer without the reading itself "
+                                               "being reported as missing too")
             partial.append((name, idx, tuple(sorted(set(r["missing"]))), r["diff_px"],
                             r["code_px"], r["layout_px"]))
             continue
@@ -1728,7 +1792,11 @@ per = ", ".join(f"{n} {p} px identical" for n, p in rows)
 if no_face:
     print(f"  export parity         SKIPPED on this machine: the exported themes name "
           f"{', '.join(no_face)}, not installed here")
-print(f"  export parity         {len(themes.EXPORTS)} of the five themes export today "
+assert set(render.THEMES) <= set(themes.EXPORTS), (
+    sorted(set(render.THEMES) - set(themes.EXPORTS)),
+    "a drawn theme is no longer exported, and the documents that say all five are would "
+    "be wrong")
+print(f"  export parity         all {len(themes.EXPORTS)} drawn themes export today "
       f"({' '.join(sorted(themes.EXPORTS))}); across {len(CASES)} readings each, the "
       f"generated layout and render.py put down the same pixels: {per}")
 assert len(rows) >= 4 * len(themes.EXPORTS) - len(partial), (rows, partial)
@@ -2408,27 +2476,28 @@ print(f"  what alpha draws      {' '.join(alpha_draws)} - taken out of `theme_al
       f" joint, and the clock line with a format and a width to fit to.  Every one of them"
       f" was measured against `theme_alpha`'s own drawing above before the parity line"
       f" counted the assembled frame")
-print(f"  not exported yet      "
-      f"{' '.join(sorted(set(render.THEMES) - set(themes.EXPORTS)))} - one theme left, and"
-      f" it is not missing a drawing. `alpha` took the derived list above and reached a zero"
-      f" diff as a file, so the export machinery is not what is in the way there. `bars` is"
-      f" a different kind of answer"
-      f" on its own: its row count and row pitch used to be functions of the machine"
-      f" (`row_h = min(56, max(28, 320 // len(rows)))`, and `rows` grew with whatever fan"
-      f" entries `sensors` reported), so one fixed widget list could not be its picture on"
-      f" every box.  The owner's decision (2026-11-08) is optional"
-      f" positional fan slots - `Fan 1` through `Fan 4`, each with a `Fan N Name` source so"
-      f" the name comes from the box at run time - rather than a repeat group, because the"
-      f" library's selectable layouts ask for seven `source` names and not one of them is a"
-      f" fan: a new name in our own table invents less than a new structure in a file whose"
-      f" point is that it is a fixed list of rows.  And measuring it moved the obstacle to"
-      f" where it actually is - the compaction - and that half is now built: the function"
-      f" reserves the same four slots and lets a row with no reading keep its place, so the"
-      f" pitch no longer depends on what this box's sensors found (the gate below counts the"
-      f" ink in all ten).  What is left before `bars` can be exported is the sources and the"
-      f" recipe, and until a generated `bars` reaches a zero pixel diff on the machine"
-      f" drawing it, it stays code-drawn.  Nothing about the wire changes either way"
-      f" (docs/theme-editor.md, docs/limits.md)")
+print(f"  every theme exports   {' '.join(sorted(themes.EXPORTS))} - all "
+      f"{len(themes.EXPORTS)} of the drawn themes are generated layouts now, and the "
+      f"parity gate above holds each one to zero differing pixels at every reading that "
+      f"answers what its file asks.  `bars` was the last, and it is the one the schema "
+      f"could not carry on its own: its row count and row pitch used to be functions of "
+      f"the machine (`row_h = min(56, max(28, 320 // len(rows)))`, with `rows` growing by "
+      f"whatever fan entries `sensors` reported), so one fixed widget list could not be "
+      f"its picture on every box.  The owner's decision (2026-11-08) is optional "
+      f"positional fan slots - `Fan 1` through `Fan 4`, each labelled from a `Fan N Name` "
+      f"source so the name comes from the box at run time - rather than a repeat group, "
+      f"because the library's selectable layouts ask for seven `source` names and not one "
+      f"of them is a fan: a new name in our own table invents less than a new structure in "
+      f"a file whose point is that it is a fixed list of rows.  Measuring it moved the "
+      f"obstacle to where it actually is - the compaction - and that half was built the "
+      f"same day: the drawing reserves the slots and lets a row with no reading keep its "
+      f"place, so the pitch stopped depending on what this box's sensors found (the gates "
+      f"below count the ink in all ten).  The last thing it needed was a key nobody had: "
+      f"`xigma.showIf`, for a row whose meter divides two fields while its number prints "
+      f"one - and chasing that diff turned up two defects in the theme's own ratio code, "
+      f"a crash path and two different rules for its two memory rows, both fixed (the "
+      f"gate that measures them prints the numbers).  Nothing about the wire changes "
+      f"either way (docs/theme-editor.md, docs/limits.md)")
 # ---- and what the one theme still waiting to be exported is made of.  Every claim the
 # ---- plan makes about it is read here out of `theme_bars`'s own body, and the slot rule is
 # ---- measured off pixels rather than inferred: the pitch is the same whether this box
@@ -2449,8 +2518,24 @@ _n_fixed = _bars_src.count("lambda v:") - 1
 for _slot in ('for slot in range(BARS_SLOTS)', '(fan or {}).get("value")',
               'str((fan or {}).get("name") or f"FAN {slot + 1}")[:10]'):
     assert _slot in _bars_src, (_slot, "the fan rows are not reserved positional slots")
-_head, _loop = _bars_src.split("for name, val, lo, hi, fmt in rows:", 1)
+_loop_head = "for name, val, lo, hi, fmt, subject in rows:"
+assert _loop_head in _bars_src, (
+    "the row loop's header is not the one this gate splits the body at, so which side the "
+    "pitch and the advance live on is no longer something it can read")
+_head, _loop = _bars_src.split(_loop_head, 1)
 _loop = _loop.split("if clock:")[0]
+# the two rules the plan says the export needed, read off the body rather than remembered:
+# a label belongs to its subject and the number and meter belong to the reading, and both
+# memory meters are formed by one function
+assert "if subject:" in _loop and "if val is not None:" in _loop, (
+    "label and number are no longer drawn under their own tests - the split that lets one "
+    "drawing and one file agree at readings where a fan slot or a metric is absent")
+assert _loop.index("if subject:") < _loop.index("if val is not None:"), (
+    "the number is no longer the second test of the row")
+assert 'pct_pair(mem, "used", "total")' in _bars_src \
+    and 'pct_pair(gpu, "memoryUsage", "dedicatedTotal")' in _bars_src, (
+    "the two memory meters are not formed by the one rule, which is what the 2026-11-09 "
+    "finding about the crash path and the truthy numerator is about")
 assert _b_arith in _head, (_head[-160:], "the pitch is not chosen before the loop")
 assert "continue" not in _loop, (
     "a row with no reading skips its advance again, and the compaction the plan measured by "
@@ -2550,20 +2635,31 @@ def _drawn_rows(m):
 
 
 def _want_rows(m):
-    """What the source table says those rows show, and which of the ten it answers."""
+    """What the source table says each row shows, and which rows have a number.
+
+    Two tests, because the drawing has two since 2026-11-09: a **label belongs to the row's
+    subject** - a fixed row's metric exists on a box of this shape whether or not this reading
+    answers it, and a fan slot exists where `sensors` reported a tachometer at that position -
+    while the **number belongs to the reading**.  Keeping them apart here is what stops that
+    split from being a story about the code: a fan row reporting a subject under no name, or
+    one reporting 0 RPM, is a case where the two disagree, and the strings below have to match
+    what the painter writes in both directions.
+    """
     vals, _gone = themes.values(m, _WHEN_BARS)
-    want, answered = [], []
+    _fans = (m or {}).get("fans") or []
+    want, has_number = [], []
     for label, bar_src, text_src, _lo, _hi in themes.BARS_ROWS:
-        if bar_src not in vals or text_src not in vals:
-            answered.append(False)
-            continue
-        answered.append(True)
         if label is None:                    # a fan slot: the name is a reading too
-            name = _FAN_NAME_OF[bar_src]
-            label = layout.text_for(name, vals[name])
-        want.append(label)
-        want.append(layout.text_for(text_src, vals[text_src]))
-    return want, answered
+            if int(bar_src.split()[1]) - 1 < len(_fans):
+                want.append(layout.text_for(_FAN_NAME_OF[bar_src],
+                                            vals[_FAN_NAME_OF[bar_src]]))
+        else:                                # a fixed row has its metric either way
+            want.append(label)
+        filled = bar_src in vals and text_src in vals
+        has_number.append(filled)
+        if filled:
+            want.append(layout.text_for(text_src, vals[text_src]))
+    return want, has_number
 
 
 _pairs = []
@@ -2592,9 +2688,9 @@ print(f"  the same rows as data   `themes.BARS_ROWS` names all {len(themes.BARS_
       f"the app's vocabulary has no entry for it, and `RAM Rate`/`Used RAM` taken from that "
       f"record's own `RAMRate`/`UsedRAM` (PROTOCOL.md 10). Spied out of the drawing: across "
       f"{len(_pairs)} boxes and {sum(_pairs)} rows, every string `bars` paints is the string "
-      f"`layout.text_for` produces from those sources, and the rows it answers are the rows "
-      f"ink lands in - including a fan reporting 0, which the drawing now shows and the "
-      f"source answers. {len(themes.source_names())} answerable sources, "
+      f"`layout.text_for` produces from those sources, and the rows whose reading answers "
+      f"ink lands in - including a fan row whose subject exists while its reading does "
+      f"not, which draws its name and nothing else. {len(themes.source_names())} answerable sources, "
       f"{len(layout.VENDOR_FORMAT)} display shapes, none missing")
 
 print(f"  what bars rows are    {_n_fixed + render.BARS_SLOTS} rows on every box - "
@@ -2604,6 +2700,216 @@ print(f"  what bars rows are    {_n_fixed + render.BARS_SLOTS} rows on every box
       f"and LOAD the ink sits in slots 0, 1 and 3 with slot 2 empty. `bars` is this "
       f"project's own drawing, not a reproduction of a vendor frame, so the change is ours "
       f"to make (docs/theme-editor.md, docs/limits.md)")
+
+# ---- the export, and the one key it needs that no vendor file ever used.  Same rule as
+# ---- every other gate here: the readings are pinned, so this holds on any machine, and what
+# ---- is asserted is relations (which rows are unanswered, which slots stay empty) rather
+# ---- than this box's sensor inventory.
+import copy as _copy
+from PIL import ImageChops as _Chops
+
+_BARS_CASES = (
+    ("all ten answered", dict(_ALL6, fans=[{"name": f"Fan {i} on this box", "value": 900 + i,
+                                            "type": "Fan"} for i in range(4)])),
+    ("no fans at all", _ALL6),
+    ("three of the six fixed rows, two fans", dict(_PART, fans=[
+        {"name": "Fan CPU", "value": 2000, "type": "Fan"},
+        {"name": "Fan System 5", "value": 1549, "type": "Fan"}])),
+    ("six fans, the second reporting zero", dict(_PART, fans=[
+        {"name": "Fan CPU", "value": 2000, "type": "Fan"},
+        {"name": "Fan System 5", "value": 0, "type": "Fan"}] + [
+        {"name": f"Fan {i}", "value": 700 + i, "type": "Fan"} for i in range(4)])),
+    ("past both ends of every scale", dict(
+        cpu={"temperature": 120.0, "load": 140.0},
+        gpu={"temperature": 5.0, "load": -5.0, "memoryUsage": 100,
+             "dedicatedTotal": 8192}, motherboard={"temperature": 0.0},
+        memory={"used": 99999, "total": 100},
+        fans=[{"name": f"Fan {i}", "value": 3000 + i, "type": "Fan"}
+              for i in range(4)])),
+    ("nothing but the clock", {"cpu": {}}),
+    ("a fan row with no name", dict(cpu={"temperature": 57.0},
+                                    fans=[{"value": 1200, "type": "Fan"}])),
+    ("one fan, three empty slots", dict(_ALL6, fans=[
+        {"name": "Fan CPU", "value": 2000, "type": "Fan"}])),
+    ("a GPU with no dedicated total", dict(
+        _ALL6, gpu={"temperature": 47.0, "load": 22.0, "memoryUsage": 4096})),
+    ("a GPU reporting 0 used", dict(
+        _ALL6, gpu={"temperature": 47.0, "load": 22.0, "memoryUsage": 0,
+                    "dedicatedTotal": 8192})),
+    ("memory used, no total", dict(_ALL6, memory={"used": 10240})),
+    ("memory total, no used", dict(_ALL6, memory={"total": 16384})),
+    ("memory both zero", dict(_ALL6, memory={"used": 0, "total": 0})),
+)
+_bars_rows, _bars_holes = [], []
+for _tag, _m in _BARS_CASES:
+    _m = dict(_m, timestamp={})
+    _r = themes.parity("bars", _m, _WHEN_BARS)
+    assert _r["diff_px"] == 0 and _r["worst_channel_delta"] == 0, (_tag, _r)
+    assert _r["code_px"] == _r["layout_px"] > 0, (_tag, _r)
+    (_bars_rows if not _r["missing"] else _bars_holes).append(
+        (_tag, _r["code_px"], tuple(sorted(set(_r["missing"])))))
+assert len(_bars_rows) + len(_bars_holes) == len(_BARS_CASES), _BARS_CASES
+
+def _rows_at(m):
+    """What each of the ten rows writes, as `{row: [(column, text)]}` - the same
+    `ImageDraw.text` spy the row gate above runs, grouped by the y the drawing puts each
+    string at.  Text is the exact evidence for these two rules: the value column's ink
+    window wants 40 px and a number reading `0 GB` is narrower than that, which is a fact
+    about the window, not about the row."""
+    del _seen_text[:]
+    _ID.ImageDraw.text = _spy
+    try:
+        render.draw(dict(m, timestamp={}), "bars", bg=render.OVERLAY)
+    finally:
+        _ID.ImageDraw.text = _real_text
+    out = {}
+    for x, y, t in _seen_text:
+        if x in (render.BARS_LBL_X, render.BARS_VAL_X):
+            out.setdefault((y - render.BARS_Y0) // _pitch, []).append(
+                ("label" if x == render.BARS_LBL_X else "value", t))
+    return out
+
+
+# The two rules the diff hunt turned up, both fixed on 2026-11-09 and measured here rather
+# than claimed.  (1) A memory dict with a total and no used field used to raise `KeyError`
+# inside the frame loop - the call below is that reading, and drawing a frame at it is the
+# regression.  The row now keeps its label and leaves its number and meter undrawn.  (2) A
+# GPU reporting exactly 0 used keeps its row, at nothing filled, the way a 0 % memory
+# reading always did; it used to drop the row, because its numerator had to be truthy.
+_no_used = _rows_at(dict(_ALL6, memory={"total": 16384}))
+assert _no_used[4] == [("label", "RAM")], (_no_used[4],  # a label, and nothing else
+                                           "the RAM row drew a number for a numerator that "
+                                           "was never reported - or `pct_pair` still raises")
+assert [t for _c, t in _no_used[5] if _c == "value"] == ["4 GB"], _no_used[5]
+_zero_gpu = _rows_at(dict(_ALL6, gpu={"temperature": 47.0, "load": 22.0, "memoryUsage": 0,
+                                      "dedicatedTotal": 8192}))
+assert [t for _c, t in _zero_gpu[5] if _c == "value"] == ["0 GB"], (
+    _zero_gpu[5], "a GPU at 0 used dropped its row again - the asymmetry between the two "
+                  "memory rows is back")
+_both_zero = _rows_at(dict(_ALL6, memory={"used": 0, "total": 0}))
+assert _both_zero[4] == [("label", "RAM")], (
+    _both_zero[4], "a zero denominator drew a RAM row, and 0/0 is not a pair to divide")
+assert _slots(render.draw(dict(_ALL6, memory={"total": 16384}), "bars"))[4] is False, \
+    "the value column has ink in a row whose number is not drawn"
+
+# and what `xigma.showIf` is worth, measured: the same file with the key stripped from the
+# two memory number rows, painted at the reading that needs it (a GPU reporting used memory
+# and no dedicated total - what an integrated GPU does).
+_no_guard = _copy.deepcopy(themes.export("bars"))
+_stripped = 0
+for _w in _no_guard["osd"]["widget"]:
+    if "showIf" in (_w["property"][0].get("xigma") or {}):
+        del _w["property"][0]["xigma"]["showIf"]
+        _stripped += 1
+assert _stripped == 2, (_stripped, "the memory number rows are not the two the recipe says")
+_gpu_only = dict(_ALL6, gpu={"temperature": 47.0, "load": 22.0, "memoryUsage": 4096})
+_gvals, _ = themes.values(_gpu_only, _WHEN_BARS)
+themes.fill_lines(_gvals, _gpu_only)
+_real_now = render._now
+render._now = lambda: _WHEN_BARS.timetuple()
+try:
+    _code_img = render.draw(_gpu_only, "bars")
+finally:
+    render._now = _real_now
+_file_img, _gnotes = layout.draw_theme(_no_guard, _gvals, canvas=(480, 480),
+                                       specials=themes.SPECIALS)
+_flat = _Chops.difference(_code_img.convert("RGBA"), _file_img.convert("RGBA")) \
+    .get_flattened_data()
+_shownif_px = sum(1 for px in _flat if px != (0, 0, 0, 0))
+_shownif_worst = max((max(px) for px in _flat), default=0)
+assert _shownif_px > 0 and _shownif_worst > 0, (
+    _shownif_px, _shownif_worst, "stripping `showIf` changed nothing, so the key is not "
+                                 "doing the work the recipe says it does")
+_src_recipe = inspect.getsource(themes.bars_recipe)
+for _where, _txt in (("`bars_recipe`'s docstring", _src_recipe),
+                     ("docs/theme-editor.md", open("docs/theme-editor.md",
+                                                   encoding="utf-8").read()),
+                     ("docs/limits.md", open("docs/limits.md", encoding="utf-8").read())):
+    assert f"{_shownif_px} px and a worst channel of {_shownif_worst}" in _txt, (
+        _where, _shownif_px, _shownif_worst,
+        "this measurement is quoted nowhere, or quoted wrong - it is the whole reason "
+        "`xigma.showIf` exists")
+
+_plan_bars = open("docs/theme-editor.md", encoding="utf-8").read()
+assert f"all {len(_BARS_CASES)} readings" in _plan_bars, (
+    len(_BARS_CASES), "docs/theme-editor.md miscounts the readings `bars` is held to")
+
+# the generated file, counted from the row table rather than from a remembered number
+_obj_bars = themes.export("bars")
+_w_bars = _obj_bars["osd"]["widget"]
+assert len(_w_bars) == 2 + 3 * len(themes.BARS_ROWS), (
+    len(_w_bars), "the export is not the heading, the clock and three rows per `BARS_ROWS`")
+_kinds_bars = {}
+for _w in _w_bars:
+    _kinds_bars[_w["type"]] = _kinds_bars.get(_w["type"], 0) + 1
+assert _kinds_bars == {"text": 1 + len(themes.BARS_FIXED_ROWS),
+                       "data": 1 + len(themes.BARS_ROWS) + len(themes.FAN_SLOTS),
+                       "bar": len(themes.BARS_ROWS)}, _kinds_bars
+_pitch_bars = min(render.BARS_ROW_MAX,
+                  max(render.BARS_ROW_MIN,
+                      render.BARS_SPAN // len(themes.BARS_ROWS)))
+for _i, (_lab, _bar_src, _txt_src, _lo, _hi) in enumerate(themes.BARS_ROWS):
+    _y = render.BARS_Y0 + _i * _pitch_bars
+    _lbl, _num, _meter = _w_bars[1 + 3 * _i], _w_bars[2 + 3 * _i], _w_bars[3 + 3 * _i]
+    assert (_lbl["type"] == "text") == (_lab is not None), (_i, _lbl["type"])
+    assert _num["property"][0]["source"] == _txt_src, (_i, _num)
+    assert _meter["property"][0]["source"] == _bar_src, (_i, _meter)
+    assert (_meter["property"][0]["minValue"], _meter["property"][0]["maxValue"]) \
+        == (_lo, _hi), (_i, _meter["property"][0])
+    # the label and the number share the row's centre; the meter hangs `BARS_BAR_DY` under
+    # it, in the drawing and in the file alike, which is why they are not one test
+    assert _lbl["property"][0]["y"] == _num["property"][0]["y"] == _y, (
+        _i, _lbl["property"][0]["y"], _num["property"][0]["y"], _y)
+    assert _meter["property"][0]["y"] == _y + render.BARS_BAR_DY, (
+        _i, _meter["property"][0]["y"], render.BARS_BAR_DY,
+        "the meter's offset from its row is no longer the constant both doors use")
+    _ext = _num["property"][0]["xigma"]
+    assert ("showIf" in _ext) == (_txt_src != _bar_src), (_i, _ext)
+    if _lab is None:
+        assert _lbl["property"][0]["source"] == themes._FAN_NAME[_bar_src], (_i, _lbl)
+    else:
+        assert _lbl["property"][0]["content"] == _lab, (_i, _lbl)
+assert all(_w["property"][0].get("xigma", {}).get("barPaint") == "render"
+           and _w["property"][0].get("xigma", {}).get("colourRamp") == "heat"
+           for _w in _w_bars if _w["type"] == "bar"), "the meters are not all one convention"
+assert not themes.validate(_obj_bars)[0], themes.validate(_obj_bars)[0]
+
+# what the review door says about it, in relations only: the rows this box cannot answer are
+# the ones it reports skipping, and a `showIf` dependency is reported by the source it names
+_chk_bars = subprocess.run([sys.executable, "-m", "xigmalcd", "--check-theme", "bars"],
+                           capture_output=True, text=True, check=True)
+_lnb = _chk_bars.stdout.splitlines()
+assert f"{len(_w_bars)} widgets" in _lnb[0], _lnb[0]
+_cannot = next((ln for ln in _lnb if "cannot:" in ln), "")
+_cannot_set = {s.strip() for s in _cannot.split("cannot:", 1)[1].split(",") if s.strip()}
+_skipped = next(ln for ln in _lnb if " boxes," in ln)
+_msk = re.search(r"skipped: (.*)$", _skipped)
+_skip_set = set() if _msk[1].strip() == "nothing" else {s.strip()
+                                                        for s in _msk[1].split(",")}
+# a `showIf` dependency is reported as `showIf:<source>`, and the source it names is the
+# meter of that row - the same reading the "cannot" half already says the box lacks
+_skip_src = {x[len("showIf:"):] if x.startswith("showIf:") else x for x in _skip_set}
+assert _skip_src == _cannot_set, (_skip_set, _cannot_set, _skipped)
+assert _cannot_set <= {w["property"][0]["source"] for w in _w_bars
+                       if w["property"][0].get("source")}, sorted(_cannot_set)
+print(f"  bars as a file        {len(_w_bars)} rows in the generated layout - the heading, "
+      f"the clock line and three widgets for each of the {len(themes.BARS_ROWS)} rows in "
+      f"`themes.BARS_ROWS`, every one at y={render.BARS_Y0}+i*{_pitch_bars} with the meter's "
+      f"`minValue`/`maxValue` and the number's `source` taken from that table, and the "
+      f"labels `text` for the {_n_fixed} fixed rows / `data` on `Fan N Name` for the "
+      f"{len(themes.FAN_SLOTS)} slots. Pixel-identical to `render.py` at all "
+      f"{len(_BARS_CASES)} readings ({len(_bars_rows)} answer every source; "
+      f"{len(_bars_holes)} leave rows unanswered and are skipped the same way both doors), "
+      f"and this box answers all but {' '.join(sorted(_cannot_set)) or 'none of them'}.")
+print(f"                        what `xigma.showIf` buys, measured: the same file with the "
+      f"key stripped from its two memory number rows sits {_shownif_px} px and a worst "
+      f"channel of {_shownif_worst}/255 away from the drawing at a reading where a GPU "
+      f"reports used memory and no dedicated total. And the two rules that measurement "
+      f"found are fixed: `memory: {{total, no used}}` no longer raises inside the frame "
+      f"loop (the RAM slot stays empty, the VRAM slot fills), and a GPU reporting exactly 0 "
+      f"used keeps its row at nothing filled the way a 0 % RAM reading always did - one "
+      f"function, `render.pct_pair`, forms both meters now (docs/theme-editor.md, "
+      f"docs/limits.md)")
 
 print(f"  a table and its reason {' '.join(sorted(layout.BAR_PAINT))} /"
       f" {' '.join(sorted(layout.ARC_PAINT))} / {' '.join(sorted(layout.COLOUR_RAMPS))}:"
@@ -2628,6 +2934,12 @@ for _t, _w in ((plan_txt, "docs/theme-editor.md"), (gui_txt, "docs/gui.md")):
                                               "many generated layouts the window opens")
 assert f"{_gen_n + _file_n} names ({_gen_n} generated + {_file_n}" in plan_txt, \
     (_gen_n, _file_n, "docs/theme-editor.md miscounts what the layout combo offers")
+for _name, _rec in sorted(themes.EXPORTS.items()):
+    _o = _rec()
+    _nw, _nc = len(_o["osd"]["widget"]), len(json.dumps(_o, indent=1, sort_keys=True))
+    assert f"{_nw} and {_spaced(_nc)}" in usage_txt, (
+        _name, _nw, _nc, "docs/usage.md does not say what generating "
+        f"{_name} writes: {_nw} widgets and {_spaced(_nc)} characters")
 for _n, _p in rows:
     assert _spaced(_p) in usage_txt, (_n, _p, "docs/usage.md does not quote "
                                       f"{_n}'s painted count from this run")
@@ -2896,7 +3208,8 @@ bad = {"width": 480, "height": 480, "osd": {"widget": [
          "time": "2026-01-01T00:00:00.000Z"}]},
     {"type": "data", "id": "xigma-a", "property": []},
     {"type": "data", "id": "xigma-a", "property": [
-        {"x": 5, "y": 5, "source": "CPU Usage"}]},
+        {"x": 5, "y": 5, "source": "CPU Usage",
+         "xigma": {"showIf": "Fan 9 Speed"}}]},
     {"type": "special", "id": "xigma-b", "property": [
         {"x": 10, "y": 10, "name": "mystery-thing", "fontSize": 26}]},
     # the two doors that place a pair, each missing the one key that makes its placement
@@ -2913,9 +3226,10 @@ hard, soft = themes.validate(bad)
 named = ["outside the 480x480 canvas", "has no entry in", "is not in layout.FONTS",
          "is outside the ten sizes", "rgba(r, g, b, a)", "repeats inside this theme",
          "has no drawing", "no `content`", "one-element list",
-         "no ring to size its text against", "distance between their centres"]
+         "no ring to size its text against", "distance between their centres",
+         "xigma.showIf names"]
 hit = sum(1 for n in named if any(n in s for s in soft + hard))
-assert hit == len(named) and len(soft) == 11 and len(hard) == 1, (hit, soft, hard)
+assert hit == len(named) and len(soft) == 12 and len(hard) == 1, (hit, soft, hard)
 n_soft, n_hard = len(soft), len(hard)
 # the doc counts these findings, so the count is re-derived here rather than remembered
 _plan_txt = open("docs/theme-editor.md", encoding="utf-8").read()
@@ -3149,7 +3463,7 @@ assert sorted(set(read) - set(cen["keys"])) == ["lineColor", "lineWidth", "name"
 assert sorted(set(cen["keys"]) - set(read)) == sorted(themes.UNREAD_WHY), \
     sorted(set(cen["keys"]) - set(read))
 assert set(sub) == {"anchor", "arcPaint", "autoFitMax", "barPaint", "colourRamp",
-                    "colourStops", "fitArc", "format"}, sub
+                    "colourStops", "fitArc", "format", "showIf"}, sub
 assert set(sub) == set(themes.XIGMA_KEYS), (sorted(set(sub) - set(themes.XIGMA_KEYS)),
                                             sorted(set(themes.XIGMA_KEYS) - set(sub)))
 assert cen["values"]["enableMove"] == {"False": 152}
@@ -4650,6 +4964,20 @@ assert not qt, qt
 fx = next(g for g in generated if g.name == "clock").fixture_line()
 for want in ("CPU Temperature 57.0", "GPU Temperature 47.0", "2026-02-17"):
     assert want in fx, fx
+# README writes the count as a word, so the gate spells it the same way rather than
+# asking the document to hold a digit
+_WORDS = "zero one two three four five six seven eight nine ten".split()
+_readme_gen = open("README.md", encoding="utf-8").read()
+_count_word = _WORDS[len(generated)] if len(generated) < len(_WORDS) else str(len(generated))
+assert f"the {_count_word} themes generated from our own drawing code" in _readme_gen, (
+    len(generated), _count_word,
+    "README miscounts the generated layouts the editor row opens")
+_gui_fields = open("docs/gui.md", encoding="utf-8").read()
+assert f"{len(offered)} names across {len(kinds)} kinds" in _gui_fields, (
+    len(offered), kinds, "docs/gui.md miscounts the fields the row offers - that sentence "
+    "says 'counted in the gate', so it is counted")
+assert all("showIf" in gui_edit.extension_fields(k) for k in kinds), (
+    kinds, "a row that any kind can be is not offered the dependency key")
 print(f"  editor model          opened {len(opened)} of the {len(pick)} layouts this "
       f"canvas can select, plus the {len(generated)} generated ones, and wrote nothing: "
       f"your theme directory still holds {len(themes.user_copies())} files. The row may "

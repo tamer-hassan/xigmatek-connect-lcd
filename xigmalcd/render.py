@@ -416,6 +416,25 @@ def temp_arc(img, cx, cy, value, lo, mid, hi, radius, width, track,
     return frac
 
 
+def pct_pair(part: dict, numerator: str, denominator: str):
+    """One pair of reported fields as a percentage, or None where there is no pair.
+
+    Both of `bars`'s memory rows are formed this way, and until 2026-11-09 they were not
+    formed *alike*: the GPU row required its numerator to be truthy, so a reading of exactly
+    0 dropped the row, while the memory row kept it - and it read `mem["used"]` outright, so
+    a dict reporting a total with no used raised `KeyError` inside the frame loop instead of
+    drawing a hole.  Neither of those is a shape a layout file can describe, so the rule is
+    stated once here (the source table calls it from the other door, and the suite measures
+    both).  A zero numerator is a reading: the row exists, at nothing filled.
+    """
+    part = part or {}
+    den = part.get(denominator)
+    val = part.get(numerator)
+    if not den or val is None:
+        return None
+    return val / den * 100
+
+
 def bar(img, x, y, w, h, frac, colour, bg=(40, 46, 50, 255)):
     d = ImageDraw.Draw(img)
     x, y, w, h = int(x * SS), int(y * SS), int(w * SS), int(h * SS)
@@ -451,8 +470,11 @@ def clock_str(now=None, fmt24=True):
     return time.strftime("%H:%M:%S" if fmt24 else "%I:%M %p", now or _now())
 
 
-def _title(img, s, y=22, size=24, colour=WHITE):
-    _text(img, (240, y), s, _fit(img, s, 440, size), colour)
+def _title(img, s, y=22, size=24, colour=WHITE, x=240, width=440):
+    """The centred heading.  `x` and `width` are parameters because one theme names both -
+    `bars`, whose title is a row in a layout file - and the defaults are the values every
+    theme has always drawn with."""
+    _text(img, (x, y), s, _fit(img, s, width, size), colour)
 
 
 # ----------------------------------------------------------------- themes --
@@ -636,6 +658,9 @@ BARS_ROW_MIN, BARS_ROW_MAX = 28, 56
 BARS_LBL_X, BARS_VAL_X = 28, 452
 BARS_BAR_X, BARS_BAR_DY, BARS_BAR_WH = 28, 17, (424, 10)
 BARS_LBL_F, BARS_VAL_F, BARS_CLOCK_F = 18, 20, 28
+BARS_CLOCK_XY, BARS_CLOCK_ANCHOR = (240, 452), "mm"
+BARS_TITLE_TEXT, BARS_TITLE_X, BARS_TITLE_Y = "SYSTEM MONITOR", 240, 30
+BARS_TITLE_F, BARS_TITLE_W = 24, 440        # the ceiling and the width `_fit` walks
 BARS_SLOTS = 4
 
 
@@ -650,10 +675,16 @@ def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
       `fans[3]` - rather than one row per fan this box happens to report.  So the row list
       has the same length on a machine with six fans and on one with none, and the pitch
       below stops depending on what `sensors` found.
-    * A row with no reading **keeps its place**: it is not drawn, and the advance still
-      happens.  That is what the 27 library layouts do, and it is the rule docs/themes.md
-      states as "a hole that says what it is, rather than a zero that reads as a
-      measurement".
+    * A row with no reading **keeps its place**: its number and meter are not drawn, and the
+      advance still happens.  That is what the 27 library layouts do, and it is the rule
+      docs/themes.md states as "a hole that says what it is, rather than a zero that reads as
+      a measurement".
+    * A row's **label belongs to its subject, not to its reading**: `BOARD` is drawn when the
+      box has a board-temperature metric to report on, whatever that metric answers, and a fan
+      slot's name is drawn only where `sensors` reported a fan at that position.  That is the
+      same split the layout file makes - a literal `text` row for the six fixed labels, a
+      `data` row on `Fan N Name` for the four slots - and it is what lets one drawing and one
+      file agree at every reading instead of only at the complete ones.
 
     What that costs on the glass is stated rather than left to be noticed: when a reading is
     missing, the rows under it no longer close up.  Before this, the pitch was divided out of
@@ -669,38 +700,48 @@ def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
     gpu = m.get("gpu") or {}
     mem = m.get("memory") or {}
     board = m.get("motherboard") or {}
-    ram = (mem["used"] / mem["total"] * 100) if mem.get("total") else None
-    gm = (gpu["memoryUsage"] / gpu["dedicatedTotal"] * 100
-          if gpu.get("memoryUsage") and gpu.get("dedicatedTotal") else None)
-    rows = [("CPU", cpu.get("temperature"), 30, 90, lambda v: f"{v:.0f}\u00b0C"),
-            ("GPU", gpu.get("temperature"), 30, 90, lambda v: f"{v:.0f}\u00b0C"),
+    ram = pct_pair(mem, "used", "total")
+    gm = pct_pair(gpu, "memoryUsage", "dedicatedTotal")
+    # (label, reading, scale, the reading's shape, whether the row has a subject at all).
+    # The subject matters because a label belongs to it and a number belongs to the reading:
+    # the six fixed rows are about metrics this machine has (a `BOARD` row exists even when
+    # this box's sensors answer nothing for it), while a fan slot exists only if `sensors`
+    # reported a row at that position.  Same split the layout file makes - a literal `text`
+    # row for the fixed labels, a `data` row on `Fan N Name` for the slots - which is what
+    # lets one drawing and one file agree at every reading.
+    rows = [("CPU", cpu.get("temperature"), 30, 90, lambda v: f"{v:.0f}\u00b0C", True),
+            ("GPU", gpu.get("temperature"), 30, 90, lambda v: f"{v:.0f}\u00b0C", True),
             ("BOARD", board.get("temperature"), 25, 80,
-             lambda v: f"{v:.0f}\u00b0C"),
-            ("LOAD", cpu.get("load"), 0, 100, lambda v: f"{v:.0f}%"),
+             lambda v: f"{v:.0f}\u00b0C", True),
+            ("LOAD", cpu.get("load"), 0, 100, lambda v: f"{v:.0f}%", True),
             ("RAM", ram, 0, 100,
-             lambda v: f"{mem.get('used', 0) // 1024} GB"),
+             lambda v: f"{mem.get('used', 0) // 1024} GB", True),
             ("VRAM", gm, 0, 100,
-             lambda v: f"{gpu.get('memoryUsage', 0) // 1024} GB")]
+             lambda v: f"{gpu.get('memoryUsage', 0) // 1024} GB", True)]
     fans = m.get("fans") or []
     for slot in range(BARS_SLOTS):
         fan = fans[slot] if slot < len(fans) else None
         rows.append((str((fan or {}).get("name") or f"FAN {slot + 1}")[:10],
-                     (fan or {}).get("value"), 0, 3000, lambda v: f"{round(v)}"))
-    _title(img, "SYSTEM MONITOR", y=30, colour=fg)
+                     (fan or {}).get("value"), 0, 3000, lambda v: f"{round(v)}",
+                     fan is not None))
+    _title(img, BARS_TITLE_TEXT, x=BARS_TITLE_X, y=BARS_TITLE_Y,
+           size=BARS_TITLE_F, width=BARS_TITLE_W, colour=fg)
     d = ImageDraw.Draw(img)
     y, span = BARS_Y0, BARS_SPAN
     row_h = min(BARS_ROW_MAX, max(BARS_ROW_MIN, span // max(len(rows), 1)))
-    for name, val, lo, hi, fmt in rows:
-        if val is not None:                     # a missing reading leaves its slot empty
+    for name, val, lo, hi, fmt, subject in rows:
+        if subject:                             # the label belongs to the row's subject
             d.text((BARS_LBL_X * SS, y * SS), name, font=font(BARS_LBL_F), fill=mid,
                    anchor="lm")
+        if val is not None:                     # the number and the meter to the reading
             d.text((BARS_VAL_X * SS, y * SS), fmt(val), font=font(BARS_VAL_F), fill=fg,
                    anchor="rm")
             bar(img, BARS_BAR_X, y + BARS_BAR_DY, BARS_BAR_WH[0], BARS_BAR_WH[1],
                 (val - lo) / (hi - lo), heat((val - lo) / (hi - lo)))
         y += row_h                              # ...and the rest of the block stays put
     if clock:
-        _text(img, (240, 452), clock_str(), font(BARS_CLOCK_F), acc)
+        _text(img, BARS_CLOCK_XY, clock_str(), font(BARS_CLOCK_F), acc,
+          anchor=BARS_CLOCK_ANCHOR)
     return img.resize((W, H), Image.LANCZOS)
 
 

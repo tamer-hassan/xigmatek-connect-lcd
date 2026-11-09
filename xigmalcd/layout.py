@@ -885,7 +885,7 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
     reported in `notes["missing"]` as `special:<name>`: an unknown name is said, not
     guessed at.
 
-    The `xigma` extension keys a text or data widget may carry - `anchor`,
+    The `xigma` extension keys a text or data widget may carry - `showIf`, `anchor`,
     `autoFitMax`, `format` - are documented at `draw_text` and `text_for`, each with
     the measured difference between our five and the vendor's files that forced it."""
     W, H = canvas or (obj["width"], obj["height"])
@@ -895,6 +895,17 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
     for wi, w in enumerate(obj["osd"]["widget"]):
         prop = w["property"][0]
         kind = w["type"]
+        # `xigma.showIf` - one row's drawing depends on a reading other than its own.  Where
+        # it matters is a `bars` memory row: its meter divides two fields, its number prints
+        # one of them, and the drawing behind this file prints neither when the division
+        # cannot be made.  A row with a dependency it cannot satisfy is reported the way an
+        # unanswered source is (`showIf:<name>` in `missing`), because silence is how a hole
+        # starts reading like a bug.
+        ext = prop.get("xigma") or {}
+        shown_if = ext.get("showIf")
+        if shown_if and shown_if not in values:
+            notes["missing"].append(f"showIf:{shown_if}")
+            continue
         if kind in ("text", "data"):
             if kind == "data":
                 src = prop["source"]

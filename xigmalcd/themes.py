@@ -198,25 +198,17 @@ SOURCES = {
     "Motherboard Temperature": ("motherboard", "temperature"),
 }
 
-#: Sources whose number comes out of two fields rather than one, and the arithmetic is the
-#: drawing's own: `render.theme_bars` divides `used / total * 100` itself, so a source that
-#: read the separate `memory.load` field instead would hand the meter a different float - they
-#: agree to a tenth of a percent on this box (62.8 against 62.82), which is exactly the kind
-#: of difference that moves a 424 px fill by a pixel.  A derived source takes the metrics dict
-#: and returns a value or None, and a None is reported like any other unanswered source.
+#: Sources whose number comes out of two reported fields rather than one, spelled as a pair
+#: of field names so the arithmetic stays in one place: `render.pct_pair` computes them, and
+#: it is the same function `render.theme_bars` divides its own meters with.  That matters for
+#: `RAM Rate` in particular: `sensors` separately reports a `memory.load` percentage, which is
+#: *not* what `used / total` works out to, and handing a 424 px meter the other number moves a
+#: fill by a device pixel somewhere.  A derived source with no pair to divide is reported like
+#: any other unanswered source, with the two field names in the reason.
 DERIVED = {
-    "RAM Rate": lambda m: _ratio(m.get("memory"), "used", "total"),
-    "GPU Memory Rate": lambda m: _ratio(m.get("gpu"), "memoryUsage", "dedicatedTotal"),
+    "RAM Rate": ("memory", "used", "total"),
+    "GPU Memory Rate": ("gpu", "memoryUsage", "dedicatedTotal"),
 }
-
-
-def _ratio(part, numerator, denominator):
-    """`numerator / denominator * 100` the way `theme_bars` works it out, or None."""
-    part = part or {}
-    if not part.get(denominator):
-        return None
-    val = part.get(numerator)
-    return None if val is None else val / part[denominator] * 100
 
 
 #: The per-sensor fan rows `bars` draws, and the reason they are ours to name: the vendor's
@@ -244,6 +236,9 @@ BARS_FIXED_ROWS = (
 )
 BARS_ROWS = BARS_FIXED_ROWS + tuple(
     (None, speed, speed, 0, 3000) for speed, _name in FAN_SLOTS)
+
+#: Which reading prints a fan row's label, given the source its meter reads.
+_FAN_NAME = {speed: name for speed, name in FAN_SLOTS}
 
 #: Sources that want a wall clock, and get one instant per frame - the same rule
 #: `render._now()` exists for (a frame that calls `time.strftime` twice shows two
@@ -323,11 +318,11 @@ def values(metrics: dict, when=None) -> tuple:
             out[src] = val
     for src in CLOCKED:
         out[src] = when
-    for src, fn in DERIVED.items():
-        val = fn(metrics)
+    for src, (group, num, den) in DERIVED.items():
+        val = render.pct_pair(metrics.get(group), num, den)
         if val is None:
-            absent[src] = ("no pair to divide" if src == "RAM Rate"
-                           else "no GPU memory fields to divide")
+            absent[src] = (f"{group}.{num} and {group}.{den} are not a pair this machine "
+                           f"reports (one is absent, or the denominator is 0)")
         else:
             out[src] = val
     fans = metrics.get("fans") or []
@@ -335,7 +330,13 @@ def values(metrics: dict, when=None) -> tuple:
         slot = int(speed.split()[1]) - 1
         fan = fans[slot] if slot < len(fans) else None
         for src, key in ((speed, "value"), (name, "name")):
-            val = (fan or {}).get(key)
+            if key == "name":
+                # `FAN 3` is what the drawing prints for a row that reports a tachometer
+                # under no name, so the source answers the same thing: an empty label would
+                # disagree with the theme over one row, far from any cause a reader could see
+                val = (fan.get("name") or f"FAN {slot + 1}") if fan else None
+            else:
+                val = fan.get("value") if fan else None
             if val is None:
                 absent[src] = (f"this box reports {len(fans)} fan row"
                                f"{'s' if len(fans) != 1 else ''}; slot {slot + 1} has "
@@ -475,6 +476,14 @@ XIGMA_KEYS = {
                   "`xigma.autoFitMax` cannot express by itself (docs/limits.md).  It is "
                   "not read at all by the ring-fitted pair door (`temp-values`, "
                   "`temp-labels`), whose size the ring decides: see `xigma.fitArc`",
+    "showIf": "another reading this row's drawing depends on: the row is drawn only when "
+              "that source has a value.  It exists for the shape `bars` draws and the "
+              "vocabulary cannot say - a meter that divides two fields (`used / total`) "
+              "beside a number that prints one of them (`Used RAM`): the theme behind the "
+              "file draws neither when the division cannot be made, so the number row names "
+              "the meter's source here.  A row whose dependency is unanswered is reported "
+              "in `missing` as `showIf:<source>`, like any other hole, rather than drawing "
+              "nothing quietly",
     "fitArc": "the ring a `special` row's text is sized against, spelled in an `arc` "
               "row's own vocabulary: {cy, radius, width, angleStart, angleEnd}, `radius` "
               "the inner edge and `width` the stroke (so outer = radius + width), the "
@@ -638,6 +647,7 @@ def validate(obj: dict) -> tuple:
         return hard + ["an `osd.widget` list with nothing in it: there is nothing to "
                        "draw, which is not the same as an empty canvas"], soft
     seen_ids = set()
+    _answerable = set(source_names()) | set(UNMAPPED)
     for i, wd in enumerate(widgets):
         kind = str(wd.get("type") or "")
         if kind not in layout.KINDS:
@@ -678,9 +688,19 @@ def validate(obj: dict) -> tuple:
             soft.append(f"widget {i} ({kind}): textColor {pr['textColor']!r} is not the "
                         "`rgba(r, g, b, a)` spelling the library uses everywhere")
         src = pr.get("source")
-        if src and src not in SOURCES and src not in CLOCKED and src not in UNMAPPED:
-            soft.append(f"widget {i} ({kind}): source {src!r} has no entry in "
-                        "themes.SOURCES - it will be reported as unanswered")
+        if src and src not in _answerable:
+            soft.append(f"widget {i} ({kind}): source {src!r} has no entry in the "
+                        f"vocabulary this program answers ({len(source_names())} names "
+                        f"from themes.source_names() - the flat fields, the derived "
+                        f"ratios, the clock and the fan slots - plus "
+                        f"{len(UNMAPPED)} it names but cannot read) - it will be "
+                        "reported as unanswered")
+        shown_if = (pr.get("xigma") or {}).get("showIf")
+        if shown_if and shown_if not in _answerable:
+            soft.append(f"widget {i} ({kind}): xigma.showIf names {shown_if!r}, which "
+                        "this program cannot answer.  A row whose dependency can never "
+                        "be satisfied never draws at all, and what would be said at "
+                        "draw time is a missing reading, not a mistyped key")
         stops, why = layout.colour_stops(pr)
         if why:
             soft.append(f"widget {i} ({kind}): xigma.colourStops is malformed - {why}")
@@ -1281,8 +1301,100 @@ def alpha_recipe() -> dict:
     }
 
 
-EXPORTS = {"alpha": alpha_recipe, "clock": clock_recipe, "dual": dual_recipe,
-           "gauge": gauge_recipe}
+def bars_recipe() -> dict:
+    """`bars` as a layout: ten rows of label, number and meter, a heading, a clock line.
+
+    The last of the five, and the one whose obstacle was not the schema but the drawing:
+    `theme_bars` reserves four fan slots and lets a row with no reading keep its place
+    (2026-11-08, docs/limits.md), so the block carries the same ten rows - and therefore the
+    same pitch, `BARS_SPAN // (6 + 4)` - on every machine, and a file can say where each row
+    goes.  The rows come from `BARS_ROWS` and the geometry from `render.BARS_*`: no number
+    here is a retyped copy of one the drawing already names.
+
+    Three things the vendor's `bar` widget cannot say, which this file says anyway:
+
+    * **One row, two readings.** The two memory rows divide a *percentage* for the meter and
+      print *gigabytes* beside it (`RAM Rate` and `Used RAM`, `GPU Memory Rate` and `Used GPU
+      Memory`), because that is what the theme draws, and a meter and a number describing one
+      sensor at two scales is not a shape the shipped vocabulary has.
+    * **A label that is a reading.** The four fan rows print `Fan N Name` - whatever this box
+      calls that tachometer, cut to the same 10 characters the drawing cuts.  The vendor's
+      editor offers the aggregates `cpuFansSpeed` "CPU Fans Speed" and `gpuFansSpeed` "GPU
+      Fans Speed", never a row per sensor (PROTOCOL.md 10), so it never needed a name for one.
+    * **A dependency a row can state.** The two memory number rows carry `xigma.showIf`
+      naming the meter's source: their own field answers even where the meter's division
+      cannot be made - a GPU reporting `memoryUsage` with no `dedicatedTotal`, which an
+      integrated GPU does - and the theme draws neither number nor meter then.  Measured,
+      before the key existed, at that one reading: 706 px and a worst channel of 255.
+    * **A ramp named, not copied.** The meter's colour is `heat(frac)`, so the row names
+      `xigma.colourRamp: "heat"` and declares the ramp's two ends; spelling that curve as
+      stops differs by one unit at 8 of its 100 sampled positions, which docs/limits.md
+      records and `dual` and `gauge` sidestep the same way.
+
+    The heading carries `xigma.autoFitMax` because `theme_bars` fits it through `_fit` - the
+    drawing's own width and ceiling, not a fitted guess - and it and the clock sit on the
+    anchor `mm` that `_text` draws with.  `cornerRadius` on the meters is declared 0 and is
+    ignored in both directions by `barPaint: render`: that painter rounds the track to half
+    the height and the fill as a function of the reading, and naming the convention is what
+    makes the declared number's silence mean something rather than disagree.
+    """
+    row_h = min(render.BARS_ROW_MAX,
+                max(render.BARS_ROW_MIN,
+                    render.BARS_SPAN // (len(BARS_FIXED_ROWS) + len(FAN_SLOTS))))
+    track = rgba_str((40, 46, 50, 255))            # `render.bar`'s own default track
+    rows = [widget("xigma-bars-heading", "text", {
+        "x": render.BARS_TITLE_X, "y": render.BARS_TITLE_Y,
+        "content": render.BARS_TITLE_TEXT, "fontFamily": "dejavu",
+        "fontSize": render.BARS_TITLE_F, "bold": True,
+        "textColor": rgba_str(render.WHITE),
+        "xigma": {"anchor": "mm", "autoFitMax": render.BARS_TITLE_W}}, 0)]
+    for i, (label, bar_src, text_src, lo, hi) in enumerate(BARS_ROWS):
+        y = render.BARS_Y0 + i * row_h
+        slug = bar_src.lower().replace(" ", "-")
+        if label is None:
+            rows.append(widget(f"xigma-bars-{slug}-name", "data", {
+                "x": render.BARS_LBL_X, "y": y, "source": _FAN_NAME[bar_src],
+                "fontFamily": "dejavu", "fontSize": render.BARS_LBL_F, "bold": True,
+                "textColor": rgba_str(render.DIM), "xigma": {"anchor": "lm"}}, len(rows)))
+        else:
+            rows.append(widget(f"xigma-bars-{slug}-label", "text", {
+                "x": render.BARS_LBL_X, "y": y, "content": label, "fontFamily": "dejavu",
+                "fontSize": render.BARS_LBL_F, "bold": True,
+                "textColor": rgba_str(render.DIM), "xigma": {"anchor": "lm"}}, len(rows)))
+        number = {"anchor": "rm"}
+        if text_src != bar_src:
+            # the memory rows: the number prints one field, the meter divides two, and the
+            # drawing behind this file prints neither when the division cannot be made (a
+            # GPU with no dedicated total answers `4096` and nothing else).  Named rather
+            # than assumed, and the suite measures the case
+            number["showIf"] = bar_src
+        rows.append(widget(f"xigma-bars-{text_src.lower().replace(' ', '-')}-value",
+                           "data", {
+            "x": render.BARS_VAL_X, "y": y, "source": text_src, "fontFamily": "dejavu",
+            "fontSize": render.BARS_VAL_F, "bold": True,
+            "textColor": rgba_str(render.WHITE), "xigma": number}, len(rows)))
+        rows.append(widget(f"xigma-bars-{slug}-meter", "bar", {
+            "x": render.BARS_BAR_X, "y": y + render.BARS_BAR_DY,
+            "width": render.BARS_BAR_WH[0], "height": render.BARS_BAR_WH[1],
+            "cornerRadius": 0, "bgColor": track, "startColor": rgba_str(render.CYAN),
+            "endColor": rgba_str(render.RED), "minValue": lo, "maxValue": hi,
+            "source": bar_src,
+            "xigma": {"barPaint": "render", "colourRamp": "heat"}}, len(rows)))
+    rows.append(widget("xigma-bars-clock", "data", {
+        "x": render.BARS_CLOCK_XY[0], "y": render.BARS_CLOCK_XY[1], "source": "Time",
+        "fontFamily": "dejavu", "fontSize": render.BARS_CLOCK_F, "bold": True,
+        "textColor": rgba_str(render.CYAN),
+        "xigma": {"anchor": render.BARS_CLOCK_ANCHOR}}, len(rows)))
+    return {
+        "id": "xigma-bars", "width": render.W, "height": render.H, "ratio": "1:1",
+        "xigma": {"theme": "bars", "generated-from": "xigmalcd/render.py",
+                  "version": __import__("xigmalcd").__version__},
+        "osd": {"widget": rows},
+    }
+
+
+EXPORTS = {"alpha": alpha_recipe, "bars": bars_recipe, "clock": clock_recipe,
+           "dual": dual_recipe, "gauge": gauge_recipe}
 
 
 def export(name: str) -> dict:

@@ -968,15 +968,43 @@ writes a theme today. What the model does and does not allow, all of it gated:
   to be re-rendered from the recorded series in the same change - not for tidiness, because
   the preview gate re-draws the layer from `docs/videos/readings-2026-11-08.json` and scores
   the tracked file against it, so a stale clip is a failing gate. The sources followed on
-  2026-11-09: `themes.BARS_ROWS` names the ten rows, four of them per-sensor fan slots
-  (`Fan N Speed`, `Fan N Name`) - which the vendor's own vocabulary has no word for, since it
-  offers the aggregates `cpuFansSpeed` "CPU Fans Speed" and `gpuFansSpeed` and never a row per
-  tachometer (PROTOCOL.md 10) - while `RAM Rate` and `Used RAM` come out of that record's
-  `RAMRate` and `UsedRAM`. A reading that is a division rather than a field is marked as one,
-  because `sensors` also reports a `memory.load` which is not the number the drawing divides
-  on this box, and a 424 px meter cannot be handed the wrong tenth of a percent. What is still
-  open is the recipe: `bars` stays code-drawn until a generated file reaches a zero pixel diff
-  on the box drawing it. Nothing about the wire changes either way
+  2026-11-09, and so did the file: `themes.BARS_ROWS` names the ten rows, four of them
+  per-sensor fan slots (`Fan N Speed`, `Fan N Name`) - which the vendor's own vocabulary has
+  no word for, since it offers the aggregates `cpuFansSpeed` "CPU Fans Speed" and
+  `gpuFansSpeed` and never a row per tachometer (PROTOCOL.md 10) - while `RAM Rate` and
+  `Used RAM` come out of that record's `RAMRate` and `UsedRAM`; and `themes.bars_recipe()`
+  generates the 32 widgets out of that table and the `BARS_*` constants. It is pixel-identical
+  to `render.py` at all 13 readings the suite gives it, answered and unanswered alike. Two
+  things that took were not in the plan:
+
+  * **`xigma.showIf`, a new extension key.** `bars`'s memory rows divide a percentage for the
+    meter and print gigabytes for the number, so the number row's drawing depends on a reading
+    other than its own - and an integrated GPU is a normal machine that hits it, reporting
+    used memory with no dedicated total. The theme draws neither number nor meter there; the
+    file, which reads `Used GPU Memory` as its own source, printed `4 GB` beside an absent
+    meter: **706 px and a worst channel of 255**. The key names the dependency, an unanswered
+    dependency is reported in the skip list as `showIf:<source>`, and the suite measures the
+    key's worth by stripping it from a generated `bars` and counting the pixels it then
+    differs by.
+  * **Two defects in the theme's own ratio code, found chasing that number.** `theme_bars`
+    read `mem["used"]` outright, so a reading with a total and no used raised `KeyError`
+    inside the frame loop; and its two memory meters were formed by different tests - the GPU
+    row required its numerator to be *truthy*, so a reading of exactly 0 dropped the row while
+    the memory row kept it. Both go through `render.pct_pair` now, and the suite measures the
+    rules that follow: at `memory: {total, no used}` the frame draws and the RAM row keeps its
+    label with no number and no meter, and at `gpu: {memoryUsage: 0, dedicatedTotal: 8192}`
+    the VRAM row draws `0 GB` with its track unfilled. A zero numerator is a reading; a zero
+    or absent denominator is not a pair. `bars` was the only theme that could have found
+    either, because it is the only one that reads those fields.
+
+  What the export did *not* cost is worth recording too: `docs/videos/bars-theme_52.mp4` did
+  not have to be re-rendered for these changes, and that is measured rather than assumed - the
+  preview section runs `themes.BARS_ROWS` against all twelve samples of the recorded series
+  and finds every row this box can have answered at every one - the six fixed rows plus the
+  fan slots inside the count its sensors reported, the slots beyond that being empty in the
+  old drawing and the new one alike. The rows these changes move are exactly the rows with no
+  subject, no reading, or no pair to divide. What is left open for `bars` is on
+  the panel, not in the file: the same rows at 1 and 2 fps on the glass (stage 6). Nothing about the wire changes either way
   (docs/theme-editor.md carries the decision and the order it is built in, in the plan's own
   table).
   A related fact came out of the same work: the one colour pair with a measured ramp is

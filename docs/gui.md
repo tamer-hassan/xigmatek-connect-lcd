@@ -72,7 +72,7 @@ one of them (see "How the three columns get their sizes", after the table):
 | the running display | controls | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. It also spells out the settings that display is running with - canvas, clock size, scrim, fans, and **the text colour it holds, as the hex it will answer again** (`text #ffc400`), which is the only place in the window you can see a colour you did not pick yourself. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Measured 1 ms for the commands Apply sends - six on the 0.2 bench ledgers below, seven in the tree, and the suite re-measures the line every run |
 | preview | preview | the background with `render.draw`'s OSD layer composited on top - playing, via one streaming ffmpeg, or as one mid-loop frame (`playing` box, see "The preview plays" below), refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How the three columns get their sizes" below | nothing |
 | theme | controls | the five themes, clock size, **the colour of the text it draws**, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
-| layout editor | controls, advanced | opens one of the layouts this machine can select (or one of the 4 generated ones), shows its widgets, and edits one field at a time; the pane under the picture then shows *that file* rather than the live theme | nothing, ever: the panel is never handed a layout file (PROTOCOL.md §11). What `save` changes is what this machine's own daemon draws next time it names that theme |
+| layout editor | controls, advanced | opens one of the layouts this machine can select (or one of the 5 generated ones), shows its widgets, and edits one field at a time; the pane under the picture then shows *that file* rather than the live theme | nothing, ever: the panel is never handed a layout file (PROTOCOL.md §11). What `save` changes is what this machine's own daemon draws next time it names that theme |
 | clips | library | every MP4 the roots hold, listed once per **distinct file** - **40 rows here out of 161 files**: 3 vendored here and 37 from the vendor's library; the other 121 are copies (69 in the Windows app's upload history, 43 in its static media, 9 left by the installed packages), 35 of them under a different name; the last two sources are read off the mounted Windows partition or the installed themes package, and a clip that exists in two roots keeps the row from the root the code would have chosen. One thing that is **not** a root: this checkout's own `themes/alpha/clips` - a clone reaches the vendor's library by installing the themes package, which is why a bare checkout lists 3 clips and an installed box lists 40, while `tools/preview_gif.py --clip themes/alpha/clips/Theme_30.mp4` reaches the tree's copy directly (that is how all five README previews are made). Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
 | background state | library | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the gate refuses says so, in the gate's words, before the button is pressed | nothing: it is a readout |
 | `One frame now` | library | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
@@ -255,7 +255,7 @@ editor commonly gets wrong:
 * **Opening writes nothing.** The file appears at `save`, because your copy of a name is
   what `--theme` and the control socket find first, and that shadowing is a fact about
   files: browsing a theme's fields must not quietly change what the loop draws. The gate
-  opens 3 library layouts and 4 generated ones and then counts the user directory:
+  opens 3 library layouts and 5 generated ones and then counts the user directory:
   empty.
 * **The field list comes out of the code.** A kind offers the intersection of the keys
   `layout.py` is *proven* to read (`themes.keys_read()` parses the painter's own source)
@@ -263,7 +263,17 @@ editor commonly gets wrong:
   the vendor's files carry that nothing reads (`enableMove`, `screenStatus`, and eight
   more, each with its reason printed by `--print-theme-fields`) are never offered, and the
   writer keeps them in the file exactly as it found them, because an editor that drops
-  keys it does not understand is an editor that corrupts the vendor's own files.
+  keys it does not understand is an editor that corrupts the vendor's own files. Alongside
+  them sit the `xigma.*` keys this program drew up for itself - offered on every kind,
+  because a drawing convention or a dependency is a property of the row, not of the shape -
+  and the one added on 2026-11-09 for `bars`, `xigma.showIf`, gets the same menu as
+  `source` does: the list of readings this program can answer, so a row cannot be pointed
+  at a dependency nobody will ever satisfy. Alongside
+  them sit the `xigma.*` keys this program drew up for itself - offered on every kind,
+  because a drawing convention or a dependency is a property of the row, not of the shape -
+  and the one added on 2026-11-09 for `bars`, `xigma.showIf`, gets the same menu as
+  `source` does: the list of readings this program can answer, so a row cannot be pointed
+  at a dependency nobody will ever satisfy.
 * **And what a field means, when the drawing is what decides it.** A `special` row whose
   drawing is a *pair* of figures reads `width` as the distance between the two figures'
   centres, and `x` as their shared centre; a row whose drawing is one line of built text
