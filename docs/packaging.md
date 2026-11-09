@@ -41,8 +41,9 @@ A build of the tree at the `v0.3` tag names the files `_0.3_` instead, and that 
 measured in its own section below, "What the 0.3 tree packages, measured" - the themes
 package changed shape on the way here, because the vendor's `.thm` containers are no longer
 packaged, so that file is a good deal smaller than the 146 137 362 B above while holding the
-same library. **The tree is at `0.4` now**, and no 0.4 build is recorded in this page: every
-byte count below is the `v0.3` tag's, and a 0.4 record belongs with the tag. The version
+same library. **The tree is at `0.4`, and `v0.4` is tagged and published**: its record is
+the last two sections of this page, built from the tag on the bench and by the runner, and
+every byte count between here and there is the `v0.3` tag's. The version
 number is spelled the same in three places - the top `debian/changelog` stanza,
 `pyproject.toml` and `xigmalcd.__version__` - and the CI job that builds the packages fails
 if those spellings ever part company (`debian/README.source` says why).
@@ -701,3 +702,111 @@ repair would be one line - `gh release edit v0.2 --notes-file <(gh release view 
 body --jq .body | grep -v '^claims, each with the bench log')` - and it was tried as a dry
 run before writing this sentence: that pipeline differs from the published body by exactly
 that one line and nothing else.
+
+### The 0.4 tag, built here and built by the runner: the same bytes, both packages
+
+```
+tag v0.4               annotated tag object `9210def26e45bafb9ab185f86ba82aec62b1050a`, on
+                       commit `b92c40709c7ba1791dd3eb29614e443e37f84153` - the `main` tip at
+                       the moment of tagging
+stanza                 `xigmatek-connect-lcd (0.4) resolute; urgency=medium`, stamped
+                       `Mon, 09 Nov 2026 11:54:02 +0200`; both bench builds' `.changes` print
+                       that same `Date:` line, not the wall clock each ran at
+runner                 one job per ref: `CI: push [v0.4]` - a tag push arrives as a push
+                       event whose branch is the tag - suite, doc/manifest/link gates, build,
+                       lintian, install + `debian/tests/smoke`, then release.  4 jobs green,
+                       published 2026-11-09T10:27:53Z, run 42601062134
+bench, same commit     two `dpkg-buildpackage -us -uc -d -i -I` in separate detached worktrees
+                       of the tag, ending 12:41:24 and 12:41:49 local
+```
+
+```
+xigmatek-connect-lcd_0.4_all.deb
+  runner     5 335 138 B  sha256 0659df2ad624ec6fee412239868e4107acd9f1398097e68a12983eab3c42f4bf
+  bench      5 335 138 B  same digest, and `cmp` against either of the two bench builds: clean
+xigmatek-connect-lcd-themes_0.4_all.deb
+  runner    79 848 628 B  sha256 dfb9f81c57a0efa7479b5e398b5146d5b1d158789fd91035d40c042119443985
+  bench     79 848 628 B  same digest, and `cmp` clean
+payload digest, read out of `dpkg -x` of any of them:
+   3940e5bb2f4d2e483e1d1ced4e5cc25e689bdf77f51ca930ef64c62528839e44   over 100 files / 85 035 542 B
+lintian, on the tagged tree's own two `.deb` files: 0 errors, 0 warnings
+```
+
+Three builds of one tag - the runner's and two on the bench, seconds apart, in build areas
+that share nothing - and both containers agree byte for byte. The clock pin holds through a
+release whose payload moved at all: the two bench `.changes` both say `Date: Mon, 09 Nov
+2026 11:54:02 +0200`, the stanza's own stamp, while the runs finished at 12:41:24 and
+12:41:49.
+
+**The payload digest moved from 0.3's `46fb6f2d…`, and it moved for one stated reason.** A
+per-file `sha256sum` over the two unpacked trees differs at exactly one row:
+
+```
+< fb202289d48362847a558419d648033a5348266ae25bd9698f0faee600b75e47  usr/share/xigmalcd/themes/alpha/README.md   29 945 B   (0.3)
+> b41a66d8863582835a926a98412967d8e7006e1e708d361394ab3099963257d7    usr/share/xigmalcd/themes/alpha/README.md   30 930 B   (0.4)
+```
+
+The other 99 files are the same bytes, the file list is identical, and the arithmetic
+closes with that one file: 85 034 557 B plus 985 B is 85 035 542 B. What the file gained is
+in the tag's own history - commit `658ef26`, which closed the `line` widget's gap against
+the vendor's own pixels rather than against its bundle defaults: the stroke is
+`rgba(240, 255, 255, 255)` on all 798 lit pixels of the two baked overlays that carry it,
+its thickness is the widget's own `height` rather than the bundle's `lineWidth: 2`, and
+`rotate` turns the rect about its centre (x165 y305 width150 height2 at `rotate: 90` lands
+at x 239..240, y 231..380, where a corner pivot leaves it at x=165 and the overlay lights
+29 pixels the corner rects do not explain). The installed size follows the same delta:
+`83 111 KiB` at 0.3, `83 116 KiB` here.
+
+The runner's install job read the pair back, and at 0.4 it reads the installed **library**
+as well as the doc set:
+
+* `xigmatek-connect-lcd 0.4 all installed-size 6184 KB`,
+  `xigmatek-connect-lcd-themes 0.4 all installed-size 83116 KB`;
+  `Need to get 14.7 MB … 58.1 MB of additional disk space` for the code package, then
+  `85.7 MB … 93.7 MB` for the library.
+* `12 markdown files under /usr/share/doc/xigmatek-connect-lcd, none compressed`,
+  `50 links inside the doc set, all resolving; 5 image link(s) repo-only by design;
+  3 pointer(s) into the source tree`, `2 kept log(s) under docs/packaging/`,
+  `manifest 125/125 files hashed clean under /usr/share/xigmalcd/themes/alpha`, and
+  `all installed checks passed`. Against 0.3's record: links up from 43 as the documents
+  grew, repo-only image links up from 3 to 5 because README's six MP4s are the picture set
+  now, hashed files the same 125.
+* The new half, which is what the 0.4 themes package is for: `name lookup - all 23
+  selectable layouts' own clips resolve by bare name`, `the pairing - all 23 selectable
+  layouts name exactly one clip and no two name the same one`, and
+  `drawn offline, no port - 113 widget boxes … 314 367 lit px on this machine`, where the
+  bench of 2026-11-08 records 114 boxes and 315 287 lit px. That split is a machine
+  difference, not a disagreement about the library: the runner has no `simsun` at 20 px, so
+  one text box falls out of its face list. docs/limits.md says so with both machines named,
+  and `debian/tests/smoke` pins the accounting identity rather than the count, so a
+  different box cannot make the check lie in either direction.
+
+The same caveat as at 0.2 and 0.3, stated before it bites anyone: this section was
+committed *after* `v0.4`, so the published code `.deb` carries an earlier copy of this
+page. The byte counts above are read off the published assets and off two builds of the
+tag itself; a build of any later commit differs by exactly this page. The payload digest is
+the number that survives an edit here.
+
+### The published v0.4 release
+
+* **v0.4**: <https://github.com/tamer-hassan/xigmatek-connect-lcd/releases/tag/v0.4>,
+  published 2026-11-09T10:27:53Z by run 42601062134, and GitHub marks it **Latest** - so
+  `gh release download --latest` now answers 0.4, which is what README's quick start pulls.
+
+| file | B | sha256 |
+|---|---|---|
+| `xigmatek-connect-lcd_0.4_all.deb` | 5 335 138 | `0659df2ad624ec6fee412239868e4107acd9f1398097e68a12983eab3c42f4bf` |
+| `xigmatek-connect-lcd-themes_0.4_all.deb` | 79 848 628 | `dfb9f81c57a0efa7479b5e398b5146d5b1d158789fd91035d40c042119443985` |
+| `xigmatek-connect-lcd_0.4_amd64.changes` | 12 982 | `34125e04f9fe5d6ec4fc5c6b35ac706e20438ac3bc0439f5e704a1be6f11aeaf` |
+| `xigmatek-connect-lcd_0.4_amd64.buildinfo` | 8 633 | `b1efddd9219086835156f70329ec5986feca8238dd14e4a1d7013a0a74d8d596` |
+
+The `.changes` and `.buildinfo` rows are the runner's, and they differ from the bench's
+(13 525 B and 7 692 B here) in the ways those two files are allowed to differ: they name
+the machine that built them and the paths it built from. The two `.deb` rows do not differ
+at all, and that is the claim.
+
+The release body closes on the sentence it has closed on since 0.2 - what neither the
+runner nor the bench judges from these bytes is the glass itself - and the tag's own
+message says the same thing at the front instead: what 0.4 has not yet been measured on is
+the exported layouts on the panel, the pairing rules in a window a person is using, and the
+quiet-box re-measure `bars` still owes.
