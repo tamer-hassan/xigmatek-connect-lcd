@@ -2886,12 +2886,44 @@ _skipped = next(ln for ln in _lnb if " boxes," in ln)
 _msk = re.search(r"skipped: (.*)$", _skipped)
 _skip_set = set() if _msk[1].strip() == "nothing" else {s.strip()
                                                         for s in _msk[1].split(",")}
-# a `showIf` dependency is reported as `showIf:<source>`, and the source it names is the
-# meter of that row - the same reading the "cannot" half already says the box lacks
-_skip_src = {x[len("showIf:"):] if x.startswith("showIf:") else x for x in _skip_set}
-assert _skip_src == _cannot_set, (_skip_set, _cannot_set, _skipped)
-assert _cannot_set <= {w["property"][0]["source"] for w in _w_bars
-                       if w["property"][0].get("source")}, sorted(_cannot_set)
+_asked_src = {w["property"][0]["source"] for w in _w_bars
+              if w["property"][0].get("source")}
+_depends = {(w["property"][0].get("xigma") or {}).get("showIf") for w in _w_bars} - {None}
+_guarded = {w["property"][0]["source"] for w in _w_bars
+            if (w["property"][0].get("xigma") or {}).get("showIf")}
+# The two halves of the report come from different places, so they are held to each other in
+# the direction each can speak for.  `skipped:` is per widget - what the draw left out - and
+# `cannot:` is per source, from what `sensors.collect()` did not answer.  Every skip reason
+# has to be a reading this box lacks.  And where a row is silenced by its dependency, the
+# widget never gets as far as its own `source`, so that source sits in `cannot:` with no skip
+# behind it: that is the relation `xigma.showIf` changes, and it is what the GitHub runner -
+# a box with no GPU at all - hit, with `Used GPU Memory` unanswerable and the row already
+# gone.  So the readings in `cannot:` with no skip behind them must be exactly the rows a
+# `showIf` stands in for, and every dependency this box lacks must arrive as a
+# `showIf:<source>` note.
+_odd = [n for n in _skip_set if not (n.startswith("showIf:") or n.startswith("font:")
+                                     or n in _asked_src)]
+assert not _odd, (_odd, "the review door reported something that is neither a reading this "
+                        "file asks for, nor a dependency, nor a face")
+_skip_src = {n[len("showIf:"):] if n.startswith("showIf:") else n for n in _skip_set
+             if not n.startswith("font:")}
+assert _skip_src <= _cannot_set, (
+    sorted(_skip_src - _cannot_set),
+    "a row was skipped for a reading this box says it answered")
+_silent = _cannot_set - _skip_src
+assert _silent <= _guarded, (
+    sorted(_silent), sorted(_guarded),
+    "a reading this box lacks was neither skipped nor silenced by a dependency, so the two "
+    "halves of the report have drifted apart")
+for _dep in sorted(_depends & _cannot_set):
+    assert f"showIf:{_dep}" in _skip_set, (
+        _dep, sorted(_skip_set), "this box cannot answer a dependency the file names, and "
+                                 "the report said nothing about the rows that depend on it")
+assert _cannot_set <= _asked_src, sorted(_cannot_set - _asked_src)
+_silent_note = ("" if not _silent else
+                f" - of those, {len(_silent)} never reach the skip list because a "
+                f"`showIf` dependency silences the row before its own reading is asked "
+                f"({', '.join(sorted(_silent))})")
 print(f"  bars as a file        {len(_w_bars)} rows in the generated layout - the heading, "
       f"the clock line and three widgets for each of the {len(themes.BARS_ROWS)} rows in "
       f"`themes.BARS_ROWS`, every one at y={render.BARS_Y0}+i*{_pitch_bars} with the meter's "
@@ -2900,7 +2932,8 @@ print(f"  bars as a file        {len(_w_bars)} rows in the generated layout - th
       f"{len(themes.FAN_SLOTS)} slots. Pixel-identical to `render.py` at all "
       f"{len(_BARS_CASES)} readings ({len(_bars_rows)} answer every source; "
       f"{len(_bars_holes)} leave rows unanswered and are skipped the same way both doors), "
-      f"and this box answers all but {' '.join(sorted(_cannot_set)) or 'none of them'}.")
+      f"and this box answers all but {' '.join(sorted(_cannot_set)) or 'none of them'}"
+      f"{_silent_note}.")
 print(f"                        what `xigma.showIf` buys, measured: the same file with the "
       f"key stripped from its two memory number rows sits {_shownif_px} px and a worst "
       f"channel of {_shownif_worst}/255 away from the drawing at a reading where a GPU "
