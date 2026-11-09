@@ -306,6 +306,21 @@ class Window(QMainWindow):
         self.bg_timer = QTimer(self)          # the background's own clock
         self.bg_timer.timeout.connect(self._play_tick)   # connected once, here
         self.mp4 = self.cfg["clip"]
+        # Whether the background under the preview is *yours* or the theme's.  A vendor
+        # layout names one clip in its own file (`themes.pair`), and while this is False
+        # the window follows that: open `Theme_07`, and `Theme_07.mp4` goes under the
+        # layer.  Choosing a clip from the library sets it, and the row that hands the
+        # layout its own clip back clears it - so "I picked this" is a fact the window
+        # remembers across restarts instead of one it has to guess from a path.
+        self.clip_custom = bool(self.cfg.get("clip_customized", False))
+        self._pair_target = ""          # the clip the open layout names, if any
+        self.pair_note = ""             # the sentence the pairing ended with
+        # Whether the list's current row moved because a reader clicked it.  Population
+        # selects the row that matches the restored clip, and the pairing selects the row
+        # it chose; both are the window answering its own question, and treating either as
+        # a choice is how "the background is mine" becomes true on a window where nobody
+        # chose anything.
+        self._programmatic = False
         self.tray_wanted = self.cfg["tray"] if tray is None else tray
         self._quitting = False
         self.bg_frame: Image.Image | None = None
@@ -356,6 +371,10 @@ class Window(QMainWindow):
         self.preview_timer.timeout.connect(self._repaint)
         self.preview_timer.start(max(200, int(1000 / self.preview_fps)))
         self._load_background(self.mp4)
+        # Said even at a fresh window, because "the theme chose this background" and "you
+        # chose this background" are different claims about the same picture, and the pane
+        # cannot tell them apart by looking at it.
+        self._apply_pair(self.theme.currentText())
         self.daemon.poll(report=True)
         if not self.daemon.present:
             # the box has to say what it is even when there is nothing to say
@@ -585,7 +604,7 @@ class Window(QMainWindow):
         self.theme = QComboBox()
         self.theme.addItems(sorted(render.THEMES))
         self.theme.setCurrentText(self.cfg["theme"])
-        self.theme.currentTextChanged.connect(self._changed)
+        self.theme.currentTextChanged.connect(self._theme_chosen)
         self.theme.setToolTip(
             "the drawings `xigmalcd` renders itself, from live sensor readings. "
             "The vendor's layouts are not in this list on purpose: this combo picks "
@@ -872,6 +891,23 @@ class Window(QMainWindow):
         self.clip_state.setWordWrap(True)
         self.clip_state.setStyleSheet("font-family:monospace;")
         mlay.addWidget(self.clip_state)
+        # The pairing, said where the clip is chosen rather than in the editor's box: it
+        # is the background's business, not the layout fields'.  One button, because a
+        # flag a reader sets by accident needs the way back in the same place.
+        self.pair_state = QLabel()
+        self.pair_state.setWordWrap(True)
+        self.pair_state.setStyleSheet("color:#888;font-style:italic;")
+        mlay.addWidget(self.pair_state)
+        self.btn_pair = QPushButton("Use this layout's own clip")
+        self.btn_pair.setToolTip(
+            "a vendor layout names one background clip in its own file, and the window "
+            "follows that pairing until you choose a clip here.  This puts the layout's "
+            "own clip back and follows it again from now on. The five themes this repo "
+            "draws from `render.py` name no clip, so with one of those open the pairing "
+            "has nothing to do (docs/themes.md, PROTOCOL.md \u00a711)")
+        self.btn_pair.clicked.connect(self._use_pair)
+        self.btn_pair.setEnabled(False)
+        mlay.addWidget(self.btn_pair)
         row = QHBoxLayout()
         self.btn_upload = QPushButton("Send this background to the panel")
         # Ctrl+Shift+U rather than Ctrl+U, because of what the field directly
@@ -1415,6 +1451,11 @@ class Window(QMainWindow):
             self.bg_frame = frame
 
     # ---- settings --------------------------------------------------------
+    def _theme_chosen(self, *_a) -> None:
+        """A theme picked: the pairing gets the first word, the repaint the second."""
+        self._apply_pair(self.theme.currentText())
+        self._changed()
+
     def _changed(self, *_a) -> None:
         """Any picker moved: repaint now, write the file once the burst settles."""
         self._repaint()
@@ -1427,6 +1468,7 @@ class Window(QMainWindow):
                 "canvas": "black" if self.canvas.currentIndex() else "clear",
                 "scrim": self.scrim.value(), "fans": self.fanline.isChecked(),
                 "preview_fps": self.preview_fps, "clip": self.mp4,
+                "clip_customized": self.clip_custom,
                 "animate": self.anim_toggle.isChecked(),
                 "advanced": self.adv_toggle.isChecked(),
                 "size": [self.width(), self.height()],
@@ -1509,7 +1551,11 @@ class Window(QMainWindow):
             self.clips.addItem(item)
         first = next((i for i, c in enumerate(self.all_clips)
                       if c.path == self.mp4), 0)
-        self.clips.setCurrentRow(first)
+        self._programmatic = True
+        try:
+            self.clips.setCurrentRow(first)
+        finally:
+            self._programmatic = False
         self._pending = list(range(len(self.all_clips)))
         # the row you selected first, then whatever is on screen, then the rest
         self._pending.remove(first)
@@ -1569,6 +1615,68 @@ class Window(QMainWindow):
                    QImage.Format.Format_RGBA8888).copy()
         item.setIcon(QIcon(QPixmap.fromImage(q)))
 
+    def _apply_pair(self, name: str) -> None:
+        """Follow the background a theme names, unless the background is yours.
+
+        One rule, said out loud in every branch, because the interesting part is the case
+        where it does nothing: the five themes drawn from `render.py` declare no clip at
+        all, and a clip the box does not have is a fact the reader needs, not a silence.
+        """
+        clip, why = themes.pair(name)
+        self._pair_target = clip
+        if not clip:
+            self.pair_note = why if not self.clip_custom else (
+                f"background is yours: {os.path.basename(self.mp4)}. "
+                f"{why[0].upper() + why[1:]}")
+            self._refresh_pair()
+            return
+        if self.clip_custom:
+            self.pair_note = (f"background is yours: {os.path.basename(self.mp4)}. This "
+                              f"layout names {clip} - the button below takes it back.")
+            self._refresh_pair()
+            return
+        path, how = clipdb.find(clip, self.all_clips)
+        if not path:
+            self.pair_note = (f"{name} names {clip}, which this box does not have; "
+                              f"keeping {os.path.basename(self.mp4)}.")
+            self._refresh_pair()
+            return
+        self.pair_note = (
+            f"{name} pairs with {clip} ({how}); it is under the layer now."
+            + ("" if how == "row" else " No row of the library holds these bytes, so "
+                                       "nothing is marked in the list."))
+        if path != self.mp4:
+            self._load_background(path)      # repaints, and the note is written after
+            self._pair_row(path)
+        else:
+            self._pair_row(path)
+        self._refresh_pair()
+
+    def _pair_row(self, path: str) -> None:
+        """Mark the list's row for a clip the pairing chose.  Guarded, not silent: the row
+        is selected so the reader can see which of the 40 it is, and `_clip_chosen` runs as
+        it always does, but the one thing it must not do is record a choice nobody made."""
+        for i, clip in enumerate(getattr(self, "all_clips", [])):
+            if clip.path == path:
+                self._programmatic = True
+                try:
+                    self.clips.setCurrentRow(i)
+                finally:
+                    self._programmatic = False
+                return
+
+    def _use_pair(self) -> None:
+        """The way back: the layout's own clip, and the pairing re-armed."""
+        self.clip_custom = False
+        self._apply_pair(self.ed.name if self.ed is not None
+                         else self.theme.currentText())
+        self.save_timer.start()
+        self._log(f"background: the layout's own clip ({self.pair_note})")
+
+    def _refresh_pair(self) -> None:
+        self.pair_state.setText(self.pair_note)
+        self.btn_pair.setEnabled(bool(self._pair_target) and self.clip_custom)
+
     def _clip_chosen(self, item: QListWidgetItem | None, *_a) -> None:
         if item is None:
             return
@@ -1581,6 +1689,13 @@ class Window(QMainWindow):
             item.setText(self._row(self.all_clips[i]))
         self._load_background(path)
         self._queued_bg = ""          # a new pick has not been asked for yet
+        # This is the moment that makes the background yours, and it is the only one: a
+        # row was clicked.  `clip_customized` is what stops a later layout change from
+        # walking over the choice, and the pairing note says what was given up.
+        if not self.clip_custom and not self._programmatic:
+            self.clip_custom = True
+            self._apply_pair(self.ed.name if self.ed is not None
+                             else self.theme.currentText())
         self._refresh_clip_state()
         self.save_timer.start()          # next start opens on the clip you chose
         # the detail only: the row itself is the line directly above this label,
@@ -1665,6 +1780,7 @@ class Window(QMainWindow):
             self.ed_state.setText("not editing: the pane below shows the theme above, "
                                   "drawn from this machine's readings")
             self.ed_note.setText("")
+            self._apply_pair(self.theme.currentText())
             self._repaint()
             return
         try:
@@ -1677,6 +1793,10 @@ class Window(QMainWindow):
             self.ed_note.setText(str(exc))
             self._repaint()
             return
+        # A vendor layout carries its own background; follow it while the background has
+        # not been chosen by hand.  This is the only place the pairing is *driven*: the
+        # theme combo above lists the five drawn themes, which declare none.
+        self._apply_pair(name)
         for wid in (self.ed_widget, self.ed_field, self.ed_stack, self.ed_save,
                     self.ed_revert):
             wid.setEnabled(True)

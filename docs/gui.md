@@ -531,6 +531,30 @@ alone. The author's own `~/.config/xigmaui/config.json` at 07:33 holds
 `clip: /usr/share/xigmalcd/themes/alpha/clips/theme_47.mp4` and `clock_size: 30`,
 which is the fingerprint of those three picks: the clip moved, the glass did not.
 
+**A layout names the picture under it, and the window follows that - until you choose.**
+Every vendor layout declares exactly one clip in its own file (`background.mediaFile`):
+all 23 selectable layouts name a distinct one, and `themes.pair(NAME)` is the one place
+that reads it, so `--list-themes` and the window cannot disagree with each other or with
+the file. Opening a layout in the editor puts its own clip under the preview and marks
+that row in the library column - measured over all 23, every one of them resolved to a
+row on this bench, and the suite asserts both halves. Two cases are said out loud rather
+than left to be inferred:
+
+* **the five themes this repo draws from `render.py` name no clip at all.** A generated
+  layout *is* the picture; there is nothing under it, and the line under the clip list
+  says so instead of leaving the reader to wonder whether the pairing is broken.
+* **a clip you picked is yours.** Choosing a row in the library sets `clip_customized`
+  in the settings file - a stored bool, because "I picked this" is a fact about a human
+  that no path on disk can recover - and from then on opening a layout leaves the
+  background alone and says which clip that layout would have used.  **Use this layout's own clip**
+  clears the flag, takes the pair back, and re-arms the pairing. Populating
+  the list also selects a row; that is the window answering its own question, and the
+  gate checks that it does *not* set the flag, because it looked exactly like a choice.
+
+The pairing changes nothing about the wire: it decides what the *preview* composites
+under our layer, and the upload button is still the only thing that sends a file to the
+panel (docs/themes.md, PROTOCOL.md §11).
+
 
 The twice-per-session metrics blob is not decoration: PROTOCOL.md §8 measures that
 `STATE all 1` goes out at the head of a session and nowhere else (TX frames 3 and 4 of

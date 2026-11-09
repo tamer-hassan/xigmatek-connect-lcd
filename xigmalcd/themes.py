@@ -405,6 +405,34 @@ def draw(obj: dict, metrics: dict, when=None, scrim: int = 0) -> tuple:
     return img, notes
 
 
+def pair(name: str) -> tuple:
+    """Which background clip a theme names, and the reason when it names none.
+
+    A vendor layout declares exactly one clip in `background.mediaFile` - 23 of the
+    library's 27 do, and the 23 values are distinct (`scan()` keeps the field for that
+    reason, and `--list-themes` prints it).  A generated layout declares none: the five
+    themes this repo draws from `render.py` are pictures, not a vendor's page with a
+    background behind it, so their exports carry no such key and there is nothing to pair.
+    That asymmetry is why this returns a *reason* rather than an empty string: the window
+    has to be able to say, in the place the question was asked, that the theme under the
+    cursor has no clip of its own, instead of silently keeping whatever was there.
+
+    The answer comes from whichever file `resolve()` chose, so a copy you have edited
+    pairs with the clip your copy names, not the vendor's.
+
+    Returns `(clip_basename, why_not)`; exactly one of the two is ever non-empty.
+    """
+    if name in EXPORTS:
+        return "", (f"{name} is drawn from `render.py`: a generated layout carries no "
+                    "`background.mediaFile`, so nothing pairs with it but what you chose")
+    rec = resolve(name)
+    if rec is None:
+        return "", why_not(name)
+    if not rec.get("background"):
+        return "", (f"{os.path.basename(rec['path'])} declares no `background.mediaFile`")
+    return os.path.basename(str(rec["background"])), ""
+
+
 def describe(record: dict) -> str:
     """One line: what `--theme <name>` will draw, and where the file came from."""
     return (f"  {record['name']:<12} {record['id']}  {record['w']}x{record['h']} "

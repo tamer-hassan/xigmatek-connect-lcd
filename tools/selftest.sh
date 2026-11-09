@@ -1587,6 +1587,40 @@ print(f"                        {len(clear)}/{len(ok)} themes need nothing this 
       f"has no reading for; the other {len(ok) - len(clear)} ask for Pump Speed, which "
       f"has never been measured on this box")
 
+# ---- every vendor layout names the clip underneath it, and that field is a fact about the
+# ---- file rather than a guess: `background.mediaFile`.  `themes.pair` is the one place that
+# ---- reads it as an answer, so the window and `--list-themes` cannot disagree with each
+# ---- other, or with the file.  What is held here is the shape of the data: one clip per
+# ---- layout, no two layouts sharing one, and a refusal in words for the five names this
+# ---- repo draws from code - which carry no such key, because a generated layout *is* the
+# ---- picture and has nothing under it.
+_named = {}
+for _r in ok:
+    _bg = str(_r["background"] or "")
+    assert _bg, (_r["name"], "a selectable layout declares no background")
+    _named.setdefault(_bg.rsplit("/", 1)[-1].lower(), []).append(_r["name"])
+assert all(len(v) == 1 for v in _named.values()), (
+    {k: v for k, v in _named.items() if len(v) > 1},
+    "two selectable layouts name the same clip, so the pairing stops being a function")
+for _r in ok:
+    _got, _why = themes.pair(_r["name"])
+    assert _got == _r["background"].rsplit("/", 1)[-1] and not _why, (_r["name"], _got, _why)
+for _n in sorted(themes.EXPORTS):
+    _got, _why = themes.pair(_n)
+    assert not _got and "no `background.mediaFile`" in _why, (_n, _got, _why)
+_refused_pair = {themes.pair(_r["name"])[0] or themes.why_not(_r["name"])[:24]
+                 for _r in out}
+_still = [_r["name"] for _r in out if not str(_r["background"]).lower().endswith(".mp4")]
+assert all(not themes.pair(_r["name"])[0] for _r in out), (
+    _refused_pair, "a canvas-refused layout answered a clip: the window must not be able to "
+                   "open what `--theme` will not draw")
+print(f"  the pairing           all {len(_named)} selectable layouts name exactly one clip "
+      f"and no two name the same one; `themes.pair` answers each by name and refuses all "
+      f"{len(themes.EXPORTS)} generated ones with the reason. The {len(out)} canvas-refused "
+      f"layouts answer with their ratio instead ({len(_still)} of them "
+      f"name{'s' if len(_still) == 1 else ''} a still image rather than a clip: "
+      f"{', '.join(_still) or 'none'})")
+
 # every pickable layout painted offline: pinned readings, one pinned instant, no port and
 # no fixtures invented - and the frame bytes each would cost on the wire, which is the
 # figure docs/usage.md quotes when it says what a library theme uploads
@@ -3908,13 +3942,27 @@ print(f"  no file                {settings.path()}")
 clip = os.path.abspath("media/Theme_11.mp4")
 want = dict(settings.load())
 want.update(theme="gauge", clock_size=44, canvas="black", scrim=60, fans=False,
-            preview_fps=4.5, clip=clip, size=[900, 640])
+            preview_fps=4.5, clip=clip, size=[900, 640], clip_customized=True)
 where = settings.save(want)
 assert where == settings.path(), where
 back = settings.load()
 for key, val in want.items():
     assert back[key] == val, (key, back[key], val)
 assert json.load(open(where))["clock_size"] == 44      # plain JSON on disk
+
+# Whether the background is the reader's or the theme's is stored, because the difference
+# between the two is a fact about what a human did and the window cannot recover it from a
+# path: a paired clip and a chosen clip are the same shape on disk.  So it is a bool, and
+# only a bool - the settings box refuses `"yes"`, `1` and `null` the way it refuses a clock
+# size of 200, because a truthy accident here silently stops the window following a
+# layout's own clip and nobody can see why the picture stopped changing.
+assert settings.load()["clip_customized"] is True, "a stored True did not come back"
+for junk in ("yes", "true", 1, 0, None, [], {}, 3.5):
+    assert settings._clean({"clip_customized": junk})["clip_customized"] is False, junk
+assert settings._clean({})["clip_customized"] is False
+assert settings._clean({"clip_customized": False})["clip_customized"] is False
+print("  the pairing flag     True survives a save and a reload; "
+      + f"{len(['yes', 'true', 1, 0, None, [], {}, 3.5])} kinds of junk fall back to False")
 
 # the text colour, through the same validation rather than a second rule: a
 # name or a short hex is normalised to `#rrggbb` on disk, and a value the
@@ -4409,6 +4457,29 @@ else:
         "machines could not agree on the file's bytes")
     print(f"  changelog stamp        {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime(when))}"
           f", {(now - when) // 60} min old: dpkg-deb clamps every member mtime to it")
+
+# The changelog's width is a packaging fact, not a style preference: the CI job runs
+# `lintian --fail-on error,warning`, and `debian-changelog-line-too-long` is a *warning*,
+# so a long line fails the build.  How this got caught the slow way: adding one word to
+# the "N offline sections" sentence - "twenty" to "twenty-one", five characters - pushed
+# that line from 77 columns to 82, and lintian flagged it in both packages while the whole
+# python suite stayed green.  The observed boundary is what the gate uses, because it is
+# the only boundary this repo has evidence for: 80 columns passes (33 lines sit there),
+# 82 is flagged, and 81 has never been tested, so the file keeps its existing budget
+# rather than probing for a limit nobody has measured.
+_cl = open("debian/changelog", encoding="utf-8").read().split("\n")
+_wide = [(k + 1, len(_ln)) for k, _ln in enumerate(_cl) if len(_ln) > 80]
+assert not _wide, (
+    max(_wide, key=lambda t: t[1]) if _wide else [],
+    "a debian/changelog line over 80 columns: lintian's debian-changelog-line-too-long "
+    "fires there, fails the .deb job, and the suite would have said nothing")
+assert sum(1 for _ln in _cl if len(_ln) == 80) >= 10, (
+    sum(1 for _ln in _cl if len(_ln) == 80),
+    "the 80-column budget this gate enforces is measured off this file's own prose; if "
+    "that count collapses the claim above is no longer the reason for the number")
+print(f"  changelog width       every line <= 80 columns ({max(len(x) for x in _cl)} here, "
+      f"{sum(1 for x in _cl if len(x) == 80)} lines at the limit): lintian fails a longer "
+      f"one, and it failed an 82-column line once already")
 PY
 
 echo
@@ -6365,6 +6436,78 @@ print(f"  docs quote the edit   docs/gui.md and docs/theme-editor.md both say "
       f" this run measured at {moved_win:,}. It is a face-dependent figure, so it is"
       f" printed beside the machine rather than pinned, but the two documents cannot drift"
       f" apart again, and neither can drift far from what this run painted")
+
+# ---- the pairing, driven through a window of its own, so nothing above this point is
+# ---- affected by the background moving under it.  The claim is the one the user of the
+# ---- window actually makes: "I opened this layout, why is the picture sitting on a clip
+# ---- that has nothing to do with it?"  A vendor layout names one clip, the window follows
+# ---- it, a click makes the background the reader's, and one button hands it back.  The
+# ---- negative halves matter as much: populating the list selects a row, and that is not a
+# ---- choice; the five themes drawn from code name no clip, and the pane says so instead of
+# ---- leaving the reader to wonder whether the pairing is broken.
+_pw = app.Window("/dev/xigma-no-such-port", 1.0, restore=False)
+assert _pw.clip_custom is False, (
+    "a window that nobody touched claims the background as its reader's - populating the "
+    "clip list selects a row, and that is not a choice")
+_moved, _rows_ok, _missed = 0, 0, []
+for _rec in pick:
+    _want = _rec["background"].rsplit("/", 1)[-1]
+    _pw.ed_name.setCurrentText(_rec["name"])
+    _base = os.path.basename(_pw.mp4)
+    if _base == _want:
+        _moved += 1
+    else:
+        _missed.append((_rec["name"], _want, _base))
+    if _pw.all_clips and 0 <= _pw.clips.currentRow() < len(_pw.all_clips):
+        if _pw.all_clips[_pw.clips.currentRow()].path == _pw.mp4:
+            _rows_ok += 1
+assert not _missed, (_moved, _missed, "the pairing did not follow these layouts' own clips")
+assert _rows_ok == len(pick), (_rows_ok, len(pick),
+                               "the library column does not show the row it paired to")
+# a reader's click wins over the pairing, from then on and across a restart
+_other = next(i for i, _c in enumerate(_pw.all_clips)
+              if os.path.basename(_c.path) != os.path.basename(_pw.mp4))
+_pw.clips.setCurrentRow(_other)
+assert _pw.clip_custom is True, "picking a clip did not make it the reader's"
+_chosen = os.path.basename(_pw.all_clips[_other].path)
+_stayed = 0
+for _rec in pick[:6]:
+    _pw.ed_name.setCurrentText(_rec["name"])
+    _stayed += os.path.basename(_pw.mp4) == _chosen
+assert _stayed == 6, (_stayed, "opening a layout walked over a background a reader chose")
+assert _pw.btn_pair.isEnabled(), ("a layout names its own clip and the window offers no way "
+                                  "back to it")
+_pw.btn_pair.click()
+assert _pw.clip_custom is False and os.path.basename(_pw.mp4) == (
+    _pw._pair_target), (_pw.clip_custom, _pw.mp4, _pw._pair_target,
+                        "the way back did not hand the layout its own clip")
+# the five drawn themes: no clip declared, and that is said rather than left to be inferred
+_before = _pw.mp4
+# every entry in this order is a real change: the window opens on `sorted(THEMES)[0]`, so
+# picking that one first would emit nothing and the note would still be the last layout's -
+# which is exactly the kind of vacuous pass a loop over names can produce
+_order = sorted(render.THEMES)[1:] + sorted(render.THEMES)[:1]
+for _t in _order:
+    _pw.theme.setCurrentText(_t)
+    assert _pw.theme.currentText() == _t, (_t, _pw.theme.currentText())
+    assert _pw.mp4 == _before, (_t, _pw.mp4, _before,
+                                "a theme that declares no clip moved the background anyway")
+    assert "no `background.mediaFile`" in _pw.pair_note, (_t, _pw.pair_note)
+_pw.theme.setCurrentText(_order[-1])         # the same name again: no signal, no change
+assert _pw.mp4 == _before and _order[-1] == _pw.theme.currentText(), _pw.mp4
+assert settings._clean(_pw._state())["clip_customized"] == _pw.clip_custom, (
+    "the window's pairing flag is not the flag its settings file holds")
+assert "Use this layout's own clip" in _pw.btn_pair.text(), _pw.btn_pair.text()
+_pw.close()
+_doc = open("docs/gui.md", encoding="utf-8").read()
+for _claim in (f"all {len(pick)} selectable layouts", "Use this layout's own clip"):
+    assert _claim in _doc, (_claim, "docs/gui.md does not describe the pairing this drives")
+print(f"  the pairing in the window  opening each of the {len(pick)} selectable layouts put "
+      f"its own clip under the preview, and marked that row in the library column "
+      f"({_rows_ok} of {len(pick)}); one click on another row made the background the "
+      f"reader's and the next {_stayed} layouts could not walk over it; the button handed "
+      f"the layout its own clip back and re-armed the pairing; and all {len(render.THEMES)} "
+      f"drawn themes left the clip where it was and said why in the same place.")
 PY
 
 echo

@@ -12,6 +12,14 @@ or the numeric id `1757491588804` - painted by `xigmalcd/layout.py` at the canva
 file itself declares and uploaded as an ordinary `.osd` frame. What has never happened,
 and still has not, is sending a theme file to the panel:
 
+That declaration is a field, not a naming convention: `background.mediaFile`, and the 23
+selectable layouts name 23 different clips between them - no two layouts share one.
+`themes.pair(NAME)` reads it, `--list-themes` prints it, and the window follows it:
+opening a layout puts that clip under the preview unless the reader has chosen a
+background by hand (docs/gui.md). Three of the four canvas-refused files name clips as
+well, and one names a `.png` rather than a clip - one more reason the refusal is keyed on
+a file's own `ratio` field rather than on what sits beside it.
+
 * the `.thm` files (27 of them, 6.8 MB at the largest, 66 300 082 B together) are the
   panel-side theme definitions the Windows app decrypts and interprets -
   `tools/thm_unlock.py` opened them with the app's constants to learn what is in them,

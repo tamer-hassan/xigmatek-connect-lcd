@@ -35,6 +35,13 @@ DEFAULTS: dict = {
     "preview_fps": 2.0,        # host-side only; a frame renders in ~9 ms
     "advanced": False,         # the folded-away knobs: see app.py:_set_advanced
     "animate": True,           # the preview pane plays the clip; False = one frame
+    # Whether the background is *yours* rather than the theme's.  A vendor layout names
+    # one clip (`themes.pair`), and the window follows that pairing while this is False -
+    # picking another clip, or sending one to the panel, makes it True, and the row that
+    # offers the layout's own clip is what turns it back.  It has to be a stored flag
+    # rather than "the clip is not the default", because a paired clip and a chosen one
+    # are the same shape once they are both paths on disk.
+    "clip_customized": False,
     "size": [1180, 780],       # the window as you left it: wide enough for the
                                # three columns, and short enough for a 1080p screen
     "split": [520, 460, 560],  # the three columns, as you left the splitter between
@@ -101,6 +108,11 @@ def _clean(loaded: dict) -> dict:
         out["advanced"] = loaded["advanced"]
     if isinstance(loaded.get("animate"), bool):
         out["animate"] = loaded["animate"]
+    # a real bool only: `"yes"`, 1 and null are the kinds of thing a hand-edited config
+    # picks up, and a truthy string here would silently stop the window following a
+    # layout's own clip
+    if isinstance(loaded.get("clip_customized"), bool):
+        out["clip_customized"] = loaded["clip_customized"]
     try:
         fps = float(loaded["preview_fps"])
         if 0.5 <= fps <= 10:

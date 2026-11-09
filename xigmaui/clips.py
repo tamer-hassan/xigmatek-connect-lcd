@@ -476,6 +476,39 @@ def list_clips(extra: str = "") -> list[Clip]:
     return found
 
 
+def find(name: str, clips: list[Clip] | None = None) -> tuple:
+    """Which file on this box a clip *name* means, and how sure the answer is.
+
+    The window needs this for one thing and it needs it to be honest: a vendor layout
+    names one clip in `background.mediaFile` (`themes.pair`), and to select the pair the
+    window has to name a file.  Three answers, because there are three states:
+
+    * **(path, "row")** - the clip is one of the rows the library column shows, so the
+      row can be marked as well as loaded.  This is the normal case: measured, all 23
+      selectable layouts name a clip that has a row on this bench.
+    * **(path, "file")** - the file exists in a root but the list holds no row for it,
+      because the dedupe rule let an identical clip keep the row (`Theme_31.mp4` is
+      `Theme_26.mp4`, sha256), or because the name is not a clip at all in the listed
+      sense - one refused 4:3 layout names a `.png`.  Said out loud rather than
+      presented as a row that is not there.
+    * **("", "")** - not on this box.  A layout's clip can be absent (a checkout without
+      the media, an install that took the library package but not the clips), and the
+      window says so instead of keeping quiet about a background it did not change.
+
+    Case is ignored on purpose: the vendor's own tree holds both `Theme_48.mp4` and
+    `theme_48.mp4` spellings, and a layout's declaration is not something a reader can
+    correct.
+    """
+    from xigmalcd.main import find_media
+
+    want = os.path.splitext(os.path.basename(str(name)))[0].lower()
+    for clip in (clips if clips is not None else list_clips()):
+        if os.path.splitext(os.path.basename(clip.path))[0].lower() == want:
+            return clip.path, "row"
+    path = find_media(os.path.basename(str(name)))
+    return (path, "file") if os.path.isfile(path) else ("", "")
+
+
 def probe(clip: Clip) -> float:
     """Measure one clip's loop length and frame size. One row at a time."""
     if not clip.seconds or not clip.px[0]:
