@@ -6,8 +6,8 @@ The five themes this project draws, what `alpha` is a redraw *of*, and the geome
 
 `xigmaui`'s theme list takes `sorted(render.THEMES)`: `alpha`, `bars`, `clock`, `dual`,
 `gauge`. Those are the pictures **this program** draws from live readings, and the window
-lists only what it can preview. `xigmalcd --theme` takes those five **and** 23 of the
-vendor's 27 layout files, by the name of the background each one declares - `Theme_07`,
+lists only what it can preview. `xigmalcd --theme` takes those five **and** 23 of the vendor's 27
+layout files, by the name of the background each one declares - `Theme_07`,
 or the numeric id `1757491588804` - painted by `xigmalcd/layout.py` at the canvas the
 file itself declares and uploaded as an ordinary `.osd` frame. What has never happened,
 and still has not, is sending a theme file to the panel:

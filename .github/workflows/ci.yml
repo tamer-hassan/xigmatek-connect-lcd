@@ -92,11 +92,19 @@ jobs:
         run: |
           python3 - <<'PY'
           import re
-          words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
-                   "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
-                   "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
-                   "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19,
-                   "twenty": 20}
+          # Spelled out rather than remembered: a suite section is added more often than
+          # this file is read, and hand-listing the words means the count runs out at some
+          # number and the failure stops being about the documents.  `\b[\w-]+` matters just
+          # as much - `\w+` would read "twenty-one" as "one", which is a real number and
+          # quietly under the limit, so the gate would report "none of them is today's 21"
+          # for a sentence that says exactly 21.
+          _LOW = ("zero one two three four five six seven eight nine ten eleven twelve "
+                  "thirteen fourteen fifteen sixteen seventeen eighteen nineteen").split()
+          words = {w: i for i, w in enumerate(_LOW)}
+          for _t, _v in (("twenty", 20), ("thirty", 30), ("forty", 40), ("fifty", 50)):
+              words[_t] = _v
+              for _i, _u in enumerate(_LOW[1:10], start=1):
+                  words[f"{_t}-{_u}"] = _v + _i
           n = sum(1 for ln in open("tools/selftest.sh", encoding="utf-8")
                   if ln.startswith('echo "== '))
           where = ["README.md", "docs/tools.md", "docs/packaging.md"]
@@ -110,7 +118,7 @@ jobs:
           bad = []
           for path in where:
               claims = [words.get(c.lower()) for c in
-                        re.findall(r"(\w+) offline sections",
+                        re.findall(r"\b([\w-]+) offline sections",
                                    open(path, encoding="utf-8").read())]
               if any(c is None for c in claims):
                   bad.append((path, "an unrecognised number word"))
@@ -122,7 +130,7 @@ jobs:
                           open("debian/changelog", encoding="utf-8").read(),
                           re.S)
           top_claims = [words.get(c.lower()) for c in
-                        re.findall(r"(\w+) offline sections", top.group(3))] if top else []
+                        re.findall(r"\b([\w-]+) offline sections", top.group(3))] if top else []
           if top_claims != [n]:
               bad.append(("debian/changelog (top stanza)", top_claims,
                           f"must state {n} and only {n}"))

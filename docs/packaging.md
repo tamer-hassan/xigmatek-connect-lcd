@@ -17,7 +17,7 @@ lintian ../xigmatek-connect-lcd_*.changes
 ```
 
 Before either package is worth building there is one gate, and CI puts it first: the
-offline suite - twenty offline sections with no panel in sight - and the `.deb` job
+offline suite - twenty-one offline sections with no panel in sight - and the `.deb` job
 `needs`
 it, so a tree that fails a check never produces a package (`.github/workflows/ci.yml`).
 

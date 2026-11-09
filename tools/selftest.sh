@@ -3601,6 +3601,167 @@ print(f"                        the two text looks-keys this program ignores - i
       f"a reading - the reason our exports omit it")
 PY
 
+echo
+echo "== the sentences that quote a printed door, reprinted from the door"
+# docs/usage.md, docs/themes.md, docs/theme-editor.md and README quote numbers that
+# `--print-theme-fields`, `--list-themes`, `--check-theme` and `--list-specials` print.  Most
+# of those numbers are already held somewhere else - the section that counts the vendor
+# library, the one that paints the exports - but what is held there is the count, not the
+# sentence.  A document can stay perfectly polite while the door it quotes changes under it,
+# which is what this section is for: every figure below is taken from the command's own
+# output on this run and compared against the words around it in the document.  Nothing here
+# opens a port, and every command runs against the tree rather than an install.
+python3 - <<'PY' || { echo "doc doors FAILED"; exit 1; }
+import subprocess
+import sys
+
+from xigmalcd import render, themes
+
+_WORDS = dict(enumerate("zero one two three four five six seven eight nine ten eleven "
+                        "twelve thirteen fourteen fifteen sixteen seventeen eighteen "
+                        "nineteen twenty twenty-one".split()))
+
+
+def door(*args):
+    """One printed door, exactly as a reader would see it."""
+    r = subprocess.run([sys.executable, "-m", "xigmalcd", *args],
+                       capture_output=True, text=True)
+    assert r.returncode == 0, (args, r.returncode, r.stderr[:400])
+    assert "ttyACM" not in r.stdout and "/dev/tty" not in r.stdout, (
+        args, "a door that quotes no device must not name one")
+    return r.stdout
+
+
+def _para(text, start, end, what):
+    """One paragraph of a document, so a figure is checked where it is claimed rather than
+    anywhere in the file - a number that appears once in a table and once, wrongly, in a
+    sentence has to fail."""
+    i = text.index(start)
+    j = text.index(end, i)
+    assert j > i, (what, start, "the paragraph does not end where this gate expects")
+    return text[i:j]
+
+
+usage = open("docs/usage.md", encoding="utf-8").read()
+plan = open("docs/theme-editor.md", encoding="utf-8").read()
+tdoc = open("docs/themes.md", encoding="utf-8").read()
+readme = open("README.md", encoding="utf-8").read()
+
+# ---- the field census sentence: `--print-theme-fields` is the door, and the sentence in
+# ---- docs/usage.md is its summary
+cen, read, sub = themes.field_census(), themes.keys_read()[0], themes.keys_read()[1]
+fields = door("--print-theme-fields")
+_p = _para(usage, "Its numbers go into the inspector design", "\n* **`--check-theme",
+           "the field census sentence")
+_claim = {
+    "distinct keys": len(cen["keys"]),
+    "widgets": cen["widgets"],
+    "read by layout.py": len(set(read) & set(cen["keys"])),
+    "carried and never read": len(set(cen["keys"]) - set(read)),
+    "read with no vendor example": len(set(read) - set(cen["keys"])),
+}
+_absent = {k: v for k, v in _claim.items() if str(v) not in _p}
+assert not _absent, (_claim, _absent, _p[:300])
+for _line in fields.splitlines():
+    if "distinct `property` keys" in _line:
+        break
+else:
+    raise AssertionError(fields[:400])
+# the two text looks-keys and the number of widgets that carry them, since that is the
+# finding the sentence says is worth knowing before anyone asks why a theme looks the same
+_it, _un = sum(cen["values"]["italic"].values()), sum(cen["values"]["underline"].values())
+assert _it == _un, (cen["values"]["italic"], cen["values"]["underline"],
+                    "the two looks-keys no longer sit on one number of widgets, and the "
+                    "sentence quotes a single number")
+assert str(_it) in _p, (_it, _p[:240], "the sentence lost the count of widgets carrying them")
+assert all(set(cen["values"][k]) == {"False"} for k in ("italic", "underline")), (
+    cen["values"]["italic"], cen["values"]["underline"],
+    "the sentence says neither looks-key is ever set anywhere in the library, and a `true` "
+    "would make that claim wrong - which is the whole finding the sentence is making")
+assert all(f"`{k}`" in fields for k in ("italic", "underline")), fields[:200]
+print(f"  --print-theme-fields  {len(cen['keys'])} keys / {cen['widgets']} widgets / "
+      f"{len(set(read) & set(cen['keys']))} read / "
+      f"{len(set(cen['keys']) - set(read))} carried unread / "
+      f"{len(set(read) - set(cen['keys']))} read with no example, and docs/usage.md's "
+      f"sentence states every one of those five numbers ({_it} widgets carry each of the "
+      f"two looks-keys, none of them ever set)")
+
+# ---- the picker claim: how many of the vendor's files this canvas can select, in the two
+# ---- documents that say it
+ok, refused = themes.scan()
+listing = door("--list-themes")
+assert listing.count("\n") >= len(ok) + len(refused), listing[:200]
+assert f"{len(ok)} of the vendor's {len(ok) + len(refused)}" in tdoc, (
+    len(ok), len(refused),
+    "docs/themes.md miscounts what the picker takes from the vendor's files")
+_row = next(ln for ln in plan.splitlines() if ln.startswith("| layout files |"))
+assert f"**{len(ok) + len(refused)}**" in _row and f"{len(ok)} at `ratio" in _row \
+    and f"{len(refused)} at `ratio" in _row, (len(ok), len(refused), _row)
+print(f"  --list-themes         {len(ok)} pickable, {len(refused)} refused, all "
+      f"{len(ok) + len(refused)} named in the listing; docs/themes.md and the plan's own "
+      f"census table row both state that split")
+
+# ---- the `special` count, spelled out in the plan
+names = themes.special_names()
+specials = door("--list-specials")
+assert all(f"  {n}" in specials for n in names), specials[:300]
+_sent = _para(plan, "`--list-specials`; ", "The label pair was the open question",
+              "the specials sentence")
+assert f"{_WORDS[len(names)]} have landed" in _sent, (
+    len(names), _sent[:160], "the plan miscounts the specials that have landed")
+for n in names:
+    assert f"`{n}`" in _sent, (n, "a landed special is not named in the sentence that "
+                                 "counts them")
+print(f"  --list-specials       {len(names)} names ({' '.join(names)}), and the plan's "
+      f"sentence counts them and names each one")
+
+# ---- one fenced transcript, line by line, against the door that wrote it: the block in
+# ---- docs/usage.md for Theme_28.  Which lines of that block a machine may change is said
+# ---- in the document, so the gate checks the file-derived ones for word-for-word equality
+# ---- and the machine-dependent ones for shape.
+_block = [ln.strip() for ln in usage[
+    usage.index("  ```\n  Theme_28 (") + 8:
+    usage.index("  ```", usage.index("  ```\n  Theme_28 (") + 8)].splitlines()]
+_chk = [ln.strip() for ln in door("--check-theme", "Theme_28").splitlines() if ln.strip()]
+assert _block[0] == _chk[0], (_block[0], _chk[0],
+                              "the transcript's first line is read out of the file, so it "
+                              "is the run's line or it is wrong")
+_ask_doc = next(ln for ln in _block if ln.startswith("this theme asks for:"))
+_ask_run = next(ln for ln in _chk if ln.startswith("this theme asks for:"))
+assert _ask_doc == _ask_run, (_ask_doc, _ask_run)
+_gaps_doc = [ln for ln in _block if ln.startswith("shaped by this repo")]
+_gaps_run = [ln for ln in _chk if ln.startswith("shaped by this repo")]
+assert _gaps_doc == _gaps_run, (_gaps_doc, _gaps_run)
+for _lbl in ("drawn from this machine's readings", "shaped by this repo",
+             "this theme asks for", "this machine answers", "and cannot"):
+    assert any(_lbl in ln for ln in _block) and any(_lbl in ln for ln in _chk), (
+        _lbl, "the transcript and the door no longer have the same lines - one of them grew "
+              "or dropped a half, and the document is supposed to show the real shape")
+_sk_doc = next(ln for ln in _block if "skipped:" in ln)
+_sk_run = next(ln for ln in _chk if " boxes," in ln)
+assert "skipped: Pump Speed" in _sk_doc, _sk_doc
+assert "Pump Speed" in _sk_run, _sk_run
+_n_boxes = int(_sk_run.split(" boxes,")[0].split()[-1])
+_n_notes = len([x.strip() for x in _sk_run.split("skipped:", 1)[1].split(",")]) \
+    if "skipped:" in _sk_run and _sk_run.split("skipped:", 1)[1].strip() != "nothing" else 0
+_widgets = int(_chk[0].split(", ")[1].split()[0])
+assert _n_boxes + _n_notes == _widgets, (_n_boxes, _n_notes, _widgets, _sk_run,
+                                         "the door's own accounting does not close, so the "
+                                         "transcript cannot be trusted for either count")
+print(f"  --check-theme Theme_28  the transcript's file-derived lines match word for word "
+      f"({_block[0]} / {_ask_doc}); the machine-dependent pair closes "
+      f"({_n_boxes} boxes + {_n_notes} skip notes = {_widgets} widgets)")
+
+# ---- README's five-theme claims: the names it previews are the themes it says exist
+_previews = [t for t in sorted(render.THEMES) if f"`{t}`" in readme]
+assert _previews == sorted(render.THEMES), (
+    _previews, sorted(render.THEMES), "README does not name every drawn theme in its "
+                                     "preview table")
+print(f"  README                names all {len(render.THEMES)} drawn themes "
+      f"({' '.join(sorted(render.THEMES))}), and its preview slots are checked by the "
+      f"section that measures the six video files")
+PY
+
 echo "== decoder round-trip: encode -> decode -> re-encode"
 python3 - <<'PY' || { echo "decoder round-trip FAILED"; exit 1; }
 from xigmalcd import protocol as p

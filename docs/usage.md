@@ -162,7 +162,8 @@ claim:
   drawn from this machine's readings: 6 boxes, 19 253 lit px, skipped: Pump Speed
   shaped by this repo rather than measured off the vendor's picture: Time
   this theme asks for: CPU Usage, Pump Speed, Time
-  this machine answers: CPU Usage, Time        and cannot: Pump Speed
+  this machine answers: CPU Usage, Time
+  and cannot: Pump Speed
   ```
 
   Which lines of that are stable and which are not: the first is read out of the file and
