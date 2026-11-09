@@ -410,17 +410,37 @@ def draw(obj: dict, metrics: dict, when=None, scrim: int = 0) -> tuple:
     return img, notes
 
 
+#: Which background each of the five themes drawn from `render.py` is shown against.
+#: Not a vendor record - the vendor library holds no page for a theme it did not draw -
+#: and not a guess either: these are the clips this project's own published pictures are
+#: composited over.  The README's five MP4s are named `<theme>-<clip>.mp4` for it
+#: (`alpha-Theme_25.mp4`, `gauge-3.mp4`, ...), docs/limits.md's census table prints a row
+#: per file with that clip's measured luma, and `tools/selftest.sh` keeps the same mapping
+#: in its `VIDEOS` table and re-derives it from the written files on every run.  The suite
+#: asserts this table equals that one, so the pairing here cannot drift away from the
+#: pictures a reader judges the themes by.  Every value is a bare name, and each resolves
+#: through `main.media_roots()` - the same lookup the window and the loop share - which
+#: the suite also checks on a bare checkout with nothing installed.
+CODE_CLIPS = {"alpha": "Theme_25.mp4", "gauge": "3.mp4", "dual": "Theme_30.mp4",
+              "clock": "Theme_07.mp4", "bars": "theme_52.mp4"}
+
+
 def pair(name: str) -> tuple:
     """Which background clip a theme names, and the reason when it names none.
 
-    A vendor layout declares exactly one clip in `background.mediaFile` - 23 of the
-    library's 27 do, and the 23 values are distinct (`scan()` keeps the field for that
-    reason, and `--list-themes` prints it).  A generated layout declares none: the five
-    themes this repo draws from `render.py` are pictures, not a vendor's page with a
-    background behind it, so their exports carry no such key and there is nothing to pair.
-    That asymmetry is why this returns a *reason* rather than an empty string: the window
-    has to be able to say, in the place the question was asked, that the theme under the
-    cursor has no clip of its own, instead of silently keeping whatever was there.
+    Two kinds of answer, both read from a file this repository keeps:
+
+    * A vendor layout declares exactly one clip in `background.mediaFile` - 23 of the
+      library's 27 do, and the 23 values are distinct (`scan()` keeps the field for that
+      reason, and `--list-themes` prints it).
+    * One of the five themes this program draws itself names the clip its own published
+      picture sits over (`CODE_CLIPS`), which is why picking `gauge` in the window's
+      layout dropdown moves the preview the same way picking `Theme_07` does.
+
+    Anything else - a generated layout somebody authored, a refused 320x240 page, a name
+    that is not a layout at all - answers with a *reason* rather than an empty string, so
+    the window can say, in the place the question was asked, that the theme under the
+    cursor has no clip of its own instead of silently keeping whatever was there.
 
     The answer comes from whichever file `resolve()` chose, so a copy you have edited
     pairs with the clip your copy names, not the vendor's.
@@ -428,8 +448,11 @@ def pair(name: str) -> tuple:
     Returns `(clip_basename, why_not)`; exactly one of the two is ever non-empty.
     """
     if name in EXPORTS:
-        return "", (f"{name} is drawn from `render.py`: a generated layout carries no "
-                    "`background.mediaFile`, so nothing pairs with it but what you chose")
+        clip = CODE_CLIPS.get(name)
+        if clip:
+            return clip, ""
+        return "", (f"{name} is drawn from `render.py` and names no published backdrop, "
+                    f"so nothing pairs with it but what you chose")
     rec = resolve(name)
     if rec is None:
         return "", why_not(name)

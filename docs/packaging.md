@@ -170,10 +170,10 @@ Two measurements decided how the package carries them:
   costs about 90 KB and buys a doc set that reads on an installed machine.
 
 What the pictures do **not** do is get packaged, and since 0.3 there are two kinds of
-them. The images: `docs/logo.png` and `docs/screenshot-xigmaui.png` (1 070 024 B), the two
+them. The images: `docs/logo.png` and `docs/screenshot-xigmaui.png` (1 114 379 B), the two
 theme contact sheets in `docs/previews/` (1 596 454 B). The videos: the six MP4s in
 `docs/videos/` (5 039 178 B - the README's five previews plus the amber-ink figure
-docs/gui.md carries) and the readings JSON that drives them (13 916 B). **7 719 572 B**
+docs/gui.md carries) and the readings JSON that drives them (13 916 B). **7 763 927 B**
 across 11 files, part of it rendered from XIGMATEK's own theme library, which is the
 other package's files and its own licence question - and the videos are also not package
 material for a second reason: what README links is GitHub's copy of them - the editor
@@ -187,8 +187,10 @@ Those five numbers are not kept by hand any more: the launcher section of
 `tools/selftest.sh` re-derives them from the files themselves (logo, the window capture,
 the two contact sheets, the six MP4s and the readings JSON) and fails if this page
 disagrees.  That gate earned its place the slow way - the video total had drifted by
-22 405 B when the amber-ink figure was re-rendered and nothing noticed, and re-shooting
-the window picture for the layout editor's new row moved the image total by 7 853 B more.
+22 405 B when the amber-ink figure was re-rendered and nothing noticed.  Since then the
+window picture has been re-shot twice and the gate moved with it both times: 7 853 B for
+the layout editor's new row, and 44 355 B for the *keep my background* box and the pairing
+line that 0.4 put under the clip list.
 
 Checked on the unpacked 0.3 packages, in that layout: **11** markdown files with no `.gz`
 next to any of them, **43** links from one document to another resolving (none dead),

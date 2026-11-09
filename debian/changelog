@@ -117,6 +117,38 @@ xigmatek-connect-lcd (0.4) resolute; urgency=medium
     rather than only on a tag: before that, the whole section printed
     SKIPPED on a push and the figures rested on one bench.
 
+  * The five themes this repository draws from `render.py` pair with a
+    background too. `themes.CODE_CLIPS` gives each of them the backdrop its
+    own published picture is composited over - `alpha` with Theme_25.mp4,
+    `gauge` with 3.mp4, `dual` with Theme_30.mp4, `clock` with Theme_07.mp4,
+    `bars` with theme_52.mp4 - so choosing one in the window's layout dropdown
+    moves the preview the way choosing a vendor page does: 5 of 5 through the
+    theme picker and 5 of 5 through the dropdown's export entries, each with
+    its library row marked.  That set is not typed in twice.  The suite reads
+    the README's `<theme>-<clip>.mp4` names back off the written files, counts
+    a candidate only when its clip part resolves as a clip this box holds -
+    which is how the amber-ink figure drops out, by not resolving rather than
+    by hand - and fails if the module's table disagrees with the derivation.
+    Four of the five backdrops measure dark and need no plate; `clock`'s is
+    bright, so the scrim arrives with it through the same luma rule as
+    everywhere else.
+
+  * The layout dropdown now chooses its own background.  A vendor layout
+    declares one clip in its own file, and picking the layout puts that clip
+    under the preview and marks its row - 23 of 23 on this bench, and the
+    suite drives every one of them.  The old rule was the other way round:
+    clicking a clip row set `clip_customized`, and from then on no layout
+    could move the picture, which is how a window came to look like it was
+    ignoring its own pairing for a reason nobody could see.  The opt-out is
+    now a box you can see - *keep my background*, stored as `keep_my_clip` -
+    and a hand is the only thing that ticks it.  Clicking a row says what the
+    pick costs instead of setting a flag; the button takes the layout's clip
+    back and unticks the box; unticking moves the picture at once rather than
+    waiting for the next layout change.  `clip_customized` is still read once,
+    honoured as a ticked box so an upgrade moves nothing under anybody,
+    announced in the log before the window does anything else, and gone from
+    the next save.
+
   * A test section that wrote the author's session file, and the rule it
     taught.  The suite's GUI section set `XDG_CONFIG_HOME=$cfgtmp` from a
     variable assigned 600 lines earlier in a different section, so run on its
@@ -143,7 +175,7 @@ xigmatek-connect-lcd (0.4) resolute; urgency=medium
     number a tool prints - including the numbers in docs/tools.md, two of
     which had gone stale a day after they were written.
 
- -- Tamer Hassan <thameruddin@gmail.com>  Mon, 09 Nov 2026 10:41:42 +0200
+ -- Tamer Hassan <thameruddin@gmail.com>  Mon, 09 Nov 2026 11:54:02 +0200
 xigmatek-connect-lcd (0.3) resolute; urgency=medium
 
   * xigmaui in three columns instead of one long scroll, at the author's own

@@ -35,13 +35,16 @@ DEFAULTS: dict = {
     "preview_fps": 2.0,        # host-side only; a frame renders in ~9 ms
     "advanced": False,         # the folded-away knobs: see app.py:_set_advanced
     "animate": True,           # the preview pane plays the clip; False = one frame
-    # Whether the background is *yours* rather than the theme's.  A vendor layout names
-    # one clip (`themes.pair`), and the window follows that pairing while this is False -
-    # picking another clip, or sending one to the panel, makes it True, and the row that
-    # offers the layout's own clip is what turns it back.  It has to be a stored flag
-    # rather than "the clip is not the default", because a paired clip and a chosen one
-    # are the same shape once they are both paths on disk.
-    "clip_customized": False,
+    # Whether a layout's own background is the one under the preview.  False, the default,
+    # means the window follows the pairing: open `Theme_07` and `Theme_07.mp4` goes under
+    # the layer.  True is the "keep my background" box in the clip column, and it is only
+    # ever set by a hand - 0.4 stopped setting it when a clip row is clicked, because a
+    # flag set behind a reader's back is what made the pairing look broken.  It has to be a
+    # stored flag rather than "the clip is not the default", because a paired clip and a
+    # chosen one are the same shape once they are both paths on disk.  The older key for
+    # the same idea was `clip_customized`: `_clean` reads it once and says so through
+    # `load(notes=...)`, and the next save writes only the new name.
+    "keep_my_clip": False,
     "size": [1180, 780],       # the window as you left it: wide enough for the
                                # three columns, and short enough for a 1080p screen
     "split": [520, 460, 560],  # the three columns, as you left the splitter between
@@ -63,8 +66,14 @@ def _clip_default() -> str:
     return DEFAULT_MP4
 
 
-def _clean(loaded: dict) -> dict:
-    """Keep only values the widgets would actually accept."""
+def _clean(loaded: dict, notes: list[str] | None = None) -> dict:
+    """Keep only values the widgets would actually accept.
+
+    `notes` collects, in sentences a window can print in its own log, anything the file
+    needed explained: a key from an older window, or two keys answering one question.  A
+    caller that shows a person the result passes a list; `save` does not, because a note is
+    not something to write to disk.
+    """
     from xigmalcd import render
 
     out = dict(DEFAULTS)
@@ -111,8 +120,22 @@ def _clean(loaded: dict) -> dict:
     # a real bool only: `"yes"`, 1 and null are the kinds of thing a hand-edited config
     # picks up, and a truthy string here would silently stop the window following a
     # layout's own clip
-    if isinstance(loaded.get("clip_customized"), bool):
-        out["clip_customized"] = loaded["clip_customized"]
+    if isinstance(loaded.get("keep_my_clip"), bool):
+        out["keep_my_clip"] = loaded["keep_my_clip"]
+        if isinstance(loaded.get("clip_customized"), bool) and notes is not None:
+            notes.append("your file carries both `keep_my_clip` and the older "
+                         "`clip_customized`: the new key wins, and the old one goes away "
+                         "on the next save")
+    elif isinstance(loaded.get("clip_customized"), bool):
+        # one key from an older window, read once and never written again.  Honouring it is
+        # the difference between an upgrade that keeps a person's background where it was
+        # and one that moves it under them; a stored False needs no note, because that is
+        # what the new default does anyway
+        out["keep_my_clip"] = loaded["clip_customized"]
+        if loaded["clip_customized"] and notes is not None:
+            notes.append('the older `clip_customized: true` in your file is now the '
+                         '"keep my background" box, and it is ticked so nothing moved '
+                         'under you. Untick it to let each layout take its own clip.')
     try:
         fps = float(loaded["preview_fps"])
         if 0.5 <= fps <= 10:
@@ -146,16 +169,20 @@ def _clean(loaded: dict) -> dict:
     return out
 
 
-def load() -> dict:
-    """The saved window state, or the defaults if there is no usable file."""
+def load(notes: list[str] | None = None) -> dict:
+    """The saved window state, or the defaults if there is no usable file.
+
+    `notes` goes through to `_clean`: a file that needs explaining gets explained, in the
+    caller's log rather than in the file.
+    """
     try:
         with open(path(), encoding="utf-8") as fh:
-            return _clean(json.load(fh))
+            return _clean(json.load(fh), notes)
     except FileNotFoundError:
-        return _clean({})
+        return _clean({}, notes)
     except (OSError, ValueError):
         # a half-written or hand-edited file is not a reason not to start
-        return _clean({})
+        return _clean({}, notes)
 
 
 def save(state: dict) -> str | None:

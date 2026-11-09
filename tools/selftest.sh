@@ -1738,7 +1738,47 @@ for _r in ok:
     assert _got == _r["background"].rsplit("/", 1)[-1] and not _why, (_r["name"], _got, _why)
 for _n in sorted(themes.EXPORTS):
     _got, _why = themes.pair(_n)
-    assert not _got and "no `background.mediaFile`" in _why, (_n, _got, _why)
+    assert _got == themes.CODE_CLIPS.get(_n) and not _why, (_n, _got, _why)
+# Where those five clips come from, derived rather than trusted.  The vendor's own record
+# names a backdrop for a page it drew; it has no page for a theme this repository draws,
+# so for these five the honest source is the published pictures themselves: the README's
+# MP4s are named `<theme>-<clip>.mp4` (`alpha-Theme_25.mp4`, `gauge-3.mp4`, ...).  A
+# candidate counts only when its clip part resolves as a clip this box holds, which is how
+# the amber-ink figure `alpha-Theme_25-amber.mp4` falls out of the derivation on its own
+# rather than being excepted by hand.
+import glob as _glob3
+from xigmalcd.main import find_media as _find_media
+_published = {}
+for _v in sorted(_glob3.glob("docs/videos/*.mp4")):
+    _stem = os.path.basename(_v)[:-4]
+    _theme, _sep, _clip = _stem.partition("-")
+    if not _sep or _theme not in render.THEMES:
+        continue
+    if not os.path.isfile(_find_media(_clip + ".mp4")):
+        # `find_media` answers with a path whether or not the file is there - that is how a
+        # missing clip gets reported as the name that was asked for - so the test here is
+        # the file, not the string.  It is also what drops the amber-ink figure: its clip
+        # part is `Theme_25-amber.mp4`, and no root holds that file.
+        continue
+    _published.setdefault(_theme, []).append(_clip + ".mp4")
+assert all(len(v) == 1 for v in _published.values()), _published
+_published = {k: v[0] for k, v in _published.items()}
+assert set(_published) == set(render.THEMES), (
+    sorted(_published), sorted(render.THEMES),
+    "a theme drawn here has no published picture naming a backdrop, so its pairing would "
+    "have to be invented")
+assert _published == themes.CODE_CLIPS, (
+    _published, themes.CODE_CLIPS,
+    "themes.CODE_CLIPS is not the backdrop set the README's own pictures are composited "
+    "over - the pairing would drift away from the pictures a reader judges the themes by")
+# and a name that is neither a vendor layout nor one of the five still answers with a
+# reason rather than an empty string, which is what the window prints
+_orphan, _why_orphan = themes.pair("no-such-layout")
+assert not _orphan and _why_orphan, (_orphan, _why_orphan)
+print(f"  the five pair too    all {len(themes.CODE_CLIPS)} themes drawn from `render.py` "
+      f"pair with the backdrop their own published picture uses, derived from the "
+      f"{len(_glob3.glob('docs/videos/*.mp4'))} MP4 names and equal to themes.CODE_CLIPS: "
+      + ", ".join(f"{k}->{v}" for k, v in sorted(themes.CODE_CLIPS.items())))
 _refused_pair = {themes.pair(_r["name"])[0] or themes.why_not(_r["name"])[:24]
                  for _r in out}
 _still = [_r["name"] for _r in out if not str(_r["background"]).lower().endswith(".mp4")]
@@ -4363,7 +4403,7 @@ print(f"  no file                {settings.path()}")
 clip = os.path.abspath("media/Theme_11.mp4")
 want = dict(settings.load())
 want.update(theme="gauge", clock_size=44, canvas="black", scrim=60, fans=False,
-            preview_fps=4.5, clip=clip, size=[900, 640], clip_customized=True)
+            preview_fps=4.5, clip=clip, size=[900, 640], keep_my_clip=True)
 where = settings.save(want)
 assert where == settings.path(), where
 back = settings.load()
@@ -4371,19 +4411,71 @@ for key, val in want.items():
     assert back[key] == val, (key, back[key], val)
 assert json.load(open(where))["clock_size"] == 44      # plain JSON on disk
 
-# Whether the background is the reader's or the theme's is stored, because the difference
-# between the two is a fact about what a human did and the window cannot recover it from a
-# path: a paired clip and a chosen clip are the same shape on disk.  So it is a bool, and
-# only a bool - the settings box refuses `"yes"`, `1` and `null` the way it refuses a clock
-# size of 200, because a truthy accident here silently stops the window following a
-# layout's own clip and nobody can see why the picture stopped changing.
-assert settings.load()["clip_customized"] is True, "a stored True did not come back"
+# Whether a layout may change the background is stored, because the difference between "the
+# pairing put this here" and "hold this one" is a fact about what a human asked for and the
+# window cannot recover it from a path: both clips are the same shape on disk.  So it is a
+# bool, and only a bool - the settings box refuses `"yes"`, `1` and `null` the way it
+# refuses a clock size of 200, because a truthy accident here silently stops the window
+# following a layout's own clip and nobody can see why the picture stopped changing.
+assert settings.load()["keep_my_clip"] is True, "a stored True did not come back"
 for junk in ("yes", "true", 1, 0, None, [], {}, 3.5):
-    assert settings._clean({"clip_customized": junk})["clip_customized"] is False, junk
-assert settings._clean({})["clip_customized"] is False
-assert settings._clean({"clip_customized": False})["clip_customized"] is False
+    assert settings._clean({"keep_my_clip": junk})["keep_my_clip"] is False, junk
+assert settings._clean({})["keep_my_clip"] is False
+assert settings._clean({"keep_my_clip": False})["keep_my_clip"] is False
 print("  the pairing flag     True survives a save and a reload; "
       + f"{len(['yes', 'true', 1, 0, None, [], {}, 3.5])} kinds of junk fall back to False")
+
+# `clip_customized` was the older key for the same idea, and 0.4 changed what its default
+# means: an older file said "a row was clicked", a newer one says "a person ticked a box".
+# Four combinations are pinned, because the one that matters is the one a real upgrade hits
+# and the one that would be easy to get wrong is the pair that disagrees with itself.
+_MIG = (("only the old key, true", {"clip_customized": True}, True,
+         "keep my background"),                     # what the box is now called
+        ("only the old key, false", {"clip_customized": False}, False,
+         None),                                     # the new default already says this
+        ("both keys, new wins", {"clip_customized": True, "keep_my_clip": False}, False,
+         "the new key wins"),
+        ("neither key", {}, False, None))
+for _label, _raw, _keeps, _said in _MIG:
+    _seen: list[str] = []
+    _got = settings._clean(_raw, _seen)
+    assert _got["keep_my_clip"] is _keeps, (_label, _got["keep_my_clip"], _keeps)
+    assert "clip_customized" not in _got, (_label, "the retired key is still in the dict")
+    if _said is None:
+        assert not _seen, (_label, _seen, "a file that needed no explaining handed the "
+                                          "window a sentence anyway")
+    else:
+        assert len(_seen) == 1 and _said in _seen[0], (
+            _label, _seen, "a file that needed explaining did not hand the window the "
+                           "sentence it promises")
+
+# and the file a person actually has: the old key on disk, honoured, explained, and gone
+# after one save.  A second settings root, so this never disturbs the file the rest of the
+# section is using.
+_root = os.environ["XDG_CONFIG_HOME"]
+_old_only = os.path.join(_root, "old-key-session")
+os.makedirs(os.path.join(_old_only, "xigmaui"), mode=0o700,
+            exist_ok=True)      # `path()` wants the app directory under the root
+os.environ["XDG_CONFIG_HOME"] = _old_only
+try:
+    with open(settings.path(), "w", encoding="utf-8") as fh:
+        json.dump({"clip_customized": True, "clip": clip}, fh)
+    _note: list[str] = []
+    _loaded = settings.load(_note)
+    assert _loaded["keep_my_clip"] is True, _loaded
+    assert len(_note) == 1 and "keep my background" in _note[0], _note
+    settings.save(_loaded)
+    _disk = json.load(open(settings.path(), encoding="utf-8"))
+    assert "clip_customized" not in _disk, _disk
+    assert _disk["keep_my_clip"] is True, _disk
+    print("  the retired key      an old `clip_customized: true` is honoured once as a "
+          "ticked box,")
+    print("                       the window is handed the note to say so, and the next "
+          "save leaves only")
+    print("                       `keep_my_clip` on disk: "
+          + f"{sorted(_disk)}")
+finally:
+    os.environ["XDG_CONFIG_HOME"] = _root
 
 # the text colour, through the same validation rather than a second rule: a
 # name or a short hex is normalised to `#rrggbb` on disk, and a value the
@@ -5222,8 +5314,8 @@ for name in ("theme_48.mp4", "Theme_25.mp4"):
 # hazard: this very section, run on its own, did that to the author's real
 # ~/.config/xigmaui/config.json (the header above says how), and the next
 # `python3 -m xigmaui` by hand came up on a clip nobody had chosen, pointed at
-# `/dev/xigma-no-such-port`, at 1 fps, with `clip_customized` set - the flag that stops
-# the window following any layout's own background.  A pairing complaint traced to a test
+# `/dev/xigma-no-such-port`, at 1 fps, with `clip_customized` set - the flag that used to
+# stop the window following any layout's own background.  A pairing complaint traced to a test
 # with no manners, which is why the check is here rather than only in the section header.
 _here = settings.path()
 _xdg = os.environ.get("XDG_CONFIG_HOME", "")
@@ -5263,6 +5355,12 @@ print(f"  no session write     restore=False left {_here} exactly as it found it
 win.clock_size.setValue(44)
 win.theme.setCurrentText("gauge")
 win._load_background(byname["Theme_11.mp4"].path)
+# `Theme_11.mp4` is deliberately a clip `gauge` does *not* pair with, and the box is ticked
+# to hold it: that is the only state in which "the clip comes back as I left it" is a
+# promise the window makes.  With the box off, the next gate below shows a restored window
+# re-pairing at start instead - which is what the box is for.
+win.chk_keep.setChecked(True)
+assert win.keep_clip is True, win.chk_keep.isChecked()
 win.save_timer.start()
 # Wait for the state this block asked for, not for one field of it.  An earlier pending
 # write can land first and satisfy a one-field condition by accident: the theme loop above
@@ -5286,6 +5384,11 @@ assert again.clock_size.value() == 44 and again.mp4 == saved["clip"]
 assert again.preview_fps == 1.0 and again.port == bad
 row = again.clips.currentRow()          # the list has to land on the remembered clip
 assert again.all_clips[row].path == saved["clip"], (row, again.all_clips[row].path)
+assert again.chk_keep.isChecked() is True, "the box did not come back as it was left"
+# With the box off, a restored window re-pairs at start: the saved clip is a memory of what
+# was under the preview, not a claim about what belongs there now.  Said out loud here
+# because it is the behaviour a person will notice - and the box, plus the line a row click
+# prints, is what makes it their choice rather than the window's.
 # The `playing` pane, on a window that was *restored* rather than handed a rate:
 # that is the shape the author's own `python3 -m xigmaui` takes, and it is the shape
 # a half-applied edit once left with `preview_fps` None and the caption's `:g` format
@@ -5296,7 +5399,11 @@ again.canvas.setCurrentIndex(0)         # `clear`: on black there is nothing to 
 again.show()
 for _ in range(20):
     appq.processEvents()
-assert again.player is not None and again.player.path == saved["clip"], again.player
+# the stream behind the picture, not behind what the file remembered: this window re-paired
+# when the box came off, and a decode stream pointed at the old clip would be a bug
+assert again.player is not None and again.player.path == again.mp4, (
+    again.player.path if again.player else None, again.mp4,
+    "the decode stream is behind a picture the preview is not showing")
 assert again.player.fps > 0, again.player.fps    # ffprobe's r_frame_rate, not a guess
 note = again.anim_note.text()
 assert "playing at" in note and f"{again.preview_fps:g} fps" in note, note
@@ -7059,16 +7166,19 @@ print(f"  docs quote the edit   docs/gui.md and docs/theme-editor.md both say "
 
 # ---- the pairing, driven through a window of its own, so nothing above this point is
 # ---- affected by the background moving under it.  The claim is the one the user of the
-# ---- window actually makes: "I opened this layout, why is the picture sitting on a clip
-# ---- that has nothing to do with it?"  A vendor layout names one clip, the window follows
-# ---- it, a click makes the background the reader's, and one button hands it back.  The
-# ---- negative halves matter as much: populating the list selects a row, and that is not a
-# ---- choice; the five themes drawn from code name no clip, and the pane says so instead of
-# ---- leaving the reader to wonder whether the pairing is broken.
+# ---- window makes now: "I picked a layout, and its own background came with it."  A vendor
+# ---- layout names one clip, the dropdown puts it under the preview and marks the row, and
+# ---- the only thing that stops that is the "keep my background" box - which a hand ticks
+# ---- and nothing else does.  It used to be the other way round: a row click set the flag,
+# ---- so a window could refuse to follow its own pairing for a reason nobody could see, and
+# ---- that is the complaint this section now pins from both sides.  The negative halves
+# ---- matter as much: populating the list selects a row, and that is not a choice; the five
+# ---- themes drawn from code name no clip, and the pane says so rather than leaving the
+# ---- reader to wonder whether the pairing is broken.
 _pw = app.Window("/dev/xigma-no-such-port", 1.0, restore=False)
-assert _pw.clip_custom is False, (
-    "a window that nobody touched claims the background as its reader's - populating the "
-    "clip list selects a row, and that is not a choice")
+assert _pw.keep_clip is False and _pw.chk_keep.isChecked() is False, (
+    "a window that nobody touched already holds the background against its own layouts - "
+    "populating the clip list selects a row, and that is not a choice")
 # What a box can honour is derived from the rows it actually lists, not assumed from this
 # bench: a clip can be genuinely absent (a checkout with nothing installed), and the honest
 # rule is "pair it when the file is here, say so when it is not".  Both halves are checked.
@@ -7126,6 +7236,15 @@ try:
     assert not _gap, (len(_alone), _gap,
                       "a checkout of this repository alone cannot pair these layouts - its "
                       "own tracked clips are no longer reachable from the window")
+    # the same stem form `_alone_stems` is kept in (no extension, lowercase): the vendor
+    # gap above uses it too, and comparing a full `Theme_25.mp4` to a stem would report a
+    # gap that is not there
+    _gap_code = [c for c in themes.CODE_CLIPS.values()
+                 if os.path.splitext(c)[0].lower() not in _alone_stems]
+    assert not _gap_code, (len(_alone), _gap_code,
+                           "a published backdrop of a theme drawn here is not reachable "
+                           "from a bare checkout, so those five would pair with nothing "
+                           "on a fresh install")
     # Two states the row list alone cannot drive, and both are worth pinning now that the
     # theme library is a root of the loop's own lookup:
     #   * no row, file in a root - the window follows the layout's clip anyway and *says* no
@@ -7168,52 +7287,178 @@ finally:
         os.environ["XIGMA_MEDIA"] = _env_media
     _alone_n = len(_alone)
     clipdb.list_clips()      # leave the module's scan counts as this box actually has them
-# a reader's click wins over the pairing, from then on and across a restart
+# a row click is a preview and a thing you may send: it no longer opts the reader out of the
+# pairing, and it says in the log what the pick costs.
 _other = next(i for i, _c in enumerate(_pw.all_clips)
               if os.path.basename(_c.path) != os.path.basename(_pw.mp4))
 _pw.clips.setCurrentRow(_other)
-assert _pw.clip_custom is True, "picking a clip did not make it the reader's"
 _chosen = os.path.basename(_pw.all_clips[_other].path)
+assert os.path.basename(_pw.mp4) == _chosen, (_pw.mp4, _chosen)
+assert _pw.keep_clip is False and _pw.chk_keep.isChecked() is False, (
+    'clicking a library row ticked "keep my background" by itself - which is the exact '
+    "thing 0.4 stopped doing, because a flag set behind a reader's back is what made the "
+    "pairing look broken")
+_said = [_l for _l in _pw.log_view.text().splitlines() if "next layout change" in _l]
+assert _said, (_pw.log_view.text()[-400:],
+               "a pick the next layout will overwrite was accepted in silence")
+# and the layouts take their own clips back over it, automatically: 6 for 6, each one named
+# in the log with the picture it replaced
+_follow = 0
+for _rec in pick[:6]:
+    _pw.ed_name.setCurrentText(_rec["name"])
+    _follow += os.path.basename(_pw.mp4) == _rec["background"].rsplit("/", 1)[-1]
+assert _follow == 6, (_follow, "the layout dropdown did not choose its own background")
+_replaced = [_l for _l in _pw.log_view.text().splitlines() if "replacing" in _l]
+assert len(_replaced) >= 6, (len(_replaced),
+                             "the pairing moved the picture without saying what it replaced")
+assert not _pw.btn_pair.isEnabled(), ("the way back is offered while the pairing is already "
+                                      "following the layout - nothing to go back to")
+# the box, ticked by a hand: now no layout moves the picture, and every refusal is said in
+# the log as well as in the note line.  A row click still moves it: the box governs
+# layouts, not the reader.
+_pw.chk_keep.setChecked(True)
+assert _pw.keep_clip is True, "the box did not reach the flag"
+_pw.clips.setCurrentRow(_other)
+assert os.path.basename(_pw.mp4) == _chosen, (_pw.mp4, _chosen,
+                                              "the box stopped a reader choosing a clip")
+_held = os.path.basename(_pw.mp4)
 _stayed = 0
 for _rec in pick[:6]:
     _pw.ed_name.setCurrentText(_rec["name"])
-    _stayed += os.path.basename(_pw.mp4) == _chosen
-assert _stayed == 6, (_stayed, "opening a layout walked over a background a reader chose")
-# and it said so.  This is the state that reads like a broken window: a layout declares a
-# clip, the preview refuses to move, and nothing else about the picture changed.  The note
-# line is one sentence of small print; the log has to carry the same sentence with the way
-# back named in it.
-_txt = _pw.log_view.text()
-assert "the background is yours" in _txt and "Use this layout's own clip" in _txt, (
-    _txt[-500:], "the window declined a layout's clip and never said why in the log")
-assert _pw.btn_pair.isEnabled(), ("a layout names its own clip and the window offers no way "
-                                  "back to it")
+    _stayed += os.path.basename(_pw.mp4) == _held
+assert _stayed == 6, (_stayed, _held, "a layout walked over a background its reader held")
+# This is the state that reads like a broken window: a layout declares a clip, the preview
+# refuses to move, and nothing else about the picture changed.  The note line is one
+# sentence of small print; the log carries the same sentence, names the box, and names the
+# way back.
+_declined = [_l for _l in _pw.log_view.text().splitlines()
+             if '"keep my background" is ticked' in _l]
+assert len(_declined) >= 1, (_pw.log_view.text()[-500:],
+                             "the window declined a layout's clip and never said why")
+assert all("Use this layout's own clip" in _l for _l in _declined), _declined[:2]
+assert _pw.btn_pair.isEnabled(), ("the box is ticked and the window offers no way back "
+                                  "from it")
 _pw.btn_pair.click()
-assert _pw.clip_custom is False and os.path.basename(_pw.mp4) == (
-    _pw._pair_target), (_pw.clip_custom, _pw.mp4, _pw._pair_target,
-                        "the way back did not hand the layout its own clip")
-# the five drawn themes: no clip declared, and that is said rather than left to be inferred
-_before = _pw.mp4
+assert _pw.keep_clip is False and _pw.chk_keep.isChecked() is False, (
+    _pw.keep_clip, _pw.chk_keep.isChecked(),
+    "the way back took the clip without unticking the box, so the next layout would move "
+    "it and the box would say otherwise")
+assert os.path.basename(_pw.mp4) == _pw._pair_target, (
+    _pw.mp4, _pw._pair_target, "the way back did not hand the layout its own clip")
+# and unticking is immediate rather than a wish for the next layout change: the picture and
+# the box never disagree about what is on screen
+_pw.chk_keep.setChecked(True)
+_pw.clips.setCurrentRow(_other)
+_pw.chk_keep.setChecked(False)
+assert os.path.basename(_pw.mp4) == _pw._pair_target, (
+    _pw.mp4, _pw._pair_target, "unticking the box left the picture on a clip the open "
+                               "layout does not name")
+# the five themes this repository draws from `render.py` pair as well: each names the
+# backdrop its own published picture is composited over (themes.CODE_CLIPS, derived from
+# the README's MP4 names in the library section).  Before 0.4 these five answered with a
+# reason and no clip, which is the half of the complaint that opened this section: the
+# vendor pages paired and the five did not.  Both pickers reach one rule - the theme picker
+# holds the themes, the layout dropdown holds their exports.
+_code, _rows_code, _bright = 0, 0, []
 # every entry in this order is a real change: the window opens on `sorted(THEMES)[0]`, so
 # picking that one first would emit nothing and the note would still be the last layout's -
 # which is exactly the kind of vacuous pass a loop over names can produce
 _order = sorted(render.THEMES)[1:] + sorted(render.THEMES)[:1]
+_pw.scrim.setValue(-1)                       # the daemon's luma rule, not a per-theme plate
 for _t in _order:
     _pw.theme.setCurrentText(_t)
     assert _pw.theme.currentText() == _t, (_t, _pw.theme.currentText())
-    assert _pw.mp4 == _before, (_t, _pw.mp4, _before,
-                                "a theme that declares no clip moved the background anyway")
-    assert "no `background.mediaFile`" in _pw.pair_note, (_t, _pw.pair_note)
+    _want = themes.CODE_CLIPS[_t]
+    _code += os.path.basename(_pw.mp4) == _want
+    _row = (_pw.all_clips[_pw.clips.currentRow()]
+            if 0 <= _pw.clips.currentRow() < len(_pw.all_clips) else None)
+    _rows_code += bool(_row) and os.path.basename(_row.path) == _want
+    assert _want in _pw.pair_note and "pairs with" in _pw.pair_note, (_t, _pw.pair_note)
+    # the plate a pairing brings with it is the luma rule's doing, measured on the row the
+    # window paired to - so "four of these five are dark" is a figure with a machine under it
+    _lum = clipdb.measure(_row)
+    _plate = _pw._render_kw()["scrim"]
+    assert (_plate > 0) == (_lum > app.BRIGHT_LUMA), (_t, _want, _lum, _plate)
+    if _lum > app.BRIGHT_LUMA:
+        _bright.append(_want)
+assert _code == len(_order), (_code, len(_order),
+                              "a theme drawn here did not pair with its published backdrop")
+assert _rows_code == len(_order), (_rows_code,
+                                   "the library column does not show the row the five paired to")
+# the same five through the dropdown, where their generated exports sit
+_drop = 0
+for _t in sorted(themes.EXPORTS):
+    _pw.ed_name.setCurrentText(_t)
+    _drop += os.path.basename(_pw.mp4) == themes.CODE_CLIPS[_t]
+assert _drop == len(themes.EXPORTS), (
+    _drop, len(themes.EXPORTS), "the dropdown's export entries paired with nothing")
+# the entry that closes the editor names no clip of its own; it hands the picture back to
+# the open theme, whose pairing then applies like any other
+assert themes.pair(app.NO_EDITOR)[0] == "", themes.pair(app.NO_EDITOR)
+_pw.ed_name.setCurrentText(app.NO_EDITOR)
+assert os.path.basename(_pw.mp4) == themes.CODE_CLIPS[_pw.theme.currentText()], (
+    _pw.mp4, _pw.theme.currentText(),
+    "closing the editor left a picture no open theme claims")
 _pw.theme.setCurrentText(_order[-1])         # the same name again: no signal, no change
-assert _pw.mp4 == _before and _order[-1] == _pw.theme.currentText(), _pw.mp4
-assert settings._clean(_pw._state())["clip_customized"] == _pw.clip_custom, (
-    "the window's pairing flag is not the flag its settings file holds")
+assert os.path.basename(_pw.mp4) == themes.CODE_CLIPS[_order[-1]], _pw.mp4
+# what a *restored* window does with a remembered clip.  The saved clip is a memory of what
+# was under the preview, not a claim about what belongs there: with the box off the open
+# theme's own backdrop takes the picture at start-up, and with it on the remembered clip
+# comes back exactly.  Both halves on a settings file of this gate's own making, with the
+# section's real one put back byte for byte afterwards - this heredoc's other windows are
+# still saving into it.
+import json                          # this heredoc imports it under other names further
+                                     # down; this gate reads and writes a file of its own
+_here_cfg = settings.path()
+_keep_cfg = (open(_here_cfg, "rb").read() if os.path.exists(_here_cfg) else None)
+_remembered = byname["Theme_11.mp4"].path            # a clip `gauge` does not pair with
+try:
+    for _box in (False, True):
+        with open(_here_cfg, "w", encoding="utf-8") as fh:
+            json.dump({"theme": "gauge", "clip": _remembered, "keep_my_clip": _box,
+                       "device": bad, "preview_fps": 1.0}, fh)
+        _back_win = app.Window(bad, None, restore=True)
+        assert _back_win.theme.currentText() == "gauge", _back_win.theme.currentText()
+        _got = os.path.basename(_back_win.mp4)
+        if _box:
+            assert _got == os.path.basename(_remembered), (
+                _got, _remembered, "the box was ticked and the window moved the picture "
+                                   "anyway")
+            assert "keep my background" in _back_win.pair_note, _back_win.pair_note
+        else:
+            assert _got == themes.CODE_CLIPS["gauge"], (
+                _got, themes.CODE_CLIPS["gauge"],
+                "a restored window without the box kept a clip its open theme does not name")
+            assert "pairs with" in _back_win.pair_note, _back_win.pair_note
+        _back_win.close()
+    print(f"  restored, both halves  a remembered {os.path.basename(_remembered)} comes "
+          f"back when the box is ticked and is replaced by gauge's own backdrop "
+          f"({themes.CODE_CLIPS['gauge']}) when it is not")
+finally:
+    if _keep_cfg is None:
+        os.remove(_here_cfg) if os.path.exists(_here_cfg) else None
+    else:
+        with open(_here_cfg, "wb") as fh:
+            fh.write(_keep_cfg)
+_st = settings._clean(_pw._state())
+assert _st["keep_my_clip"] == _pw.keep_clip == _pw.chk_keep.isChecked(), (
+    "the window's pairing flag is not the flag its settings file holds, or not the box "
+    "a reader can see")
+assert "clip_customized" not in _st and "clip_customized" not in _pw._state(), (
+    "the window still writes the key 0.4 retired, so a file would answer a question the "
+    "code no longer asks")
 assert "Use this layout's own clip" in _pw.btn_pair.text(), _pw.btn_pair.text()
+assert "keep my background" in _pw.chk_keep.text(), _pw.chk_keep.text()
 _pw.close()
 _doc = open("docs/gui.md", encoding="utf-8").read()
 for _claim in (f"all {len(pick)} selectable layouts", "Use this layout's own clip",
                "does not write one",            # the save_settings rule, above
-               "in the note line under"):       # a declined pairing has to be said twice
+               "in the note line under",        # a declined pairing has to be said twice
+               "keep my background",            # the box: the only way to opt out
+               "read once and honoured",        # `clip_customized`, the retired key
+               "dropdown selects it automatic",  # 0.4: the pairing arrives by itself
+               "backdrop their own",            # the five themes' published backdrops
+               "themes.CODE_CLIPS"):            # ...and where they are kept
     assert _claim in _doc, (_claim, "docs/gui.md does not describe the pairing this drives")
 _missing_note = ("and each said so instead of pretending" if _absent else
                  "(0 here: that branch is driven instead by taking the rows *and* every "
@@ -7222,13 +7467,20 @@ _missing_note = ("and each said so instead of pretending" if _absent else
 print(f"  the pairing in the window  of the {len(pick)} selectable layouts, "
       f"{len(_here)} name a clip this box lists and every one of those moved under the "
       f"preview with its row marked ({_rows_ok}/{len(_here)}); {len(_absent)} name a clip "
-      f"this box does not have {_missing_note}; one click on another row made the "
-      f"background the reader's and the next {_stayed} layouts could not walk over it; the "
-      f"button handed the layout its own clip back and re-armed the pairing; and all "
-      f"{len(render.THEMES)} drawn themes left the clip where it was and said why in the "
-      f"same line. On a bare checkout - no installed package, no Windows partition - the "
-      f"{_alone_n} rows this repository's own files give the window cover all {len(pick)} "
-      f"pairs.")
+      f"this box does not have {_missing_note}; a row click put another clip under the "
+      f"preview and ticked nothing, and the next 6 layouts each took their own back "
+      f"(6/6) while saying what they replaced ({len(_replaced)} log lines); ticking "
+      f"\"keep my background\" held {_held} against all 6 ({_stayed}/6) and named every "
+      f"refusal in the log; the button took the pair back and unticked the box, and "
+      f"unticking alone moved the picture at once. And the {len(render.THEMES)} themes "
+      f"drawn from `render.py` pair too: {_code}/{len(_order)} through the theme picker "
+      f"and {_drop}/{len(themes.EXPORTS)} through the dropdown's export entries, each one "
+      f"with its row marked ({_rows_code}/{len(_order)}) and its backdrop named in the "
+      f"note; {len(_bright)} of those backdrops is bright and came with a plate "
+      f"({', '.join(_bright) or 'none'}), the rest measured dark and needed none. On a "
+      f"bare checkout - no installed package, no Windows partition - the {_alone_n} rows "
+      f"this repository's own files give the window cover all {len(pick)} vendor pairs "
+      f"and all {len(themes.CODE_CLIPS)} published backdrops.")
 PY
 
 echo

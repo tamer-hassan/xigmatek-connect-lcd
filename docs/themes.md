@@ -15,8 +15,12 @@ and still has not, is sending a theme file to the panel:
 That declaration is a field, not a naming convention: `background.mediaFile`, and the 23
 selectable layouts name 23 different clips between them - no two layouts share one.
 `themes.pair(NAME)` reads it, `--list-themes` prints it, and the window follows it:
-opening a layout puts that clip under the preview unless the reader has chosen a
-background by hand (docs/gui.md). Three of the four canvas-refused files name clips as
+opening a layout puts that clip under the preview unless the reader has ticked *keep my
+background* (docs/gui.md). The five themes this repository draws from `render.py` are not
+vendor pages, so there is no vendor record to read for them: they pair with the backdrop
+their own published picture is composited over, kept in `themes.CODE_CLIPS` and derived
+back out of the README's `<theme>-<clip>.mp4` names by `tools/selftest.sh` on every run.
+Three of the four canvas-refused files name clips as
 well, and one names a `.png` rather than a clip - one more reason the refusal is keyed on
 a file's own `ratio` field rather than on what sits beside it.
 

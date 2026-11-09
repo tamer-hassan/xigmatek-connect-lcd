@@ -308,7 +308,11 @@ class Window(QMainWindow):
         super().__init__()
         self.autosave = restore if save_settings is None else save_settings
         self._said_no_save = False
-        self.cfg = settings.load() if restore else settings._clean({})
+        # what the file needed explaining, in its own words: an older key, or two keys that
+        # answer one question.  Logged once _build() has given us somewhere to say it.
+        self._cfg_notes: list[str] = []
+        self.cfg = (settings.load(self._cfg_notes) if restore
+                    else settings._clean({}, self._cfg_notes))
         self.setWindowTitle(TITLE)
         self.port = port or self.cfg["device"]
         self.preview_fps = preview_fps or self.cfg["preview_fps"]
@@ -319,20 +323,22 @@ class Window(QMainWindow):
         self.bg_timer = QTimer(self)          # the background's own clock
         self.bg_timer.timeout.connect(self._play_tick)   # connected once, here
         self.mp4 = self.cfg["clip"]
-        # Whether the background under the preview is *yours* or the theme's.  A vendor
-        # layout names one clip in its own file (`themes.pair`), and while this is False
-        # the window follows that: open `Theme_07`, and `Theme_07.mp4` goes under the
-        # layer.  Choosing a clip from the library sets it, and the row that hands the
-        # layout its own clip back clears it - so "I picked this" is a fact the window
-        # remembers across restarts instead of one it has to guess from a path.
-        self.clip_custom = bool(self.cfg.get("clip_customized", False))
+        # Whether a layout's own background is the one under the preview.  A vendor layout
+        # names one clip in its own file (`themes.pair`), and while this is False the window
+        # follows that: open `Theme_07`, and `Theme_07.mp4` goes under the layer.  True is
+        # the "keep my background" box in the clip column, and a hand is the only thing that
+        # ticks it - clicking a library row used to, which is how a window came to look like
+        # it was ignoring its own pairing (docs/gui.md).  It is a stored flag rather than
+        # "the clip is not the default", because a paired clip and a chosen one are the same
+        # shape once they are both paths on disk.
+        self.keep_clip = bool(self.cfg.get("keep_my_clip", False))
         self._pair_target = ""          # the clip the open layout names, if any
         self.pair_note = ""             # the sentence the pairing ended with
         # Whether the list's current row moved because a reader clicked it.  Population
         # selects the row that matches the restored clip, and the pairing selects the row
         # it chose; both are the window answering its own question, and treating either as
-        # a choice is how "the background is mine" becomes true on a window where nobody
-        # chose anything.
+        # a choice is how a line about "your background" gets printed for a click nobody
+        # made.
         self._programmatic = False
         self.tray_wanted = self.cfg["tray"] if tray is None else tray
         self._quitting = False
@@ -384,6 +390,12 @@ class Window(QMainWindow):
         self.preview_timer.timeout.connect(self._repaint)
         self.preview_timer.start(max(200, int(1000 / self.preview_fps)))
         self._load_background(self.mp4)
+        # A file that needed explaining gets explained here, once, before anything the
+        # window does about it: an older key is honoured silently in the sense that the
+        # background does not move, and loudly in every other one.
+        for _note in self._cfg_notes:
+            self._log(_note)
+        self._cfg_notes = []
         # Said even at a fresh window, because "the theme chose this background" and "you
         # chose this background" are different claims about the same picture, and the pane
         # cannot tell them apart by looking at it.
@@ -916,13 +928,33 @@ class Window(QMainWindow):
         self.pair_state.setWordWrap(True)
         self.pair_state.setStyleSheet("color:#888;font-style:italic;")
         mlay.addWidget(self.pair_state)
+        # The opt-out, as a box you can see and tick, rather than a flag set behind your
+        # back by a click on the list.  That is the whole of the 0.4 change: a layout's own
+        # background arrives automatically, and the only way it does not is this control -
+        # whose state is therefore always something the reader chose to be true.
+        self.chk_keep = QCheckBox("keep my background")
+        self.chk_keep.setToolTip(
+            "unticked, the default: choose a layout and the background it names in its own "
+            "file goes under the preview, and the row is marked for you.  Ticked: the clip "
+            "under the preview stays wherever you left it, and a layout that names another "
+            "one says so in the note line and the log instead of moving it.  Nothing else "
+            "in the window ticks this box. Each of the five themes this repo draws from "
+            "`render.py` names the backdrop its own published picture sits over "
+            "(`themes.CODE_CLIPS`), so they pair as well; a layout you authored yourself "
+            "names none, and with one of those open the pairing has nothing to do "
+            "(docs/themes.md, PROTOCOL.md \u00a711)")
+        self.chk_keep.setChecked(self.keep_clip)      # before the connect: no fake click
+        self.chk_keep.toggled.connect(self._keep_toggled)
+        mlay.addWidget(self.chk_keep)
         self.btn_pair = QPushButton("Use this layout's own clip")
         self.btn_pair.setToolTip(
             "a vendor layout names one background clip in its own file, and the window "
-            "follows that pairing until you choose a clip here.  This puts the layout's "
-            "own clip back and follows it again from now on. The five themes this repo "
-            "draws from `render.py` name no clip, so with one of those open the pairing "
-            "has nothing to do (docs/themes.md, PROTOCOL.md \u00a711)")
+            "follows that pairing unless you tick \"keep my background\" here.  This puts "
+            "the layout's own clip back and unticks the box, so it follows again from now "
+            "on. Each of the five themes this repo draws from `render.py` names the "
+            "backdrop its own published picture sits over, so they pair as well; a layout "
+            "you authored yourself names none, and with one of those open the pairing has "
+            "nothing to do (docs/themes.md, PROTOCOL.md \u00a711)")
         self.btn_pair.clicked.connect(self._use_pair)
         self.btn_pair.setEnabled(False)
         mlay.addWidget(self.btn_pair)
@@ -1486,7 +1518,7 @@ class Window(QMainWindow):
                 "canvas": "black" if self.canvas.currentIndex() else "clear",
                 "scrim": self.scrim.value(), "fans": self.fanline.isChecked(),
                 "preview_fps": self.preview_fps, "clip": self.mp4,
-                "clip_customized": self.clip_custom,
+                "keep_my_clip": self.keep_clip,
                 "animate": self.anim_toggle.isChecked(),
                 "advanced": self.adv_toggle.isChecked(),
                 "size": [self.width(), self.height()],
@@ -1649,7 +1681,7 @@ class Window(QMainWindow):
         item.setIcon(QIcon(QPixmap.fromImage(q)))
 
     def _apply_pair(self, name: str) -> None:
-        """Follow the background a theme names, unless the background is yours.
+        """Follow the background a layout names, unless the "keep my background" box is on.
 
         One rule, said out loud in every branch, because the interesting part is the case
         where it does nothing: the five themes drawn from `render.py` declare no clip at
@@ -1658,24 +1690,25 @@ class Window(QMainWindow):
         clip, why = themes.pair(name)
         self._pair_target = clip
         if not clip:
-            self.pair_note = why if not self.clip_custom else (
+            self.pair_note = why if not self.keep_clip else (
                 f"background is yours: {os.path.basename(self.mp4)}. "
                 f"{why[0].upper() + why[1:]}")
             self._refresh_pair()
             return
-        if self.clip_custom:
+        if self.keep_clip:
             self.pair_note = (f"background is yours: {os.path.basename(self.mp4)}. This "
-                              f"layout names {clip} - the button below takes it back.")
+                              f"layout names {clip} - untick \"keep my background\", or "
+                              f"press the button below, to take it back.")
             # The reader needs more than a changed line of small print here.  This is the
             # case where a layout declares a clip, the preview does not move, and nothing
             # else about the window looks different - so say it in the log too, in the same
-            # words the note uses, and say which button undoes it.  Only when the two clips
+            # words the note uses, and say how to undo it.  Only when the two clips
             # actually differ: opening the layout whose clip is already under the layer is
             # not a refusal, and logging it would be noise.
-            if clip and clip != os.path.basename(self.mp4):
-                self._log(f"{name} names {clip}; the background is yours "
-                          f"({os.path.basename(self.mp4)}), so the window kept it. "
-                          f"\"Use this layout's own clip\" puts it back.")
+            if clip != os.path.basename(self.mp4):
+                self._log(f"{name} names {clip}; \"keep my background\" is ticked, so "
+                          f"the window kept {os.path.basename(self.mp4)}. Untick it, or "
+                          f"\"Use this layout's own clip\" takes it back now.")
             self._refresh_pair()
             return
         path, how = clipdb.find(clip, self.all_clips)
@@ -1689,8 +1722,12 @@ class Window(QMainWindow):
             + ("" if how == "row" else " No row of the library holds these bytes, so "
                                        "nothing is marked in the list."))
         if path != self.mp4:
+            was = os.path.basename(self.mp4)
             self._load_background(path)      # repaints, and the note is written after
             self._pair_row(path)
+            # The movement is the whole point of the feature, and it replaced a picture -
+            # so the log says which one, and what asked for it.
+            self._log(f"background: {clip}, {name}'s own clip ({how}), replacing {was}")
         else:
             self._pair_row(path)
         self._refresh_pair()
@@ -1709,16 +1746,38 @@ class Window(QMainWindow):
                 return
 
     def _use_pair(self) -> None:
-        """The way back: the layout's own clip, and the pairing re-armed."""
-        self.clip_custom = False
+        """The way back: the layout's own clip, and the box unticked so it follows again."""
+        self.keep_clip = False
+        self.chk_keep.blockSignals(True)     # a button doing it must not log as a tick
+        self.chk_keep.setChecked(False)
+        self.chk_keep.blockSignals(False)
         self._apply_pair(self.ed.name if self.ed is not None
                          else self.theme.currentText())
         self.save_timer.start()
         self._log(f"background: the layout's own clip ({self.pair_note})")
 
+    def _keep_toggled(self, on: bool) -> None:
+        """The one place `keep_my_clip` changes, and a hand did it.
+
+        Unticking takes the open layout's clip back at once rather than waiting for the
+        next layout change: a box and a picture that disagree about what is on screen are
+        worse than either alone.
+        """
+        self.keep_clip = on
+        name = self.ed.name if self.ed is not None else self.theme.currentText()
+        if on:
+            self._log('keeping your background: no layout will move it until you untick '
+                      '"keep my background"')
+        else:
+            self._log(f"layouts choose their own background again ({name})")
+        self._apply_pair(name)
+        self.save_timer.start()
+
     def _refresh_pair(self) -> None:
         self.pair_state.setText(self.pair_note)
-        self.btn_pair.setEnabled(bool(self._pair_target) and self.clip_custom)
+        # the button is the way back from the box, so it only means something while the
+        # box is on; with it off the pairing is already doing the button's work
+        self.btn_pair.setEnabled(bool(self._pair_target) and self.keep_clip)
 
     def _clip_chosen(self, item: QListWidgetItem | None, *_a) -> None:
         if item is None:
@@ -1732,13 +1791,18 @@ class Window(QMainWindow):
             item.setText(self._row(self.all_clips[i]))
         self._load_background(path)
         self._queued_bg = ""          # a new pick has not been asked for yet
-        # This is the moment that makes the background yours, and it is the only one: a
-        # row was clicked.  `clip_customized` is what stops a later layout change from
-        # walking over the choice, and the pairing note says what was given up.
-        if not self.clip_custom and not self._programmatic:
-            self.clip_custom = True
-            self._apply_pair(self.ed.name if self.ed is not None
-                             else self.theme.currentText())
+        # Picking a row puts that clip under the preview, and nothing else.  Whether a later
+        # layout change walks over it belongs to the "keep my background" box, which only a
+        # hand moves: until 0.4 a row click set the flag itself, which is how a window ended
+        # up refusing to follow any layout's pairing - for reasons the reader could not see
+        # (docs/gui.md).  So the cost of the pick is said out loud instead of recorded in
+        # silence: the layout open right now names another clip, and will put it back.
+        if (not self._programmatic and self._pair_target
+                and self._pair_target != os.path.basename(path)):
+            _open = (self.ed.name if self.ed is not None else self.theme.currentText())
+            self._log(f"background: {os.path.basename(path)}, yours to preview and to "
+                      f"send. {_open} names {self._pair_target}, and the next layout "
+                      f"change puts it back unless you tick \"keep my background\"")
         self._refresh_clip_state()
         self.save_timer.start()          # next start opens on the clip you chose
         # the detail only: the row itself is the line directly above this label,

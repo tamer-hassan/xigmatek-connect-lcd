@@ -534,27 +534,48 @@ alone. The author's own `~/.config/xigmaui/config.json` at 07:33 holds
 `clip: /usr/share/xigmalcd/themes/alpha/clips/theme_47.mp4` and `clock_size: 30`,
 which is the fingerprint of those three picks: the clip moved, the glass did not.
 
-**A layout names the picture under it, and the window follows that - until you choose.**
+**A layout names the picture under it, and the dropdown selects it automatically.**
 Every vendor layout declares exactly one clip in its own file (`background.mediaFile`):
 all 23 selectable layouts name a distinct one, and `themes.pair(NAME)` is the one place
 that reads it, so `--list-themes` and the window cannot disagree with each other or with
-the file. Opening a layout in the editor puts its own clip under the preview and marks
-that row in the library column - measured over all 23, every one of them resolved to a
-row on this bench, and the suite asserts both halves. Two cases are said out loud rather
-than left to be inferred:
+the file. Choosing a layout in the dropdown puts its own clip under the preview and marks
+that row in the library column - measured over all 23 vendor layouts and all five
+generated exports in that dropdown, every one of them resolved to a row on this bench, and
+the suite asserts both halves. Two cases are said out loud rather than left to be inferred:
 
-* **the five themes this repo draws from `render.py` name no clip at all.** A generated
-  layout *is* the picture; there is nothing under it, and the line under the clip list
-  says so instead of leaving the reader to wonder whether the pairing is broken.
-* **a clip you picked is yours.** Choosing a row in the library sets `clip_customized`
-  in the settings file - a stored bool, because "I picked this" is a fact about a human
-  that no path on disk can recover - and from then on opening a layout leaves the
-  background alone and says which clip that layout would have used - in the note line under
-  the picture **and** in the log, because a preview that refuses to move looks exactly like a
-  broken window and a line of small print is easy to miss.  **Use this layout's own clip**
-  clears the flag, takes the pair back, and re-arms the pairing. Populating
-  the list also selects a row; that is the window answering its own question, and the
-  gate checks that it does *not* set the flag, because it looked exactly like a choice.
+* **the five themes this repository draws from `render.py` pair with the backdrop their own
+  published picture sits over** - `alpha`→`Theme_25.mp4`, `gauge`→`3.mp4`,
+  `dual`→`Theme_30.mp4`, `clock`→`Theme_07.mp4`, `bars`→`theme_52.mp4`, kept in
+  `themes.CODE_CLIPS`. That is not a guess and not a vendor record either: the vendor
+  library has no page for a theme it did not draw, so the honest source is this project's
+  own pictures - the README's MP4s are named `<theme>-<clip>.mp4` for it, and
+  `tools/selftest.sh` derives the set back out of those file names on every run and fails
+  if the table disagrees. The amber-ink figure (`alpha-Theme_25-amber.mp4`) drops out of
+  that derivation by itself, because its clip part is not a file any media root holds.
+  `clock` is the one backdrop that is bright, so pairing it brings the scrim plate with it
+  - the same luma rule as everywhere else, not a per-theme setting. A layout *you* authored
+  names no clip at all, and the line under the clip list says so instead of leaving the
+  reader to wonder whether the pairing is broken.
+* **a background stays put only if you say so, with a box you can see.** *keep my
+  background*, in the clip column, stored as the bool `keep_my_clip` - a stored flag,
+  because "hold this one" is a fact about a human that no path on disk can recover.
+  Ticked, opening a layout leaves the background alone and says which clip that layout
+  would have used - in the note line under the picture **and** in the log, because a
+  preview that refuses to move looks exactly like a broken window and a line of small
+  print is easy to miss.  **Use this layout's own clip** unticks it, takes the pair back,
+  and re-arms the pairing.
+
+That box used to be set by clicking a row in the library, under the old key
+`clip_customized`, and 0.4 stopped doing that: a row pick is a preview and a thing you
+may send, and until a reader asks otherwise the layout in the dropdown owns the picture.
+So clicking a row now prints what the pick costs - which clip the open layout names, and
+that the next layout change brings it back - and nothing in the window ticks the box by
+itself. A file written by the older window is read once and honoured: `clip_customized:
+true` becomes a ticked box, so an upgrade does not move a background under anybody, and
+the window says so in its log before it does anything else; the next save writes only the
+new key. Populating the list also selects a row; that is the window answering its own
+question, and the gate checks that it does *not* tick the box or print that line, because
+it looked exactly like a choice.
 
 The pairing changes nothing about the wire: it decides what the *preview* composites
 under our layer, and the upload button is still the only thing that sends a file to the
@@ -1067,8 +1088,9 @@ indexed rather than 9.2-9.8 KB.
 **What it remembers.** `~/.config/xigmaui/config.json`, written by
 `xigmaui/settings.py`: the port, theme, clock size, canvas, scrim, fan figures, preview
 rate, window size, the three splitter widths, the text colour, whether the advanced
-controls are folded away, whether closing the window hides it to the tray, and the clip
-that was selected. The write is atomic and debounced -
+controls are folded away, whether closing the window hides it to the tray, the clip
+that was selected, and `keep_my_clip` - whether the *keep my background* box is ticked.
+The write is atomic and debounced -
 500 ms behind a burst of clicks, once more on close - and the read goes through
 validation rather than trust: a truncated or hand-edited file falls back to the
 defaults instead of stopping the window, out-of-range values are dropped, and a clip
@@ -1076,6 +1098,17 @@ path that is not there (the Windows partition is not always mounted) falls back 
 `media/Theme_25.mp4` rather than drawing a blank preview. `--device` and
 `--preview-fps` on the command line win over the file, and `--fresh` ignores and
 overwrites it.
+
+**One older key is read once.** A file written before 0.4 may hold `clip_customized`,
+which meant "a row was clicked, so no layout may walk over that clip". `_clean` maps it
+to `keep_my_clip` and leaves the behaviour alone - a box that was effectively on stays on,
+so an upgrade moves nothing - and `load(notes=...)` hands the window the sentence it
+prints in its log before the first pairing line: *the older `clip_customized: true` in
+your file is now the "keep my background" box, and it is ticked so nothing moved under
+you.* The next save writes only the new key, and a file that somehow carries both is
+answered by the new one, with a note saying the old key is on its way out. A stored junk
+value (`"yes"`, `1`, `null`) is still refused: only a real bool counts, because a truthy
+string here would quietly stop the window following its pairing.
 
 **A window that was started without that file does not write one.** `save_settings`
 defaults to `restore`, so a normal session and `--fresh` (whose help promises to
@@ -1087,8 +1120,10 @@ here because one of this project's own test sections did exactly that: it set
 section, which expands to nothing when the section is run on its own, so the write landed
 in `~/.config/xigmaui/config.json`. The next `python3 -m xigmaui` by hand opened on a clip
 nobody had chosen, pointed at `/dev/xigma-no-such-port`, and carried
-`clip_customized: true` - which is the flag that stops the window following any layout's
-own background. Two things were wrong with that: the section was not self-contained, and
+`clip_customized: true` - the older flag that stopped the window following any layout's
+own background, and the reason the pairing complaint that opened this section looked like
+a broken window rather than a stored bool. Two things were wrong with that: the section
+was not self-contained, and
 the window had no rule about writing a file it had refused to read. Nothing about the
 *panel* is stored, because the panel cannot be asked
 what it remembers (§11): the file describes the window, not the glass.
