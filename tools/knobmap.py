@@ -21,8 +21,8 @@ file would change the picture on the glass, and the figure is the size of the ch
 directions of "worse" and "stronger" happen: `--bg black` comes out *more* opaque through
 the file door - a plate composited under the finished layer seals every pixel at alpha 255,
 while a `theme_*` body's own translucent fills stay translucent against its canvas
-(docs/usage.md's `--bg` row) - and `--no-clock` on `clock` is a case where the code door
-ignores the option entirely.
+(docs/usage.md's `--bg` row) - and an option a body ignores is worse than either, because
+both doors then draw the default frame while the reader asked for something else.
 
 Machine dependence, stated: the non-zero figures sit on glyph edges and inside shapes whose
 size walks a font's metrics, so they move with the installed faces.  What does not move is
@@ -40,8 +40,10 @@ The knobs are read as what they are, not as flags someone remembers:
   is asked with `heat` (its other branch) and not with an invented string that would take
   the default's branch and turn a no-op into a pass.
 * a parameter in a signature that the body never reads is left out of the rows and said out
-  loud: `theme_clock(clock=True, ...)` is exactly that, which is why `--no-clock` moves that
-  theme 0 px.
+  loud, because counting it as 'answered by the file door' would be a lie: both doors draw
+  the default frame.  `theme_clock(clock=True, ...)` was exactly that until 0.4, and
+  `--no-clock` moved that theme 0 px; the body honours the option now, and the map's
+  row for it is exact against the generated layout's deleted `Time` row.
 
 Usage::
 

@@ -770,7 +770,7 @@ them, and `main.paint` already prefers a file for any other name.  Whether that 
 measurement per option, not per theme, and `tools/knobmap.py` makes it: one pinned reading
 dict at one pinned instant, every option each `theme_*` signature accepts (read with
 `inspect`), the best row-level edit of that theme's own export for each, and the pixels
-between the two doors.  On this run 27 of the 36 (theme, option) pairs land at zero differing
+between the two doors.  On this run 28 of the 37 (theme, option) pairs land at zero differing
 pixels with a worst channel of 0 - the reader's text colour (through `themes.with_ink`), a
 clock or fan row switched off by deleting it, `--clock-size` as the Time row's `fontSize`,
 `--cold`/`--hot` as `minValue`/`maxValue`, `--label` and `--title` as a text row's `content`,
@@ -784,19 +784,25 @@ antialiasing: `alpha`'s heading is not a text row a `content` edit can reach, `g
 `source` moves the arc's ramp and ticks as well as its reading, and `gauge`'s `gradient` has
 no key in the file model at all.
 
-One option is in a signature and nowhere in a body: `clock` takes `clock` and never reads it,
-and `main._theme_kwargs` routes `--no-clock` straight to it - so that flag leaves that theme
-at 0 px, which is said here rather than fixed quietly, because honouring it would redraw a
-theme on the glass.  Two more options - `clock`'s `big` and `gauge`'s `gradient` - are read by
+One option was in a signature and nowhere in a body until 0.4: `clock` took `clock` and
+never read it, while `main._theme_kwargs` routed `--no-clock` straight to it - so that flag
+moved 0 px on the one theme whose picture is a clock.  `clock` honours `--no-clock` now: the
+big time line goes and the date and the readings line stay in their own y bands, which puts
+the pair in the map as a row that lands at 0 px against the generated layout with its `Time`
+row deleted.  Anyone using the flag gets a different frame on the glass, so stage 6 of
+[theme-editor.md](theme-editor.md) owes it a look; nothing here is claimed from the panel.
+Nothing in the map is left unread today, and the section that runs the tool re-derives that
+from the bodies rather than remembering it.  Two options - `clock`'s `big` and
+`gauge`'s `gradient` - are read by
 the body but have no entry in `_theme_kwargs` at all, so no flag or socket message can set
 them; `big` is a *size* (`theme_clock(big=140)`), not a flag, and the first version of this
 map mistook it for one and asked with `True`.
 
 What belongs to the machine: the non-zero pixel counts walk glyph edges and installed faces,
 so the suite prints them beside the machine and this page carries only the counts, the sets
-and the floor.  What does not: which pairs are exactly 0, and that the unread option is
-unread - both are re-derived on every run by the section that runs the tool, and it asserts
-the words above against the run. And **none of this has
+and the floor.  What does not: which pairs are exactly 0, and that no option in a
+signature is left unread - both are re-derived on every run by the section that runs the
+tool, and it asserts the words above against the run.  And **none of this has
 been looked at on glass yet**: the frame byte counts in docs/usage.md (3 558 B for
 `Theme_29` up to 8 115 B for `Theme_35`, one pinned fixture, one pinned instant) are
 offline figures from `--dry-run`, and the glass pass is stage 6 of

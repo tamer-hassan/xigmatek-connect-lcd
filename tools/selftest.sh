@@ -503,20 +503,38 @@ for theme in ("gauge", "dual", "clock", "bars", "alpha"):
 # the upload path quantises to 256 colours by default (PROTOCOL.md §12), so a
 # chosen ink has to survive *that* to be worth choosing.  Measured here, over the
 # colours the GUI offers: the worst per-channel shift on the way through.
+#
+# The frame has to hold enough of the ink for "the most common colour" to *be* the ink
+# being asked about, so this probe asks `clock` for its big time line.  It used to pass
+# `clock=False` as well, which read as "keep the picture simple" and worked only because
+# `theme_clock` ignored that flag: once the flag honours the request (docs/limits.md's
+# knob-map paragraph), that frame is the readings line alone and the assert below would
+# have measured some other colour's trip through the palette.  So the probe now checks
+# its own premise - the wanted ink is present, exactly, in thousands of pixels *before*
+# the quantise - rather than assuming a theme draws what its signature offers.
 import io
 from PIL import Image
 worst = 0
+swatch = None
 for name in ("amber", "mint", "cyan", "green", "red", "#ff4040"):
     want = R.parse_ink(name)
-    enc = R.to_png(R.draw(M, "clock", clock=False, date=False, ink=want))
+    frame = R.draw(M, "clock", clock=True, date=False, ink=want)
+    pre = counts(frame)
+    assert pre.get(want, 0) > 1000, (
+        name, pre.get(want), "the frame this probe quantises does not carry the ink it "
+                             "is asking about, so the assert below would measure some "
+                             "other colour's trip through the palette")
+    enc = R.to_png(frame)
     seen = counts(Image.open(io.BytesIO(enc)).convert("RGBA"))
     got = max(seen, key=seen.get)
     shift = max(abs(a - b) for a, b in zip(want[:3], got[:3]))
     worst = max(worst, shift)
+    swatch = pre[want] if swatch is None else min(swatch, pre[want])
     assert shift <= 1, (name, want, got, shift,
                         "the palette path moved a chosen ink by more than a count")
 print(f"  through the palette   a chosen ink returns within {worst}/255 per channel "
-      f"on the default 256-colour upload path")
+      f"on the default 256-colour upload path, over frames holding {swatch:,} px of "
+      f"that ink before the quantise")
 
 # ---- the same reader's colour, through the *file* door.  `themes.draw` has no `ink`
 # ---- argument and is right not to have one: a layout's colours are its own, which is why a
@@ -4107,6 +4125,52 @@ for name, knob in sorted(expect_unread):
     assert f"`theme_{name}` never reads `{knob}`" in _usage_doc, (
         name, knob, "docs/usage.md lists the flag that reaches this option without saying "
                     "that the theme ignores it")
+
+# The other direction, and the one that matters now: an option that *is* read has to be a row,
+# and for this one an exact row.  `--no-clock` on `clock` was caught by this tool as an option
+# in the signature and nowhere in the body; the body honours it as of 0.4, so the pair became
+# a row that lands at 0 px in both doors.  If the body ever stops honouring it, the option
+# drops back onto the unread list above (so the counts move) *and* this assert names it, which
+# is the difference between a gate that reports a drift and one that quietly re-labels it.
+_HONOURED = {"clock": ("clock", "drops the big time line and keeps the date and the readings "
+                                "line")}
+for _name, (_knob, _phrase) in _HONOURED.items():
+    _here = [r for r in rows if r["theme"] == _name and r["knob"] == _knob]
+    assert len(_here) == 1 and _here[0]["exact"], (
+        _name, _knob, [(r["knob"], r["diff_px"]) for r in _here],
+        "this option is no longer one row landing at 0 px in both doors: the theme stopped "
+        "honouring the flag, or its file-side answer moved")
+    assert f"`{_name}` honours `--no-{_knob}`" in _lim, (
+        _name, _knob, "docs/limits.md does not say the flag is honoured, which is the half a "
+                      "reader acts on")
+    assert _phrase in open("docs/usage.md", encoding="utf-8").read(), (
+        _name, _phrase, "docs/usage.md's flag table does not describe what this flag does to "
+                        "that frame")
+# and no "the body ignores it" sentence may outlive a fix
+for _r in rows:
+    assert (f"`{_r['theme']}` takes `{_r['knob']}` and never reads it" not in _lim), (
+        _r["theme"], _r["knob"], "docs/limits.md still calls an option that this run found in "
+                                 "the body unread")
+
+# docs/tools.md quotes the same split in its catalogue row, and that table is only read if its
+# rows are the shape the header promises: an inserted row once spliced itself into the next
+# one, and GitHub drops the extra cells without warning.
+_tools_doc = open("docs/tools.md", encoding="utf-8").read()
+_t_claim = f"{len(zero)} of the {len(rows)} pairs"
+assert _t_claim in _tools_doc, (_t_claim, len(zero), len(rows),
+                                "docs/tools.md's catalogue row quotes different digits than "
+                                "this run measured")
+_cat = _tools_doc.split("\n")
+_h = next(k for k, ln in enumerate(_cat) if ln.startswith("| If the question is |"))
+_end = _h
+while _end + 1 < len(_cat) and _cat[_end + 1].startswith("|"):
+    _end += 1
+_cols = _cat[_h].count("|") - 1
+_ragged = [(k + 1, _cat[k].count("|") - 1) for k in range(_h, _end + 1)
+           if _cat[k].count("|") - 1 != _cols]
+assert not _ragged, (_ragged, _cols, "the catalogue table has rows that are not "
+                                     f"{_cols} cells, so the overflow is dropped by the "
+                                     "renderer and those sentences are not being read")
 _missing = [c for c in _claims if c not in _lim]
 assert not _missing, (_missing, "docs/limits.md does not state what this run measured, so the "
                                 "paragraph is prose again rather than a claim held to the map")

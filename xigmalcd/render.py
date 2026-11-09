@@ -615,13 +615,26 @@ def dual_status_line(m: dict) -> str:
 
 
 def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY, ink=None):
-    """Mostly a clock: huge time, one line of readings underneath."""
+    """Mostly a clock: huge time, one line of readings underneath.
+
+    `clock=False` drops the big time line and leaves the date and the readings line where
+    they are - the layout does not re-flow, because the two remaining lines each have their
+    own y band and nothing moves into the gap.  That rule was in the signature and not in
+    the body for most of this project's life: `--no-clock` reached this theme through
+    `_theme_kwargs` and did nothing at all.  That is the kind of gap a knob table hides and
+    a map measured against the drawing cannot (`tools/knobmap.py`), and the section that runs
+    it now holds this pair at zero differing pixels - the code drawing drops the line, the
+    generated layout answers the same option by deleting its `Time` row.  On the glass this
+    is a frame change for anyone using the flag, so it belongs with the bench pass in
+    docs/theme-editor.md's stage 6.
+    """
     img = Image.new("RGBA", (W * SS, H * SS), bg)
     fg, mid, acc = _skin(ink, *SKIN["clock"])
-    t = clock_str()
-    # One budget for every line in this theme: 440 panel px, which is what the big
-    # time line already used and what the other two did not.
-    _text(img, (240, 190), t, _fit(img, t, 440, big), fg)
+    if clock:
+        t = clock_str()
+        # One budget for every line in this theme: 440 panel px, which is what the big
+        # time line already used and what the other two did not.
+        _text(img, (240, 190), t, _fit(img, t, 440, big), fg)
     if date:
         date_s = date_str()
         # `Wednesday 31 December 2099` measures 382.5 panel px at 22, so the date
