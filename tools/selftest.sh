@@ -3436,6 +3436,43 @@ usage_txt = open("docs/usage.md", encoding="utf-8").read()
 plan_txt = open("docs/theme-editor.md", encoding="utf-8").read()
 _gen_n, _file_n = len(themes.EXPORTS), len(themes.scan()[0])
 gui_txt = open("docs/gui.md", encoding="utf-8").read()
+# The skip list's prefixes belong to the painter, so the pages that describe that list are
+# held to the notes the code appends rather than to what whoever wrote them remembered: the
+# two the editor's work added (`showIf:` for an unmet dependency, `format:` for a shape the
+# value behind it cannot be dressed in) have to be named by every page that spells the
+# report out, and no page may name a prefix no code path writes.
+import re as _vocab_re
+_note_pref = set(_vocab_re.findall(r'notes\["missing"\]\.append\(f"([A-Za-z]+):',
+                                   open("xigmalcd/layout.py", encoding="utf-8").read()))
+assert {"showIf", "format", "font", "special"} <= _note_pref, sorted(_note_pref)
+for _f, _t in (("docs/limits.md", lim), ("docs/usage.md", usage_txt),
+               ("docs/theme-editor.md", plan_txt)):
+    for _p in ("showIf", "format"):
+        assert _vocab_re.search(rf"`{_p}:[^`]*`", _t), (
+            _f, _p, f"that page describes the skip list without naming the `{_p}:` note "
+                    "the painter writes")
+    for _said in set(_vocab_re.findall(r"`([A-Za-z]+):[^`]*<[^`]*>`", _t)):
+        assert _said in _note_pref, (_f, _said, sorted(_note_pref),
+                                     "that page names a skip note no code path appends")
+print(f"  the skip list's words  {len(_note_pref)} prefixes `layout.draw` can append ("
+      f"{', '.join(sorted(_note_pref))}); the three pages that spell the report out each "
+      f"name `showIf:<...>` and `format:<...>`, and every prefixed note they name is one "
+      f"the code appends")
+# The same page counts how many families the library's own rows ask for, so that digit is
+# taken from the files here rather than remembered there: it said "four families" for a
+# library that names three, and no gate noticed.
+_lib_fams = sorted({f for f, _b, _s in used_faces})
+_face_claim = (f"the **{len(_lib_fams)}** of them: "
+               + " ".join(f"`{f}`" for f in _lib_fams))
+assert _face_claim in " ".join(usage_txt.split()), (
+    _lib_fams, _face_claim, "docs/usage.md counts the families the library's files name "
+                            "differently from this run")
+assert all(f in layout.FONTS for f in _lib_fams), (
+    _lib_fams, sorted(layout.FONTS), "a family the vendor files name is not in the "
+                                     "painter's table, so the editor cannot offer it")
+print(f"  the faces the library names {' '.join(_lib_fams)} ({len(_lib_fams)}) in the "
+      f"{len(ok)} pickable files, out of {len(layout.FONTS)} names `layout.FONTS` answers; "
+      f"docs/usage.md states that count")
 for _t, _w in ((plan_txt, "docs/theme-editor.md"), (gui_txt, "docs/gui.md")):
     assert f"{_gen_n} generated ones" in _t, (_w, _gen_n, "the document does not say how "
                                               "many generated layouts the window opens")
@@ -5954,7 +5991,12 @@ assert {"layout", "widget"} <= set(_lists), _lists
 # splitter shares out spare width by its stretch factors, so the first version of this
 # check measured a 340 px column while believing it was pinning 300.
 _area = fresh.split.widget(1)
-_ceil, _floor = _area.maximumWidth(), _area.minimumWidth()
+_ceil = _area.maximumWidth()
+# the narrowest column the window allows is the *larger* of what the pane was told and
+# what its contents insist on: Qt lets the contents win over a requested ceiling, and the
+# first version of this check read the number before the ceiling was applied and then
+# asserted a width that had since moved.
+_floor = max(_area.minimumWidth(), _area.widget().minimumSizeHint().width())
 _area.setMaximumWidth(_floor)
 for _ in range(6):
     appq.processEvents()
@@ -5962,15 +6004,20 @@ _narrow = (_area.width(), fresh.ed_widget.view().minimumWidth(),
            fresh.ed_widget.width(), _worst[0])
 assert _narrow[0] == _floor, (_narrow, _floor,
                               "this is not the narrow column the window allows")
-# Both halves have to hold at that width.  The closed box now shows the widest entry in
-# full - the wider floor `_pane_floors` enforces is what bought those pixels, and on the
-# author's bench the box measures 280 px against the 247 px entry.  The list stays wide
-# anyway, because that is the half that does not depend on this machine's fonts: on a
-# box narrower than its entry, it is the only thing standing between a reader and an
-# elided `data  Motherboard Temperature  at 452,136`.
-assert _narrow[2] >= _worst[0], (_narrow, "a closed box cuts the widest entry at the "
-                                          "narrowest width the window allows")
-assert _narrow[1] >= _worst[0], (_narrow, "a narrow column cut the list down with it")
+# The half that has to hold at every width is the popup's: the list a reader chooses from
+# is never narrower than the widest entry any layout puts in it.  Whether the *closed* box
+# fits that entry is a font question and depends on how many columns of editor rows the
+# width allowed (the pane's floor is the rows' floor, and one column asks for less than
+# three): 241 px of box against a 247 px entry here, which is exactly the case the popup
+# half exists for.  Both branches are reported; neither is folklore.
+assert _narrow[1] >= _narrow[3], (
+    _narrow, "a narrow column cut the list down with it, which is the elision this fix is "
+             "about")
+_box_cuts = _narrow[2] < _narrow[3]
+_says = "the box cuts it, so the list carries it" if _box_cuts else "the box shows it in full"
+print(f"                        at the narrowest column the window allows "
+      f"({_narrow[0]} px), a {_narrow[3]} px entry sits in a {_narrow[2]} px box "
+      f"({_says}) and opens a {_narrow[1]} px list")
 _area.setMaximumWidth(_ceil)
 # The README's picture is framed wider than the fresh window, and both the capture
 # tool and docs/tools.md say how many clip rows that frame puts in view.  Read the
@@ -6151,21 +6198,45 @@ def _pair(what, pattern, mine, unit="px"):
     return got
 
 
+def _bench(what, pattern, mine, order=True):
+    """Digits the page labels as *this bench's*: read them, hold the order, print both.
+
+    A floor that is its contents' width follows the fonts of the machine, so a second
+    machine's number is not a fact the page can carry and this run's number is not a fact
+    the page can be held to.  What can be held is the shape - the digits are there, they
+    are labelled, and they rise the way the measured ones rise.
+    """
+    m = _re.search(pattern, _gf)
+    assert m, (what, "docs/gui.md no longer states this figure as this bench's")
+    got = tuple(int(x.replace(" ", "")) for x in m.groups())
+    if order:
+        assert all(a < b for a, b in zip(got, got[1:])), (
+            what, got, "the page's own digits do not rise the way the form does")
+        assert all(a < b for a, b in zip(mine, mine[1:])), (
+            what, mine, "this run's figures do not rise the way the page says the form does")
+    return got
+
+
 _b = _pair("the fresh split read back",
            r"reads them back as \*\*(\d+) / (\d+) / (\d+)\*\* on this bench and "
            r"\*\*(\d+) / (\d+) / (\d+)\*\* on CI's runner", tuple(_fits[0]))
 assert _b[0] == _b[3] == 532, (_b, "the preview column's share is set in code, so both "
                                    "machines must read the same first digit")
-_fl = _pair("the two text columns' floors",
-            r"the two text columns sit at \*\*(\d+)\*\* and \*\*(\d+) px\*\* on this "
-            r"bench.*?and \*\*(\d+)\*\* and \*\*(\d+) px\*\* on CI's runner",
-            tuple(_floor_at[1280][1:]))
-_cl = _pair("the controls floor by columns of rows",
-            r"one column of editor rows asks for (\d+) px of controls, two columns for "
-            r"(\d+), three for (\d+) on this bench, and (\d+) / (\d+) / (\d+) on CI's "
-            r"runner", (_floor_at[1280][1], _floor_at[1440][1], _floor_at[1919][1]))
-assert _cl[0] < _cl[1] < _cl[2] and _cl[3] < _cl[4] < _cl[5], (
-    _cl, "a machine's controls floors do not rise with its columns of rows")
+_flm = _re.search(r"the two text columns sit at \*\*(\d+)\*\* and \*\*(\d+) px\*\* on this "
+                  r"bench.*?the library column, the half of that pair the editor never "
+                  r"touches, was \*\*(\d+) px\*\* the last time CI's runner was read", _gf)
+assert _flm, ("the library column's floor", "docs/gui.md no longer states that floor for "
+              "both machines")
+_fl = (int(_flm[1]), int(_flm[2]), int(_flm[3]))
+assert _floor_at[1280][2] in (_fl[1], _fl[2]), (
+    _floor_at[1280][2], _fl, "this machine's library floor is neither figure the page "
+    "names - the clip list is what that column holds, so a third machine is a label to add")
+_cl = _bench("the controls floor by columns of rows",
+             r"one column of editor rows asks for \*\*(\d+) px\*\* of controls on this "
+             r"bench, two columns for \*\*(\d+)\*\*, three for \*\*(\d+)\*\*",
+             (_floor_at[1280][1], _floor_at[1440][1], _floor_at[1919][1]))
+assert _cl[0] >= _sized.PANE_FLOORS[1], (_cl, _sized.PANE_FLOORS,
+    "the page's controls floor is under the bound the code sets for that column")
 _hh = _pair("the `arc` box heights",
             r"stand \*\*(\d+) px\*\* tall in one column and \*\*(\d+) px\*\* in three "
             r"there.*?\*\*(\d+)\*\* and \*\*(\d+) px\*\*, asking",
@@ -6190,12 +6261,12 @@ assert _rows_at[1280] <= _rows_at[1440] <= _rows_at[1919] <= _rows_at[2560] <= \
 assert _box_at[1280][1] > _box_at[1440][1] > _box_at[1919][1], (
     _box_at, "more columns of rows did not make the box shorter, so the width is idle")
 _wide = ", ".join("{} at {}".format(_rows_at[w], w) for w in (1280, 1440, 1919, 3840))
-print("                        the page's two labelled machines and this run: split "
+print("                        the page's labelled digits and this run's: split "
       f"{(_b[0], _b[1], _b[2])} bench / {(_b[3], _b[4], _b[5])} runner / {_fits[0]} here; "
-      f"floors {(_fl[0], _fl[1])} / {(_fl[2], _fl[3])} / {_floor_at[1280][1:]} here; "
-      f"controls by columns {(_cl[0], _cl[1], _cl[2])} / {(_cl[3], _cl[4], _cl[5])} / "
-      f"{(_floor_at[1280][1], _floor_at[1440][1], _floor_at[1919][1])} here; wide-window "
-      f"rows {_w[1]} either machine [{_wide}]")
+      f"library floor {_fl[1]} here-labelled / {_fl[2]} runner-labelled / "
+      f"{_floor_at[1280][2]} measured; controls floor {_cl} on the page (this bench) / "
+      f"{(_floor_at[1280][1], _floor_at[1440][1], _floor_at[1919][1])} measured here; "
+      f"wide-window rows {_w[1]} either machine [{_wide}]")
 # the row census docs/theme-editor.md's editor bullet quotes is the model's, so the
 # digits are counted here rather than remembered there.  Whitespace is flattened on both
 # sides: that page wraps, and a compare that broke on a newline would fail for the
@@ -6927,6 +6998,301 @@ print(f"  an unset is a value   un-setting the ring's `arcPaint` removes the key
       f" {2} undo steps in the history and `dirty` false, because that flag is a state"
       f" (does memory disagree with the file?) and not a counter of what was typed.")
 
+# ---- what a text row paints, proved by painting ----
+# The note line under the editor's rows answers "what will this row look like" for a
+# `text` or `data` widget (`edit.drawn_text`).  A sentence like that is worth nothing if
+# it is a second implementation of the drawing, so the claim held here has the same shape
+# as every other claim in this repo: draw the file, then draw a copy of the file with that
+# one row replaced by a literal `text` widget whose `content` is the string the model
+# named, and require the two frames to be byte-identical.  A row the model says paints no
+# line must be a row the painter skipped, and the reason the model gives must be a reason
+# the painter's own notes give.
+_line_rows = _twin_same = _line_none = _caveats = 0
+_reasons, _twin_fail = {}, []
+for _ed2 in generated + [gui_edit.Editor.open_theme(r["name"]) for r in pick]:
+    _base, _notes = _ed2.paint(*_ed2.fixture())
+    _drawn_idx = {b[3] for b in _notes["boxes"]}
+    _objs = _ed2.obj["osd"]["widget"]
+    for _i, _w in enumerate(_ed2.widgets()):
+        if str(_w.get("type") or "") not in ("text", "data"):
+            continue
+        _line_rows += 1
+        _ed2.select(_i)
+        _line, _why = _ed2.drawn_text()
+        if _line is None:
+            _line_none += 1
+            assert _why, (_ed2.name, _i, "a row that paints nothing has to say why")
+            assert _i not in _drawn_idx, (
+                _ed2.name, _i, _why, "the model says no line and the painter drew one")
+            _key = _why.split("`")[1] if "`" in _why else _why[:20]
+            _reasons[_key] = _reasons.get(_key, 0) + 1
+            if "showIf" in _why:
+                assert any(str(m).startswith("showIf:") for m in _notes["missing"]), (
+                    _ed2.name, _i, _why, _notes["missing"],
+                    "the model blamed a dependency the painter never reported")
+            continue
+        if _why:
+            _caveats += 1
+            assert str(_ed2.prop().get("source")) in {str(g) for g in _notes["gaps"]}, (
+                _ed2.name, _i, _why, _notes["gaps"], "a caveat the painter does not share")
+        _pr = dict(_w["property"][0])
+        _pr.pop("source", None)
+        _pr["content"] = _line
+        _objs[_i] = {**_w, "type": "text", "property": [_pr]}
+        try:
+            _img2, _n2 = _ed2.paint(*_ed2.fixture())
+        finally:
+            _objs[_i] = _w
+        if _img2.tobytes() == _base.tobytes():
+            _twin_same += 1
+        else:
+            _twin_fail.append((_ed2.name, _i, repr(_line)[:36],
+                               sum(1 for a, b in zip(_base.tobytes(), _img2.tobytes())
+                                   if a != b)))
+assert not _twin_fail, _twin_fail[:6]
+assert _twin_same + _line_none == _line_rows, (_twin_same, _line_none, _line_rows)
+print(f"  what a row paints     {_line_rows} `text`/`data` rows in "
+      f"{len(generated) + len(pick)} layouts: {_twin_same} paint a line at this fixture, "
+      f"and the literal-`text` twin of every one of them came back byte-identical to the "
+      f"file it came from ({len(_twin_fail)} differ); {_line_none} paint nothing and say "
+      f"why (" + ", ".join(f"{k} {v}" for k, v in sorted(_reasons.items(),
+                                                         key=lambda kv: -kv[1])[:4])
+      + f"), and {_caveats} of the painted lines are spelled by a shape this repo "
+      f"declares unmeasured")
+# docs/gui.md quotes those four counts as digits, so they are compared with this run
+# rather than remembered there. They are the one family of figures in that page that does
+# not depend on fonts: rows, layouts and the fixture are the same files everywhere.
+_gh = " ".join(gui_txt.split())
+for _claim in (f"the **{_line_rows}** `text`/`data` rows of the "
+               f"**{len(generated) + len(pick)}** layouts twice",
+               f"**{_twin_same}** rows paint a line at this fixture and all "
+               f"**{_twin_same}** twins came back identical",
+               f"the **{_line_none}** that do not",
+               f"**{_caveats}** of the painted lines"):
+    assert _claim in _gh, (_claim, "docs/gui.md counts what a row paints differently from "
+                                   "this run")
+_pump = _reasons.get("Pump Speed", 0)
+assert f"`Pump Speed` in {_pump} layouts" in _gh, (_pump,
+    "docs/gui.md's breakdown of the rows this fixture cannot answer is not this run's")
+# The same door with a hole punched in the readings: a row whose `xigma.showIf` dependency
+# vanishes has to be *said* by the model and skipped by the painter, not drawn half.  Only
+# `bars` carries the key, on its two memory figures, each depending on the rate the meter
+# beside it divides by - and a rate is two reported fields, which is what `themes.DERIVED`
+# exists to say, so the hole is punched by name from that table rather than guessed here.
+_ed2 = gui_edit.Editor.open_theme("bars")
+_fx, _when = _ed2.fixture()
+_holey = [i for i, _w in enumerate(_ed2.widgets())
+          if (_w["property"][0].get("xigma") or {}).get("showIf")]
+assert len(_holey) == 2, _holey
+_hole, _other = _holey
+_dep = _ed2.widgets()[_hole]["property"][0]["xigma"]["showIf"]
+_dep2 = _ed2.widgets()[_other]["property"][0]["xigma"]["showIf"]
+_grp, _used_f, _total_f = themes.DERIVED[_dep]
+assert themes.DERIVED[_dep2][:1] != (_grp,), (
+    _dep, _dep2, "the two rows have to depend on different groups, or the hole punched "
+                 "below takes both of them out and the comparison is hollow")
+_fx[_grp].pop(_total_f, None)                    # the total the rate divides by
+_ed2.select(_hole)
+_line, _why = _ed2.drawn_text(_fx, _when)
+_img, _notes = _ed2.paint(_fx, _when)
+assert _line is None and "showIf" in _why, (_line, _why, _dep)
+assert f"showIf:{_dep}" in [str(m) for m in _notes["missing"]], (_dep, _notes["missing"])
+assert _hole not in {b[3] for b in _notes["boxes"]}, "the row drew anyway"
+_ed2.select(_other)
+_keep, _keep_why = _ed2.drawn_text(_fx, _when)
+assert _keep is not None, (_dep2, _keep_why)
+print(f"  and with a hole       `bars` row {_hole} depends on `{_dep}`, spelled from "
+      f"`{_grp}.{_used_f}` / `{_grp}.{_total_f}`: with the total gone the model says so in "
+      f"words, the painter records `showIf:{_dep}` and skips the row, while the other "
+      f"`{_dep2}` row next to it still paints {_keep!r} - both doors answer the same "
+      f"question the same way")
+
+# Two more rows, built here rather than read from a file, because no file in the library is
+# in either state while a hand-edited one can be: a family the vocabulary does not name,
+# and no family at all.  Both get the same answer through both doors - the model says it in
+# words, `layout.draw` notes `font:` and skips the row - and the second one is the fact
+# nobody would guess from a form: there is no default face to fall back to.
+for _tag, _fam, _want in (("not in the vocabulary", "Impact", "has no file for the family"),
+                          ("the key absent", None, "carries no `fontFamily`")):
+    _fprop = {"x": 10, "y": 120, "source": "CPU Temperature", "fontSize": 20,
+              "textColor": "rgba(255, 255, 255, 1)"}
+    if _fam:
+        _fprop["fontFamily"] = _fam
+    _fed = gui_edit.Editor({"width": render.W, "height": render.H, "osd": {"widget": [
+        {"id": "xigma-face", "type": "data", "property": [_fprop]}]}},
+        origin="suite probe")
+    _fed.select(0)
+    _f_line, _f_why = _fed.drawn_text()
+    _f_img, _f_notes = _fed.paint(*_fed.fixture())
+    assert _f_line is None and _want in _f_why, (_tag, _f_line, _f_why)
+    assert not _f_notes["boxes"], (_tag, _f_notes["boxes"], "the row drew anyway")
+    assert any(str(m).startswith("font:") for m in _f_notes["missing"]), (
+        _tag, _f_notes["missing"], "the painter skipped a face row without saying so")
+print("  a family, both ways   `Impact` (a name `layout.FONTS` does not carry) and a row "
+      "with no `fontFamily` at all: both draw nothing, both say so, and the painter notes "
+      "`font:impact` / `font:` beside them")
+
+# ---- a `format` the value cannot be dressed in: refused on the way in, survived on the way out
+# `xigma.format` is handed to `strftime` for a clock and to `format()` for a reading, and
+# either door raises when the specifier does not fit the value behind it.  Two answers are
+# needed, and they are not the same one: the editor must refuse such a key *before it
+# reaches the file* (this repo's rule: a write that cannot be drawn is said, not done), and
+# the painter must survive a file that already carries one, because a file is a file and
+# `--theme` opens whatever is there.  The agreement below is not a list of bad specifiers
+# remembered here: for each candidate the gate asks the painter's own door whether it
+# raises, and the model has to take the same side.
+_fmt_row = next(e for e in generated if e.name == "bars")
+_fmt_row.select(next(i for i, _w in enumerate(_fmt_row.widgets())
+                     if str(_w.get("type") or "") == "data"
+                     and _w["property"][0].get("source") == "Used RAM"))
+_fsrc = _fmt_row.prop()["source"]
+_fvals, _ = themes.values(*_fmt_row.fixture())
+_fprobe = _fvals[_fsrc]
+_CAND = ("%q", "%d %d", "{}", "{:,.0f}", "%.1f", "%s", "{0}", "%A %d %B %Y", "")
+_agree, _refused, _taken = [], [], []
+for _cf in _CAND:
+    _raises = True
+    try:
+        layout.text_for(_fsrc, _fprobe, _cf)
+        _raises = False
+    except Exception:
+        pass
+    _was_dirty, _was_steps = _fmt_row.dirty, _fmt_row.steps
+    _ok, _note = _fmt_row.set("format", _cf)
+    assert _ok != _raises, (
+        _cf, _ok, _raises, _note, "the model and the painter disagree about one format: a "
+        "row that writes what the drawing cannot apply is the bug this refuses to be")
+    _agree.append((_cf, "paints" if not _raises else "refused"))
+    (_taken if _ok else _refused).append(_cf)
+    if _raises:
+        assert _note and _cf in _note, (_cf, _note,
+                                        "a refusal has to name the format it refused")
+        # a refusal changes nothing: `dirty` and the undo count are read back as they were
+        # before *this* attempt, not as they were at the start of the sweep (an earlier
+        # candidate that was accepted is a real change the row keeps)
+        assert (_fmt_row.dirty, _fmt_row.steps) == (_was_dirty, _was_steps), (
+            _cf, _was_steps, _fmt_row.steps, _was_dirty, _fmt_row.dirty,
+            "a refused format moved the file anyway")
+        if _cf.startswith("{"):
+            # the shape people reach for is `str.format`'s, so refusing `{:,.0f}` has two
+            # jobs: say no, and point at the spelling this field takes.  A pointer is only
+            # worth following when it has been checked, so the gate takes whatever the
+            # sentence offers, hands it to the model, and puts the row back afterwards; a
+            # refusal that offers nothing has to say why not.
+            _sug = _re.search(r"already implied: `([^`]*)` works", _note)
+            if _sug:
+                _ok2, _note2 = _fmt_row.set("format", _sug.group(1))
+                assert _ok2, (_cf, _sug.group(1), _note2,
+                              "the spelling a refusal points at does not pass the refusal "
+                              "it came from")
+                assert _fmt_row.undo(), (_cf, _sug.group(1),
+                                         "the probe left the row changed")
+                assert (_fmt_row.dirty, _fmt_row.steps) == (_was_dirty, _was_steps), (
+                    _cf, "putting the probe back did not return the row to where it was")
+            else:
+                assert "not `str.format`" in _note, (
+                    _cf, _note, "a brace-style refusal either fixes the reader's spelling "
+                                "or says why it cannot")
+print(f"  a format, both doors  {_fsrc} (a {type(_fprobe).__name__} at this fixture, "
+      f"{_fprobe}) against {len(_CAND)} candidate specifiers: the model takes the painter's "
+      f"side on every one - accepted "
+      f"{', '.join(repr(c) for c in _taken) or '(none)'}, refused "
+      f"{', '.join(repr(c) for c in _refused) or '(none)'} - and every refusal left the "
+      f"row's `dirty` and undo count exactly as it found them")
+# ... and the survival half.  A file that *already* carries an unappliable format, built
+# here rather than written by the editor, has to be reported and skipped: not raised
+# through the frame loop, and not taken out along with the rest of the frame.
+_two = [{"id": "xigma-hold-a", "type": "data",
+         "property": [{"x": 10, "y": 10, "source": "CPU Temperature",
+                       "fontFamily": "dejavu", "fontSize": 20,
+                       "textColor": "rgba(255, 255, 255, 1)"}]},
+        {"id": "xigma-hold-b", "type": "data",
+         "property": [{"x": 10, "y": 100, "source": "GPU Temperature",
+                       "fontFamily": "dejavu", "fontSize": 20,
+                       "textColor": "rgba(255, 255, 255, 1)"}]}]
+_frame = lambda props: {"width": render.W, "height": render.H,
+                        "osd": {"widget": [dict(w, property=[p])
+                                           for w, p in zip(_two, props)]}}
+_clean, _cn = themes.draw(_frame([dict(_two[0]["property"][0]),
+                                  dict(_two[1]["property"][0])]), *_fmt_row.fixture())
+_baded = {**_two[1]["property"][0], "xigma": {"format": "%q"}}
+_bad_img, _bn = themes.draw(_frame([dict(_two[0]["property"][0]), _baded]),
+                            *_fmt_row.fixture())
+_holes = [str(m) for m in _bn["missing"]]
+assert not [m for m in _cn["missing"] if str(m).startswith("format:")], _cn["missing"]
+assert any(m.startswith("format:GPU Temperature") for m in _holes), (
+    _holes, "a file naming an unappliable format has to be *said*, the way every other "
+            "hole in a frame is said")
+assert len(_bn["boxes"]) == len(_cn["boxes"]) - 1, (
+    [b[3] for b in _cn["boxes"]], [b[3] for b in _bn["boxes"]],
+    "the bad row took another one with it, or nothing was skipped at all")
+assert px_differ(_clean, _bad_img) > 0, "the two frames are one picture, so no row was left out"
+_bad_ed = gui_edit.Editor(_frame([dict(_two[0]["property"][0]), _baded]),
+                          origin="suite probe")
+_bad_ed.select(1)
+_line, _why = _bad_ed.drawn_text()
+assert _line is None and "cannot be applied" in _why and "%q" in _why, (_line, _why)
+print(f"  the same file, painted   a hand-built layout whose `GPU Temperature` row carries "
+      f"`format: \"%q\"`: the painter raised nothing, {len(_cn['boxes'])} rows drew clean "
+      f"and {len(_bn['boxes'])} drew with the hole, and its notes say "
+      f"{[m for m in _holes if str(m).startswith('format:')]}; the editor's own row answer "
+      f"is: {_why[:96]}")
+# ---- a family name the file spells differently than the vocabulary does ----
+# `Arial` is what the vendor's files write and `arial` is what `layout.FONTS` names; the
+# painter folds the case before it resolves a family, so those two spellings are the same
+# face on the glass.  The editor's menu shows the file's own spelling (dropping it would
+# misrepresent the row), which means the model has to answer it the way the painter does -
+# and an earlier version of this window offered `Arial` in a list and refused it in the
+# model in the same breath.  What makes the fold safe is not an argument, it is a pixel
+# count: the frame before and after must be identical.  And nothing else folds, because the
+# painter folds nothing else.
+_a_ed = None
+for _cand in [gui_edit.Editor.open_theme(r["name"]) for r in pick]:
+    for _ci, _cw in enumerate(_cand.widgets()):
+        _cfam = str((_cw.get("property") or [{}])[0].get("fontFamily") or "")
+        if _cfam and _cfam not in _ed_api.choices("fontFamily") \
+                and _cfam.lower() in _ed_api.choices("fontFamily"):
+            _a_ed, _a_i, _a_spelling = _cand, _ci, _cfam
+            break
+    if _a_ed:
+        break
+assert _a_ed, ("no library file writes a family the vocabulary spells another way, so the "
+               "fold below has nothing to fold - and the menu no longer shows one either")
+_a_ed.select(_a_i)
+_a_before, _a_n0 = _a_ed.paint(*_a_ed.fixture())
+_a_ok, _a_note = _a_ed.set("fontFamily", _a_spelling)
+assert _a_ok, (_a_spelling, _a_note,
+               "a menu entry the model refuses is a choice the reader cannot take")
+assert _a_note and _a_spelling in _a_note and _a_ed.value("fontFamily") in \
+    _ed_api.choices("fontFamily"), (_a_spelling, _a_note, _a_ed.value("fontFamily"),
+                                    "the fold has to say which spelling it stored")
+_a_after, _a_n1 = _a_ed.paint(*_a_ed.fixture())
+_a_px = px_differ(_a_before, _a_after)
+assert _a_px == 0, (_a_spelling, _a_ed.value("fontFamily"), _a_px,
+                    "folding a family's case moved ink, so it was never the same face")
+assert [str(m) for m in _a_n1["missing"]] == [str(m) for m in _a_n0["missing"]], (
+    _a_n0["missing"], _a_n1["missing"], "the fold changed which rows the painter skipped")
+print(f"  a family, two spellings  `{_a_spelling}` is what the file writes, and "
+      f"{_a_ed.value('fontFamily')!r} is what `layout.FONTS` names: the model takes the "
+      f"painter's side (it folds what `layout.font_for` folds), says what it stored "
+      f"({_a_note[:70]}...), and both frames are {_a_before.size} with {_a_px} px of "
+      f"difference")
+_s_ed = next(e for e in generated if e.name == "bars")
+_s_ed.select(next(i for i, _w in enumerate(_s_ed.widgets())
+                 if str(_w.get("type") or "") == "data"
+                 and _w["property"][0].get("source") == "CPU Temperature"))
+_s_ok, _s_note = _s_ed.set("source", "cpu temperature")
+assert not _s_ok and "takes one of" in _s_note, (
+    _s_ok, _s_note, "only the family is folded: a source's case is part of its name, and "
+                    "the painter matches sources exactly")
+_s_ok2, _ = _s_ed.set("fontFamily", "DEJAVU")
+assert _s_ok2 and _s_ed.value("fontFamily") == "dejavu", (_s_ok2,
+                                                          _s_ed.value("fontFamily"))
+print(f"                        and the fold stays in one field: `source` as "
+      f"`cpu temperature` is still refused ({_s_note[:52]}...), while `DEJAVU` folds to "
+      f"`dejavu` because `font_for` lowercases that one name")
+
+
 # ---- one more kind of row the inspector can be handed: a `special` that draws a *pair*.
 # ---- No shipped file carries one yet (`alpha` is not exported), so this probe builds the
 # ---- row and asks the model what it may edit, and what the edit does to the picture.
@@ -7351,6 +7717,138 @@ print(f"  a menu shows the value  every value menu selects what the row holds, n
       f"`clock-readings`, and the `data` row picked here displays `{menu_shown}` in a "
       f"menu starting `{menu_held}`. The two agree only when the value happens to sort "
       f"first, which is why the ring's `arcPaint` never showed this up")
+# ---- what the rows say the row paints, and what the face menu shows for a family ----
+# The model's half - a string, proved by painting it - is gated above.  This is the
+# window's half: the note line under the rows carries that answer for the rows that decide
+# it, and the `fontFamily` menu shows each family drawn from the file this box resolves it
+# to.  A family with no file here cannot be exercised through the vendor's five names on a
+# box that happens to have all five, so the check adds a sixth to the painter's own table
+# for its length: `edit.choices("fontFamily")` *is* that table, so the row has to answer
+# what it says, and the table is put back and checked back afterwards.
+from PyQt6.QtCore import Qt as _FaceQt      # local to this block: the heredoc's own `Qt`
+                                            # alias comes a thousand lines further down
+# `bars` on purpose: it is the one layout that carries both a reading this fixture answers
+# and slots it does not (`Fan 3 Name`/`Fan 4 Speed`), so both branches of the answer are
+# checked in one window rather than one of them being left to luck.
+win._editor_open("bars")
+for _ in range(8):
+    appq.processEvents()
+_bars_i = next(i for i in range(win.ed_widget.count())
+               if str(win.ed.widgets()[i].get("type") or "") == "data"
+               and win.ed.widgets()[i]["property"][0].get("source") == "CPU Temperature")
+win.ed_widget.setCurrentIndex(_bars_i)
+for _ in range(6):
+    appq.processEvents()
+_line_w, _why_w = win.ed.drawn_text()
+_note_w = focus_row(win, "source")
+assert _line_w, (_line_w, _why_w, "a row reading CPU Temperature has to paint something")
+assert f'draws as "{_line_w}"' in _note_w, (_note_w, _line_w,
+                                            "the note line is not the model's answer")
+assert not _why_w or _why_w in _note_w, (_note_w, _why_w)
+# the other branch, in the same place: a row whose source this box has no reading for
+_fan_i = [i for i in range(win.ed_widget.count())
+          if str(win.ed.widgets()[i].get("type") or "") == "data"
+          and str(win.ed.widgets()[i]["property"][0].get("source") or "") in _short]
+assert _fan_i, ("bars", _short, "the layout this check opens has to carry an unanswered "
+               "slot, or the second branch of the answer is never exercised")
+win.ed_widget.setCurrentIndex(_fan_i[0])
+for _ in range(6):
+    appq.processEvents()
+_line_n, _why_n = win.ed.drawn_text()
+_note_n = focus_row(win, "source")
+assert not _line_n, (_line_n, "a slot this box does not report should not paint")
+assert "paints no line" in _note_n, (_note_n, _why_n)
+print(f"  what the row says     the note line carries the model's answer both ways: a "
+      f"`CPU Temperature` row reads {_line_w!r}, and the row for "
+      f"{win.ed.widgets()[_fan_i[0]]['property'][0]['source']!r} says it paints nothing "
+      f"({_why_n[:56]})")
+_fc = win._ed_ctl("fontFamily")
+_faces = win.ed.faces_here()
+assert _fc.iconSize().width() >= 20, (_fc.iconSize(), "no room in the menu for a face")
+_res, _dead = [], []
+for _i in range(_fc.count()):
+    _nm, _p = _fc.itemText(_i), _faces.get(_fc.itemText(_i))
+    if _nm == app.UNSET:
+        continue
+    _tip = str(_fc.itemData(_i, _FaceQt.ItemDataRole.ToolTipRole) or "")
+    if _p:
+        _pm = _fc.itemIcon(_i).pixmap(_fc.iconSize())
+        assert not _pm.isNull(), (_nm, _p, "a family with a file here got no preview")
+        _im = _pm.toImage()
+        assert any(_im.pixelColor(x, y).alpha() for x in range(0, _im.width(), 2)
+                   for y in range(0, _im.height(), 2)), (
+            _nm, _p, "the preview drew nothing: the face was opened but no ink landed")
+        assert os.path.basename(_p) in _tip, (_nm, _p, _tip,
+                                              "the entry hides the file it is showing")
+        _res.append(_nm)
+    else:
+        assert _fc.itemIcon(_i).isNull(), (_nm, "a family with no file here got a preview")
+        assert "no font file" in _tip, (_nm, _tip)
+        _dead.append(_nm)
+assert _res, (_faces, "nothing resolved to a file, so this box has no fonts at all")
+# the family check runs against a row that *does* have a reading: an unanswered source is
+# the painter's first reason to skip a row, and a check that reached the family reason
+# through a row already skipped for another one would be proving the order of the checks
+# rather than the family answer.
+win.ed_widget.setCurrentIndex(_bars_i)
+for _ in range(6):
+    appq.processEvents()
+assert win.ed.drawn_text()[0], "the row the family check needs has to be a painting one"
+_keep_fonts = dict(layout.FONTS)
+layout.FONTS["no-such-face"] = {"regular": "/nonexistent/**/Nope.ttf",
+                                "bold": "/nonexistent/**/Nope-Bold.ttf"}
+try:
+    win._ed_bind_rows()                     # the menu is refilled from the painter's table
+    _ix = [k for k in range(_fc.count()) if _fc.itemText(k) == "no-such-face"]
+    assert _ix, (_fc.count(), "a family `layout.FONTS` names never reached the row's menu")
+    assert _fc.itemIcon(_ix[0]).isNull(), "an unresolvable family was given a preview"
+    assert "no font file" in str(_fc.itemData(_ix[0], _FaceQt.ItemDataRole.ToolTipRole) or "")
+    _ok_f, _note_f = win.ed.set("fontFamily", "no-such-face")
+    assert _ok_f, _note_f                   # it is in the vocabulary the model offers
+    _lt, _lw = win.ed.drawn_text()
+    assert not _lt and "no file" in _lw, (_lt, _lw,
+                                          "a row on an unresolvable family must say so")
+    assert "no file" in focus_row(win, "fontFamily"), _lw
+    win.ed.undo()
+    assert win.ed.value("fontFamily") in _keep_fonts, win.ed.value("fontFamily")
+finally:
+    layout.FONTS.clear()
+    layout.FONTS.update(_keep_fonts)
+    win._ed_bind_rows()
+assert [k for k in range(_fc.count()) if _fc.itemText(k) == "no-such-face"] == [], \
+    "the patched family outlived the check that patched it"
+assert set(layout.FONTS) == set(_keep_fonts), "the painter's font table came back changed"
+# A family outside the vocabulary still reaches its own row's menu, because a file is
+# allowed to name one (`_ed_bind_rows` inserts the row's own value rather than dropping
+# it), and it is marked exactly like a family whose globs match nothing.  Driven by
+# changing the open row in memory - nothing is written to any file - and put back.
+_odd = win.ed.widgets()[_bars_i]["property"][0]
+_had_fam = _odd.get("fontFamily")
+_odd["fontFamily"] = "Impact"
+try:
+    win._ed_bind_rows()
+    _io = [k for k in range(_fc.count()) if _fc.itemText(k) == "Impact"]
+    assert _io, (_fc.count(), "a file naming a family `layout.FONTS` does not carry never "
+                              "showed up in its own row's menu")
+    assert _fc.itemIcon(_io[0]).isNull(), "a family nothing here can open was previewed"
+    assert "no font file" in str(_fc.itemData(_io[0], _FaceQt.ItemDataRole.ToolTipRole)
+                                 or ""), _io[0]
+    _ot, _ow = win.ed.drawn_text()
+    assert not _ot and "has no file for the family `impact`" in _ow, (_ot, _ow)
+finally:
+    if _had_fam is None:
+        _odd.pop("fontFamily", None)
+    else:
+        _odd["fontFamily"] = _had_fam
+    win._ed_bind_rows()
+assert [k for k in range(_fc.count()) if _fc.itemText(k) == "Impact"] == [], \
+    "the row's own odd family outlived the check that put it there"
+assert win.ed.value("fontFamily") == _had_fam, (win.ed.value("fontFamily"), _had_fam)
+print(f"  the face menu         {len(_res)} of {_fc.count()} entries carry a preview drawn "
+      f"from the file `layout.font_for` names ({', '.join(sorted(_res))}); a family whose "
+      f"globs match nothing gets no preview, says so in its own tooltip, and a row using it "
+      f"answers: {_lw[:60]}")
+
 
 unset = ""
 # which library file carries an `arc` is derived, not remembered: the census says one of

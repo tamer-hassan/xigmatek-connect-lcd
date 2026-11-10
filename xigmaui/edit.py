@@ -149,6 +149,15 @@ def choices(field: str) -> tuple:
 #: shipped widgets - `layout.rgba`'s docstring is where that census lives).
 COLOUR_FIELDS = ("textColor", "bgColor", "startColor", "endColor", "lineColor")
 
+#: The one menu field whose value the painter folds before looking it up.
+#: `layout.font_for` lowercases `fontFamily`, so the `Arial` the vendor's files write and
+#: the `arial` `layout.FONTS` names are the **same face** on the glass - and an editor
+#: that shows the file's spelling in its menu but refuses it in its model is offering a
+#: choice it will not take.  Every other menu is matched exactly, because the painter
+#: matches it exactly: `source`, `showIf`, `name` and `anchor` are dictionary keys, so
+#: their case is part of the value and nothing is folded for them.
+CASE_FOLDED_FIELDS = ("fontFamily",)
+
 
 def colour_text(value) -> tuple:
     """(a colour in the vendor's spelling, or None, and the sentence if it failed).
@@ -413,8 +422,9 @@ class Editor:
     def set(self, field: str, value, commit: bool = True) -> tuple:
         """Set one field.  Returns (ok, what_was_said): the second half is empty when
         the value went in exactly as written, and a sentence when it was rewritten (a
-        colour converted to `rgba()`) or when the write was refused and nothing moved.
-        The window prints it, which is how a reader finds out that `#ff4040` became
+        colour converted to `rgba()`, or a family folded to the spelling `layout.FONTS`
+        carries) or when the write was refused and nothing moved.  The window prints it,
+        which is how a reader finds out that `#ff4040` became
         `rgba(255, 64, 64, 1)` without opening a diff.
 
         `commit=False` is a keystroke in a spinbox: the change is applied and the
@@ -443,6 +453,21 @@ class Editor:
             if text != value:
                 note = f"stored as {text}"
             value = text
+        if field in CASE_FOLDED_FIELDS and isinstance(value, str):
+            # the painter's fold, applied once and said out loud: the row keeps a family
+            # name `layout.FONTS` actually carries, and the reader is told the picture did
+            # not move (the suite checks that, pixel by pixel, for a vendor row that writes
+            # the capitalised spelling).
+            _choice = choices(field)
+            if value not in _choice:
+                canon = next((c for c in _choice if isinstance(c, str)
+                              and c.lower() == value.lower()), None)
+                if canon is not None:
+                    wrote, value = value, canon
+                    note = (f"`{canon}` stored in place of `{wrote}`: the painter "
+                            f"lowercases `{field}` before resolving it, so this is the "
+                            f"same face and the row now names it the way `layout.FONTS` "
+                            f"spells it")
         if self._pending is None:
             self._pending = copy.deepcopy(self.obj)
         if field in ("x", "y") and value is not None:
@@ -484,6 +509,13 @@ class Editor:
         else:
             choice = choices(field)
             if choice and value not in choice:
+                if field in CASE_FOLDED_FIELDS and any(
+                        isinstance(c, str) and c.lower() == str(value).lower()
+                        for c in choice):
+                    # the same value the file already holds, spelled the file's way.  The
+                    # menu offers it, the painter resolves it, and `set` says which
+                    # spelling ends up in the file.
+                    return ""
                 return f"{field} takes one of: {' '.join(map(str, choice))}"
         if field in number_fields():
             try:
@@ -496,7 +528,71 @@ class Editor:
             if not 0 <= int(value) < (w if field == "x" else h):
                 return (f"{field} must stay inside the {w}x{h} canvas this layout "
                         f"declares - a widget off the glass cannot be shown here")
+        if field == "format":
+            # `xigma.format` goes straight into `layout.text_for`, which hands it to
+            # `strftime` for a clock and to `format()` for a reading.  Either door raises
+            # on a specifier that does not fit the value behind it - `%q` and `{:.1f}` on
+            # an int are the two that showed up while wiring the note line - and a format
+            # the painter cannot apply is worse than an out-of-range number: `layout.draw`
+            # catches what it expects (`KeyError`) and nothing else, so a file carrying one
+            # does not draw a wrong figure, it stops the frame loop.  So the row tries the
+            # value this widget would actually be given.  If the source answers at this
+            # fixture that is its reading; if it does not, the probe is the clock instant
+            # for a clock source and a plain number for every other, which is what
+            # `themes.SOURCES` says the name means.  A refusal always names the probe.
+            return self._format_fits(value)
         return ""
+
+    def _format_fits(self, fmt) -> str:
+        """Can `xigma.format` be applied to the value this row's `source` carries?"""
+        if not isinstance(fmt, str):
+            return f"format is a string of strftime or format() specifiers, not {fmt!r}"
+        prop = self.prop()
+        src = str(prop.get("source") or "")
+        if not src:
+            return (f"this row has no `source` to format: a `text` row paints its "
+                    f"`content` exactly as written, so `format` would do nothing")
+        vals, absent = themes.values(*self.fixture())
+        if src in vals:
+            probe, whence = vals[src], f"the reading this fixture gives for `{src}`"
+        elif src in themes.CLOCKED or src in ("Time", "Date"):
+            probe, whence = self.fixture()[1], f"the clock (`{src}`)"
+        else:
+            probe, whence = 1234.0, f"a number (no reading for `{src}` here)"
+        try:
+            got = layout.text_for(src, probe, fmt)
+        except KeyError:
+            return (f"`{src}` has no shape this program knows, so a `format` is the only "
+                    f"way to spell it - and `{fmt}` cannot be applied to {whence}")
+        except (ValueError, TypeError) as exc:
+            hint = ""
+            if fmt.startswith("{"):
+                # the shape people reach for is `str.format`'s, and this field is
+                # `format(value, X)`: the braces are already there.  Pointing at the
+                # spelling this one takes is only worth doing when the pointer has been
+                # checked on the same value - advice that also raises is worse than no
+                # advice - and an empty suggestion ("no format at all") is not advice a
+                # reader can act on, so it is not offered.
+                _inner = fmt[1:]
+                if _inner.startswith(":"):
+                    _inner = _inner[1:]
+                _inner = _inner.rstrip("}")
+                if _inner:
+                    try:
+                        layout.text_for(src, probe, _inner)
+                        hint = (" - this field is `format(value, X)`, so the braces are "
+                                f"already implied: `{_inner}` works")
+                    except Exception:
+                        hint = (" - this field is `format(value, X)`, not `str.format`, "
+                                "so the braces are already implied")
+                else:
+                    hint = (" - this field is `format(value, X)`, not `str.format`: the "
+                            "braces are already implied, and what is between them has to "
+                            "be a presentation type (`,.0f`, `.1f`, `d`); leaving the field "
+                            "empty means the shape this program already spells")
+            return (f"`{fmt}` cannot be applied to {whence} ({exc}); `layout.text_for` "
+                    f"would raise on it, and the frame loop would stop{hint}")
+        return "" if got else f"`{fmt}` spells nothing for {whence}"
 
     # ---------------------------------------------------------------- undo --
     def undo(self) -> bool:
@@ -555,6 +651,137 @@ class Editor:
         vals, absent = themes.values(*self.fixture())
         return (f"fixture: {', '.join(f'{k} {v}' for k, v in sorted(vals.items()))}"
                 + (f"  (no reading for {', '.join(sorted(absent))})" if absent else ""))
+
+    # ----------------------------------------------------- what a row paints --
+    def drawn_text(self, metrics: dict | None = None,
+                   when: datetime.datetime | None = None) -> tuple:
+        """What the selected row paints as a line of text, and what is said beside it.
+
+        Returns `(string, sentence)`.  The string is `None` when the row paints nothing,
+        and then the sentence is the reason; when a string is painted the sentence is
+        empty - unless the string came from a shape nobody measured off the vendor's
+        picture, in which case it says so.  "Say what you cannot do, and say what you
+        guessed" is the same rule the painter follows in `notes["missing"]` and
+        `notes["gaps"]`, and this is the half a reader can act on: the `content`,
+        `format`, `source`, `fontFamily` and `xigma.showIf` rows all change this line.
+
+        It is deliberately not a second renderer.  Every rule here is the painter's own,
+        read in the order `layout.draw` applies them - a `xigma.showIf` the readings
+        cannot satisfy takes the row out before its own source is ever asked; an
+        unanswered source skips it; `layout.text_for` is the only formatting door and a
+        format the value cannot be dressed in skips it; and the face is asked last,
+        because a row with a correct string and a family this box cannot open draws
+        nothing either - which is also what a row with *no* `fontFamily` at all does,
+        since there is no default face to fall back to - and the claim that this *is* the
+        painted line is proved by painting, not by agreement between two pieces of code:
+        for every text-bearing row of the 28 layouts this editor opens, the suite draws
+        the file, then draws a copy of the file with that one row replaced by a literal
+        `text` widget whose `content` is the string returned here, and requires the two
+        frames to be byte-identical.  145 rows in 28 layouts, 132 of them painting a line
+        at this fixture, 0 pixels of difference between the two doors, in 1.5 s.
+        """
+        kind = str(self.selected().get("type") or "")
+        if kind not in ("text", "data"):
+            return None, _NOT_A_LINE.get(
+                kind, f"a `{kind}` row paints no line of text")
+        prop = self.prop()
+        if metrics is None:
+            metrics, when = self.fixture()
+        vals, absent = themes.values(metrics, when)
+        ext = prop.get("xigma") or {}
+        shown_if = ext.get("showIf")
+        if shown_if and shown_if not in vals:
+            return None, (f"its `xigma.showIf` is `{shown_if}`, and these readings do "
+                          f"not answer it: the row is skipped")
+        src = prop.get("source")
+        if kind == "data" and src not in vals:
+            return None, (f"no reading for `{src}` on this machine: the row is skipped"
+                          if src in absent else
+                          f"`{src}` is not a source name this program can answer")
+        if kind == "text":
+            line, caveat = str(prop.get("content") or ""), ""
+        else:
+            try:
+                line = layout.text_for(src, vals[src], ext.get("format"))
+            except KeyError:
+                return None, f"`{src}` has no shape this program knows how to spell"
+            except (ValueError, TypeError) as exc:
+                # the painter's own answer, in the painter's own words: a `format` the
+                # value cannot be dressed in is a row that draws nothing, reported and not
+                # raised (`layout.draw` records `format:<source>` in `missing`).  The row
+                # should not have been saved with it - `edit.Editor._format_fits` refuses
+                # one on the way in - so reaching this line means the file came from
+                # somewhere else.
+                return None, (f"its `format` {ext.get('format')!r} cannot be applied to "
+                              f"`{src}` ({exc}): the painter skips the row and says so")
+            caveat = ("" if src in layout.FORMATS_MEASURED or ext.get("format") else
+                      f"`{src}` is spelled by `layout.VENDOR_FORMAT`, which is not one of "
+                      f"the {len(layout.FORMATS_MEASURED)} shapes measured off the "
+                      f"vendor's picture - `--check-theme` reports it as a gap, and a "
+                      f"`format` here is how you settle it")
+        # last, as the painter checks it last: the face.  A row with a correct string and a
+        # family nothing here can open still draws nothing, so the string is not worth
+        # reporting until the face has been asked about.
+        face, fam, _path = layout.font_for(prop)
+        if face is None:
+            if not str(prop.get("fontFamily") or "").strip():
+                # the other way to have no face: the key is simply not in the file.  There
+                # is no default to fall back to - `layout.draw` notes `font:` with an empty
+                # name and skips the row - so this is a row that draws nothing, and a
+                # reader who has just cleared a family needs to be told that out loud.
+                return None, ("the file carries no `fontFamily`, and there is no default "
+                              "face to fall back to: the painter notes `font:` and skips "
+                              "the row, so it puts no ink on the glass")
+            return None, (f"this box has no file for the family `{fam}`, so the row "
+                          f"draws nothing - the vendor's names are not fonts")
+        return line, caveat
+
+    def face_here(self) -> tuple:
+        """What family the selected row asked for, and the file this box has for it.
+
+        `(family, path_or_None, bold)`, answered by `layout.font_for` - the loader the
+        painter itself uses, at the row's own size and weight.  It matters more than a
+        label: when a family resolves to nothing, `layout.draw` records `font:<family>`
+        in `notes["missing"]` and the row is skipped - no ink at all - so an unresolvable
+        family is a row that quietly vanishes from the frame.
+        """
+        face, fam, path = layout.font_for(self.prop())
+        return fam, path, bool(self.prop().get("bold"))
+
+    def faces_here(self) -> dict:
+        """Every family the editor offers, answered with the file this box has for it.
+
+        `family -> path`, `None` where nothing matches.  The five names come from
+        `choices("fontFamily")`, which is `layout.FONTS`' own vocabulary, and each is
+        resolved through `layout.font_for` at the selected row's size and weight, so the
+        two facts the window needs - which entries are dim because this box has no such
+        file, and which names are the *same face* spelled differently - are read off the
+        painter's table rather than remembered here.  On a box with only DejaVu and
+        Liberation installed that is worth saying out loud: `verdana` and `dejavu` land
+        on one file, `simsun` and `宋体` on another, and `arial` on Liberation, which is a
+        metric-compatible stand-in and not the vendor's font.
+        """
+        prop = dict(self.prop())
+        fams = list(choices("fontFamily"))
+        own = str(prop.get("fontFamily") or "")
+        if own and own not in fams:
+            fams.append(own)        # a file can name a family the vocabulary does not
+        return {fam: layout.font_for({**prop, "fontFamily": fam})[2] for fam in fams}
+
+
+#: Why a row that is not a line of text cannot have one.  Said per kind, because "no"
+#: that names the reason is the difference between an editor and a form: an `arc` row is
+#: not missing a string, it is a sweep, and the keys that decide it are named in the rows
+#: above this one.
+_NOT_A_LINE = {
+    "bar": "a `bar` row paints a meter: `minValue`/`maxValue` and the fill colour decide "
+           "it, and its figure is a separate `data`/`text` row",
+    "arc": "an `arc` row paints a sweep: `startAngle`/`endAngle` (or `minValue`/"
+           "`maxValue`) and a paint convention, never a line of text",
+    "line": "a `line` row paints a rule - width, colour and two points",
+    "special": "a `special` row hands the drawing its own text: the named drawing builds "
+               "its line(s) from whatever sources it asks for (`--list-specials`)",
+}
 
 
 #: The pinned fixture: the same readings every documented figure in this repo was read

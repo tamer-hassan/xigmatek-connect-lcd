@@ -380,6 +380,17 @@ finding that out before an editor is built on top of it:
   reported in the skip list as `showIf:<source>`, the same way an unanswered source is, and
   the difference the key makes is measured rather than asserted (the gate strips the key from
   a generated `bars` and counts the pixels it then differs by).
+* **`xigma.format`, and the two answers a bad one needs.** A format string goes to
+  `strftime` for a clock and to `format()` for a reading, and either door raises when the
+  specifier does not fit the value behind it - `%q`, `%d %d`, `{}` and `{:,.0f}` all raise on
+  the int this fixture gives for `Used RAM`, while `,.0f` inside the braces does not, which
+  is why the braces are refused with the spelling that works. Two answers, not one: the
+  editor refuses such a value *before it reaches the file* (`edit.Editor._format_fits`,
+  which probes the value this row's `source` actually carries and says which probe it used),
+  and the painter survives a file that already carries one - it records
+  `format:<source> (ValueError)` in the skip list, like every other hole, and draws the rest
+  of the frame. Nine candidates, both doors, same verdict on each: the gate is the agreement,
+  not a list of bad specifiers kept in either place.
 * **`xigma.fitArc`**. A width budget is the schema's only fit rule, and it cannot express
   what `alpha`'s two temperature columns are sized by: the ring's hole, measured as ink,
   both strings against it at once. So a `special` row that draws that pair names the ring

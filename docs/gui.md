@@ -145,22 +145,27 @@ number in that shape comes from a measurement, most of them of a failure:
   gate can only hold this tree, and what this tree asserts is that the same failure cannot
   come back - the suite builds a fresh window and checks both halves, no column narrower
   than its contents' own minimum and no horizontal scrollbar in any of the three;
-* and a drop-down's list is wider than the box that opens it.  Swept across all **28**
-  layouts the editor can open, the widest row it can put in its widget menu measures
-  **247 px** on this bench (`data  Motherboard Temperature  at 452,136`) and 264 px on the
-  runner, and a closed box in a 300 px column is **241 px** there, 248 px on the runner -
-  so the list, which opens at its box's width, cuts every entry past that in the one place
-  a reader is choosing between entries.  The popup's own view gets the width instead
-  (**323 px** for that row, 340 px on the runner) and costs the column nothing, while the
-  box never asks for more than its longest entry: a box that did was the floor under the
-  whole controls column once.  That column is not reachable any more - `_pane_floors`
-  raises the pane to its own contents, **329 px** on this bench and 337 px on the runner -
-  so the suite pins the pane to *its own floor*, reads the width back before it claims
-  anything about it, and checks both halves there: the list is never narrower than the
-  widest entry any of the 28 layouts puts in that row, and neither is the closed box
-  (**280 px** around that 247 px entry here).  Those two relations are what the gate
-  asserts; the digits beside them are this bench's, and the runner's are in brackets the
-  same way, because a column's width is a font question and not a constant.
+* and a drop-down shows what it holds, box and list both.  Swept across all **28** layouts
+  the editor can open, the widest row its widget menu can be handed measures **247 px** on
+  this bench (`data  Motherboard Temperature  at 452,136`) and 264 px on CI's runner.  In
+  0.4 the list opened at its box's width and the box was whatever the column left it, so in
+  a **300 px** column that entry was cut in the one place a reader is choosing between
+  entries.  Both halves are fixed now: the popup's own view gets the width (**323 px** for
+  that row, 340 px on the runner) and costs the column nothing, and `_ed_box_readable`
+  makes the closed box ask for its longest entry, because an elided
+  `data  Motherboard Tempe…` in the box that says *which row you are editing* is the same
+  complaint one widget later.  That second half is what the controls column pays for: its
+  floor went from **329 px** to **362 px** on this bench.  It is not the 0.4 failure coming
+  back - `_pane_floors` raises a pane to what its contents insist on, so the column cannot
+  be dragged under them and a sideways scrollbar is unreachable; the library column, whose
+  contents the editor never touches, sits at **359 px** here and **376 px** on the runner.
+  The suite pins the controls pane to *its own floor*, reads the width back before it claims
+  anything about it, and asserts the half that has to hold at every width - the list a
+  reader chooses from is never narrower than the widest entry any of the 28 layouts puts in
+  that row - then prints which branch the closed box landed in: **411 px** of column,
+  **323 px** of box around a **247 px** entry on this bench, so the entry fits both.  A
+  box's own `minimumSizeHint` is still held under its longest entry, so the column is not
+  paying for anything the text itself does not need.
 
 The window's floor is the owner's rule, written in `xigmaui/app.py` as `MIN_WIDTH,
 MIN_HEIGHT = 1280, 1024`: a 1280×1024 desktop at minimum, up to a 3840×2160 one, and
@@ -189,12 +194,13 @@ exceeds the room that justified them; every figure above is then read out of thi
 held to whichever of the two labelled machines is running the suite.
 
 And the columns' floors are not remembered constants: `_pane_floors()` raises each pane's
-minimum to its own contents' `minimumSizeHint`, so the two text columns sit at **329** and **359 px** on this bench
-where the code's lower bounds are 300 and 320 - and **337** and **376 px** on CI's runner, the same two columns. A pane that cannot be dragged
-under what it holds cannot grow a horizontal scrollbar inside itself, so the 0.4 failure
-mode is unreachable rather than merely avoided. The floor also moves with the form: one column of editor rows asks for 329 px of controls, two columns for 386, three for 554 on this bench, and 337 / 403 / 575 on CI's runner, and the window's own minimum rises with them.
+minimum to its own contents' `minimumSizeHint`, so the two text columns sit at **362** and **359 px** on this bench
+where the code's lower bounds are 300 and 320 - and the library column, the half of that
+pair the editor never touches, was **376 px** the last time CI's runner was read. A pane
+that cannot be dragged under what it holds cannot grow a horizontal scrollbar inside
+itself, so the 0.4 failure mode is unreachable rather than merely avoided. The controls
+floor is the editor's own footprint, so it moves twice over: one column of editor rows asks for **362 px** of controls on this bench, two columns for **386**, three for **554** - a closed drop-down that has to show the longest entry it holds is part of what those columns carry - and the window's own minimum rises with them. Those three are this bench's digits; the suite prints its own three beside them on every machine and holds the order rather than a second machine's numbers, because a floor that follows the fonts is not a constant to compare.
 The 18 rows of an `arc` widget stand **779 px** tall in one column and **403 px** in three there, the grid's own ask going **171 / 344 / 512 px** - **723** and **378 px**, asking **180 / 361 / 533**, on CI's runner - which is the reflow buying height without buying a scrollbar, and all twelve figures come off the sizing pass the suite runs on every machine.
-The 18 rows of an `arc` widget stand **779 px** tall in one column and **403 px** in three, the grid's own ask going **171 / 344 / 512 px** - the reflow buying height without buying a scrollbar, all six figures this bench's, off the same sizing pass the suite runs and prints on every machine.
 
 ### The preview plays, or shows one frame
 
@@ -340,6 +346,57 @@ nudge it with the arrow keys.
 
 What the suite holds this to, rather than assumes - every one of these is something an
 editor commonly gets wrong:
+
+* **The note line under the rows says what the row paints.** For a `text` or `data` widget
+  the keys that choose the line - `content`, `source`, `xigma.format`, `fontFamily`,
+  `fontSize`, `bold`, `anchor`, `autoFitMax`, `xigma.showIf` - print the sentence the row
+  means *and* the line it produces: `draws as "57°C"`, or `paints no line: no reading for
+  `Fan 3 Name` on this machine: the row is skipped`, or the caveat that a shape is
+  `layout.VENDOR_FORMAT`'s rather than one measured off the vendor's picture. The string
+  comes from `edit.drawn_text`, which walks the painter's own rules in the painter's own
+  order (`themes.values` for the reading, `layout.text_for` for the shape,
+  `layout.font_for` for the face, a `showIf` asked before the row's own source), and it is
+  proved by painting rather than by agreement between two pieces of code: the suite draws
+  each of the **145** `text`/`data` rows of the **28** layouts twice, once as the file has
+  it and once with that row replaced by a literal `text` widget whose `content` is the
+  string the model named, and the two frames must be byte-identical. **132** rows paint a
+  line at this fixture and all **132** twins came back identical; the **13** that do not
+  (`Pump Speed` in 9 layouts, the `Fan 3`/`Fan 4` slots this box reports no tachometer for)
+  are rows the painter skips too, each with the reason the model gives; **23** of the
+  painted lines are spelled by a shape the file itself declares unmeasured. Punch a hole in
+  the readings and both doors answer the same way: `bars`' RAM row depends on `RAM Rate`,
+  spelled from `memory.used` / `memory.total`; with the total gone the model says so, the
+  painter records `showIf:RAM Rate`, and the `GPU Memory Rate` row beside it still paints.
+* **A `format` the value cannot be dressed in is refused on the way in and survived on the
+  way out.** `%q`, `%d %d`, `{}` and `{:,.0f}` all raise inside `format()` for the int this
+  fixture gives `Used RAM`; the model refuses each one, names the value it probed, and leaves
+  `dirty` and the undo count exactly where they were - and for the brace spellings it points
+  at the form this field actually takes (`,.0f`), only after checking that the suggestion
+  paints. A file that *already* carries one - built in the suite, not written by the editor -
+  does not stop the frame loop: the painter records `format:<source> (ValueError)` in its
+  skip list and draws the rest, 2 rows clean becoming 1 row and one said hole.
+* **The `fontFamily` menu shows the face it names.** Each entry carries a preview drawn
+  with the file `layout.font_for` resolves that name to on *this* box - the same Pillow call
+  the painter makes, so the shape you choose is the shape that reaches the glass, at one
+  height because a row's own size is in the row beside it - and the tooltip says which file
+  it was drawn from. A family whose globs match nothing here gets no preview and says so
+  both in its tooltip and in the note line, because the painter skips such a row entirely
+  (`font:<family>` in its `missing` notes): a name with no file is not a smaller face, it is
+  no ink - and neither is a row with **no `fontFamily` at all**, which is the fact nobody
+  guesses from a form, since there is no default face to fall back to. All five vendor names
+  resolve on the author's bench, so the gate builds the other cases instead of waiting for
+  them: it adds a family with no file to `layout.FONTS` for the length of the check (and
+  asserts the table comes back unchanged), puts `Impact` on an open row in memory - no file
+  is written - and hands the model and the painter a row with the key absent.
+
+* **A family spelled the file's way is folded, once, and said.** The vendor's rows write
+  `Arial` and `layout.FONTS` names `arial`; `layout.font_for` lowercases before it resolves,
+  so those are one face on the glass - which made the menu's own entry (the row's value,
+  shown rather than dropped) a choice the model refused. It no longer refuses: the row keeps
+  the name `layout.FONTS` carries, the window says what was stored, and the suite compares
+  the two frames for a real vendor row and finds **0 px** of difference. Nothing else folds
+  - `source`, `showIf`, `name` and `anchor` are keys the painter matches exactly, and
+  `source: cpu temperature` is still refused in words.
 
 * **Opening writes nothing.** The file appears at `save`, because your copy of a name is
   what `--theme` and the control socket find first, and that shadowing is a fact about

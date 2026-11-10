@@ -1070,7 +1070,10 @@ writes a theme today. What the model does and does not allow, all of it gated:
     meter: **706 px and a worst channel of 255**. The key names the dependency, an unanswered
     dependency is reported in the skip list as `showIf:<source>`, and the suite measures the
     key's worth by stripping it from a generated `bars` and counting the pixels it then
-    differs by.
+    differs by. The other prefix in that list came out of the editor's work: an unappliable
+    `xigma.format` is reported as `format:<source> (ValueError)`, because the model refuses
+    one on the way into the file and the painter still has to survive one that is already in
+    it - a hand-edited key then costs one row and says which, instead of stopping the loop.
   * **Two defects in the theme's own ratio code, found chasing that number.** `theme_bars`
     read `mem["used"]` outright, so a reading with a total and no used raised `KeyError`
     inside the frame loop; and its two memory meters were formed by different tests - the GPU

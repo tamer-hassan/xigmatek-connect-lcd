@@ -66,10 +66,10 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from PIL import Image                                            # noqa: E402
+from PIL import Image, ImageDraw, ImageFont                      # noqa: E402
 from PyQt6.QtCore import QEvent, QSize, Qt, QTimer        # noqa: E402
 from PyQt6.QtGui import (QAction, QBrush, QColor, QIcon, QImage, QKeySequence,
-                         QPainter, QPen, QPixmap)                  # noqa: E402
+                         QPalette, QPainter, QPen, QPixmap)        # noqa: E402
 from PyQt6.QtWidgets import (QApplication, QCheckBox, QColorDialog, QComboBox,
                              QDoubleSpinBox, QFormLayout, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QLineEdit, QListWidget,
@@ -131,6 +131,12 @@ MIN_WIDTH, MIN_HEIGHT = 1280, 1024
 #: label and a sentinel in one, because the row both shows what the file says and is how
 #: a reader un-says it - and because picking the first real choice instead would be a lie
 #: (`no arcPaint` is the vendor's ring convention, not "render").
+#: The faces the `fontFamily` row's menu has already drawn a preview of, keyed by file,
+#: height and the ink colour it was drawn in.  A preview is a Pillow render of the same
+#: `.ttf` the painter opens, and re-rendering five of them every time a row is bound would
+#: be the only cost this cache saves.
+_FACE_ICONS: dict = {}
+
 UNSET = "(not set)"
 
 #: The layout combo's first entry: "close the editor".  A constant rather than a string
@@ -205,6 +211,70 @@ def _readable(combo: QComboBox) -> QComboBox:
         # need, and any icon column the entries carry
         view.setMinimumWidth(wide + 60 + combo.iconSize().width())
     return combo
+
+
+def _ed_face_icon(ctl: QComboBox, path: str, height: int = 15) -> QIcon:
+    """A menu icon drawn with the face the painter would actually use.
+
+    The point of the picture in the `fontFamily` row's menu is that it is not Qt's font
+    list: the bytes come from the file `layout.font_for` named, through the same Pillow
+    call `layout.draw_text` makes, so the shape a reader is choosing is the shape that
+    goes to the glass.  It previews the **face**, not the size - every entry is drawn at
+    one height, because a menu cannot honestly show what 8 px or 74 px will look like and
+    the row's own size is in the row beside it.  The ink is the popup's own text colour,
+    so the preview is legible on a light desktop and on a dark one; a family this box has
+    no file for gets no icon at all, which is the honest mark.
+    """
+    col = ctl.palette().color(QPalette.ColorRole.WindowText)
+    key = (path, height, col.rgba())
+    if key in _FACE_ICONS:
+        return _FACE_ICONS[key]
+    img = Image.new("RGBA", (34, height + 7), (0, 0, 0, 0))
+    ImageDraw.Draw(img).text(
+        (2, 3), "Ag", font=ImageFont.truetype(path, height),
+        fill=(col.red(), col.green(), col.blue(), 255))
+    q = QImage(img.tobytes("raw", "RGBA"), img.width, img.height, img.width * 4,
+               QImage.Format.Format_RGBA8888).copy()
+    _FACE_ICONS[key] = QIcon(QPixmap.fromImage(q))     # the same conversion the clip
+    return _FACE_ICONS[key]                           # icons and the ink chips use
+
+
+def _ed_face_marks(ctl: QComboBox, faces: dict) -> None:
+    """Put each family's own shape in front of its name, and mark the ones with no file.
+
+    The vocabulary is the vendor's (`arial`, `verdana`, `simsun`, `dejavu`, `宋体`), so the
+    names tell a reader nothing about what the glass will show; the file this box resolves
+    each one to does.  `faces` is `edit.Editor.faces_here()` - the painter's own loader
+    answered per name - and the icon is `_ed_face_icon`, drawn from that file.  A name
+    with no file gets an empty icon and a tooltip that says so, because the alternative is
+    a menu that promises a face this machine cannot draw.
+    """
+    for i in range(ctl.count()):
+        name, path = ctl.itemText(i), faces.get(ctl.itemText(i))
+        if name == UNSET:
+            # not a family name, so nothing to preview and nothing to warn about.  A
+            # `fontFamily` row never offers this entry today - `(not set)` is only put in
+            # the menu for this program's own keys, and `fontFamily` is the vendor's - so
+            # this branch is the helper declining to mark a thing it was never asked
+            # about.  What it says, if a later change does offer it, is the truth about a
+            # text row with no family: there is no default face to fall back to.
+            ctl.setItemIcon(i, QIcon())
+            ctl.setItemData(i, "no `fontFamily` in the file, and there is no default face "
+                               "to fall back to: a row without one draws no ink at all",
+                            Qt.ItemDataRole.ToolTipRole)
+            continue
+        if path is None:
+            ctl.setItemIcon(i, QIcon())
+            ctl.setItemData(
+                i, f"no font file on this box answers `{name}`: a row that names it draws "
+                   f"no ink at all (the painter puts `font:{name.lower()}` in its "
+                   f"`missing` notes, and `--check-theme` prints that)",
+                Qt.ItemDataRole.ToolTipRole)
+        else:
+            ctl.setItemIcon(i, _ed_face_icon(ctl, path))
+            ctl.setItemData(i, f"{os.path.basename(path)}\nthe preview is one height for "
+                               f"every entry: the row's own `fontSize` decides the size",
+                            Qt.ItemDataRole.ToolTipRole)
 
 
 def _ed_shrink(ctl) -> None:
@@ -904,6 +974,7 @@ class Window(QMainWindow):
         self.ed_name.addItem(NO_EDITOR)
         self.ed_name.addItems(sorted(themes.EXPORTS))
         self.ed_name.addItems([r["name"] for r in themes.scan()[0]])
+        self._ed_box_readable(self.ed_name)
         # The counts in this sentence are read out of the library rather than remembered:
         # it said "three generated layouts" after `alpha` and `bars` joined the exports, and
         # nothing noticed, because the numbers were typed in prose.  The GUI section asserts
@@ -1278,6 +1349,15 @@ class Window(QMainWindow):
         used rather than remembered constants because they follow the fonts of the
         machine (the same column is 329 px on the author's bench and 337 px on CI's
         runner) and the number of editor columns the width just allowed.
+
+        The controls column gets one more term, and it is the one that paid for itself
+        twice: a closed drop-down shows its current entry, so the pane has to be wide
+        enough for the *widest entry any layout can put in that box*, not merely wide
+        enough for the box's own `minimumSizeHint` - which, since the row controls were
+        allowed to give way, is deliberately smaller than what they hold.  The furniture
+        (the form's label column, the pane's margins, the scrollbar) is read off the
+        layout as it stands, so the arithmetic says what this style costs instead of
+        guessing at another's.
         """
         for i, floor in enumerate(self.PANE_FLOORS):
             area = self.split.widget(i)
@@ -1286,6 +1366,28 @@ class Window(QMainWindow):
             inner = area.widget()
             need = inner.minimumSizeHint().width() if inner is not None else 0
             area.setMinimumWidth(max(floor, need))
+
+    def _ed_box_readable(self, box: QComboBox) -> int:
+        """Make one editor head box wide enough to show the widest entry it holds.
+
+        `_ed_shrink` lets a row's control give way, and that is right for a form of
+        eighteen of them; it is not right for the two boxes that say *which layout* is
+        open and *which row* you are editing, because the text they carry all the time is
+        the reader's orientation, and an elided `data  Motherboard Tempe…` in the closed
+        box is the same complaint the popup width was opened to answer, one widget later.
+        So the box asks for its longest entry plus the furniture the popup gets from
+        `_readable` (frame, margins, the arrow, a scrollbar the list may need), and
+        `_pane_floors` then raises the column to whatever that costs - which is why this
+        is not the 0.4 bug returning: the 0.4 window had a 300 px floor and 375 px of
+        contents, and the column simply overflowed.
+
+        Returns the width asked for, so the caller can say what it did.
+        """
+        met = box.view().fontMetrics()
+        wide = max((met.horizontalAdvance(box.itemText(i))
+                    for i in range(box.count())), default=0)
+        box.setMinimumWidth(wide + 60 + box.iconSize().width() if wide else 0)
+        return wide
 
     # ---- preview ---------------------------------------------------------
     # ---- the text colour -------------------------------------------------
@@ -2088,6 +2190,8 @@ class Window(QMainWindow):
             self.ed_widget.addItem(self.ed.label(i))
         self.ed_widget.blockSignals(False)
         _readable(self.ed_widget)
+        self._ed_box_readable(self.ed_widget)
+        self._pane_floors()
         self.ed_widget.setCurrentIndex(0)
         self._editor_pick_widget(0)
         self._repaint()
@@ -2127,6 +2231,20 @@ class Window(QMainWindow):
         if kind != self._ed_kind:
             self._ed_build_rows(kind)
         self._ed_bind_rows()
+        # the column's floor follows what the boxes now hold: the widget menu's entries
+        # are as wide as the widest row any layout puts there, and that changes with the
+        # layout - so the narrowest width the pane may be dragged to changes with it.  No
+        # loop is possible: an entry's width is a fact about the text and the fonts, never
+        # about the width the pane happens to have.
+        self._pane_floors()
+        # ...and the sentence under the rows goes back with them.  A reader can change the
+        # *widget* while the keyboard focus stays where it was - the mouse picks the row
+        # above, focus never moves - and then no FocusIn ever fires: the note line would be
+        # left explaining the same field of a different widget, which is a sentence about a
+        # row that is no longer on screen.  The suite found this by picking a `data` row
+        # whose source has no reading and reading a stale `draws as "57°C"`.
+        if getattr(self, "_ed_last", ""):
+            self._ed_explain(self._ed_last)
         self._editor_state()
 
     def _ed_fields(self, kind: str) -> list:
@@ -2263,6 +2381,17 @@ class Window(QMainWindow):
     #: ask for more than this threshold says they get.
     _ED_COL_PX = 240
 
+    #: The rows whose value decides *what line* a `text`/`data` widget paints, as opposed
+    #: to where its ink sits or what colour it is.  `content` and `source` choose the
+    #: words, `xigma.format` chooses their shape, `fontFamily`/`fontSize`/`bold` choose
+    #: the face, `anchor`/`autoFitMax` choose how much of the line survives at the face
+    #: it was laid out with, and `xigma.showIf` can take the row out before any of it is
+    #: asked.  For these the note line says what the row draws (`edit.drawn_text`); the
+    #: ink and position rows say nothing extra, because the picture under the cursor
+    #: already answers those in the most direct way available.
+    _ED_LINE_FIELDS = ("content", "source", "format", "fontFamily", "fontSize", "bold",
+                       "anchor", "autoFitMax", "showIf")
+
     def _editor_reflow(self, width: int = 0) -> None:
         """One, two or three columns of rows, by the width the *pane* has.
 
@@ -2336,6 +2465,14 @@ class Window(QMainWindow):
                 ctl.setCurrentText(str(value) if value is not None else items[0])
                 ctl.blockSignals(False)
                 _readable(ctl)
+                if field == "fontFamily":
+                    # each entry shows the face it names, drawn from the file this box
+                    # resolves it to, and an entry with no such file says so in its own
+                    # tooltip rather than looking like a choice.  The icon size is set
+                    # here because the style's default is not a size a face can be read
+                    # at, and `_readable` already adds this width to the popup's list.
+                    ctl.setIconSize(QSize(34, 22))
+                    _ed_face_marks(ctl, self.ed.faces_here())
             elif what == "num":
                 ctl.blockSignals(True)
                 try:
@@ -2394,20 +2531,58 @@ class Window(QMainWindow):
             label.setToolTip(self._ed_says[field])
 
     def _ed_explain(self, field: str) -> None:
-        """Say what one row means, in the line under the rows.
+        """Say what one row means, and what the row it belongs to paints right now.
 
         Which sentence is the model's business, not this window's: `themes.XIGMA_KEYS`
         for this program's own keys, `edit.field_note` for the `special` drawings whose
         `x` and `width` mean a pair's centre and pitch rather than a box's corner and
         span - and which of those a row is, the registry answers through the door it
         draws (`themes.special_is_pair`/`special_door`).  Nothing here remembers that.
+
+        The second half is the WYSIWYG one: for a `text` or `data` row, the keys that
+        decide its *line* say what that line is (`edit.drawn_text`), because a format
+        string or a family name is exactly the kind of value a reader cannot check by
+        staring at it in a box.  When the line cannot be painted the same place carries
+        the painter's own reason - no reading for that source, a `showIf` these readings
+        do not answer, no file for that family on this box, or no family in the file at
+        all - and when it is painted by a shape nobody measured off the vendor's picture,
+        the caveat says so as well.  The
+        suite proves the string is the painted line by drawing both doors and comparing
+        the frames byte for byte.
         """
         if self.ed is None:
             return
         says = getattr(self, "_ed_says", {}).get(field, "")
-        if says:
+        parts = [says] if says else []
+        kind = str(self.ed.selected().get("type") or "")
+        if field in self._ED_LINE_FIELDS and kind in ("text", "data"):
+            if field == "fontFamily":
+                fam, path, bold = self.ed.face_here()
+                if not fam:
+                    # the row carries no family.  Nothing is resolved and nothing is
+                    # invented: the painter skips such a row, so saying "the default face"
+                    # would promise ink that never arrives.
+                    parts.append("the file names no family at all, and there is no "
+                                 "default face to draw with")
+                else:
+                    same = sorted(f for f, p in self.ed.faces_here().items()
+                                  if p and p == path and f != fam)
+                    parts.append(f"this box draws `{fam}` as "
+                                 + (os.path.basename(path) if path
+                                    else "no file at all")
+                                 + (" bold" if bold else " regular")
+                                 + (f", the same face as {', '.join(same)}" if same
+                                    else ""))
+            line, note = self.ed.drawn_text()
+            if line is None:
+                parts.append(f"paints no line: {note}")
+            else:
+                parts.append(f'draws as "{line}"')
+                if note:
+                    parts.append(note)
+        if parts:
             self._ed_last = field
-            self.ed_note.setText(says)
+            self.ed_note.setText("   ".join(parts))
 
     def _ed_row_value(self, field: str):
         """What one row's control currently holds."""

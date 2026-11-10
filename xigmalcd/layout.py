@@ -920,6 +920,15 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
                 except KeyError:
                     notes["missing"].append(src)
                     continue
+                except (ValueError, TypeError) as exc:
+                    # a `xigma.format` the value behind the source cannot be dressed in.
+                    # This is not a shape a layout drawn here can produce - the editor
+                    # refuses one before it reaches the file (`edit.Editor._format_fits`) -
+                    # but a file is a file, and the alternative to saying it is a frame
+                    # loop that dies on the widget.  Said in the same voice as every other
+                    # hole, with the reason attached so the reader can fix the key.
+                    notes["missing"].append(f"format:{src} ({type(exc).__name__})")
+                    continue
             else:
                 s = prop["content"]
             face, fam, path = font_for(prop)

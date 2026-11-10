@@ -125,10 +125,14 @@ claim:
   box (`tools/fanscan.py` has never been pointed at one).
 * **A widget with no reading is skipped and said so**, not drawn as a zero. Painted
   offline from one pinned metrics dict and one pinned instant, all 23 layouts draw
-  something - 114 widget boxes between them on this bench, whose fonts resolve all four
-  families the library names; the suite prints the face situation per machine, because a
-  box with no CJK face installed drops those widgets and lands under that count - and 9
-  print
+  something - 114 widget boxes between them on this bench, whose font files resolve every
+  family the library's rows name (the **3** of them: `arial` `simsun` `verdana`, answered
+  here by Liberation Sans, DejaVu Sans and Noto Sans CJK, because a Linux box has the
+  shapes and not the vendor's font files); the suite prints the face situation per
+  machine, because a box with no CJK face installed drops those widgets and lands under
+  that count.  A row with **no `fontFamily` at all** drops the same way - the report says
+  `font:` with nothing after the colon, because there is no default face to fall back to -
+  and 9 print
   `skipped Pump Speed: no pump tachometer has been measured on this box`. The same notes
   name every face substitution (`arial` -> `LiberationSans-Regular.ttf`, `simsun` ->
   Noto Sans CJK) and every shape that is this repo's choice rather than something measured
@@ -183,9 +187,11 @@ claim:
   for different things, which the suite holds in that direction rather than as one count:
   `skipped:` is **per widget** - one note each, repeats and all, where a row silenced by its
   dependency is named by what it depends on (`showIf:GPU Memory Rate`) instead of by its own
-  reading - while `and cannot:` is **per source**, from what `sensors.collect()` left
-  unanswered. On a box with no GPU the two differ by exactly those silenced rows, and the
-  suite asserts that difference instead of pretending it is not there. A drawn theme with no
+  reading, and a row silenced by a `xigma.format` its value cannot be dressed in is named by
+  that key (`format:GPU Temperature (ValueError)`) - while `and cannot:` is **per source**,
+  from what `sensors.collect()` left unanswered. On a box with no GPU the two differ by
+  exactly those silenced rows, and the suite asserts that difference instead of pretending
+  it is not there. A drawn theme with no
   export - none today, and the wording is driven in a gate by taking one away - is still
   answered in words rather than an error.
 * **One theme directory is read, and one is writable, and they are the same one:**
