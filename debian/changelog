@@ -101,8 +101,9 @@ xigmatek-connect-lcd (0.5) resolute; urgency=medium
     row of the 28 layouts is drawn twice, once as the file has it and once with
     that row replaced by a literal `text` widget holding the model's string, and
     the two frames must be byte-identical - 145 rows, 132 of them painting a
-    line at this fixture, 0 twins differing, 13 rows skipped by both doors with
-    the reason said out loud.
+    line at this fixture here and 131 on CI's runner (no CJK face there for the
+    vendor's `simsun` rows to open), 0 twins differing, 13 rows skipped by both
+    doors here and 14 there, each with the reason said out loud.
 
   * `xigma.format` is refused when the value cannot be dressed in it, and a
     file that already carries one is survived.  `%q`, `%d %d`, `{}` and

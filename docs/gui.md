@@ -366,10 +366,13 @@ editor commonly gets wrong:
   each of the **145** `text`/`data` rows of the **28** layouts twice, once as the file has
   it and once with that row replaced by a literal `text` widget whose `content` is the
   string the model named, and the two frames must be byte-identical. **132** rows paint a
-  line at this fixture and all **132** twins came back identical; the **13** that do not
-  (`Pump Speed` in 9 layouts, the `Fan 3`/`Fan 4` slots this box reports no tachometer for)
-  are rows the painter skips too, each with the reason the model gives; **23** of the
-  painted lines are spelled by a shape the file itself declares unmeasured. Punch a hole in
+  line at this fixture and all **132** twins came back identical - on CI's runner, where no
+  CJK face is installed for the vendor's `simsun` rows to resolve, **131** paint and all
+  **131** twins come back identical. The **13** that do not here (**14** there) are rows the
+  painter skips too, each with the reason the model gives: `Pump Speed` in **9** layouts,
+  the `Fan 3`/`Fan 4` slots this box reports no tachometer for, and on the runner the rows
+  whose family has no file to open. **23** of the painted lines are spelled by a shape the
+  file itself declares unmeasured (**22** there). Punch a hole in
   the readings and both doors answer the same way: `bars`' RAM row depends on `RAM Rate`,
   spelled from `memory.used` / `memory.total`; with the total gone the model says so, the
   painter records `showIf:RAM Rate`, and the `GPU Memory Rate` row beside it still paints.

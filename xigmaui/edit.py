@@ -678,7 +678,9 @@ class Editor:
         the file, then draws a copy of the file with that one row replaced by a literal
         `text` widget whose `content` is the string returned here, and requires the two
         frames to be byte-identical.  145 rows in 28 layouts, 132 of them painting a line
-        at this fixture, 0 pixels of difference between the two doors, in 1.5 s.
+        at this fixture on the author's bench - 131 on CI's runner, whose fonts have no CJK
+        face for `simsun` to resolve - with 0 pixels of difference between the two doors, in
+        1.5 s.
         """
         kind = str(self.selected().get("type") or "")
         if kind not in ("text", "data"):

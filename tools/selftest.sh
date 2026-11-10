@@ -7082,21 +7082,35 @@ print(f"  what a row paints     {_line_rows} `text`/`data` rows in "
                                                          key=lambda kv: -kv[1])[:4])
       + f"), and {_caveats} of the painted lines are spelled by a shape this repo "
       f"declares unmeasured")
-# docs/gui.md quotes those four counts as digits, so they are compared with this run
-# rather than remembered there. They are the one family of figures in that page that does
-# not depend on fonts: rows, layouts and the fixture are the same files everywhere.
+# Two kinds of count live in that sentence, and they are held in two ways.  What the files
+# decide - rows, layouts, `Pump Speed` in N layouts - is the same on every machine, so it
+# is asserted exactly.  What a **face** decides is not: a row whose family resolves to no
+# file paints nothing, and CI's runner ships no CJK face, so the painted / twin / skipped /
+# caveat counts differ there and docs/gui.md says which machine each belongs to.
 _gh = " ".join(gui_txt.split())
 for _claim in (f"the **{_line_rows}** `text`/`data` rows of the "
                f"**{len(generated) + len(pick)}** layouts twice",
-               f"**{_twin_same}** rows paint a line at this fixture and all "
-               f"**{_twin_same}** twins came back identical",
-               f"the **{_line_none}** that do not",
-               f"**{_caveats}** of the painted lines"):
-    assert _claim in _gh, (_claim, "docs/gui.md counts what a row paints differently from "
-                                   "this run")
-_pump = _reasons.get("Pump Speed", 0)
-assert f"`Pump Speed` in {_pump} layouts" in _gh, (_pump,
-    "docs/gui.md's breakdown of the rows this fixture cannot answer is not this run's")
+               f"`Pump Speed` in **{_reasons.get('Pump Speed', 0)}** layouts"):
+    assert _claim in _gh, (_claim, "docs/gui.md counts what the files put there, and this "
+                                   "run disagrees")
+_mc = _pair("rows that paint a line, and twins that match them",
+            r"\*\*(\d+)\*\* rows paint a line at this fixture and all \*\*(\d+)\*\* "
+            r"twins came back identical - on CI's runner.*?\*\*(\d+)\*\* paint and all "
+            r"\*\*(\d+)\*\* twins come back identical", (_twin_same, _twin_same))
+_sk = _re.search(r"The \*\*(\d+)\*\* that do not here \(\*\*(\d+)\*\* there\)",
+                 _gh)
+assert _sk and _line_none in (int(_sk[1]), int(_sk[2])), (
+    _line_none, _sk.groups() if _sk else None,
+    "docs/gui.md's count of rows that paint no line is not this machine's labelled number")
+_cv = _re.search(r"\*\*(\d+)\*\* of the painted lines are spelled by a shape the file "
+                 r"itself declares unmeasured \(\*\*(\d+)\*\* there\)", _gh)
+assert _cv and _caveats in (int(_cv[1]), int(_cv[2])), (
+    _caveats, _cv.groups() if _cv else None,
+    "docs/gui.md's caveat count is not this machine's labelled number")
+print(f"  the counts, both machines  this run: {_twin_same} painting a line with all "
+      f"{_twin_same} twins identical, {_line_none} painting nothing, {_caveats} caveated; "
+      f"the page's pairs: {_mc} painted/twins, {_sk.groups()} skipped, "
+      f"{_cv.groups()} caveats")
 # The same door with a hole punched in the readings: a row whose `xigma.showIf` dependency
 # vanishes has to be *said* by the model and skipped by the painter, not drawn half.  Only
 # `bars` carries the key, on its two memory figures, each depending on the rate the meter
