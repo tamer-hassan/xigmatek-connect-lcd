@@ -847,10 +847,18 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   design exists to avoid; a save that tried it is refused, and `--check-theme gauge` says
   the export does not exist yet instead of failing.
 * **`property` is a one-element list, and that is a hard rule, not a style preference.**
-  All 152 vendor widgets use one entry, and `layout.draw_theme` reads `property[0]` only -
+  All **152** vendor widgets use one entry, and `layout.draw_theme` reads `property[0]` only -
   a second entry would be silently unwritten, which is the failure mode this repo's
   "say the choice, never repair it" rule refuses. Same for an empty `osd.widget` list:
-  nothing to draw is not the same thing as an empty canvas.
+  nothing to draw is not the same thing as an empty canvas. Since 0.6 both rules have a
+  door in the editor in front of them, and neither door keeps a private copy of the rule:
+  `add_widget` runs `validate` over the layout *with the new row in it* and refuses on any
+  hard answer before the row exists, and `delete_widget` refuses the row that would empty
+  the list, asking `validate` what it would say about the emptied layout and repeating that
+  sentence. The suite re-counts the envelope the rules guard - every one of the **185**
+  rows in the **28** layouts the editor opens carries exactly `id`, `layerIndex`, `type`,
+  `property`, `widgetContent`, and `property` is one element in all of them - and fails if
+  the page's digits stop being that run's.
 * **A round trip is byte-identical, with one measured bound.** All 27 shipped layouts
   reproduce from their own parsed content, and `shape_of()` records the one thing the
   vendor's files disagree about - 18 escape non-ASCII as `\uXXXX`, 9 keep it raw - so a

@@ -1,6 +1,6 @@
 [project]
 name = "xigmalcd"
-version = "0.5"
+version = "0.6"
 description = "Show Linux system stats on the LCD built into Xigmatek Connect AIO coolers"
 readme = "README.md"
 requires-python = ">=3.9"

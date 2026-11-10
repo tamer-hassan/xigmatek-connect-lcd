@@ -7329,6 +7329,473 @@ print(f"                        and the fold stays in one field: `source` as "
       f"`cpu temperature` is still refused ({_s_note[:52]}...), while `DEJAVU` folds to "
       f"`dejavu` because `font_for` lowercases that one name")
 
+# ---- rows you can add, delete and reorder.  Two rules decide what this can claim.  The
+# ---- envelope a new row has to fit is taken from the files on this run, not from a list
+# ---- kept here: every row this program can read carries exactly the five keys
+# ---- `gui_edit.WIDGET_KEYS`, with `property` a one-element list.  And every claim about
+# ---- what a reorder *does* is a pixel count from the painter, because a claim about list
+# ---- indices is the model talking to itself.
+_rows_all = [w for _e in (generated + [gui_edit.Editor.open_theme(r["name"]) for r in pick])
+             for w in _e.widgets()]
+_kinds_seen = {}
+for _w in _rows_all:
+    _kinds_seen[str(_w.get("type"))] = _kinds_seen.get(str(_w.get("type")), 0) + 1
+assert sorted(_kinds_seen) == sorted(layout.KINDS), sorted(_kinds_seen)
+_bad_env = [_w for _w in _rows_all if frozenset(_w) != frozenset(gui_edit.WIDGET_KEYS)]
+assert not _bad_env, (_bad_env[:2], "the five-key envelope is not what the files carry")
+assert all(isinstance(_w.get("property"), list) and len(_w["property"]) == 1
+           for _w in _rows_all), "a `property` that is not one element"
+assert all(_w.get("widgetContent") == "" for _w in _rows_all)
+_mandatory, _used = {}, {}
+for _k in _kinds_seen:
+    _common = None
+    for _w in _rows_all:
+        if str(_w.get("type")) != _k:
+            continue
+        _keys = set(_w["property"][0])
+        _common = _keys if _common is None else (_common & _keys)
+    _mandatory[_k] = sorted(_common - {"xigma"})
+    for _f in _mandatory[_k]:
+        if _f in ("x", "y"):
+            continue
+        _used[(_k, _f)] = {repr(_w["property"][0][_f]) for _w in _rows_all
+                           if str(_w.get("type")) == _k and _f in _w["property"][0]}
+assert all(_used[(_k, _f)] for (_k, _f) in _used), "a mandatory key nobody sets"
+
+_add_ok = _add_soft = _place_clear = _place_moved = _place_stuck = 0
+_add_notes = {}
+for _e in (generated + [gui_edit.Editor.open_theme(r["name"]) for r in pick]):
+    _base = themes.canonical(_e.obj)
+    for _k in sorted(layout.KINDS):
+        _t = gui_edit.Editor(copy.deepcopy(_e.obj), origin=_e.origin, path=_e.path,
+                             name=_e.name, theme=_e.theme)
+        if _t.rows_of(_k):
+            _t.select(_t.rows_of(_k)[-1])
+        _steps0 = _t.steps
+        _img0, _notes0 = _t.paint(*_t.fixture())
+        _boxes0 = [r for r in (_notes0.get("boxes") or []) if r[2]]
+        _good, _said = _t.add_widget(_k, name="temp-labels")
+        if not _good:
+            assert _t.steps == _steps0 and not _t.dirty, (_k, "a refused add moved the file")
+            continue
+        _add_ok += 1
+        _i_new = _t.index
+        _new = _t.widgets()[_i_new]
+        _prop = _new["property"][0]
+        assert str(_new.get("type")) == _k
+        assert frozenset(_new) == frozenset(gui_edit.WIDGET_KEYS)
+        assert not (set(_mandatory[_k]) - set(_prop)), (
+            _k, sorted(set(_mandatory[_k]) - set(_prop)),
+            "a new row left out a key every row of that kind carries")
+        for _f in _mandatory[_k]:
+            if _f in ("x", "y"):
+                continue
+            assert repr(_prop[_f]) in _used[(_k, _f)], (
+                _k, _f, _prop[_f], "a new row's default is a value no row of that kind uses")
+        assert [str(w.get("id")) for w in _t.widgets()].count(str(_new.get("id"))) == 1, (
+            "the new id collides inside this layout")
+        _hard, _soft = themes.validate(_t.obj)
+        assert not _hard, (_e.name, _k, _hard)
+        _add_soft += len(_soft)
+        _img1, _notes1 = _t.paint(*_t.fixture())
+        _mine = [r for r in (_notes1.get("boxes") or []) if r[3] == _i_new and r[2]]
+        assert _mine, (_e.name, _k, "the row the model added paints no box",
+                       [str(m) for m in _notes1["missing"]])
+        assert len([r for r in (_notes1.get("boxes") or []) if r[2]]) > len(_boxes0), (
+            _e.name, _k, "the box count did not rise")
+        _other = [r[2] for r in (_notes1.get("boxes") or []) if r[3] != _i_new and r[2]]
+        _meets = gui_edit._overlaps(_mine[0][2], _other)
+        _diff = px_differ(_img0, _img1)
+        if _meets:
+            # a row copied onto a full canvas has nowhere to go: `alpha` has no 194x194 px
+            # spot that meets none of its boxes, so an `arc` there sits exactly on the ring
+            # it was copied from.  That is said in the sentence rather than hidden, and the
+            # window marks the row it just selected so a reader can still find it.
+            _place_stuck += 1
+            assert "no free room" in _said or "bigger than" in _said, (_e.name, _k, _said)
+        else:
+            assert _diff > 0, (_e.name, _k, _said,
+                               "a row that is clear of every other box changed no pixel")
+            if "nearest free spot" in _said:
+                _place_moved += 1
+            else:
+                _place_clear += 1
+        _add_notes.setdefault(_k, _said)
+        assert _t.steps == _steps0 + 1, (_k, "add is not exactly one undo step")
+        assert _t.undo() and themes.canonical(_t.obj) == _base, (
+            _e.name, _k, "one press of undo did not put the file back byte for byte")
+
+# the refusals, each one moving nothing at all.  The last-row refusal is compared
+# against `themes.validate`'s own hard string, because the claim is that the model
+# repeats the library rather than paraphrasing it.
+_EMPTY_PHRASE = next(w for w in themes.validate({"width": render.W, "height": render.H,
+                                                    "osd": {"widget": []}})[0]
+                            if "empty canvas" in w)
+_ref = []
+for _bad, _want in (("nope", "is not a kind this program draws"),
+                    ("special", "has to name one of")):
+    _t = gui_edit.Editor(copy.deepcopy(generated[0].obj), origin="suite probe",
+                         name=generated[0].name, theme=generated[0].theme)
+    _steps0, _dirty0, _n0 = _t.steps, _t.dirty, len(_t.widgets())
+    _good, _said = _t.add_widget(_bad)
+    assert not _good and _want in _said, (_bad, _said)
+    assert (_t.steps, _t.dirty, len(_t.widgets())) == (_steps0, _dirty0, _n0), (
+        _bad, "a refusal moved the layout")
+    _ref.append(f"`{_bad}` -> {_said[:40]}")
+_t = gui_edit.Editor(copy.deepcopy(generated[0].obj), origin="suite probe",
+                     name=generated[0].name, theme=generated[0].theme)
+while len(_t.widgets()) > 1:
+    _t.select(len(_t.widgets()) - 1)
+    assert _t.delete_widget()[0], "deleting down to one row was refused early"
+_steps0 = _t.steps
+_good, _said = _t.delete_widget()
+assert not _good and _EMPTY_PHRASE in _said, (_said, _EMPTY_PHRASE,
+                   "the model does not refuse the last row in `validate`'s words")
+assert _t.steps == _steps0 and len(_t.widgets()) == 1, "the refusal still removed the row"
+_ref.append(f"the last row -> {_said[:44]}")
+_t = gui_edit.Editor(copy.deepcopy(generated[0].obj), origin="suite probe",
+                     name=generated[0].name, theme=generated[0].theme)
+_t.select(0)
+assert _t.delete_widget()[0], "deleting row 0 was refused"
+_t.select(0)
+_good, _said = _t.move_widget(-1)
+assert not _good and "already the first drawn" in _said, _said
+_ref.append(f"move past the front -> {_said[:36]}")
+
+# ---- the reorder, measured per adjacent pair.  Three numbers per pair: whether the two
+# ---- boxes meet at all, whether the swap moves any pixel, and - inside the rectangle the
+# ---- two boxes share - how many pixels **both** rows cover opaquely and how many of those
+# ---- the two rows paint in different colours.  The rule that comes out of the files is
+# ---- bidirectional, and it is asserted both ways: a swap moves ink exactly where the two
+# ---- rows lay opaque ink of different colours on the same pixel.  A box is a bounding box
+# ---- (an `arc`'s is mostly the hole its ring is drawn around), and two vendor `line` rows
+# ---- cross in sub-pixel coverage only, which is why four of the thirteen pairs whose boxes
+# ---- meet are silent.  The corpus has no pair that shares opaque ink of the *same* colour;
+# ---- if one ever appears, this assert says which rule it broke rather than loosening.
+_swap_zero = _swap_move = 0
+_silent = []
+for _e in (generated + [gui_edit.Editor.open_theme(r["name"]) for r in pick]):
+    _img0, _notes0 = _e.paint(*_e.fixture())
+    _bx = {r[3]: r[2] for r in (_notes0.get("boxes") or []) if r[2]}
+    _ws = _e.widgets()
+    for _i in range(len(_ws) - 1):
+        if _i not in _bx or _i + 1 not in _bx:
+            continue
+        _t = gui_edit.Editor(copy.deepcopy(_e.obj), origin=_e.origin, path=_e.path,
+                             name=_e.name, theme=_e.theme)
+        _t.select(_i)
+        _ok, _said = _t.move_widget(+1)
+        assert _ok, (_e.name, _i, _said)
+        _img1, _notes1 = _t.paint(*_t.fixture())
+        assert ({str(_w.get("id")): _w.get("layerIndex") for _w in _e.widgets()}
+                == {str(_w.get("id")): _w.get("layerIndex") for _w in _t.widgets()}), (
+                _e.name, _i, "a reorder rewrote `layerIndex`, which nothing here reads")
+        assert sorted(str(_w.get("id")) for _w in _t.widgets()) == sorted(
+            str(_w.get("id")) for _w in _ws), (_e.name, _i, "a swap lost or invented a row")
+        _d = px_differ(_img0, _img1)
+        if not gui_edit._overlaps(_bx[_i], [_bx[_i + 1]]):
+            assert _d == 0, (_e.name, _i, "two rows whose boxes never meet swapped ink")
+            _swap_zero += 1
+            continue
+        x0, y0 = max(_bx[_i][0], _bx[_i + 1][0]), max(_bx[_i][1], _bx[_i + 1][1])
+        x1, y1 = min(_bx[_i][2], _bx[_i + 1][2]), min(_bx[_i][3], _bx[_i + 1][3])
+        solo = []
+        for _one in (_i, _i + 1):
+            _s = gui_edit.Editor({"width": render.W, "height": render.H,
+                                  "osd": {"widget": [copy.deepcopy(_ws[_one])]}},
+                                 origin="suite probe", name=_e.name)
+            _si, _sn = _s.paint(*_s.fixture())
+            solo.append(_si.convert("RGBA"))
+        _opaque = _differ = 0
+        for _y in range(y0, y1 + 1):
+            for _x in range(x0, x1 + 1):
+                _a, _b = solo[0].getpixel((_x, _y)), solo[1].getpixel((_x, _y))
+                if _a[3] == 255 and _b[3] == 255:
+                    _opaque += 1
+                    if _a[:3] != _b[:3]:
+                        _differ += 1
+        assert (_d > 0) == (_differ > 0), (
+            _e.name, _i, _d, _opaque, _differ,
+            "a swap moved ink with no two-coloured opaque overlap, or the reverse: the "
+            "draw-order rule and the pixel count disagree about which row is on top")
+        if _d:
+            _swap_move += 1
+        else:
+            _silent.append((_e.name, _i, _opaque, str(_ws[_i].get("type")),
+                            str(_ws[_i + 1].get("type"))))
+print(f"  rows you can add      {_add_ok} adds across {len(generated) + len(pick)} layouts: "
+      f"each one paints a box the frame did not have and changes pixels, and one press of "
+      f"undo puts the file back byte for byte.  The envelope is "
+      f"{len(gui_edit.WIDGET_KEYS)} keys on all {len(_rows_all)} rows; a new row carries "
+      f"the {len(_mandatory['text'])}/{len(_mandatory['data'])}/{len(_mandatory['bar'])}/"
+      f"{len(_mandatory['arc'])}/{len(_mandatory['special'])}/{len(_mandatory['line'])} "
+      f"keys text/data/bar/arc/special/line rows always carry, and every one of its values "
+      f"is a value rows of that kind already use ({_add_soft} soft notes said out loud, "
+      f"none repaired).  Placement is the painter's own boxes: {_place_clear} sit where "
+      f"their source sits and are clear, {_place_moved} moved to the nearest free spot, "
+      f"{_place_stuck} still meet a box and the sentence says so")
+print(f"                        refused in words, moving nothing: {'; '.join(_ref)}")
+print(f"                        reorder: {_swap_zero} adjacent pairs whose boxes never "
+      f"meet swapped 0 px; of the {len(_silent) + _swap_move} whose boxes do meet, "
+      f"{_swap_move} moved ink and {len(_silent)} did not, and in each of those "
+      f"{len(_silent)} no pixel of the overlap is covered opaquely by both rows "
+      f"({'; '.join(f'{n} {a}/{b} rows {i}/{i + 1}' for n, i, o, a, b in _silent[:4])}"
+      + (f"; +{len(_silent) - 4} more)" if len(_silent) > 4 else ")"))
+print(f"                        one add, in the model's own sentence: "
+      f"{_add_notes.get('text', '')[:140]}")
+
+# ---- the figures this cycle's pages write down.  Each one is counted again from the files
+# ---- or the code on this run, and the sentence has to carry that answer: a digit that goes
+# ---- stale fails the run instead of ageing quietly in a paragraph.  The counts that follow
+# ---- a face - which placement bucket an add landed in, which reorder pairs moved ink - are
+# ---- deliberately NOT in this list, and are printed above for the machine that made them.
+_f_ed = [gui_edit.Editor.open_theme(_r["name"]) for _r in pick]
+_f_rows = [_w for _e in _f_ed for _w in _e.widgets()]
+_f_ids = {str(_w.get("id")) for _w in _f_rows}
+_pos_same = sum(1 for _e in _f_ed for _i, _w in enumerate(_e.widgets())
+                if _w.get("layerIndex") == _i)
+assert len(_f_ids) < len(_f_rows), (
+    "the id-reuse sentence is about a fact the files no longer show")
+assert 0 < _pos_same < len(_f_rows), (
+    "layerIndex now *is* the position in every row, which is the one finding that would "
+    "make a reorder have to rewrite it")
+_edit_src = " ".join(open("xigmaui/edit.py", encoding="utf-8").read().split())
+# the comment block's own continuation markers, and whatever spacing they leave behind
+_edit_src = " ".join(_edit_src.replace(" #:", " ").split())
+
+
+def _stated(what, source, pattern, mine):
+    """One figure a page (or a code comment) states, held to the count this run made."""
+    m = _re.search(pattern, source)
+    assert m, (what, "the sentence that states this figure is gone, so nothing checks it")
+    got = tuple(int(x.replace(" ", "")) for x in m.groups())
+    assert got == tuple(mine), (what, got, mine,
+                     "the digits written down are not this run's")
+    return got
+
+
+# the model's own comment block, which is the source a reader of the installed tree gets
+_stated("the row envelope, in `edit.py`'s comment", _edit_src,
+        r"every one of the \*\*(\d+)\*\* widget rows in the \*\*(\d+)\*\* layouts",
+        (len(_rows_all), len(generated) + len(pick)))
+_LAYER = r"equals the row's position in \*\*(\d+)\*\* of their \*\*(\d+)\*\* rows and " \
+         r"differs in \*\*(\d+)\*\*"
+_stated("the layerIndex census, in `edit.py`'s comment", _edit_src, _LAYER,
+        (_pos_same, len(_f_rows), len(_f_rows) - _pos_same))
+
+
+# docs/gui.md: the four bullets' digits, in the order the page writes them
+_stated("the row envelope, on the page", _gf,
+        r"all \*\*(\d+)\*\* rows in the \*\*(\d+)\*\* layouts carry exactly the "
+        r"\*\*(\d+)\*\* keys",
+        (len(_rows_all), len(generated) + len(pick), len(gui_edit.WIDGET_KEYS)))
+_stated("the mandatory keys per kind, on the page", _gf,
+        r"carries the \*\*(\d+) / (\d+) / (\d+) / (\d+) / (\d+) / (\d+)\*\* keys that",
+        tuple(len(_mandatory[_k]) for _k in ("text", "data", "bar", "arc", "special",
+                                             "line")))
+_stated("the special registry, on the page", _gf,
+        r"the \*\*(\d+)\*\* drawings `themes\.SPECIALS` registers", (len(themes.SPECIALS),))
+_shared = r"one id shared by \*\*(\d+)\*\* of those rows"
+_idsel = {}
+for _w in _f_rows:
+    _k = str(_w.get("id"))
+    _idsel[_k] = _idsel.get(_k, 0) + 1
+_v_rows = _f_rows + [_w for _r in _rej for _w in
+                     ((themes.load(_r["path"]).get("osd") or {}).get("widget") or [])]
+_v_ids = {}
+for _w in _v_rows:
+    _k = str(_w.get("id"))
+    _v_ids[_k] = _v_ids.get(_k, 0) + 1
+
+# docs/limits.md also carries the envelope, in prose about the library's hard rules.
+_lim = " ".join(open("docs/limits.md", encoding="utf-8").read().split())
+_stated("the row envelope, in docs/limits.md", _lim,
+        r"every one of the \*\*(\d+)\*\* rows in the \*\*(\d+)\*\* layouts the editor "
+        r"opens carries exactly `id`, `layerIndex`, `type`, `property`, `widgetContent`, "
+        r"and `property` is one element in all of them",
+        (len(_rows_all), len(generated) + len(pick)))
+_stated("the vendor's row count, in docs/limits.md", _lim,
+        r"All \*\*(\d+)\*\* vendor widgets use one entry", (len(_v_rows),))
+_stated("the vendor's id reuse, on the page", _gf,
+        r"those \*\*(\d+)\*\* files' \*\*(\d+)\*\* rows answer to \*\*(\d+)\*\* distinct "
+        r"ids, " + _shared,
+        (len(pick), len(_f_rows), len(_f_ids), max(_idsel.values())))
+_stated("the vendor's id reuse, in `edit.py`'s comment", _edit_src,
+        r"\*\*(\d+)\*\* rows in \*\*(\d+)\*\* files answering to \*\*(\d+)\*\* distinct "
+        r"ids, " + _shared,
+        (len(_v_rows), len(pick) + len(_rej), len(_v_ids), max(_v_ids.values())))
+_stated("the placement step, on the page", _gf,
+        r"walked over the canvas in \*\*(\d+) px\*\* steps", (gui_edit.PLACE_STEP,))
+_stated("the layerIndex census, on the page", _gf, _LAYER,
+        (_pos_same, len(_f_rows), len(_f_rows) - _pos_same))
+# ...and the refusal the page promises "in the library's own words": the phrase is taken
+# from `themes.validate` on this run, and both the model and the page have to carry it.
+assert _EMPTY_PHRASE in _gf, (
+    "docs/gui.md no longer quotes `validate` verbatim for an empty layout, which is the "
+    "sentence `delete_widget` refuses the last row with")
+_ORDER = ("text", "data", "bar", "arc", "special", "line")
+_mand_str = "/".join(str(len(_mandatory[_k])) for _k in _ORDER)
+print(f"                        the page's digits, from this run: {len(_rows_all)} rows in "
+      f"{len(generated) + len(pick)} layouts carry the {len(gui_edit.WIDGET_KEYS)} keys, "
+      f"mandatory per kind {len(_rows_all) and _mand_str}; the {len(pick)} vendor files' "
+      f"{len(_f_rows)} rows answer to {len(_f_ids)} ids and "
+      f"{len(_f_rows) - _pos_same} of them do not spell `layerIndex` as their position; "
+      f"the placement step is {gui_edit.PLACE_STEP} px and {len(themes.SPECIALS)} "
+      f"drawings are registered")
+# ---- the window's half of the same three doors: the buttons, what the add menu promises
+# ---- before it is pressed, and what the new controls cost the three columns.  The floors
+# ---- are read before and after, because a control nobody measured is how 0.5's controls
+# ---- column grew from 329 px to 362 px of contents: the label is the cost.
+_win_floors0 = None
+_win_contents0 = None
+win.adv_toggle.setChecked(True)
+_ix = win.ed_name.findText("bars")
+assert _ix > 0, (_ix, "the layout combo offers no `bars` entry, so opening it through the "
+                      "combo is not what this gate can check")
+win.ed_name.setCurrentIndex(_ix)
+for _ in range(8):
+    appq.processEvents()
+_win_floors0 = [win.split.widget(i).minimumWidth() for i in range(3)]
+_win_contents0 = [win.split.widget(i).widget().minimumSizeHint().width() for i in range(3)]
+_rows0 = win.ed_widget.count()
+assert win.ed is not None and _rows0 == len(win.ed.widgets()) == 32, _rows0
+_acts = {}
+for _a in win.ed_add_menu.actions():
+    if not _a.text():
+        continue
+    _acts[_a.text()] = _a
+assert sorted(_acts) == sorted(gui_edit.kinds()), (sorted(_acts), sorted(gui_edit.kinds()),
+                                                  "the add menu does not offer every kind")
+assert "special" in _acts and _acts["special"].menu() is not None
+_spe = [a.text() for a in _acts["special"].menu().actions()]
+assert sorted(_spe) == sorted(themes.SPECIALS), (_spe, sorted(themes.SPECIALS),
+                                          "the `special` sub-menu is not the registry")
+for _k, _a in _acts.items():
+    if _k == "special":
+        for _sa in _a.menu().actions():
+            assert _sa.toolTip().startswith("a `special` row drawing"), (
+                _sa.text(), _sa.toolTip())
+        continue
+    assert _a.toolTip().startswith("a copy of"), (
+        _k, _a.toolTip(), "the entry does not name the row a new one of that kind copies")
+assert not win.ed.dirty and win.ed_undo.text() == "undo", "opening a layout changed the file"
+
+# press `arc`, and the window agrees with the file afterwards
+_img_a, _notes_a = win.ed.paint(*win.ed.fixture())
+_acts["arc"].trigger()
+for _ in range(8):
+    appq.processEvents()
+assert win.ed_widget.count() == _rows0 + 1, (win.ed_widget.count(), _rows0,
+                                             "the row the model added is not in the menu")
+assert win.ed.index == win.ed_widget.currentIndex() == _rows0, (
+    win.ed.index, win.ed_widget.currentIndex(), "the new row is not the selected one")
+assert "added a arc row" in win.ed_note.text(), win.ed_note.text()
+assert win.ed_undo.text() == "undo (1)", win.ed_undo.text()
+assert win.ed.dirty, "a row was added and the window does not know the file is outstanding"
+_img_b, _notes_b = win.ed.paint(*win.ed.fixture())
+assert px_differ(_img_a, _img_b) > 0, "the window's add did not move the preview"
+assert len([r for r in _notes_b["boxes"] if r[2]]) > \
+    len([r for r in _notes_a["boxes"] if r[2]]), "the window add painted no new box"
+_win_floors1 = [win.split.widget(i).minimumWidth() for i in range(3)]
+_win_contents1 = [win.split.widget(i).widget().minimumSizeHint().width() for i in range(3)]
+# The floor is not a constant to compare against: it *is* the contents, and the contents
+# changed because the newly added row is now the selected one - an `arc`'s field grid asks
+# a different width from the `data` row that was selected before.  What has to hold, and is
+# what the sizing rule promises, is that no pane is ever narrower than what it holds and
+# none of them scrolls sideways, before and after a structural change.
+for _i, _nm in enumerate(("preview", "controls", "library")):
+    for _img_tag, _floors, _contents in (("before", _win_floors0, _win_contents0),
+                                         ("after", _win_floors1, _win_contents1)):
+        _area = win.split.widget(_i)
+        assert _floors[_i] >= _contents[_i], (_nm, _img_tag, _floors, _contents,
+                                              "a pane's floor is under its own contents")
+        _hs = _area.horizontalScrollBar()
+        assert _hs.maximum() == 0 and not _hs.isVisible(), (
+            _nm, _img_tag, _hs.maximum(), "this pane scrolls sideways at some point of the "
+                                          "add")
+win.ed_undo.click()
+for _ in range(8):
+    appq.processEvents()
+assert win.ed_widget.count() == _rows0 and not win.ed.dirty, (
+        _rows0, win.ed_widget.count(), win.ed.dirty, win.ed.steps,
+        win.ed.index, win.ed._pending is not None, win.ed_undo.text(),
+        "undo did not put the rows back")
+_img_c, _notes_c = win.ed.paint(*win.ed.fixture())
+assert px_differ(_img_a, _img_c) == 0, "the frame after undo is not the frame before the add"
+
+# the two reorder buttons: what they do, and where they stop being offered
+win._editor_pick_widget(0)
+for _ in range(4):
+    appq.processEvents()
+assert not win.ed_up.isEnabled(), "row 0 offers `up`, which would do nothing"
+assert win.ed_down.isEnabled(), "row 0 of 32 does not offer `down`"
+_ids0 = [str(w.get("id")) for w in win.ed.widgets()]
+win.ed_down.click()
+for _ in range(6):
+    appq.processEvents()
+_ids1 = [str(w.get("id")) for w in win.ed.widgets()]
+assert _ids1[:2] == _ids0[1::-1] and _ids1[2:] == _ids0[2:], (_ids1[:3], _ids0[:3],
+                                          "`down` did not swap neighbours")
+assert win.ed_widget.itemText(0) == win.ed.label(0), "the menu kept the old row's label"
+assert "swapped" in win.ed_note.text(), win.ed_note.text()
+win._editor_pick_widget(len(_ids1) - 1)
+for _ in range(4):
+    appq.processEvents()
+assert not win.ed_down.isEnabled(), "the last row offers `down`, which would do nothing"
+assert win.ed_up.isEnabled() and win.ed_del.isEnabled(), "the last row of 32 refuses `up`"
+
+# and `remove`: one row out of the list, out of the frame, and back by undo.  Each act is
+# exactly one undo step and the steps are last-in-first-out, so the press after a remove
+# puts the row back and leaves the reorder standing - the file only reads clean again after
+# both, and the frame says which of the two was undone.
+_img_p, _notes_p = win.ed.paint(*win.ed.fixture())
+_steps_p = win.ed.steps
+win.ed_del.click()
+for _ in range(6):
+    appq.processEvents()
+assert win.ed_widget.count() == _rows0 - 1, win.ed_widget.count()
+assert "removed row" in win.ed_note.text(), win.ed_note.text()
+assert win.ed.steps == _steps_p + 1, (_steps_p, win.ed.steps,
+                                      "a remove is not exactly one undo step")
+_img_e, _notes_e = win.ed.paint(*win.ed.fixture())
+assert px_differ(_img_p, _img_e) > 0, "a row was removed and the picture did not notice"
+assert [str(w.get("id")) for w in win.ed.widgets()] == _ids1[:-1], "the wrong row went"
+win.ed_undo.click()
+for _ in range(6):
+    appq.processEvents()
+assert win.ed_widget.count() == _rows0 and win.ed.dirty, "undo did not put the row back"
+assert px_differ(_img_p, win.ed.paint(*win.ed.fixture())[0]) == 0, (
+    "the frame after undoing the remove is not the frame before it")
+win.ed_undo.click()
+for _ in range(6):
+    appq.processEvents()
+assert not win.ed.dirty and win.ed.steps == 0, (
+    win.ed.steps, win.ed.dirty, "the reorder's step did not come back, so two acts were "
+                                "not two steps")
+assert px_differ(_img_a, win.ed.paint(*win.ed.fixture())[0]) == 0, (
+    "undoing both acts did not bring the original frame back")
+assert win.ed_del.isEnabled(), "the button is disabled with 32 rows in the layout"
+# ...and the window goes back as the later gates in this section find it: no layout open,
+# the row and its controls disabled.  A gate that leaves state behind is a gate that makes
+# the next one's pass mean something else.
+win.ed_name.setCurrentIndex(0)                     # app.NO_EDITOR
+for _ in range(6):
+    appq.processEvents()
+assert win.ed is None and not win.ed_widget.isEnabled(), (
+    "closing the layout did not put the shell back")
+print(f"  the buttons too       add / remove / up / down driven through the window: the add "
+      f"menu offers {len(_acts)} kinds and its `special` sub-menu the {len(_spe)} drawings "
+      f"this program has, each entry saying which row it copies; a press adds a row the "
+      f"preview paints, selects it, marks the file outstanding, and one press of undo puts "
+      f"both the list and the frame back; `up` is disabled at row 0 and `down` at row "
+      f"{_rows0 - 1}, and `remove` is enabled at {_rows0} rows because the model, not the "
+      f"button, is what refuses the last one - and two acts really are two steps: one "
+      f"press puts a removed row back with the reorder still standing, the next takes the "
+      f"reorder back and the file reads clean.  Sizing across the change: floors "
+      f"{_win_floors0} -> {_win_floors1} and contents {_win_contents0} -> "
+      f"{_win_contents1}, no pane under its own contents and no horizontal scrollbar at "
+      f"either point - the controls column follows the *selected* kind's grid, not the "
+      f"number of rows")
 
 # ---- one more kind of row the inspector can be handed: a `special` that draws a *pair*.
 # ---- No shipped file carries one yet (`alpha` is not exported), so this probe builds the

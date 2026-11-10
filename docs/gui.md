@@ -206,7 +206,7 @@ A pane
 that cannot be dragged under what it holds cannot grow a horizontal scrollbar inside
 itself, so the 0.4 failure mode is unreachable rather than merely avoided. The controls
 floor is the editor's own footprint, so it moves twice over: one column of editor rows asks for **376 px** of controls on this bench, two columns for **400**, three for **568** - and **394 / 417 / 589** on CI's runner - a closed drop-down that has to show the longest entry it holds is part of what those columns carry, and the window's own minimum rises with them. Every one of those digits is read out of this page and held to whichever of the two labelled machines is running the suite, because a floor that follows the fonts is not a constant to compare.
-The 18 rows of an `arc` widget stand **796 px** tall in one column and **403 px** in three there, the grid's own ask going **171 / 344 / 512 px** - **723** and **378 px**, asking **180 / 361 / 533**, on CI's runner - which is the reflow buying height without buying a scrollbar, and all twelve figures come off the sizing pass the suite runs on every machine.
+The 18 rows of an `arc` widget stand **827 px** tall in one column and **434 px** in three there - 31 px more than 0.5 measured, which is what the row of row-level controls under the fields costs in height, not in width - the grid's own ask going **171 / 344 / 512 px** - **723** and **378 px**, asking **180 / 361 / 533**, on CI's runner - which is the reflow buying height without buying a scrollbar, and all twelve figures come off the sizing pass the suite runs on every machine.
 
 ### The preview plays, or shows one frame
 
@@ -407,6 +407,59 @@ editor commonly gets wrong:
   - `source`, `showIf`, `name` and `anchor` are keys the painter matches exactly, and
   `source: cpu temperature` is still refused in words.
 
+* **Rows can be added, removed and reordered, and a new row is always a copy of a row that
+  already draws.** Four controls under the fields do it - `add`, `remove`, `up`, `down` - and
+  each entry of the add menu says, before it is pressed, which row the new one copies: this
+  layout's own row of that kind if it has one, otherwise a real row somewhere in the corpus,
+  with this repo's five exports ranked first because every row in them is carried to a
+  zero-pixel diff against the picture it exports. There is no table of defaults in this code,
+  and an honest one was not available: the vendor's application bundles are not in this tree
+  (only their file names are, in PROTOCOL.md §10), so the files are the only evidence of what
+  a row of a kind looks like. The files decide the shape too, and the suite re-counts them on
+  every run: all **185** rows in the **28** layouts carry exactly the **5** keys `id`,
+  `layerIndex`, `type`, `property`, `widgetContent`; `property` is a one-element list in every
+  one and `widgetContent` is `""`; and a new row carries the **7 / 7 / 11 / 14 / 7 / 9** keys
+  that `text` / `data` / `bar` / `arc` / `special` / `line` rows always carry, each of its
+  values a value rows of that kind already use. A `special` is the one kind the model refuses
+  unnamed - the sub-menu lists the **5** drawings `themes.SPECIALS` registers - because a
+  `special` nothing draws is not a thinner picture but no picture, which is what the painter's
+  `special:<name>` note says. Ids follow the spelling of the file being edited (UUIDs in the
+  vendor's, `xigma-…` in ours) and stay unique inside a layout, which `themes.validate` only
+  asks softly - those **23** files' **123** rows answer to **25** distinct ids, one id
+  shared by **18** of those rows - and the model obeys it anyway.
+* **Where a new row lands is decided by the painter's boxes, and the sentence says what
+  happened.** A trial draw with the row in it reports the box that row *actually* paints - an
+  anchor does not mean the same thing for every kind and every `xigma.anchor` - and that box
+  is walked over the canvas in **4 px** steps to the free position nearest the one it was
+  copied from. Where there is no such position the row stays where its source sits and the
+  sentence says so, and the row is left selected so the reader can drag it; quietly moving a
+  row nobody asked to move, or parking one where it is invisible without saying, is the same
+  repair this model refuses elsewhere. Which of the adds landed, moved or found no room
+  follows this machine's faces, so the suite prints those three counts per machine instead of
+  promising them here.
+* **A reorder is the draw order, and it is proved with pixels.** The rule, asserted in both
+  directions over every adjacent pair of drawn rows in all 28 layouts: a swap moves ink
+  **exactly** where the two rows both cover some pixel opaquely and in different colours.
+  Pairs whose bounding boxes never meet swap 0 px, and the gate fails if one of them moves a
+  pixel; pairs whose boxes meet but whose ink never both lie opaque in the overlap also swap
+  0 px, which is what an `arc`'s box (mostly the hole its ring is drawn around) and two vendor
+  `line` rows crossing in sub-pixel coverage look like. Which pair falls on which side is a
+  font question, so those counts are printed per machine and the rule is what is held.
+  `layerIndex` is left exactly where it was: over the vendor's files it equals the row's
+  position in **23** of their **123** rows and differs in **100** (`Theme_01` gives six of its
+  eight rows 0), nothing in `layout.py` reads it, and inventing a meaning the files do not
+  show would be a repair rather than a fix.
+* **The last row of a layout cannot be removed, in `validate`'s own words.** Emptying the list
+  is a hard problem - "an `osd.widget` list with nothing in it: there is nothing to draw,
+  which is not the same as an empty canvas" - so the model asks that same door what it would
+  say and repeats it, and `remove` stays disabled at one row instead of letting a reader find
+  the sentence at save time. Every one of the four acts is exactly **one** undo step and the
+  steps are last-in-first-out: one press after a remove puts the row back with the reorder
+  still standing, the next takes the reorder back, and the frame says which of the two was
+  undone. The refusals - a kind nothing draws, a `special` with no name, a move past either
+  end of the list, the last row - all leave `dirty`, the undo count and the file exactly where
+  they found them, which the gate checks rather than hopes.
+
 * **Opening writes nothing.** The file appears at `save`, because your copy of a name is
   what `--theme` and the control socket find first, and that shadowing is a fact about
   files: browsing a theme's fields must not quietly change what the loop draws. The gate
@@ -421,9 +474,6 @@ editor commonly gets wrong:
   keys it does not understand is an editor that corrupts the vendor's own files. Alongside
   them sit the `xigma.*` keys this program drew up for itself - offered on every kind,
   because a drawing convention or a dependency is a property of the row, not of the shape -
-  and the one added on 2026-11-09 for `bars`, `xigma.showIf`, gets the same menu as
-  `source` does: the list of readings this program can answer, so a row cannot be pointed
-  at a dependency nobody will ever satisfy.
   and the one added on 2026-11-09 for `bars`, `xigma.showIf`, gets the same menu as
   `source` does: the list of readings this program can answer, so a row cannot be pointed
   at a dependency nobody will ever satisfy.
@@ -506,11 +556,12 @@ display.
 
 What it does **not** do, said plainly: nothing is sent to the panel (PROTOCOL.md §11 - the
 panel is never handed a layout file), so what a save changes is what *this machine's*
-daemon draws next time it names that theme; no row is resized by dragging an edge, and
-nothing about a layout's *shape* changes by hand - no widget is added, removed or
-reordered; the editor draws from the pinned fixture and not live readings; and the theme
-combo above still lists only the five, because that combo picks what the loop draws from
-this machine's sensors.
+daemon draws next time it names that theme; no row is resized by dragging an edge; a
+row can be added only as a copy of a row that already draws, removed down to but never
+including the last one, and reordered only through the list that *is* the draw order;
+the editor draws from the pinned fixture and not live readings; and the theme combo
+above still lists only the five, because that combo picks what the loop draws from this
+machine's sensors.
 
 ### The colour of the text
 
@@ -764,10 +815,10 @@ Five things it deliberately does not pretend to be:
   nothing itself (§11): the theme JSON declares widgets and the firmware ignores
   them, so editing a layout means drawing every widget in Python and shipping the
   result as frames - which is what this does, and it is what makes a row's
-  position draggable on screen at all. What it is *not* is the vendor's app: no
-  widget is added, removed or reordered, nothing about a layout is ever sent to
-  the panel, and the theme pane offers the five themes this repo draws, with the
-  daemon's own options.
+  position draggable on screen at all. What it is *not* is the vendor's app: a new row
+  is always a copy of a row this program already draws rather than a table of defaults,
+  nothing about a layout is ever sent to the panel, and the theme pane offers the five
+  themes this repo draws, with the daemon's own options.
 * **No storage gauge.** The status pane prints `space` as a number with a note
   that it is not a size ledger: across four accepted uploads it moved a few KB
   in either direction and never resembled the file's size (§9).

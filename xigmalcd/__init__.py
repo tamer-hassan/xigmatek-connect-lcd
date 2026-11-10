@@ -3,7 +3,7 @@ from . import protocol, render, sensors
 from .protocol import (Link, Message, ProtocolError, decode, encode,
                        find_ports)
 
-__version__ = "0.5"
+__version__ = "0.6"
 
 # the module is called render, so its draw entry point is aliased at the top
 # level for convenience

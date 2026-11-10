@@ -75,7 +75,7 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QColorDialog, QComboBox,
                              QHBoxLayout, QLabel, QLineEdit, QListWidget,
                              QListWidgetItem, QMainWindow, QMenu, QMessageBox,
                              QProgressBar, QPushButton, QScrollArea,
-                             QSizePolicy, QSpinBox, QSplitter,
+                             QSizePolicy, QSpinBox, QSplitter, QToolButton,
                              QSystemTrayIcon,
                              QVBoxLayout, QWidget)
 
@@ -1015,8 +1015,8 @@ class Window(QMainWindow):
         #
         # The rows live in a grid that reflows between one, two and three columns
         # depending on the width this splitter happens to give the box (see
-        # `EditorBox`), so the 18 rows of an `arc` widget make this box 796 px tall in
-        # one column at a 1280x1024 window and 403 px in three at 1919x1055 (measured in
+        # `EditorBox`), so the 18 rows of an `arc` widget make this box 827 px tall in
+        # one column at a 1280x1024 window and 434 px in three at 1919x1055 (measured in
         # the window; the suite's sizing gate prints both) instead of pushing a
         # scrollbar under the column - the failure mode 0.5 was written to catch.
         self._ed_host = QWidget()
@@ -1059,6 +1059,43 @@ class Window(QMainWindow):
         # field column is what put a 357 px floor under the whole controls column
         # (measured) while the labels and fields needed barely more
         eform.addLayout(brow)
+
+        # The structural controls, on a row of their own for the same reason.  Their
+        # labels are short and the sentence goes where it does the work: in the tooltip
+        # before the press, and in the model's own words under the rows after it.  A
+        # wider label here is a wider floor for the whole column, which the sizing gate
+        # reads back off this pane rather than from a remembered number.
+        srow = QHBoxLayout()
+        self.ed_add = QToolButton()
+        self.ed_add.setText("add")
+        self.ed_add.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.ed_add_menu = QMenu(self.ed_add)
+        self.ed_add.setMenu(self.ed_add_menu)
+        self.ed_add.setToolTip(
+            "insert one row of a kind you choose from this menu.  A new row is always a "
+            "copy of a row that already draws - this layout's own row of that kind if it "
+            "has one, otherwise a real row from the 28 layouts the editor opens - because "
+            "the vendor's application bundles are not in this tree, so the files are the "
+            "only evidence this program has of what a row of a kind looks like.  Each "
+            "entry says which row it copies")
+        self.ed_del = QPushButton("remove")
+        self.ed_del.setToolTip(
+            "take the selected row out.  The last row of a layout cannot be removed: "
+            "emptying the list is a hard problem for the library - there is nothing "
+            "to draw, which is not the same as an empty canvas")
+        self.ed_del.clicked.connect(self._editor_delete_row)
+        self.ed_up = QPushButton("up")
+        self.ed_up.setToolTip("draw this row one place earlier.  The list *is* the draw "
+                              "order, so an earlier row is painted under the next one")
+        self.ed_up.clicked.connect(lambda: self._editor_move_row(-1))
+        self.ed_down = QPushButton("down")
+        self.ed_down.setToolTip("draw this row one place later, so it paints over the row "
+                                "it used to sit under")
+        self.ed_down.clicked.connect(lambda: self._editor_move_row(+1))
+        for _b in (self.ed_add, self.ed_del, self.ed_up, self.ed_down):
+            srow.addWidget(_b)
+        srow.addStretch(1)
+        eform.addLayout(srow)
 
         self.ed_note = QLabel()
         self.ed_note.setWordWrap(True)
@@ -2255,6 +2292,13 @@ class Window(QMainWindow):
         self.ed_revert.setEnabled(self.ed.name in copies)
         self.ed_undo.setEnabled(self.ed.steps > 0)
         self.ed_undo.setText(f"undo ({self.ed.steps})" if self.ed.steps else "undo")
+        # the structural controls, answered from the model rather than remembered: what
+        # they can do depends on how many rows this layout has and which one is selected,
+        # and the menu entries say what each add would copy *before* the press
+        self.ed_del.setEnabled(len(self.ed.widgets()) > 1)
+        self.ed_up.setEnabled(self.ed.index > 0)
+        self.ed_down.setEnabled(self.ed.index < len(self.ed.widgets()) - 1)
+        self._ed_fill_add_menu()
 
     def _editor_pick_widget(self, index: int) -> None:
         """Select one widget and lay out every field that kind carries.
@@ -2304,11 +2348,11 @@ class Window(QMainWindow):
 
         Off until a layout is open: a row that offers fields with no file behind it
         is a row that would write to nothing.  The grid's rows ride along with their
-        host, so this names the host and the three buttons rather than a per-field
-        list that could fall out of step with whichever rows exist today.
+        host, so this names the host and the buttons rather than a per-field list that
+        could fall out of step with whichever rows exist today.
         """
         for wid in (self.ed_widget, self._ed_host, self.ed_undo, self.ed_save,
-                    self.ed_revert):
+                    self.ed_revert, self.ed_add, self.ed_del, self.ed_up, self.ed_down):
             wid.setEnabled(on)
 
     def _ed_build_rows(self, kind: str) -> None:
@@ -2437,8 +2481,8 @@ class Window(QMainWindow):
         """One, two or three columns of rows, by the width the *pane* has.
 
         This is the responsive half, and it is here because the alternative is a
-        scrollbar: the 18 rows of an `arc` widget make this box **796 px** tall in one
-        column at a 1280x1024 window and **403 px** in three at 1919x1055 (measured in
+        scrollbar: the 18 rows of an `arc` widget make this box **827 px** tall in one
+        column at a 1280x1024 window and **434 px** in three at 1919x1055 (measured in
         the window, and printed by the suite's sizing gate with the grid's own ask of
         171 / 344 / 512 px), and a controls column that cannot hold what it is shown is
         exactly the 0.4 defect the fresh-window gate now fails on.  The box asks for it
@@ -2687,13 +2731,100 @@ class Window(QMainWindow):
         ctl.setText(start.name())                # the row shows the hex it typed
         self._ed_apply_row(field, True)
 
+    # ------------------------------------------------ the structural controls --
+    def _ed_fill_add_menu(self) -> None:
+        """One entry per kind, each saying which real row a new one of that kind copies.
+
+        The sentence is the model's (`edit.Editor.add_note`), not a description written
+        here, so the menu cannot promise a row the model would not build.  A `special`
+        gets a sub-menu of the drawings this program has, because a `special` with no name
+        is not a thinner picture: the painter records `special:<name>` and skips the row,
+        which is why the model refuses to add one unnamed.
+        """
+        if self.ed is None:
+            return
+        self.ed_add_menu.clear()
+        for kind in edit.kinds():
+            if kind == "special":
+                sub = self.ed_add_menu.addMenu("special")
+                for nm in sorted(themes.SPECIALS):
+                    act = sub.addAction(nm)
+                    act.setToolTip(f"a `special` row drawing `{nm}`; every other key is "
+                                   f"copied from {self.ed.add_note('special')}")
+                    act.triggered.connect(lambda _c, n=nm: self._editor_add("special", n))
+                continue
+            act = self.ed_add_menu.addAction(kind)
+            act.setToolTip(self.ed.add_note(kind))
+            act.triggered.connect(lambda _c, k=kind: self._editor_add(k))
+
+    def _ed_refresh_widget_list(self) -> None:
+        """Re-fill the widget menu after rows were added, removed or moved.
+
+        The labels come from the model (`ed.label`), so the menu says what the file holds;
+        signals are blocked because replacing the list would otherwise fire a selection
+        change against a half-built menu, and the row the model selected is put back by
+        index afterwards.
+        """
+        self.ed_widget.blockSignals(True)
+        self.ed_widget.clear()
+        for i in range(len(self.ed.widgets())):
+            self.ed_widget.addItem(self.ed.label(i))
+        self.ed_widget.setCurrentIndex(self.ed.index)
+        self.ed_widget.setToolTip(self.ed.tip(self.ed.index))
+        self.ed_widget.blockSignals(False)
+
+    def _editor_add(self, kind: str, name: str = "") -> None:
+        """Ask the model for a row, then make the window agree with the file."""
+        if self.ed is None:
+            return
+        good, said = self.ed.add_widget(kind, name=name)
+        self._log(("row added: " if good else "row refused: ") + said)
+        if good:
+            self._ed_refresh_widget_list()
+            self._editor_pick_widget(self.ed.index)
+            self._repaint()
+        self.ed_note.setText(said)
+        self._editor_state()
+
+    def _editor_delete_row(self) -> None:
+        if self.ed is None:
+            return
+        good, said = self.ed.delete_widget()
+        self._log(("row removed: " if good else "row not removed: ") + said)
+        if good:
+            self._ed_refresh_widget_list()
+            self._editor_pick_widget(self.ed.index)
+            self._repaint()
+        self.ed_note.setText(said)
+        self._editor_state()
+
+    def _editor_move_row(self, delta: int) -> None:
+        """Slide the selected row through the list.
+
+        `up` is an earlier index, which is *under* the rest: the list is the draw order,
+        so the words on the buttons say what happens to the picture rather than what
+        happens to a number.
+        """
+        if self.ed is None:
+            return
+        good, said = self.ed.move_widget(int(delta))
+        self._log(("row reordered: " if good else "row not reordered: ") + said)
+        if good:
+            self._ed_refresh_widget_list()
+            self._editor_pick_widget(self.ed.index)
+            self._repaint()
+        self.ed_note.setText(said)
+        self._editor_state()
+
     def _editor_undo(self) -> None:
         if self.ed is None:
             return
         if self.ed.undo():
-            # the note line belongs to the selected field, so it is re-read after the
-            # undo: a sentence about a pair row must not outlive the row it described.
-            # What the undo *did* is said by `ed_state` and by the picture moving.
+            # Undo puts a whole layout back, and a whole layout includes how many rows
+            # there are: a row that was added, removed or moved comes back, so the widget
+            # menu is rebuilt from the model before anything is bound to it.  Signals stay
+            # blocked inside that rebuild, so this cannot fire a selection change twice.
+            self._ed_refresh_widget_list()
             self._ed_bind_rows()      # every row re-reads the model: undo may have
                                       # moved any of them, not the one you were in
             # ...and the sentence line goes back with them. Undo can change which

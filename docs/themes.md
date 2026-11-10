@@ -105,9 +105,11 @@ them here instead, and both are gated in `tools/selftest.sh` rather than asserte
   choice rather than measured off the vendor's picture (`Time`, `CPU Frequency`,
   `Pump Speed`) are named in the same note.
 
-What is **not** built is an editor drawn from live readings, and any way to change a
-layout's *shape* by hand: rows are moved one at a time, never resized by their edge, added,
-removed or reordered. What **is** built, since
+What is **not** built is an editor drawn from live readings, and resizing a row by its
+edge: a row is moved one point at a time, and a row is added only as a copy of one that
+already draws, removed never past the last, and reordered through the list that is the
+draw order (the four bullets, and the digits they hold, are in docs/gui.md). What **is**
+built, since
 2026-11-08, is the window's `Layout` box - one layout, one widget, **every field that
 widget carries as a row of its own** (10 rows for a `text` widget through 18 for an
 `arc`), over the same model the suite drives headless: a layout file under

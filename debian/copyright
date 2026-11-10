@@ -59,6 +59,17 @@ License: GPL-3.0-or-later
  /usr/share/common-licenses/GPL-3; it is also reproduced verbatim as LICENSE at
  the top level of the upstream source, and included below.
 
+License: GPL-3.0-or-later+OTHER
+ The two names in that one field are the two halves of the file it applies to.
+ The drawing on top is ours, under GPL-3.0-or-later as the paragraph of that
+ name below says.  What sits under it is one frame lifted out of a XIGMATEK
+ background clip, and the vendor has granted no licence for it, so the
+ combination is redistributed on the same assessment the OTHER paragraph
+ below states - interoperability and record-keeping, with the offer to take
+ the files down if the rights holder says otherwise.  A file under that Files
+ stanza is therefore not clean to relicense: GPL covers our contribution and
+ nothing else.
+
 License: OTHER
  What was done, plainly: the files under themes/alpha/ and the three clips in
  media/ were copied, byte for byte, out of a vendor installation on the author's

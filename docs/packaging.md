@@ -959,7 +959,26 @@ W: xigmatek-connect-lcd source: missing-license-paragraph-in-dep5-copyright
 
 and `lintian --fail-on error,warning` exits 2 on it. It changes nothing about the two
 `.deb` files, both of which come back 0 / 0 / 0 above, so it is not worth moving a tag for:
-it is a `debian/copyright` stanza, and it belongs in a release that has not been stamped yet.
+it is a `debian/copyright` stanza, and it belongs in a release that has not been stamped
+yet - which is where it is fixed. Checked here both ways on one input, the `.dsc` of a
+source-only build, in a detached worktree:
+
+```
+dpkg-buildpackage -S -us -uc -d -i -I      # the tree of `v0.5`, and the same tree with
+                                          # one paragraph added to debian/copyright
+lintian --tag-display-limit 0 --fail-on error,warning ../xigmatek-connect-lcd_0.5.dsc
+  as tagged        W: xigmatek-connect-lcd source: missing-license-paragraph-in-dep5-
+                   copyright gpl-3.0-or-later+other [debian/copyright:37]      exit 2
+  + the paragraph                                        0 errors, 0 warnings   exit 0
+```
+
+The paragraph names the two halves it applies to, because the honest version of a
+combined licence is the sentence that says the licence covers only the half it was
+written for: our drawing is GPL-3.0-or-later, the frame of a vendor clip underneath it
+is still unlicensed, and the combination is redistributed on the assessment the OTHER
+paragraph already states. The CI job's own `-b` build never reaches that check, so its
+summary line stays `errors=0 warnings=0 infos=0` - true of what it looks at, and this
+page is what says what it does not.
 The runner's summary line stays `errors=0 warnings=0 infos=0`, which is true of what that
 job looks at, and this is the sentence that says what it does not.
 

@@ -1,3 +1,133 @@
+xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
+
+  * NOT RELEASED.  This stanza describes the tree since the `v0.5` tag.  Its
+    stamp is what makes two builds of it agree on bytes, not a claim that
+    anyone published it; the release commit replaces `UNRELEASED` with the
+    record of what was tagged.
+
+  * The layout editor can add a row, remove one, and change which row is on
+    top.  Four controls sit under the fields - `add`, `remove`, `up`,
+    `down` - and each entry of the add menu says, before it is pressed,
+    which row the new one copies.  A new row is always a copy of a row that
+    already draws: this layout's own row of that kind if it has one,
+    otherwise a real row from the 28 layouts the editor opens, with this
+    repo's five exports ranked first because every row in them is carried to
+    a zero-pixel diff against the picture it exports.  No default table was
+    written, because an honest one is not available: the vendor's
+    application bundles are not in this tree - only their file names are, in
+    PROTOCOL.md section 10 - so the files are the only evidence of what a
+    row of a kind looks like.
+
+  * What that evidence says, re-counted from the files on every run rather
+    than trusted from a page: all 185 rows in the 28 layouts carry exactly
+    the five keys `id`, `layerIndex`, `type`, `property`, `widgetContent`,
+    `property` is a one-element list in every one of them, and
+    `widgetContent` is `""` in all of them.  A new row carries the
+    7 / 7 / 11 / 14 / 7 / 9 keys that `text` / `data` / `bar` / `arc` /
+    `special` / `line` rows always carry, and every one of its values is a
+    value rows of that kind already use.  A `special` row is refused without
+    a name from the five drawings `themes.SPECIALS` registers, because a
+    `special` nothing draws is no picture rather than a thinner one.  Ids
+    follow the spelling of the file being edited - UUIDs in the vendor's,
+    `xigma-...` in ours - and stay unique inside a layout, which
+    `themes.validate` asks only softly (the vendor's 152 rows in 27 files
+    answer to 54 distinct ids, one id shared by 18 of those rows) and the
+    model obeys it anyway.
+
+  * Where a new row lands is decided by the painter's own boxes.  A trial
+    draw with the row in it reports the box that row actually paints - an
+    anchor does not mean the same thing for every kind and every
+    `xigma.anchor` - and that box is walked over the canvas in 4 px steps to
+    the nearest free position.  Where there is no such position the row
+    stays where its source sits and the sentence says so out loud; the row
+    is left selected so the reader can drag it.  Quietly moving a row nobody
+    asked to move, and parking one out of sight without saying, are both the
+    silent repair this model refuses elsewhere.  Which of the adds landed,
+    moved or found no room follows this machine's faces, so those three
+    counts are printed per machine rather than promised in prose.
+
+  * A reorder moves no ink: the order of `osd.widget` is the draw order, and
+    what a swap does is proved with pixels in both directions.  Over every
+    adjacent pair of drawn rows in all 28 layouts, a swap changes the frame
+    exactly where the two rows both cover some pixel opaquely and in
+    different colours.  Pairs whose bounding boxes never meet must swap 0 px,
+    and the gate fails if one of them moves a pixel; pairs whose boxes meet
+    but whose ink never both lie opaque in the overlap also swap 0 px, which
+    is what an `arc`'s box - mostly the hole its ring is drawn around - and
+    two vendor `line` rows crossing in sub-pixel coverage look like.
+    `layerIndex` is left exactly where it was: over the vendor's files it
+    equals the row's position in 23 of their 123 rows and differs in 100,
+    nothing in `layout.py` reads it, and inventing a meaning the files do not
+    show would be a repair rather than a fix.
+
+  * The last row of a layout cannot be removed, in the library's own words:
+    the model empties a copy of the layout, asks `themes.validate` what that
+    costs, and repeats its answer - "an `osd.widget` list with nothing in
+    it: there is nothing to draw, which is not the same as an empty canvas"
+    - rather than paraphrasing it.  `remove` stays disabled at one row, so a
+    reader never meets that sentence for the first time at save.  Every one
+    of the four acts is exactly one undo step, and the steps are
+    last-in-first-out: one press after a remove puts the row back with the
+    reorder still standing, the next takes the reorder back, and the frame
+    says which of the two was undone.  A refusal - a kind nothing draws, an
+    unnamed `special`, a move past either end, the last row - leaves
+    `dirty`, the undo count and the file exactly where they were found, and
+    the suite checks that rather than hoping.
+
+  * One digit this cycle wrote down wrong, and the gate returned it before
+    it shipped.  The sentence was "those 23 files' 123 rows answer to 54
+    distinct ids": the 54 belongs to the whole vendor library, across 27
+    files and 152 rows, while the 23 layouts this editor can open hold 123
+    rows and 25 ids.  Both figures are counted in the run now and held
+    against the page, so the pair cannot drift apart again.
+
+  * A duplicated sentence in docs/gui.md - the two lines about
+    `xigma.showIf` getting the same menu as `source`, printed twice in one
+    bullet - went out with 0.5 and is gone.  It was found while putting the
+    four bullets about structural editing into that list, which is what
+    reading a page cover to cover does that reading a diff does not.
+
+  * The window's sizing figures move, in height only.  The row of structural
+    controls costs 31 px: an `arc`'s 18 field rows stand 827 px tall in one
+    column and 434 px in three on the author's bench, where 0.5 measured 796
+    and 403, and GitHub's runner re-reads its own halves of those pairs when
+    the suite next runs there.  The three columns' floors, the controls
+    floor by columns of rows, the fresh split and the narrowest column the
+    window allows are unchanged, and the suite still fails any pane that has
+    to scroll sideways to be read.
+
+  * lintian has been printing one warning that no CI run has ever seen,
+    because the CI job builds binary-only (`-us -uc -b`) while a source
+    package build reaches the source checks:
+    `missing-license-paragraph-in-dep5-copyright gpl-3.0-or-later+other
+    [debian/copyright:37]`, which makes `--fail-on error,warning` exit 2.
+    The `docs/previews/*` stanza names that combined licence - our drawing
+    over one frame of a vendor clip - and no paragraph of that name existed
+    to answer for it.  One does now, and it says what is true: GPL covers
+    our half of those files and nothing else, and the combination is
+    redistributed on the assessment the OTHER paragraph already states.
+    Checked both ways on this bench: `dpkg-buildpackage -S -us -uc -d -i -I`
+    at `v0.5` plus lintian on the `.dsc` answers that warning and exit 2;
+    the same build with the paragraph added answers 0 errors, 0 warnings.
+
+  * Gates for all of it, in the same twenty-two offline sections, no port
+    opened by any of them.  The new checks take their shape from the files
+    on this run - the envelope, the mandatory key sets, the id reuse, the
+    `layerIndex` census - and hold the sentences in docs/gui.md,
+    docs/limits.md and `edit.py`'s own comments to that count.  A figure
+    that follows a face is printed with the machine it was read on, and the
+    page labels whose machine each half of the pair belongs to; a run that
+    matches neither half fails rather than loosening the claim.
+
+  * Still not built, and said in the pages rather than left to be found: an
+    editor drawing live readings (the pane draws the pinned fixture, which
+    is the picture the documents describe), resizing a row by its edge,
+    snapping to a grid or to a neighbour, and the half only glass can
+    answer - `--no-clock` on the panel, the quiet-box re-measure `bars`
+    owes, the pairing note seen on the panel, and the transcript stage 6
+    asks for.
+
+ -- Tamer Hassan <thameruddin@gmail.com>  Tue, 10 Nov 2026 16:30:41 +0200
 xigmatek-connect-lcd (0.5) resolute; urgency=medium
 
   * The window shows its layout editor from the start.  It is the only
