@@ -43,6 +43,34 @@ xigmatek-connect-lcd (0.5) resolute; urgency=medium
     the suite builds a fresh window, reads the three columns back and
     fails if any of them has to scroll sideways to be read.
 
+  * The layout editor shows its fields instead of hiding them behind a
+    menu.  Picking a widget now lays out every field that kind carries,
+    one row each: 10 rows for a `text` widget, 11 for `data`, 12 for
+    `special`, 8 for `line`, 15 for `bar`, 18 for `arc` - counted across
+    the 185 widgets in the 28 layouts the editor can open, from
+    `edit.field_names` and `edit.extension_fields` rather than a table.
+    The control per row is the model's answer as well: a menu where
+    `edit.choices()` names a vocabulary, a checkbox for `bold`, a spinbox
+    for `edit.number_fields()`, a colour row with a swatch and the
+    dialog for `edit.COLOUR_FIELDS`, a text box for what is genuinely
+    free text.  Rows reflow between one, two and three columns with the
+    width the window has.  Fixing the gates turned up a defect the
+    dropdown had been hiding: a row for a key the file never carried
+    showed a placeholder 0 and wrote that 0 back on focus-out, inventing
+    a key and an undo step; a box nobody touched no longer writes.
+
+  * The window's floor is 1280x1024 and its fresh size is 1440x1024,
+    with the splitter asked for 532/540/356 - the owner's rule, a
+    1280x1024 desktop at minimum up to 3840x2160.  Each column's floor
+    is now its own contents' width rather than a remembered constant,
+    so no column can be dragged under what it holds and the sideways
+    scrollbar 0.4 shipped is unreachable rather than merely avoided; the
+    window clamps its floor to what the screen offers and logs the
+    sentence when either clamp bites.  Measured at the sizes the rule
+    names: one column of editor rows at 1280 (9 clip rows in view), two
+    at 1440, three from 1919 up; 28 clip rows at 3840, with the preview
+    still capped at 532 px because the 480 px frame is never scaled up.
+
   * Gates for the layout itself, in the same twenty-two offline sections.
     A fresh window is checked against its own contents: no column
     narrower than what it holds, no horizontal scrollbar in any of the

@@ -5143,7 +5143,8 @@ import sys
 import time
 import types
 sys.path.insert(0, ".")
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox,
+                             QListView, QSpinBox)
 from PyQt6.QtCore import QCoreApplication
 appq = QApplication([])
 from xigmaui import app, clips as clipdb, panel, settings
@@ -5899,8 +5900,7 @@ fresh._editor_open(_worst[1])           # open the one that needs the most room
 for _ in range(4):
     appq.processEvents()
 _lists = {}
-for _cb, _nm in ((fresh.ed_name, "layout"), (fresh.ed_widget, "widget"),
-                 (fresh.ed_field, "field")):
+for _cb, _nm in ((fresh.ed_name, "layout"), (fresh.ed_widget, "widget")):
     _m = _cb.view().fontMetrics()
     _long = max((_m.horizontalAdvance(_cb.itemText(_i))
                  for _i in range(_cb.count())), default=0)
@@ -5913,34 +5913,31 @@ for _cb, _nm in ((fresh.ed_name, "layout"), (fresh.ed_widget, "widget"),
         "the closed box asks for more than its longest entry: the column pays for it")
     _lists[_nm] = (_long, _cb.view().minimumWidth(), _cb.width())
 assert {"layout", "widget"} <= set(_lists), _lists
-# The case the fix exists for, made on purpose: the controls column pinned to 300 px,
-# the width 0.4's fresh window handed it (measured against the tag: 520/300/352).  A
-# request alone will not do it - QSplitter shares out spare width by its stretch
-# factors - so the pane's own ceiling is set, measured against, and put back.
+# The case the fix exists for, made on purpose: the controls column pinned to the
+# narrowest width the window now allows, which is its contents' own floor (0.4's 300 px
+# column is unreachable by construction - `_pane_floors` raises the pane to what it
+# holds, which is the other half of the fix).  A request alone will not do it: a
+# splitter shares out spare width by its stretch factors, so the first version of this
+# check measured a 340 px column while believing it was pinning 300.
 _area = fresh.split.widget(1)
-_ceil = _area.maximumWidth()
-_area.setMaximumWidth(300)
+_ceil, _floor = _area.maximumWidth(), _area.minimumWidth()
+_area.setMaximumWidth(_floor)
 for _ in range(6):
     appq.processEvents()
 _narrow = (_area.width(), fresh.ed_widget.view().minimumWidth(),
            fresh.ed_widget.width(), _worst[0])
-assert _narrow[0] == 300, (_narrow, "this is not the narrow column the report was about")
-assert _narrow[2] < _worst[0], (
-    _narrow, "the box is wide enough here, so this check would not have caught it")
+assert _narrow[0] == _floor, (_narrow, _floor,
+                              "this is not the narrow column the window allows")
+# Both halves have to hold at that width.  The closed box now shows the widest entry in
+# full - the wider floor `_pane_floors` enforces is what bought those pixels, and on the
+# author's bench the box measures 280 px against the 247 px entry.  The list stays wide
+# anyway, because that is the half that does not depend on this machine's fonts: on a
+# box narrower than its entry, it is the only thing standing between a reader and an
+# elided `data  Motherboard Temperature  at 452,136`.
+assert _narrow[2] >= _worst[0], (_narrow, "a closed box cuts the widest entry at the "
+                                          "narrowest width the window allows")
 assert _narrow[1] >= _worst[0], (_narrow, "a narrow column cut the list down with it")
 _area.setMaximumWidth(_ceil)
-# and the split the docs quote is the one the code carries, in the style each page
-# writes it: "560 / 400 / 420" in docs/gui.md, "(560/400/420)" in docs/theme-editor.md.
-_sp = settings.DEFAULTS["split"]
-assert f"{_sp[0]} / {_sp[1]} / {_sp[2]}" in gui_txt, (
-    _sp, "docs/gui.md quotes a different fresh split than settings.DEFAULTS")
-_te = open("docs/theme-editor.md", encoding="utf-8").read()
-assert f"({_sp[0]}/{_sp[1]}/{_sp[2]})" in _te, (
-    _sp, "docs/theme-editor.md's pixel census quotes a different fresh split")
-# ... and what the splitter makes of that request at a fresh window, which is the
-# other half of the same sentence: docs/gui.md quotes the columns as they come back.
-assert f"{_fits[0][0]} / {_fits[0][1]} / {_fits[0][2]}" in gui_txt, (
-    _fits[0], "docs/gui.md quotes a different measured split for a fresh window")
 # The README's picture is framed wider than the fresh window, and both the capture
 # tool and docs/tools.md say how many clip rows that frame puts in view.  Read the
 # tool's own default and measure it here, in this same window, rather than carrying
@@ -5958,8 +5955,19 @@ _spell = "zero one two three four five six seven eight nine ten eleven twelve".s
 assert _capt_rows < len(_spell), _capt_rows
 _words = f"{_spell[_capt_rows]} rows of the clip list"
 for _f in ("tools/screenshot.py", "docs/tools.md"):
-    assert _words in open(_f, encoding="utf-8").read(), (
+    _shot_txt = open(_f, encoding="utf-8").read()
+    # the tool says this twice - once in its docstring, once in `--size`'s help - and the
+    # help is split across adjacent string literals, so quotes and line breaks come out
+    # before anything is compared.  Otherwise the second sentence is invisible here,
+    # which is how it drifted: the first version of this check passed while the help still
+    # said "seven" and the docstring said "nine", because `in` stops at the first match
+    # and the sentence that rotted was the half nobody read.
+    _shot_flat = " ".join(_shot_txt.replace('"', "").split())
+    assert _words in _shot_flat, (
         _f, _words, "that page counts the captured clip rows differently")
+    for _wrong in (w for w in _spell if w != _spell[_capt_rows]):
+        assert f"{_wrong} rows of the clip list" not in _shot_flat, (
+            _f, _wrong, _capt_rows, "that page gives two row counts for one frame")
 for _t in (fresh.preview_timer, fresh.thumb_timer, fresh.daemon_timer):
     _t.stop()
 fresh.panel.stop()
@@ -5975,6 +5983,132 @@ print(f"  a fresh window fits     {settings.DEFAULTS['split']} asked, {_fits[0]}
       f"{_narrow[1]} px list around a {_narrow[2]} px box. The README's "
       f"{_capt_w}x{_capt_h} frame puts {_capt_rows} clip rows in view, and the two "
       f"pages that say so spell it the same")
+# and the split the docs quote is the one the code carries, and the columns they
+# quote are the ones the splitter made of it.  Both are compared after the print
+# above, so a failure here shows the measurement it disagreed with rather than
+# leaving the number to be found by hand: docs/gui.md writes "532 / 540 / 356" for
+# the request and the columns as they come back, docs/theme-editor.md "(532/540/356)".
+_sp = settings.DEFAULTS["split"]
+assert f"{_sp[0]} / {_sp[1]} / {_sp[2]}" in gui_txt, (
+    _sp, "docs/gui.md quotes a different fresh split than settings.DEFAULTS")
+_te = open("docs/theme-editor.md", encoding="utf-8").read()
+assert f"({_sp[0]}/{_sp[1]}/{_sp[2]})" in _te, (
+    _sp, "docs/theme-editor.md's pixel census quotes a different fresh split")
+assert f"{_fits[0][0]} / {_fits[0][1]} / {_fits[0][2]}" in gui_txt, (
+    _fits[0], "docs/gui.md quotes a different measured split for a fresh window")
+
+# ---- the owner's sizing rule, and the responsive half of the editor ----
+# 1280x1024 at minimum, up to 3840x2160, and the editor's field grid taking one, two or
+# three columns as the controls column gets width.  Every figure docs/gui.md's "How the
+# three columns get their sizes" section quotes comes out of this one pass, on this
+# machine, with the widest row set the editor can be asked for on show: an `arc` widget's
+# 18 fields, from `gauge`.
+_sized = app.Window(bad, None, restore=False)
+_sized.show()
+_sized.adv_toggle.setChecked(True)
+_sized._editor_open("gauge")
+for _ in range(8):
+    appq.processEvents()
+_arc_at = next(i for i in range(_sized.ed_widget.count())
+               if str(_sized.ed.widgets()[i].get("type") or "") == "arc")
+_sized.ed_widget.setCurrentIndex(_arc_at)
+for _ in range(8):
+    appq.processEvents()
+from xigmaui import edit as _ed_api        # the model behind the rows
+assert len(_sized.ed_rows) == (len(_ed_api.field_names("arc"))
+                               + len(_ed_api.extension_fields("arc"))), _sized.ed_rows
+_rows_at, _cols_at, _floor_at = {}, {}, {}
+_host_at, _box_at = {}, {}      # columns in use -> the grid's own minimum width;
+                                # window width -> (columns, editor box height)
+for _W, _H in ((1280, 1024), (1440, 1024), (1919, 1055), (2560, 1440), (3840, 2160)):
+    _sized.resize(_W, _H)
+    for _ in range(14):
+        appq.processEvents()
+    # the threshold is only honest if the grid the columns made genuinely fits in the
+    # room that justified them, and the columns actually arrive as the window widens -
+    # "responsive" that never switches is a layout that shrinks on a 4K screen
+    _host = _sized._ed_host
+    assert _host.minimumSizeHint().width() <= _sized.split.widget(1).viewport().width(), (
+        _W, _sized._ed_cols, _host.minimumSizeHint().width(),
+        "the field grid asked for more width than the column it sits in has")
+    _cols_at[_W] = _sized._ed_cols
+    for _i, _nm in enumerate(("preview", "controls", "library")):
+        _area = _sized.split.widget(_i)
+        _inner = _area.widget()
+        assert _area.viewport().width() >= _inner.minimumSizeHint().width(), (
+            _W, _nm, _area.viewport().width(), _inner.minimumSizeHint().width(),
+            "a column is narrower than what it holds")
+        assert not _area.horizontalScrollBar().isVisible() and \
+            _area.horizontalScrollBar().maximum() == 0, (
+            _W, _nm, "a column scrolls sideways at this window size")
+    _rows_at[_W] = _sized.clips.viewport().height() // max(1, _sized.clips.sizeHintForRow(0))
+    _cols_at[_W] = _sized._ed_cols
+    _floor_at[_W] = [_sized.split.widget(i).minimumWidth() for i in range(3)]
+    # what one column of rows actually costs, at the number of columns in use: the
+    # per-column threshold in app.py is only honest if a column of rows fits inside it,
+    # and the box's own height is the other half of "uses the screen real estate"
+    _host_at[_sized._ed_cols] = _sized._ed_host.minimumSizeHint().width()
+    _box_at[_W] = (_sized._ed_cols, _sized.ed_group.height())
+# the floor itself: the window never lets a column be narrower than its contents, and
+# never asks for more than MIN_WIDTH/MIN_HEIGHT - or than the screen, whichever is smaller
+_seq = [_cols_at[w] for w in (1280, 1440, 1919, 2560, 3840)]
+assert _seq == sorted(_seq) and all(a <= 3 for a in _seq), _cols_at
+assert _cols_at[1440] >= 2, (_cols_at, "the rows still stack in one column at the fresh "
+                                       "window, so the extra width is going nowhere")
+assert _cols_at[3840] == 3, (_cols_at, "a 4K desktop gets no more columns than a laptop")
+_avail = _sized.screen().availableGeometry()
+for _i, _want in enumerate((app.MIN_WIDTH, app.MIN_HEIGHT)):
+    _got = (_sized.minimumWidth(), _sized.minimumHeight())[_i]
+    assert _got >= min(_want, (_avail.width(), _avail.height())[_i]), (
+        _got, _want, _avail.width(), _avail.height(),
+        "the window's own floor is under the rule MIN_WIDTH/MIN_HEIGHT states")
+print(f"  the sizing rule         floor {app.MIN_WIDTH}x{app.MIN_HEIGHT} (this screen has "
+      f"{_avail.width()}x{_avail.height()}), window minimum "
+      f"{_sized.minimumWidth()}x{_sized.minimumHeight()}, pane floors "
+      f"{_floor_at[1280]}; the editor grid takes "
+      + ", ".join(f"{_cols_at[w]} col at {w}" for w in (1280, 1440, 1919, 3840))
+      + f"; clip rows in view "
+      + ", ".join(f"{_rows_at[w]} at {w}" for w in (1280, 1440, 1919, 2560, 3840))
+      + f"; the controls pane's floor moves with the columns it holds: "
+      + ", ".join(f"{_floor_at[w][1]} at {w}" for w in (1280, 1440, 1919)))
+# the widest row set this window can be asked for, in the window rather than in a
+# stand-in form: an `arc` widget's 18 rows in one column, then in three.  Both figures
+# the app.py comment quotes come from this line.
+_arc_rows = len(_ed_api.field_names("arc")) + len(_ed_api.extension_fields("arc"))
+print(f"                        the 18-row case (`arc`, {_arc_rows} rows, from the "
+      f"model's lists): "
+      + ", ".join(f"{_box_at[w][0]} col at {w} -> grid asks "
+                  f"{_host_at[_box_at[w][0]]} px, box stands {_box_at[w][1]} px tall"
+                  for w in (1280, 1440, 1919)))
+assert _host_at[max(_host_at)] <= 3 * _sized._ED_COL_PX, (
+    _host_at, _sized._ED_COL_PX, "three columns of rows ask for more than the "
+    "threshold says they get")
+# ... and docs/gui.md quotes two of those measurements as digits, so they are compared
+# with this pass rather than remembered there
+for _claim in (f"shows **{_rows_at[3840]}** clip rows",
+               f"the two text columns sit at **{_floor_at[1280][1]}** and "
+               f"**{_floor_at[1280][2]} px**",
+               f"one column of editor rows asks for {_floor_at[1280][1]} px of controls, "
+               f"two columns for {_floor_at[1440][1]}, three for {_floor_at[1919][1]}",
+               f"The 18 rows of an `arc` widget stand **{_box_at[1280][1]} px** tall in "
+               f"one column and **{_box_at[1919][1]} px** in three, the grid's own ask "
+               f"going **{_host_at[1]} / {_host_at[2]} / {_host_at[3]} px**"):
+    assert _claim in gui_txt, (_claim, "docs/gui.md states a figure this run measured "
+                                       "differently")
+# the row census docs/theme-editor.md's editor bullet quotes is the model's, so the
+# digits are counted here rather than remembered there.  Whitespace is flattened on both
+# sides: that page wraps, and a compare that broke on a newline would fail for the
+# wrong reason (and be "fixed" by wrecking the prose).
+_bf, _be = len(_ed_api.field_names("bar")), len(_ed_api.extension_fields("bar"))
+_bar_claim = (f"a `bar` widget gets **{_bf + _be}** rows - **{_bf}** keys the painter "
+              f"reads for that kind plus **{_be}** of our own")
+assert _bar_claim in " ".join(_te.split()), (_bf, _be, _bar_claim,
+                                             "docs/theme-editor.md's row census for a "
+                                             "`bar` is not what the model lists")
+for _t in (_sized.preview_timer, _sized.thumb_timer, _sized.daemon_timer):
+    _t.stop()
+_sized.panel.stop()
+_sized.panel.wait(2000)
 
 # the default window size the docs quote is the one the code uses
 want = f"{settings.DEFAULTS['size'][0]}x{settings.DEFAULTS['size'][1]}"
@@ -6925,6 +7059,26 @@ assert win.ed_group not in win._adv_hide and win.ed_group.isVisible(), \
 win.adv_toggle.setChecked(True)
 for _ in range(6):
     appq.processEvents()
+def focus_row(w, field):
+    """Put the reader's focus on one editor row, and prove the focus actually landed.
+
+    The note line under the rows speaks for whichever row is focused (app.py's
+    `eventFilter`), so a gate that reads that line has to move the focus and then check
+    the move happened: several windows are up by here, a window that is not active
+    defers focus, and a deferred focus would leave the next assertion reading a stale
+    sentence and passing for the wrong reason.
+    """
+    w.activateWindow()
+    for _ in range(3):
+        appq.processEvents()
+    w._ed_ctl(field).setFocus()
+    for _ in range(3):
+        appq.processEvents()
+    assert w._ed_ctl(field).hasFocus(), (
+        field, "focus never landed: the note line below is not this row's sentence")
+    return w.ed_note.text()
+
+
 assert win.ed_group.isVisible(), "the layout editor is not on show"
 assert win.ed_name.count() == 1 + len(themes.EXPORTS) + len(pick), win.ed_name.count()
 assert win.ed_name.itemText(0) == app.NO_EDITOR, win.ed_name.itemText(0)
@@ -6936,7 +7090,7 @@ for _ in range(6):
 assert win.ed is not None and win.ed.name == "Theme_28", win.ed.name
 assert win.ed_widget.count() == len(win.ed.widgets())
 kind0 = win.ed.selected()["type"]
-listed = [win.ed_field.itemText(i) for i in range(win.ed_field.count())]
+listed = list(win.ed_rows)
 assert listed == (list(gui_edit.field_names(kind0))
                   + list(gui_edit.extension_fields(kind0))), (kind0, listed)
 assert win.ed_widget.toolTip() == win.ed.tip(0) and \
@@ -6951,17 +7105,17 @@ osd_open = win._osd.copy()
 win.ed_name.setCurrentText("gauge")
 for _ in range(6):
     appq.processEvents()
-garows = [win.ed_field.itemText(i) for i in range(win.ed_field.count())]
+garows = list(win.ed_rows)
 assert "arcPaint" in garows and "colourRamp" in garows, garows
-win.ed_field.setCurrentText("arcPaint")
+win._ed_ctl("arcPaint")
 for _ in range(4):
     appq.processEvents()
-assert win.ed_stack.currentWidget() is win.ed_menu, "an enumerated key got a text box"
-assert [win.ed_menu.itemText(i) for i in range(win.ed_menu.count())] == \
+assert isinstance(win._ed_ctl("arcPaint"), QComboBox), "an enumerated key got a text box"
+assert [win._ed_ctl('arcPaint').itemText(i) for i in range(win._ed_ctl('arcPaint').count())] == \
     ["render", "vendor"], "the two ring conventions are not the two on show"
 # the menu shows the value the file holds, not the first choice it could hold
-assert win.ed_menu.currentText() == win.ed.value("arcPaint"), \
-    (win.ed_menu.currentText(), win.ed.value("arcPaint"))
+assert win._ed_ctl('arcPaint').currentText() == win.ed.value("arcPaint"), \
+    (win._ed_ctl('arcPaint').currentText(), win.ed.value("arcPaint"))
 # a `special` row in the window: its fields are the model's list, its drawing menu is the
 # registry, and the sentence that explains `width` as a pitch shows only for a row whose
 # door reads it that way.  No shipped file carries a pair row yet (`alpha` is not
@@ -6974,20 +7128,20 @@ sp_at = next(i2 for i2, w in enumerate(win.ed.widgets()) if w["type"] == "specia
 win.ed_widget.setCurrentIndex(sp_at)
 for _ in range(4):
     appq.processEvents()
-sp_rows = [win.ed_field.itemText(i) for i in range(win.ed_field.count())]
+sp_rows = list(win.ed_rows)
 assert sp_rows == (list(gui_edit.field_names("special"))
                    + list(gui_edit.extension_fields("special"))), sp_rows
 assert "width" in sp_rows and "autoFitMax" in sp_rows and "fitArc" in sp_rows, sp_rows
 # a menu has to show the value the row holds, not the first choice it *could* hold:
 # `name` is the field where the two differ, because the vocabulary is sorted and this
 # row's value is `dual-status`, second of the three
-win.ed_field.setCurrentText("name")
+win._ed_ctl("name")
 for _ in range(4):
     appq.processEvents()
-assert [win.ed_menu.itemText(i) for i in range(win.ed_menu.count())] == \
+assert [win._ed_ctl('name').itemText(i) for i in range(win._ed_ctl('name').count())] == \
     list(themes.special_names()), "the drawing menu is not the registry"
-assert win.ed_menu.currentText() == win.ed.value("name") == "dual-status", \
-    (win.ed_menu.currentText(), win.ed.value("name"))
+assert win._ed_ctl('name').currentText() == win.ed.value("name") == "dual-status", \
+    (win._ed_ctl('name').currentText(), win.ed.value("name"))
 # and the same claim on a `data` row, whose `source` vocabulary is long: pick one whose
 # source is not the menu's first entry, so the check below cannot pass by luck
 first_source = sorted(themes.source_names())[0]
@@ -6997,39 +7151,39 @@ data_at = next(i2 for i2, w in enumerate(win.ed.widgets())
 win.ed_widget.setCurrentIndex(data_at)
 for _ in range(4):
     appq.processEvents()
-win.ed_field.setCurrentText("source")
+win._ed_ctl("source")
 for _ in range(4):
     appq.processEvents()
-assert win.ed_menu.currentText() == win.ed.value("source"), \
-    (win.ed_menu.currentText(), win.ed.value("source"))
-menu_shown, menu_held = win.ed.value("source"), win.ed_menu.itemText(0)
+assert win._ed_ctl('source').currentText() == win.ed.value("source"), \
+    (win._ed_ctl('source').currentText(), win.ed.value("source"))
+menu_shown, menu_held = win.ed.value("source"), win._ed_ctl('source').itemText(0)
 assert menu_shown != menu_held, (menu_shown, menu_held)   # the check below bites
 win.ed_widget.setCurrentIndex(sp_at)
 for _ in range(4):
     appq.processEvents()
-win.ed_field.setCurrentText("width")
+focus_row(win, "width")
 for _ in range(4):
     appq.processEvents()
-assert win.ed_stack.currentWidget() is win.ed_num, "a number field without a spinbox"
+assert isinstance(win._ed_ctl("width"), QSpinBox), "a number field without a spinbox"
 line_note = win.ed_note.text()
 assert "does not read `width`" in line_note, line_note
 # the same row, drawing through the other door - and changed with the window's own
 # menu, not the model, so the undo button becomes live the way it does for a reader
-win.ed_field.setCurrentText("name")
+win._ed_ctl("name")
 for _ in range(4):
     appq.processEvents()
-assert win.ed_menu.currentText() == "dual-status", win.ed_menu.currentText()
-win.ed_menu.setCurrentText("fan-figures")
+assert win._ed_ctl('name').currentText() == "dual-status", win._ed_ctl('name').currentText()
+win._ed_ctl('name').setCurrentText("fan-figures")
 for _ in range(6):
     appq.processEvents()
 assert win.ed.prop().get("name") == "fan-figures", win.ed.prop()
 assert win.ed_undo.isEnabled() and win.ed_undo.text() == "undo (1)", \
     (win.ed_undo.isEnabled(), win.ed_undo.text())
-win.ed_field.setCurrentText("x")
+focus_row(win, "x")
 for _ in range(4):
     appq.processEvents()
 assert "pair's own anchor" in win.ed_note.text(), win.ed_note.text()
-win.ed_field.setCurrentText("width")
+focus_row(win, "width")
 for _ in range(4):
     appq.processEvents()
 assert "not a box width" in win.ed_note.text(), win.ed_note.text()
@@ -7045,26 +7199,26 @@ assert themes.user_copies() == [], "an in-memory edit wrote a file"
 # other pair row, but its ceiling sentence must name the ring and not the width key that
 # drawing never reads: an editor that explained the wrong fit key would be the same mistake
 # as a menu showing the wrong value, one screen later
-win.ed_field.setCurrentText("name")
+win._ed_ctl("name")
 for _ in range(4):
     appq.processEvents()
-win.ed_menu.setCurrentText("temp-values")
+win._ed_ctl("name").setCurrentText("temp-values")
 for _ in range(6):
     appq.processEvents()
 assert win.ed.prop().get("name") == "temp-values", win.ed.prop()
-win.ed_field.setCurrentText("fontSize")
+focus_row(win, "fontSize")
 for _ in range(4):
     appq.processEvents()
 ring_note = win.ed_note.text()
 assert "fitArc" in ring_note and "autoFitMax" not in ring_note, ring_note
-win.ed_field.setCurrentText("width")
+focus_row(win, "width")
 for _ in range(4):
     appq.processEvents()
 assert "not a box width" in win.ed_note.text(), win.ed_note.text()
 # a key the drawing does not read is still on the field list, because fields are per kind
 # and the vocabulary is the vendor's, so the reason beside it is what has to say what it
 # does *not* do on this row
-win.ed_field.setCurrentText("autoFitMax")
+focus_row(win, "autoFitMax")
 for _ in range(4):
     appq.processEvents()
 why_note = win.ed_note.text()
@@ -7075,7 +7229,7 @@ for _ in range(4):
 assert win.ed.prop().get("name") == "dual-status", win.ed.prop()
 # the field the reader was last on stays selected across an undo, so the sentence that
 # comes back is asked for on purpose: back on `width`, a `line` row says it reads none
-win.ed_field.setCurrentText("width")
+focus_row(win, "width")
 for _ in range(4):
     appq.processEvents()
 assert "does not read `width`" in win.ed_note.text(), win.ed_note.text()
@@ -7110,12 +7264,12 @@ if arcs:
     win.ed_widget.setCurrentIndex(arc_at)
     for _ in range(4):
         appq.processEvents()
-    win.ed_field.setCurrentText("arcPaint")
+    win._ed_ctl("arcPaint")
     for _ in range(4):
         appq.processEvents()
-    unset = win.ed_menu.itemText(0)
-    assert unset == app.UNSET and win.ed_menu.currentText() == app.UNSET, \
-        (unset, win.ed_menu.currentText())
+    unset = win._ed_ctl('arcPaint').itemText(0)
+    assert unset == app.UNSET and win._ed_ctl('arcPaint').currentText() == app.UNSET, \
+        (unset, win._ed_ctl('arcPaint').currentText())
     assert win.ed.value("arcPaint") is None
 win.ed_name.setCurrentText("Theme_28")
 for _ in range(6):
@@ -7123,11 +7277,11 @@ for _ in range(6):
 win.ed_widget.setCurrentIndex(target)
 for _ in range(4):
     appq.processEvents()
-assert win.ed_field.itemText(0) == "x" and win.ed_stack.currentWidget() is win.ed_num, \
+assert list(win.ed_rows)[0] == "x" and isinstance(win._ed_ctl("x"), QSpinBox), \
     "a coordinate got something other than a spinbox"
 before_x = int(win.ed.value("x"))
-win.ed_num.setValue(before_x + 20)
-win.ed_num.editingFinished.emit()
+win._ed_ctl("x").setValue(before_x + 20)
+win._ed_ctl("x").editingFinished.emit()
 for _ in range(6):
     appq.processEvents()
 assert int(win.ed.value("x")) == before_x + 20, win.ed.value("x")
@@ -7141,15 +7295,15 @@ assert moved_win > 200, moved_win
 
 # a value the model refuses: the spinbox holds it, the note says why, and the picture
 # stays put - the difference between a refusal and a silent clamp
-win.ed_num.setValue(9999)
+win._ed_ctl("x").setValue(9999)
 for _ in range(4):
     appq.processEvents()
 assert "canvas" in win.ed_note.text(), win.ed_note.text()[:70]
 assert int(win.ed.value("x")) == before_x + 20, "a refused value reached the layout"
 assert win._osd.tobytes() == edited.tobytes(), "a refused edit moved the picture"
-win.ed_num.blockSignals(True)
-win.ed_num.setValue(before_x + 20)
-win.ed_num.blockSignals(False)
+win._ed_ctl("x").blockSignals(True)
+win._ed_ctl("x").setValue(before_x + 20)
+win._ed_ctl("x").blockSignals(False)
 assert win.ed.steps == 1, win.ed.steps
 
 win.ed_save.click()

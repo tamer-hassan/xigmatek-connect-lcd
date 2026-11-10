@@ -347,8 +347,8 @@ runner could write different bytes of the same animation.
   if the `--device` path exists, because in this mode the window's own status read opens the
   port, and a screenshot is not the thing to take someone's panel over with; the default is
   `/dev/xigmatek-lcd`, which on a capture machine has nothing behind it.  `--size WxH`
-  frames it (`--size`, 1380x860 for the README's picture: the three columns side by side,
-  seven rows of the clip list). The window's own fresh default is 1320x800 - `settings.DEFAULTS
+  frames it (`--size`, 1440x1024, the window's own fresh default, for the README's picture: the three
+columns side by side, nine rows of the clip list). The window's own fresh default is 1440x1024 - `settings.DEFAULTS
   ["size"]` - and the suite asserts that both figures named here appear in the code as
   constants or defaults, so neither sentence can go stale. Nothing about the layout is fixed
   by the picture: the preview column caps itself at the 480 px frame, the clip library is a

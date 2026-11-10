@@ -151,7 +151,7 @@ override_dh_auto_install:
 	# capture docs/screenshot-xigmaui.png, the two live captures the README links
 	# (docs/xigmaui1.png, docs/xigmaui2.png), the two docs/previews/ contact sheets,
 	# and the six docs/videos/*.mp4 the README links (plus the readings JSON they draw
-	# from) - 11 182 199 B across thirteen files, some of it derived from
+	# from) - 11 204 512 B across thirteen files, some of it derived from
 	# XIGMATEK's own theme library, which is the other package's business and its own
 	# licence. An installed system therefore gets the prose, and the README it can
 	# read says what it shows. debian/README.source keeps this difference in mind for

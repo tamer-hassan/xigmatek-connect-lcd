@@ -268,13 +268,15 @@ shell over that model, and the gates say so in counts.
   byte-identically to the start and leaves 2 undo steps with `dirty` **false**: that flag
   answers "does memory disagree with the file?", not "was anything typed?", so it is
   derived from two snapshots rather than a counter.
-* **The row does not lie about the model.** The combo offers 28 names (5 generated + 23
-  files), the field list for a `bar` is the model's 14, an `x` of 9999 sits in the
-  spinbox refused in words while the picture stays put, and the one library layout that
-  carries an `arc` shows `(not set)` for `arcPaint` rather than picking a default to
-  display - *which* file that is gets derived by the gate, because the last figure that
-  was remembered here instead of derived went stale. The pane's cap - never larger than
-  the 480 px glass - holds with an editor frame in it.
+* **The rows do not lie about the model.**  Counted by the gate rather than remembered
+  here: the layout combo offers 28 names (5 generated + 23 files); a `bar` widget gets
+  **15** rows - **11** keys the painter reads for that kind plus **4** of our own; an `x`
+  of 9999 sits in the spinbox, refused in words while the picture stays put; and the one
+  library layout that carries an `arc` shows `(not set)` in its `arcPaint` row rather
+  than picking a default to display.  The figure this bullet used to carry was remembered
+  rather than derived, and went stale the day `xigma.showIf` was added for `bars`: it
+  said a `bar` had 14 fields.  The pane's cap - never larger than the 480 px glass -
+  holds with the rows in it.
 * **Pixel counts mean one thing.** `px_differ` in the suite counts pixels that disagree in
   any channel, the same count `themes.parity` reports. The first version divided a byte
   count by four, which printed 905 where the honest number is 1 163 - a fifth out, in the
@@ -700,9 +702,10 @@ per-theme milliseconds in docs/gui.md stay labelled as owed a quiet-box re-measu
   **never scales up** and scales down only as the pane shrinks. The suite asserts the cap
   arithmetic (`pane_l.maximumWidth() == render.W + app.PANE_CHROME`, `>= render.W` - "the
   frame could never be shown 1:1" - and `pane_l.width() == pane_l.maximumWidth()`), and
-  docs/gui.md carries the rest of the pixel census: splitter minimums 200/300/320, 66 px
-  clip rows with room for 6 clips at the 1320×800 default, a 150 px list floor and an 84 px
-  log floor, and a fresh split (560/400/420) that leaves every column at least its
+  docs/gui.md carries the rest of the pixel census: pane floors 200/300/320, each raised
+  to what that column's own contents measure, 66 px
+  clip rows with room for 9 clips at the 1440×1024 default, a 150 px list floor and an 84 px
+  log floor, and a fresh split (532/540/356) that leaves every column at least its
   contents' own minimum width - which 0.4's 1180 px window and 520/460/560 split did
   not, and is what the controls column's horizontal scrollbar came from. Keeping the
   canvas *inside*
@@ -746,7 +749,7 @@ number gated, the docs updated in the same change.
 | 1 | **landed 2026-11-08.** the 23 `1:1` layouts selectable in the loop: name→layout resolver, human names from `background.mediaFile`, the source→`sensors.collect()` table, `--list-themes`, `notes["missing"]` printed as "no pump tachometer here, widget skipped" and again over the socket's `status`, the four `4:3` themes excluded by a gate on `ratio` so a future 480 layout cannot be dropped by a filter, and a `--theme` name that is canonicalised once at parse time so the CLI, the log and the socket all spell it the same | 1-1½ | 3-4½ |
 | 2 | **machinery landed 2026-11-08,** `--export-theme NAME`, `--list-specials`, the `special` kind and its injected registry, the `xigma` extension keys, byte-stability and parity gates over four readings; four of five generate today: `alpha` (12 widgets, 6 312 chars), `clock` (3, 1 448), `gauge` (5, 2 314) and `dual` (10, 4 677) each reach a **zero-pixel diff** on every reading that answers what they ask; `bars` does not, and the table under "What settled the ring and the bar" says what it still needs - including that `bars` may not be expressible as one file at all. (`--print-theme-fields`, listed here as unbuilt, landed with stage 3.) | 2-2½ | 6-7½ **Completed 2026-11-09:** `bars` joined them - 32 widgets, zero differing pixels at all 13 readings the gate gives it - which took a change to that theme's own drawing (ten reserved rows, a row with no reading keeping its place) and one key the schema had never had, `xigma.showIf`. |
 | 3 | **landed 2026-11-08.** the file model: the user root `~/.config/xigmalcd/themes` read before the checkout and before `/usr/share`, so an edited copy shadows the vendor's by file operation alone and deleting it puts the vendor's back; `canonical()`/`shape_of()`, `validate()` split into hard (will not draw) and soft (worth saying), `save()` (atomic tmp + `os.replace`, `.bak`, trailing newline, user root only, the five code names refused, traversal names refused), `copy_for_edit()`, `delete_user_theme()`, `user_copies()`, `themes.draw()` for an object that never touched a disk, and `--check-theme NAME` as the review door. The round-trip gate is in: **27/27 layouts reproduce byte for byte** and **23/23 copies are byte-identical to their source**. Not built: the window that drives it | 1-1½ | 3-4½ |
-| 4 | **landed 2026-11-08, in the two changes the plan named.** First the model (`xigmaui/edit.py`, no Qt, driven headless by the suite) and the window's layout-editor row over it: one layout combo (3 generated + 23 files), one widget, one field, one value; opening writes nothing; the field list is derived from `themes.keys_read()`; colours are stored in the vendor's `rgba()` spelling; refusals move nothing; 20 keystrokes are 1 undo step; the saved file redraws byte-identically what was on screen (1 163 px for the `(20, 0)` nudge, through both doors). Then the canvas inside that same pane: press a row's ink box to select it (the file's row index, later row wins an overlap), drag to move it - one drag, one undo step, the row follows the cursor and the pane repaints as it goes - and the arrow keys nudge 1 px / 10 px. Still to build: drawing the editor from live readings, and resizing or reordering rows | 3-3½ | 9-10½ |
+| 4 | **landed 2026-11-08, in the two changes the plan named.** First the model (`xigmaui/edit.py`, no Qt, driven headless by the suite) and the window's layout-editor row over it: one layout combo (3 generated + 23 files), one widget, one field, one value; opening writes nothing; the field list is derived from `themes.keys_read()`; colours are stored in the vendor's `rgba()` spelling; refusals move nothing; 20 keystrokes are 1 undo step; the saved file redraws byte-identically what was on screen (1 163 px for the `(20, 0)` nudge, through both doors). Then the canvas inside that same pane: press a row's ink box to select it (the file's row index, later row wins an overlap), drag to move it - one drag, one undo step, the row follows the cursor and the pane repaints as it goes - and the arrow keys nudge 1 px / 10 px. **Amended 2026-11-10 (0.5):** the field dropdown became rows - every field the kind carries, one row each, **10 for `text` up to 18 for `arc`** counted off the model's lists across 185 widgets, one to three columns as the window's width allows (the window's floor is 1280x1024 now, per the owner), and the note line follows focus. Still to build: drawing the editor from live readings, and resizing, adding or reordering rows | 3-3½ | 9-10½ |
 | 5 | docs and gates: docs/themes.md's "not in the picker, and that is not an oversight" section brought up to date, docs/usage.md's CLI table, docs/gui.md's window census, README's five-theme claims, the window's own theme tooltip (it still says the vendor files are for the panel's firmware, which §11 contradicts), `smoke` rendering every installed layout offline against a pinned values dict. The suite grows by at least one section - stage 1's gates belong in the vendor-library section that already re-derives docs/themes.md's colour census, not in a new one - and then every place `twenty` is a gate moves with it: README, docs/tools.md, docs/packaging.md, the top changelog stanza, and the count `.github/workflows/ci.yml` compares against | 1 | 3 |
 | 6 | on glass, with the panel attached and the owner watching: the runnable set at 1 and 2 fps, achieved fps, loop seams for the vendor clips, the dark-ink-over-bright question that docs/limits.md still carries, `--no-clock` on `clock` (that frame changed in 0.4 - docs/limits.md's knob map), the quiet-box re-measurement docs/gui.md's cost paragraph owes to `bars`, and the transcript kept the way docs/packaging/ keeps installs | 1 | 3 |
 | | **total** | **10-12** | **30-36 h** |

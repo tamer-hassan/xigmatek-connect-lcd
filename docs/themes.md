@@ -108,8 +108,9 @@ them here instead, and both are gated in `tools/selftest.sh` rather than asserte
 What is **not** built is an editor drawn from live readings, and any way to change a
 layout's *shape* by hand: rows are moved one at a time, never resized by their edge, added,
 removed or reordered. What **is** built, since
-2026-11-08, is the window's `Layout` box - one layout, one widget, one field at a
-time, over the same model the suite drives headless: a layout file under
+2026-11-08, is the window's `Layout` box - one layout, one widget, **every field that
+widget carries as a row of its own** (10 rows for a `text` widget through 18 for an
+`arc`), over the same model the suite drives headless: a layout file under
 `~/.config/xigmalcd/themes` is read before the vendor's copy of the same name, a copy
 made for editing is byte-identical to the file it came from (23/23), a save is atomic
 and keeps a `.bak`, and deleting your copy puts the vendor's back in front. All of it

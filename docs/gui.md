@@ -72,7 +72,7 @@ one of them (see "How the three columns get their sizes", after the table):
 | the running display | controls | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. It also spells out the settings that display is running with - canvas, clock size, scrim, fans, and **the text colour it holds, as the hex it will answer again** (`text #ffc400`), which is the only place in the window you can see a colour you did not pick yourself. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Measured 1 ms for the commands Apply sends - six on the 0.2 bench ledgers below, seven in the tree, and the suite re-measures the line every run |
 | preview | preview | the background with `render.draw`'s OSD layer composited on top - playing, via one streaming ffmpeg, or as one mid-loop frame (`playing` box, see "The preview plays" below), refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How the three columns get their sizes" below | nothing |
 | theme | controls | the five themes, clock size, **the colour of the text it draws**, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
-| layout editor | controls, always on | opens one of the layouts this machine can select (or one of the 5 generated ones), shows its widgets, and edits one field at a time; the pane under the picture then shows *that file* rather than the live theme | nothing, ever: the panel is never handed a layout file (PROTOCOL.md §11). What `save` changes is what this machine's own daemon draws next time it names that theme |
+| layout editor | controls, always on | opens one of the layouts this machine can select (or one of the 5 generated ones), shows its widgets, and lays out every field that widget carries as a row of its own (8 to 18 rows by kind, from the model's list); the pane under the picture then shows *that file* rather than the live theme | nothing, ever: the panel is never handed a layout file (PROTOCOL.md §11). What `save` changes is what this machine's own daemon draws next time it names that theme |
 | clips | library | every MP4 the roots hold, listed once per **distinct file** - **40 rows out of the 46 mp4 files this repository tracks** (204 files on the author's bench, where the installed package and a mounted Windows partition add themselves; still 40 rows): 3 rows from the clips vendored here and 37 from the vendor's library on any of those boxes, the rest of the files being copies that collapse by content - 6 among the 46 tracked here (3 of them under another name), 164 on the bench, and the dated audit of all of it is written out under "Cost, measured on this box" below. This checkout's own `themes/alpha/clips` is one of the roots the list walks: 43 clip files, byte-identical to what `xigmatek-connect-lcd-themes` installs (the suite re-hashes every one against that package's manifest), which is what lets a clone pair all 23 layouts `--list-themes` prints and why the same 40 rows turn up on a CI runner with nothing installed. `tools/preview_gif.py --clip themes/alpha/clips/Theme_30.mp4` reaches those files by path, which is how all five README previews are made. Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
 | background state | library | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the gate refuses says so, in the gate's words, before the button is pressed | nothing: it is a readout |
 | `One frame now` | library | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
@@ -108,7 +108,7 @@ number in that shape comes from a measurement, most of them of a failure:
   (`CLIP_ICON`), and `ResizeMode.Adjust` - which lays rows out against the viewport
   and is what painted one selected clip as a block taller than the list - went to
   `Fixed` with uniform rows. Measured afterwards, and printed by the suite:
-  **66 px rows, and room for 6 clips at the fresh 1320×800 window, 11 at 1919×1055**
+  **66 px rows, and room for 9 clips at the fresh 1440×1024 window, 10 at 1919×1055**
   — rows in view, which is capacity: this bench has 40 distinct clips to
   put in them (204 files behind them on the author's bench), while a checkout of this
   repository on its own - no installed package, no second partition - walks the 46 mp4 files
@@ -158,16 +158,38 @@ number in that shape comes from a measurement, most of them of a failure:
   entry-wider-than-box rather than any of those four numbers - which is the half no
   machine's fonts can rot.
 
-The fresh window default is **1320×800** (`xigmaui/settings.py`), with the splitter
-asked for **560 / 400 / 420**. That request is deliberately wider than the window:
-`QSplitter` scales an over-wide request down proportionally, which keeps one shape at
-every window width, so the three numbers are a proportion rather than three widths - at
-a fresh window they come back as **560 / 367 / 385**, every column wider than its own
-contents measure. Short enough for a 1080p screen, and the README's capture frames the
-same window at 1380×860. The suite builds a window at these defaults, reads the
-splitter back and asserts each column is at least as wide as what it holds and that none
-of the three scrolls sideways; it checks both triples against this page, so neither can
-go stale.
+The window's floor is the owner's rule, written in `xigmaui/app.py` as `MIN_WIDTH,
+MIN_HEIGHT = 1280, 1024`: a 1280×1024 desktop at minimum, up to a 3840×2160 one, and
+everything between used as it comes. It is a floor rather than an insistence -
+`Window.__init__` takes `max(what the contents measure, min(1280x1024, what the screen
+offers))`, so a screen with a panel on it that cannot show 1 024 px of window gets the
+most it can, and the window **says so in its own log** rather than letting the bottom
+row of controls fall off the edge. The fresh default is **1440×1024**
+(`xigmaui/settings.py`), which is above the floor and inside a 1080p screen.
+
+The splitter is asked for **532 / 540 / 356** at that window - the left column capped at
+the 480 px frame plus its chrome, the controls given enough for two columns of editor
+rows, the library the rest - and a fresh window reads them back as **532 / 541 / 359**
+(each pane's floor is its contents' own width),
+every column wider than its own contents measure. The same three numbers are a shape at
+other widths: `QSplitter` scales an over-wide request down proportionally and its
+stretch factors hand a wide window's slack to the controls and the library, so at
+3840×2160 the library column is 1 318 px across and shows **28** clip rows while the
+preview stays capped at its 532 px - it is never scaled up, because pixels the glass does
+not have would only be a bigger lie. The suite builds a window at these defaults, reads
+the splitter back, asserts each column is at least as wide as what it holds, that none of
+the three scrolls sideways, and that the editor grid's column count times its per-column
+threshold is never less than what that grid asked for; it checks both triples against
+this page, so neither can go stale.
+
+And the columns' floors are not remembered constants: `_pane_floors()` raises each pane's
+minimum to its own contents' `minimumSizeHint`, so the two text columns sit at **329** and **359 px**
+on this bench where the code's lower bounds are 300 and 320 - and they move with the
+machine's fonts, which is precisely why the gate compares the relation and not the
+digits. A pane that cannot be dragged under what it holds cannot grow a horizontal
+scrollbar inside itself, so the 0.4 failure mode is unreachable rather than merely
+avoided. The floor also moves with the form: one column of editor rows asks for 329 px of controls, two columns for 386, three for 554, and the window's own minimum rises with them.
+The 18 rows of an `arc` widget stand **779 px** tall in one column and **403 px** in three, the grid's own ask going **171 / 344 / 512 px** - the reflow buying height without buying a scrollbar, all six figures off the same sizing pass the suite runs.
 
 ### The preview plays, or shows one frame
 
@@ -295,9 +317,21 @@ invisible until a reader found an unrelated checkbox.
 One group box, on show by default, that opens a layout as data: the three
 generated themes (`clock`, `dual`, `gauge` - JSON written out of `render.py` on demand)
 and the 23 layout files this canvas can select, the same set `--list-themes` prints.
-A row picks a widget, a field, and a value; a second row says what happened. And the
-picture itself can be pointed at: press a row to select it, drag it to move it, nudge it
-with the arrow keys.
+Two picks - layout, then widget - and then **every field that widget carries is on
+screen at once, one row each**: no menu to open to find out what a row holds. The
+counts are the model's, not a table kept here: `edit.field_names(kind)` plus
+`edit.extension_fields(kind)` is **10 rows for a `text` widget, 11 for `data`, 12 for
+`special`, 8 for `line`, 15 for `bar`, 18 for `arc`** - measured across the
+**185 widgets** in the 28 layouts the editor can open, in the gate. Which control a row
+uses is the model's answer too: a menu wherever a vocabulary already exists in code
+(`edit.choices()` - 5 families, 27 readings for `source` and `showIf`, 6 anchors, 5
+special drawings, the painter conventions, the named ramps), a checkbox for `bold`, a
+spinbox for `edit.number_fields()`, a colour row with a swatch and the colour dialog for
+`edit.COLOUR_FIELDS`, and a plain text box only for what is genuinely free text - a line
+of `content`, a `format`. The grid takes one column of rows in a narrow controls column
+and two or three as the window widens, which is what 1280×1024 through 3840×2160 is for.
+And the picture itself can be pointed at: press a row to select it, drag it to move it,
+nudge it with the arrow keys.
 
 What the suite holds this to, rather than assumes - every one of these is something an
 editor commonly gets wrong:
@@ -318,9 +352,7 @@ editor commonly gets wrong:
   because a drawing convention or a dependency is a property of the row, not of the shape -
   and the one added on 2026-11-09 for `bars`, `xigma.showIf`, gets the same menu as
   `source` does: the list of readings this program can answer, so a row cannot be pointed
-  at a dependency nobody will ever satisfy. Alongside
-  them sit the `xigma.*` keys this program drew up for itself - offered on every kind,
-  because a drawing convention or a dependency is a property of the row, not of the shape -
+  at a dependency nobody will ever satisfy.
   and the one added on 2026-11-09 for `bars`, `xigma.showIf`, gets the same menu as
   `source` does: the list of readings this program can answer, so a row cannot be pointed
   at a dependency nobody will ever satisfy.

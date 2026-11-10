@@ -71,11 +71,11 @@ from PyQt6.QtCore import QEvent, QSize, Qt, QTimer        # noqa: E402
 from PyQt6.QtGui import (QAction, QBrush, QColor, QIcon, QImage, QKeySequence,
                          QPainter, QPen, QPixmap)                  # noqa: E402
 from PyQt6.QtWidgets import (QApplication, QCheckBox, QColorDialog, QComboBox,
-                             QDoubleSpinBox, QFormLayout, QGroupBox,
+                             QDoubleSpinBox, QFormLayout, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QLineEdit, QListWidget,
                              QListWidgetItem, QMainWindow, QMenu, QMessageBox,
                              QProgressBar, QPushButton, QScrollArea,
-                             QSizePolicy, QSpinBox, QSplitter, QStackedWidget,
+                             QSizePolicy, QSpinBox, QSplitter,
                              QSystemTrayIcon,
                              QVBoxLayout, QWidget)
 
@@ -114,6 +114,17 @@ TITLE = "Xigmatek Connect LCD"
 # around a 480 px picture (`_fit()` never scales up); _build() applies it and the
 # suite checks the arithmetic against the frame size itself.
 PANE_CHROME = 52
+
+#: The window's floor, as the owner set it: a 1280x1024 desktop at minimum, up to a
+#: 3840x2160 one, with everything between used as it comes.  This is a *floor*, not a
+#: size to insist on - a 1024-tall screen with a panel on it hands a window fewer than
+#: 1024 px, and a window whose last row of controls cannot be reached is worse than a
+#: slightly shorter one - so `Window.__init__` clamps it to what the screen actually
+#: offers, never below what the window's own contents measure, and says in its log when
+#: that floor bites.  The maximum needs no constant: Qt lets the window grow to the
+#: screen, and 3840x2160 is inside that, so what has to be proven is that the layout
+#: *uses* the width - see `_ED_COL_PX` and the fresh-window gate in tools/selftest.sh.
+MIN_WIDTH, MIN_HEIGHT = 1280, 1024
 
 #: The menu entry that means "this key is not in the file at all", for the one kind of
 #: field whose absence is a value: this program's own `xigma` extension keys.  It is a
@@ -194,6 +205,30 @@ def _readable(combo: QComboBox) -> QComboBox:
         # need, and any icon column the entries carry
         view.setMinimumWidth(wide + 60 + combo.iconSize().width())
     return combo
+
+
+def _ed_shrink(ctl) -> None:
+    """Let one row's control give way, so a column of rows never sets a floor.
+
+    The pair with `_readable`, and the reason a form of 18 rows can live in a 347 px
+    column at all: the *list* a drop-down opens carries the entry's width, so the
+    closed box is free to be as narrow as its column.  Without this, a `source` menu
+    asks for the width of `Motherboard Temperature`, eighteen of them ask for the
+    width of the window, and the controls column grows a horizontal scrollbar inside
+    itself - the 0.4 defect, rebuilt from the other end.  A spinbox is the same trap
+    with different furniture: its range is deliberately wider than any legal value
+    (an out-of-range number is *said* by the model, not clamped away), so it must not
+    demand room for `-100000` in a column that holds a two-digit `fontSize`.
+    """
+    if isinstance(ctl, QComboBox):
+        ctl.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        ctl.setMinimumContentsLength(6)
+    elif isinstance(ctl, QSpinBox):
+        ctl.setMinimumWidth(56)
+    elif isinstance(ctl, QLineEdit):
+        ctl.setMinimumWidth(64)
+    ctl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
 
 class Canvas(QLabel):
@@ -307,6 +342,25 @@ class Canvas(QLabel):
         super().keyPressEvent(event)
 
 
+class EditorBox(QGroupBox):
+    """The editor group, which re-flows its field grid when *it* is resized.
+
+    The window's own `resizeEvent` is not the signal to watch: the columns live in a
+    splitter, and dragging a handle never fires it - which is exactly the bug
+    docs/gui.md records for the preview picture.  So the box measures its own width
+    and asks the window how many columns of rows that width can hold.  It is the same
+    hook `_fit()` uses for the glass, applied to a form.
+    """
+
+    def __init__(self, title: str, on_width):
+        super().__init__(title)
+        self._on_width = on_width
+
+    def resizeEvent(self, event):                          # noqa: N802
+        super().resizeEvent(event)
+        self._on_width(self.width())
+
+
 class Window(QMainWindow):
     """The main window.
 
@@ -411,7 +465,28 @@ class Window(QMainWindow):
         self.save_timer.timeout.connect(self._save_now)
 
         self._build()
-        self.resize(*self.cfg["size"])       # as you left it
+        # ---- the floor this window may not be dragged under, and the screen it may
+        # not overflow (MIN_WIDTH/MIN_HEIGHT above says whose rule it is) ----
+        avail = self.screen().availableGeometry()
+        floor_w = max(self.minimumSizeHint().width(), min(MIN_WIDTH, avail.width()))
+        floor_h = max(self.minimumSizeHint().height(), min(MIN_HEIGHT, avail.height()))
+        self.setMinimumSize(floor_w, floor_h)
+        # Only the lower bound is applied to the size you left it at.  A window taller
+        # than the screen is ordinary desktop behaviour - the window manager moves it and
+        # you scroll - while a window shorter than its own contents is a control you
+        # cannot reach, so `avail` bounds the floor above and not the window below.
+        want = tuple(self.cfg["size"])
+        got = (max(want[0], floor_w), max(want[1], floor_h))
+        if got != want:
+            # refuse-and-say, the same way a bad port path or a two-number `split`
+            # is handled: the file said one thing, the screen says another, and the
+            # window tells you which one it drew instead of leaving you to find out
+            # by hunting for a button that fell off the bottom edge
+            self._log(f"window sized {got[0]}x{got[1]}, not {want[0]}x{want[1]}: this "
+                      f"window will not go under {floor_w}x{floor_h}, the size its own "
+                      f"contents need (the rule is MIN_WIDTH x MIN_HEIGHT, or this "
+                      f"screen's {avail.width()}x{avail.height()}, whichever is less)")
+        self.resize(*got)                    # as you left it, inside those bounds
         # ...and only now the two columns: a splitter that has never been laid
         # out treats setSizes as a wish, and the second half of the window is
         # what loses.  Verified offscreen: setting it inside _build left the
@@ -809,12 +884,19 @@ class Window(QMainWindow):
         # it away made the whole point of that package invisible.  The boxes the
         # switch *does* fold moved to the preview column instead, so this one
         # has the room its rows need.
-        editor = QGroupBox("Layout: edit a file the loop can draw")
-        eform = QFormLayout(editor)
+        editor = EditorBox("Layout: edit a file the loop can draw", self._editor_reflow)
+        eform = QVBoxLayout(editor)
+        head = QFormLayout()
+        # installed before anything is added to it: a layout that is built and never
+        # put into the box is destroyed at the end of _build(), and with it every
+        # widget that was addRow'd into it - which is how the layout and widget
+        # pickers vanished without a trace (the suite now checks the box contains
+        # them, because "no exception" is not how you notice a missing control)
+        eform.addLayout(head)
         # one growth policy, stated rather than inherited from whatever style
         # this desktop happens to use: every field fills the field column, so a
         # combo is never a strip narrower than the text it is showing.
-        eform.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        head.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         self.ed_name = QComboBox()
         # `themes.scan()` is already user-first, so a name that has been edited appears
         # once and opens the copy: reopening continues rather than starting over.  The
@@ -844,61 +926,47 @@ class Window(QMainWindow):
                                "this machine's readings")
         self.ed_state.setStyleSheet("color:#888;font-style:italic;")
         self.ed_state.setWordWrap(True)
-        eform.addRow("layout", self.ed_name)
-        eform.addRow("", self.ed_state)
+        head.addRow("layout", self.ed_name)
+        head.addRow("", self.ed_state)
 
         self.ed_widget = QComboBox()
         self.ed_widget.setToolTip("one widget of this layout: its kind, what it shows, "
                                   "and where it sits")
         self.ed_widget.currentIndexChanged.connect(self._editor_pick_widget)
-        eform.addRow("widget", self.ed_widget)
+        head.addRow("widget", self.ed_widget)
 
-        self.ed_field = QComboBox()
-        self.ed_field.setToolTip(
-            "a key the painter actually reads. This list comes out of the code rather "
-            "than a table kept here: `themes.keys_read()` parses `layout.py`, and the "
-            "keys the vendor's files carry that nothing reads - which "
-            "`--print-theme-fields` prints with the reason each is inert - are not "
-            "offered")
-        self.ed_field.currentTextChanged.connect(self._editor_pick_field)
-        eform.addRow("field", self.ed_field)
+        # Every field the model lists for the selected widget gets a row of its own:
+        # there is no `field` menu left to open to find out what a widget carries.
+        # Which control a row uses is still not a guess made here - `edit.choices()`,
+        # `edit.number_fields()` and `edit.COLOUR_FIELDS` decide menu / spinbox /
+        # checkbox / colour picker, the same dispatch the single value box ran on,
+        # applied one row at a time.
+        #
+        # The rows live in a grid that reflows between one, two and three columns
+        # depending on the width this splitter happens to give the box (see
+        # `EditorBox`), so the 18 rows of an `arc` widget make this box 779 px tall in
+        # one column at a 1280x1024 window and 403 px in three at 1919x1055 (measured in
+        # the window; the suite's sizing gate prints both) instead of pushing a
+        # scrollbar under the column - the failure mode 0.5 was written to catch.
+        self._ed_host = QWidget()
+        self.ed_grid = QGridLayout(self._ed_host)
+        self.ed_grid.setContentsMargins(0, 0, 0, 0)
+        self.ed_grid.setHorizontalSpacing(10)
+        eform.addWidget(self._ed_host)
+        self.ed_rows: dict = {}         # field -> (label, host, control, swatch, kind)
+        self._ed_focus: dict = {}       # control id -> the field it edits
+        self._ed_says: dict = {}        # field -> the sentence that row explains
+        self._ed_had: dict = {}         # field -> does the file actually carry this key
+        self._ed_kind = ""              # the kind those rows were built for
+        self._ed_cols = 1
 
-        # One page per kind of value, because a free-text box for `bold` or a menu for a
-        # coordinate is a way of typing something the model can only refuse.  The menus
-        # are the vocabulary that already exists in code: families in `layout.FONTS`,
-        # metric names in the source table, drawings in `themes.SPECIALS`, painter
-        # conventions in `layout.ARC_PAINT`/`BAR_PAINT`, named ramps in
-        # `layout.COLOUR_RAMPS`.
-        for box in (self.ed_name, self.ed_widget, self.ed_field):
+        for box in (self.ed_name, self.ed_widget):
             box.setSizePolicy(QSizePolicy.Policy.Expanding,
                               QSizePolicy.Policy.Fixed)
-        self.ed_stack = QStackedWidget()
-        self.ed_num = QSpinBox()
-        # Deliberately wider than any legal value. A spinbox that clamps 999 down to 479
-        # is a widget editing the file on its own; this repo's rule is that an
-        # out-of-range value is *said*, so the spinbox holds it, the model refuses it,
-        # and the note under this row prints the refusal.
-        self.ed_num.setRange(-100000, 100000)
-        self.ed_num.valueChanged.connect(lambda *_a: self._editor_apply(False))
-        self.ed_num.editingFinished.connect(lambda: self._editor_apply(True))
-        self.ed_menu = QComboBox()
-        self.ed_menu.currentIndexChanged.connect(lambda _i: self._editor_apply(True))
-        self.ed_text = QLineEdit()
-        self.ed_text.textEdited.connect(lambda *_a: self._editor_apply(False))
-        self.ed_text.editingFinished.connect(lambda: self._editor_apply(True))
-        self.ed_bool = QCheckBox("bold")
-        self.ed_bool.toggled.connect(lambda _b: self._editor_apply(True))
-        for page in (self.ed_num, self.ed_menu, self.ed_text, self.ed_bool):
-            page.setSizePolicy(QSizePolicy.Policy.Expanding,
-                               QSizePolicy.Policy.Fixed)
-            self.ed_stack.addWidget(page)
-        self.ed_stack.setSizePolicy(QSizePolicy.Policy.Expanding,
-                                    QSizePolicy.Policy.Fixed)
-        eform.addRow("value", self.ed_stack)
 
         brow = QHBoxLayout()
         self.ed_undo = QPushButton("undo")
-        self.ed_undo.setToolTip("back one edit. A run of keystrokes in the value box is "
+        self.ed_undo.setToolTip("back one edit. A run of keystrokes in one row is "
                                 "one step, not one per press")
         self.ed_undo.clicked.connect(self._editor_undo)
         self.ed_save = QPushButton("save as your copy")
@@ -916,15 +984,15 @@ class Window(QMainWindow):
         brow.addWidget(self.ed_undo)
         brow.addWidget(self.ed_save)
         brow.addWidget(self.ed_revert)
-        # a spanning row, not a field-column row: three buttons inside the
-        # field column is what put a 357 px floor under the whole controls
-        # column (measured) while the labels and fields needed barely more
-        eform.addRow(brow)
+        # a row of its own across the whole width: three buttons squeezed into a
+        # field column is what put a 357 px floor under the whole controls column
+        # (measured) while the labels and fields needed barely more
+        eform.addLayout(brow)
 
         self.ed_note = QLabel()
         self.ed_note.setWordWrap(True)
         self.ed_note.setStyleSheet("color:#999;font-style:italic;")
-        eform.addRow("", self.ed_note)
+        eform.addWidget(self.ed_note)
         self.ed_group = editor                   # the suite's gate names it from outside
         col.addWidget(editor)
         self.ed = None                        # nothing open until a name is picked
@@ -935,9 +1003,7 @@ class Window(QMainWindow):
         self._off_glass = ""                    # what the last marks said about ink
         # nothing to edit until a layout is open: a row that offers fields before there
         # is a file behind it is a row that will write to nothing
-        for wid in (self.ed_widget, self.ed_field, self.ed_stack, self.ed_undo,
-                    self.ed_save, self.ed_revert):
-            wid.setEnabled(False)
+        self._ed_set_enabled(False)
 
         media = QGroupBox("Background: the layer under our frame")
         mlay = QVBoxLayout(media)
@@ -1186,9 +1252,40 @@ class Window(QMainWindow):
         self.statusBar().showMessage(f"port {self.port}")
         self._populate_clips()
         self._refresh_clip_state()
+        # the columns' floors, once the rows they hold exist: the clip list's width
+        # is what its longest row needs, and that is not known before the walk
+        self._pane_floors()
         # the switch's initial position: setChecked() above ran before the
         # `toggled` connect, so the folding has to be applied here as well
         self._set_advanced(self.adv_toggle.isChecked())
+
+    #: The three columns' own floors, in pixels: the preview is the one the picture
+    #: can shrink inside (the cap in `_build` is its other half), and the two text
+    #: columns are what a wrapped label plus a readable control need.  Those are only
+    #: lower bounds - `_pane_floors` raises each one to what the column's own contents
+    #: measure - and `tools/selftest.sh` reads both halves back at three window sizes
+    #: and fails the build if a column ever gets less than what it holds.  That is the
+    #: 0.4 defect: the controls column sitting on its 300 px floor while its contents
+    #: measured 375 px, so it grew a horizontal scrollbar inside itself.
+    PANE_FLOORS = (200, 300, 320)
+
+    def _pane_floors(self) -> None:
+        """No column narrower than what it holds, by construction rather than by hope.
+
+        A pane whose minimum is its contents' minimum cannot be dragged under them, so
+        the sideways scrollbar the 0.4 window shipped with is not something a later
+        change has to remember to avoid - it is unreachable.  The measured contents are
+        used rather than remembered constants because they follow the fonts of the
+        machine (the same column is 329 px on the author's bench and 337 px on CI's
+        runner) and the number of editor columns the width just allowed.
+        """
+        for i, floor in enumerate(self.PANE_FLOORS):
+            area = self.split.widget(i)
+            if area is None:
+                continue
+            inner = area.widget()
+            need = inner.minimumSizeHint().width() if inner is not None else 0
+            area.setMinimumWidth(max(floor, need))
 
     # ---- preview ---------------------------------------------------------
     # ---- the text colour -------------------------------------------------
@@ -1466,6 +1563,13 @@ class Window(QMainWindow):
         """
         if obj is self.preview and event.type() == QEvent.Type.Resize:
             self._fit()
+        elif event.type() == QEvent.Type.FocusIn and id(obj) in self._ed_focus:
+            # the note line under the rows speaks for the row the reader is *in*,
+            # because eighteen rows each with their own visible sentence is not a
+            # form, it is a manual.  The sentence itself is the model's
+            # (`edit.field_note`, `themes.XIGMA_KEYS`), written when the rows were
+            # bound, and the label carries it as a tooltip for anyone not tabbing.
+            self._ed_explain(self._ed_focus[id(obj)])
         return super().eventFilter(obj, event)
 
     def _load_background(self, path: str) -> None:
@@ -1951,9 +2055,7 @@ class Window(QMainWindow):
         """
         if not name or name == NO_EDITOR:
             self.ed = None
-            for wid in (self.ed_widget, self.ed_field, self.ed_stack, self.ed_undo,
-                        self.ed_save, self.ed_revert):
-                wid.setEnabled(False)
+            self._ed_set_enabled(False)
             self.ed_state.setText("not editing: the pane below shows the theme above, "
                                   "drawn from this machine's readings")
             self.ed_note.setText("")
@@ -1974,9 +2076,7 @@ class Window(QMainWindow):
         # not been chosen by hand.  This is the only place the pairing is *driven*: the
         # theme combo above lists the five drawn themes, which declare none.
         self._apply_pair(name)
-        for wid in (self.ed_widget, self.ed_field, self.ed_stack, self.ed_save,
-                    self.ed_revert):
-            wid.setEnabled(True)
+        self._ed_set_enabled(True)
         self.ed_undo.setEnabled(False)
         self.ed_undo.setText("undo")
         self.ed_widget.blockSignals(True)
@@ -2012,125 +2112,364 @@ class Window(QMainWindow):
         self.ed_undo.setText(f"undo ({self.ed.steps})" if self.ed.steps else "undo")
 
     def _editor_pick_widget(self, index: int) -> None:
-        """Select one widget and rebuild the field list for its kind."""
+        """Select one widget and lay out every field that kind carries.
+
+        The rows are rebuilt when the *kind* changes - one `data` row becoming
+        another re-binds values, it does not rebuild widgets, so focus and scroll
+        position survive picking a different widget - and bound to the model on
+        every selection.
+        """
         if self.ed is None or int(index) < 0:
             return
         self.ed.select(int(index))
         self.ed_widget.setToolTip(self.ed.tip(int(index)))
         kind = str(self.ed.selected().get("type") or "")
-        fields = list(edit.field_names(kind)) + list(edit.extension_fields(kind))
-        self.ed_field.blockSignals(True)
-        self.ed_field.clear()
-        self.ed_field.addItems(fields)
-        self.ed_field.blockSignals(False)
-        _readable(self.ed_field)
-        if fields:
-            self.ed_field.setCurrentIndex(0)
-            self._editor_pick_field(fields[0])
+        if kind != self._ed_kind:
+            self._ed_build_rows(kind)
+        self._ed_bind_rows()
         self._editor_state()
 
-    def _editor_pick_field(self, field: str) -> None:
-        """Show the right editor for one field, holding its current value.
+    def _ed_fields(self, kind: str) -> list:
+        """One kind's fields, in the model's order: painter-read keys, then ours.
 
-        A menu wherever the vocabulary already exists in code, a checkbox for a bool, a
-        spinbox for a number, and a text box only for what is genuinely free text - a
-        colour, a format, a line of content.  That split is `edit.choices()` and
-        `edit.number_fields()`, not a guess made here.
+        `edit.field_names` is the intersection of what `layout.py` is proven to read
+        (`themes.keys_read()` takes them out of the painter's own source) and what
+        that kind draws, so the vendor's unread bookkeeping - `enableMove`,
+        `screenStatus` - never gets a row and survives a save untouched.  Counting
+        those inert keys is `--print-theme-fields`' business, not this form's.
+        """
+        return list(edit.field_names(kind)) + list(edit.extension_fields(kind))
+
+    def _ed_set_enabled(self, on: bool) -> None:
+        """The editor's controls, on or off, in one place.
+
+        Off until a layout is open: a row that offers fields with no file behind it
+        is a row that would write to nothing.  The grid's rows ride along with their
+        host, so this names the host and the three buttons rather than a per-field
+        list that could fall out of step with whichever rows exist today.
+        """
+        for wid in (self.ed_widget, self._ed_host, self.ed_undo, self.ed_save,
+                    self.ed_revert):
+            wid.setEnabled(on)
+
+    def _ed_build_rows(self, kind: str) -> None:
+        """One control per field this kind carries, wired to the model.
+
+        Which control, and why, is the model's answer rather than a switch written
+        here: a menu wherever a vocabulary already exists in code (`edit.choices()`:
+        families in `layout.FONTS`, metric names in the source table, drawings in
+        `themes.SPECIALS`, painter conventions in `layout.ARC_PAINT`/`BAR_PAINT`,
+        named ramps in `layout.COLOUR_RAMPS`), a checkbox for a bool, a spinbox for
+        `edit.number_fields()`, a colour row for `edit.COLOUR_FIELDS`, and a plain
+        text row only for what is genuinely free text - a line of `content`, a
+        `format`.  A free-text box for `bold`, or a menu for a coordinate, is a way
+        of typing something the model can only refuse; that is the reason the rows
+        are built from those three lists and not from a label per key.
+        """
+        while self.ed_grid.count():
+            item = self.ed_grid.takeAt(0)
+            wid = item.widget()
+            if wid is not None:
+                wid.deleteLater()
+        self.ed_rows = {}
+        self._ed_focus = {}          # control id -> the field it edits, for the note line
+        self._ed_says = {}           # field -> the sentence that row explains
+        self._ed_had = {}              # field -> is this key in the file at all
+        for field in self._ed_fields(kind):
+            label = QLabel(field)
+            extra = None                       # the colour row's swatch button
+            opts = edit.choices(field)
+            if field == "bold":
+                ctl, what = QCheckBox("set"), "bool"
+                ctl.toggled.connect(lambda on, f=field: self._ed_apply_row(f, True))
+            elif opts:
+                ctl, what = QComboBox(), "menu"
+                ctl.currentIndexChanged.connect(
+                    lambda _i, f=field: self._ed_apply_row(f, True))
+            elif field in edit.number_fields():
+                ctl, what = QSpinBox(), "num"
+                # Deliberately wider than any legal value. A spinbox that clamps 999
+                # down to 479 is a widget editing the file on its own; this repo's rule
+                # is that an out-of-range value is *said*, so the box holds it, the
+                # model refuses it, and the note line prints the refusal in its words.
+                ctl.setRange(-100000, 100000)
+                ctl.valueChanged.connect(lambda *_a, f=field: self._ed_apply_row(f, False))
+                ctl.editingFinished.connect(lambda f=field: self._ed_apply_row(f, True))
+            elif field in edit.COLOUR_FIELDS:
+                ctl, what = QLineEdit(), "colour"
+                extra = QPushButton()
+                extra.setFixedSize(24, 22)
+                extra.clicked.connect(lambda _c, f=field: self._ed_pick_colour(f))
+                ctl.textEdited.connect(lambda *_a, f=field: self._ed_apply_row(f, False))
+                ctl.editingFinished.connect(lambda f=field: self._ed_apply_row(f, True))
+            else:
+                ctl, what = QLineEdit(), "text"
+                ctl.textEdited.connect(lambda *_a, f=field: self._ed_apply_row(f, False))
+                ctl.editingFinished.connect(lambda f=field: self._ed_apply_row(f, True))
+            _ed_shrink(ctl)
+            box = QWidget()
+            bl = QHBoxLayout(box)
+            bl.setContentsMargins(0, 0, 0, 0)
+            bl.setSpacing(4)
+            if extra is not None:
+                bl.addWidget(extra)
+            bl.addWidget(ctl)
+            self.ed_rows[field] = (label, box, ctl, extra, what)
+            ctl.installEventFilter(self)
+            self._ed_focus[id(ctl)] = field
+            if extra is not None:
+                extra.installEventFilter(self)
+                self._ed_focus[id(extra)] = field
+        self._ed_kind = kind
+        self._ed_place_rows()
+
+    def _ed_ctl(self, field: str):
+        """The control one row edits.  The offline checks drive rows through here."""
+        return self.ed_rows[field][2]
+
+    def _ed_place_rows(self) -> None:
+        """Put the rows into the grid, column-first, at `self._ed_cols` columns.
+
+        Column-first on purpose: `x`, `y`, `source` and the rest of one kind's list
+        read *down* the first column, so a two-column form shows the same order the
+        model's list has rather than shuffling it into a zigzag a reader has to chase.
+        """
+        for field, (label, box, _c, _e, _w) in self.ed_rows.items():
+            self.ed_grid.removeWidget(label)
+            self.ed_grid.removeWidget(box)
+        fields = list(self.ed_rows)
+        if not fields:
+            return
+        per = -(-len(fields) // self._ed_cols)          # ceil: rows per column
+        for i, field in enumerate(fields):
+            label, box = self.ed_rows[field][0], self.ed_rows[field][1]
+            col, row = divmod(i, per)              # i // per = which column of rows,
+            self.ed_grid.addWidget(label, row, col * 2)      # i % per = which row down it
+            self.ed_grid.addWidget(box, row, col * 2 + 1)
+        for col in range(self._ed_cols):
+            self.ed_grid.setColumnStretch(col * 2, 0)   # the label takes what it needs
+            self.ed_grid.setColumnStretch(col * 2 + 1, 1)
+        for col in range(self._ed_cols * 2, 40):        # no leftover stretch columns
+            self.ed_grid.setColumnStretch(col, 0)
+
+    #: How much of the column one column of rows is allowed to ask for.  Measured, not
+    #: guessed: the grid's own `minimumSizeHint` comes out at **171 px** for one column
+    #: of rows, **344** for two and **512** for three - about 171 px per column, because
+    #: the control can go that narrow while the *list* it opens still carries the
+    #: entry's width (that is `_ed_shrink` doing its job, and `_readable` keeping the
+    #: list honest).  240 per column is therefore the point where the next column
+    #: genuinely fits rather than merely being asked for.  `tools/selftest.sh` re-measures
+    #: those three numbers in the live window and fails the build if three columns ever
+    #: ask for more than this threshold says they get.
+    _ED_COL_PX = 240
+
+    def _editor_reflow(self, width: int = 0) -> None:
+        """One, two or three columns of rows, by the width the *pane* has.
+
+        This is the responsive half, and it is here because the alternative is a
+        scrollbar: the 18 rows of an `arc` widget make this box **779 px** tall in one
+        column at a 1280x1024 window and **403 px** in three at 1919x1055 (measured in
+        the window, and printed by the suite's sizing gate with the grid's own ask of
+        171 / 344 / 512 px), and a controls column that cannot hold what it is shown is
+        exactly the 0.4 defect the fresh-window gate now fails on.  The box asks for it
+        through `EditorBox.resizeEvent`, because the window's own `resizeEvent` never
+        fires when a splitter handle is what changed.
+
+        The width that decides it is the scroll area's **viewport**, never the box's
+        own: the box is laid out at `max(viewport, its own minimum)`, so measuring the
+        box and then choosing columns from it feeds itself - more columns, a wider
+        minimum, a wider box - which is how the first version of this ended up with
+        three columns in a 347 px pane and a horizontal scrollbar under it.  The
+        viewport only depends on the splitter, so the loop cannot close.
+        """
+        if getattr(self, "_ed_reflowing", False):
+            return
+        self._ed_reflowing = True
+        try:
+            pane = self.split.widget(1)
+            avail = pane.viewport().width() or width
+            cols = max(1, min(3, avail // self._ED_COL_PX))
+            if cols != self._ed_cols:
+                self._ed_cols = cols
+                self._ed_place_rows()
+            # more columns means a wider minimum for this column, so the floor moves
+            # with it - and because the grid only takes another column when the pane
+            # already has _ED_COL_PX more to give, the new floor is always inside the
+            # room that made the choice.  That is why this cannot oscillate.
+            self._pane_floors()
+        finally:
+            self._ed_reflowing = False
+
+    def _ed_bind_rows(self, only=None) -> None:
+        """Read the model back into every row (or one), without firing it.
+
+        The menu rows are filled here rather than at build time, because what a menu
+        holds depends on what the row holds: an extension key that is **absent** gets
+        the `UNSET` entry and it is the entry selected - showing the first choice
+        instead would be the one lie this form could tell, since `arcPaint` missing
+        *is* a value (the vendor's ring, not "render").  And a value the vocabulary
+        does not name is put in the menu rather than hidden from it: the file is what
+        it is, and a row that cannot show it is a row that will silently change it.
+        """
+        if self.ed is None or not self.ed_rows:
+            return
+        kind = str(self.ed.selected().get("type") or "")
+        ext = set(edit.extension_fields(kind))
+        name = str(self.ed.prop().get("name") or "")
+        for field, (label, box, ctl, extra, what) in self.ed_rows.items():
+            if only is not None and field != only:
+                continue
+            value = self.ed.value(field)
+            if what == "bool":
+                ctl.blockSignals(True)
+                ctl.setChecked(bool(value))
+                ctl.blockSignals(False)
+            elif what == "menu":
+                items = [str(o) for o in edit.choices(field)]
+                ctl.blockSignals(True)
+                ctl.clear()
+                if value is None and field in ext:
+                    items.insert(0, UNSET)
+                elif str(value) not in items:
+                    items.insert(0, str(value))
+                ctl.addItems(items)
+                ctl.setCurrentText(str(value) if value is not None else items[0])
+                ctl.blockSignals(False)
+                _readable(ctl)
+            elif what == "num":
+                ctl.blockSignals(True)
+                try:
+                    ctl.setValue(int(value))
+                    self._ed_had[field] = value is not None
+                except (TypeError, ValueError):
+                    # A key the file does not carry shows as 0 in the box, and that 0 is
+                    # a placeholder, not a value: `_ed_had` remembers it so the row never
+                    # writes the key back just because focus passed through.  Inventing
+                    # `width: 0` on a drawing that never read `width` would change the
+                    # file the reader only came to look at.
+                    ctl.setValue(0)     # a missing key: the drawer's own default
+                    self._ed_had[field] = False
+                ctl.blockSignals(False)
+            else:                        # text and colour both edit the spelling
+                ctl.blockSignals(True)
+                ctl.setText("" if value is None else str(value))
+                ctl.blockSignals(False)
+            if what == "colour" and extra is not None:
+                spelled, _bad = edit.colour_text(value) if value else (None, "")
+                extra.setStyleSheet(
+                    f"background:{spelled or 'transparent'};"
+                    f"border:1px solid #666;")
+                extra.setToolTip(
+                    "pick a colour. This file spells colours the way the vendor's do: "
+                    "`rgba(r, g, b, a)` with `a` a 0..1 fraction - and typing `#ff4040` "
+                    "or `amber` here is accepted and stored as rgba, in words, by the "
+                    "note line under these rows")
+            # why the row exists, from the model rather than from a table here
+            label.setStyleSheet("")            # clear any refusal mark from before
+        self._ed_say_rows()
+
+    def _ed_say_rows(self) -> None:
+        """Re-read the sentence each row carries, without touching any value.
+
+        Two things decide those sentences and one of them is a field a reader can
+        change: an extension key has a standing reason (`themes.XIGMA_KEYS`), and what
+        a `special` row's `x`/`width`/`fontSize` *mean* depends on which drawing the
+        row's `name` selects and which door that drawing draws through
+        (`themes.special_is_pair`, `themes.special_door`, asked through
+        `edit.field_note`).  So changing `name` changes the meaning of the rows around
+        it, and a sentence left over from the previous drawing is a lie about the
+        picture on screen.  Only the sentences are refreshed: a reader mid-keystroke in
+        another row must not have their text replaced under them.
+        """
+        if self.ed is None or not self.ed_rows:
+            return
+        kind = str(self.ed.selected().get("type") or "")
+        name = str(self.ed.prop().get("name") or "")
+        for field, (label, _box, _ctl, _extra, _what) in self.ed_rows.items():
+            why = themes.XIGMA_KEYS.get(field)
+            self._ed_says[field] = (
+                f"xigma.{field}: {why}" if why
+                else (edit.field_note(kind, field, name) or
+                      f"{field}: what the painter reads for a {kind} widget"))
+            label.setToolTip(self._ed_says[field])
+
+    def _ed_explain(self, field: str) -> None:
+        """Say what one row means, in the line under the rows.
+
+        Which sentence is the model's business, not this window's: `themes.XIGMA_KEYS`
+        for this program's own keys, `edit.field_note` for the `special` drawings whose
+        `x` and `width` mean a pair's centre and pitch rather than a box's corner and
+        span - and which of those a row is, the registry answers through the door it
+        draws (`themes.special_is_pair`/`special_door`).  Nothing here remembers that.
         """
         if self.ed is None:
             return
-        value = self.ed.value(field)
-        opts = edit.choices(field)
-        spelled = [str(o) for o in opts]
-        if field == "bold":
-            page = self.ed_bool
-            self.ed_bool.blockSignals(True)
-            self.ed_bool.setChecked(bool(value))
-            self.ed_bool.blockSignals(False)
-        elif opts:
-            page = self.ed_menu
-            self.ed_menu.blockSignals(True)
-            self.ed_menu.clear()
-            # An extension key that is absent has no value to select, and showing the
-            # first choice as though it were would be the one lie this row could tell:
-            # `arcPaint` missing means the vendor's ring, not "render".  So the row says
-            # it is missing, and choosing that entry is how a reader un-sets a key.
-            ext = field in edit.extension_fields(
-                str(self.ed.selected().get("type") or ""))
-            items = list(spelled)
-            if value is None and ext:
-                items.insert(0, UNSET)
-            elif str(value) not in items:
-                items.insert(0, str(value))   # a value the vocabulary does not name
-            self.ed_menu.addItems(items)
-            # select what the row actually holds, not the first entry of the vocabulary.
-            # The two agree only by luck: the ring's `arcPaint` reads "render" and the
-            # sorted menu starts with "render", but a `special` named `dual-status` sits
-            # second in a menu that starts `clock-readings`, and showing the first entry
-            # there would tell a reader the row draws a different picture than it does
-            self.ed_menu.setCurrentText(str(value) if value is not None else items[0])
-            self.ed_menu.blockSignals(False)
-            _readable(self.ed_menu)
-        elif field in edit.number_fields():
-            page = self.ed_num
-            self.ed_num.blockSignals(True)
-            try:
-                self.ed_num.setValue(int(value))
-            except (TypeError, ValueError):
-                self.ed_num.setValue(0)      # a missing key: the drawer's own default
-            self.ed_num.blockSignals(False)
-        else:
-            page = self.ed_text
-            self.ed_text.blockSignals(True)
-            self.ed_text.setText("" if value is None else str(value))
-            self.ed_text.blockSignals(False)
-        self.ed_stack.setCurrentWidget(page)
-        # an extension key gets the reason it exists next to the field, because that is
-        # the one thing a reader cannot infer from the value: `no arcPaint` is not
-        # "unset", it is the vendor's ring
-        why = themes.XIGMA_KEYS.get(field)
-        if why:
-            self.ed_note.setText(f"xigma.{field}: {why}")
-        else:
-            # a plain field can need a sentence too.  On a row that draws a *pair* of
-            # figures, `x` is the pair's centre and `width` the distance between the two
-            # figures' centres, not a box width - and which rows that is true of is asked
-            # of the registry's door (`themes.special_is_pair`), never remembered here
-            self.ed_note.setText(edit.field_note(
-                str(self.ed.selected().get("type") or ""), field,
-                str(self.ed.prop().get("name") or "")))
+        says = getattr(self, "_ed_says", {}).get(field, "")
+        if says:
+            self._ed_last = field
+            self.ed_note.setText(says)
 
-    def _editor_value(self):
-        """What the on-screen editor currently holds for the selected field."""
-        page = self.ed_stack.currentWidget()
-        if page is self.ed_bool:
-            return self.ed_bool.isChecked()
-        if page is self.ed_menu:
-            return (None if self.ed_menu.currentText() == UNSET
-                    else self.ed_menu.currentText())
-        if page is self.ed_num:
-            return self.ed_num.value()
-        return self.ed_text.text()
+    def _ed_row_value(self, field: str):
+        """What one row's control currently holds."""
+        _label, _box, ctl, _extra, what = self.ed_rows[field]
+        if what == "bool":
+            return ctl.isChecked()
+        if what == "menu":
+            return None if ctl.currentText() == UNSET else ctl.currentText()
+        if what == "num":
+            return ctl.value()
+        return ctl.text()
 
-    def _editor_apply(self, commit: bool) -> None:
-        """Hand one value to the model, and print in words what it did.
+    def _ed_apply_row(self, field: str, commit: bool) -> None:
+        """Hand one row's value to the model, and print in words what it did.
 
-        `commit=False` is a keystroke: the picture moves and the undo step waits, so a
-        run of typing is one undo (the coalescing `edit.Editor.set` implements).  A
-        refusal repaints nothing - the layout, the dirty flag and the history stay as
-        they were, which is the part an editor most often gets wrong.
+        `commit=False` is a keystroke: the picture moves and the undo step waits, so
+        a run of typing in one row is one undo (the coalescing `edit.Editor.set`
+        implements that, not this window).  A refusal repaints nothing - the layout,
+        the dirty flag and the history stay as they were, which is the part an editor
+        most often gets wrong - and the refused row's label is marked, because with
+        eighteen rows on screen a sentence in a note line is easy to lose.
         """
-        if self.ed is None:
+        if self.ed is None or field not in self.ed_rows:
             return
-        field = self.ed_field.currentText()
-        if not field:
+        if (self.ed_rows[field][4] == "num"
+                and not self._ed_had.get(field, True)
+                and self._ed_row_value(field) == 0):
+            # the placeholder again: an untouched box on a key the file never held.
+            # Writing it would be the editor changing the layout, not the reader.
             return
-        ok, note = self.ed.set(field, self._editor_value(), commit=commit)
+        ok, note = self.ed.set(field, self._ed_row_value(field), commit=commit)
+        label = self.ed_rows[field][0]
+        label.setStyleSheet("" if ok else "color:#c62828;font-weight:bold;")
         if note:
             self.ed_note.setText(note)
         if ok:
+            self._ed_say_rows()          # `name` changes what the rows around it mean
+            if self.ed_rows[field][4] == "colour":
+                self._ed_bind_rows(field)      # show the rgba the model stored
+            if not note:
+                self._ed_explain(field)
             self._repaint()
         self._editor_state()
+
+    def _ed_pick_colour(self, field: str) -> None:
+        """The colour dialog, for the row that asked - the window's one colour route.
+
+        The ink of the *theme* has its own row above (and moves `render.SKIN` for the
+        five drawn themes); this one writes this widget's own key, which is what a
+        layout file spells.  The value goes in as `#rrggbb` and comes back as
+        `rgba(r, g, b, 1)` because `layout.rgba` reads nothing else - `edit.set` says
+        that conversion out loud rather than doing it quietly.
+        """
+        if self.ed is None or field not in self.ed_rows:
+            return
+        ctl = self.ed_rows[field][2]
+        start = QColorDialog.getColor(QColor(ctl.text()) if ctl.text() else QColor(255, 255, 255),
+                                      self, f"{field}: pick a colour")
+        if not start.isValid():
+            return
+        ctl.setText(start.name())                # the row shows the hex it typed
+        self._ed_apply_row(field, True)
 
     def _editor_undo(self) -> None:
         if self.ed is None:
@@ -2139,7 +2478,13 @@ class Window(QMainWindow):
             # the note line belongs to the selected field, so it is re-read after the
             # undo: a sentence about a pair row must not outlive the row it described.
             # What the undo *did* is said by `ed_state` and by the picture moving.
-            self._editor_pick_field(self.ed_field.currentText())
+            self._ed_bind_rows()      # every row re-reads the model: undo may have
+                                      # moved any of them, not the one you were in
+            # ...and the sentence line goes back with them. Undo can change which
+            # drawing a `special` row is, and that is what decides whether `width` is a
+            # pitch or a key the drawing never reads: a note left describing the other
+            # door would talk about a picture that is no longer on screen.
+            self._ed_explain(getattr(self, "_ed_last", ""))
             self._repaint()
         self._editor_state()
 
@@ -2250,7 +2595,7 @@ class Window(QMainWindow):
         dy = int(pr.get("y") or 0) - self._drag[3]
         self._drag = None
         self.ed.commit()                    # one drag, one undo step
-        self._editor_pick_field(self.ed_field.currentText())
+        self._ed_bind_rows()                # the x/y rows show where the row landed
         self._repaint()
         self._canvas_marks()
         self._editor_state()
@@ -2282,7 +2627,7 @@ class Window(QMainWindow):
         if not ok:
             self.ed_note.setText(note)
             return
-        self._editor_pick_field(self.ed_field.currentText())
+        self._ed_bind_rows()                # the x/y rows show the new position
         self._repaint()
         self._canvas_marks()
         self._editor_state()

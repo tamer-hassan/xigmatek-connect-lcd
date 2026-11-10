@@ -173,10 +173,10 @@ Two measurements decided how the package carries them:
 What the pictures do **not** do is get packaged, and since 0.3 there are two kinds of
 them. The images: `docs/logo.png`, the generated window capture `docs/screenshot-xigmaui.png`
 and the two live captures the README carries - `docs/xigmaui1.png`, `docs/xigmaui2.png` -
-4 532 651 B across four of them. Then the two theme contact sheets in `docs/previews/`
+4 554 964 B across four of them. Then the two theme contact sheets in `docs/previews/`
 (1 596 454 B). The videos: the six MP4s in
 `docs/videos/` (5 039 178 B - the README's five previews plus the amber-ink figure
-docs/gui.md carries) and the readings JSON that drives them (13 916 B). **11 182 199 B**
+docs/gui.md carries) and the readings JSON that drives them (13 916 B). **11 204 512 B**
 across 13 files, part of it rendered from XIGMATEK's own theme library, which is the
 other package's files and its own licence question - and the videos are also not package
 material for a second reason: what README links is GitHub's copy of them - the editor
@@ -198,10 +198,13 @@ for the *keep my background* box and the pairing line that 0.4 put under the cli
 then **27 719 B less** for 0.5 - the panel's report and the guarded reset left the
 controls column for the foot of the preview column, where they are folded away on first
 run, so the capture shows fewer pixels than it used to even though the layout editor is
-now open by default and the fresh window is 140 px wider (1320x800, the splitter asked
-for 560/400/420).  That one was captured twice: the first pass was taken before the note
-beside the switch was reworded, so it showed words the code no longer writes, and the
-number above is the capture that matches the tree.
+now open by default and the fresh window is 140 px wider.  That one was captured twice:
+the first pass was taken before the note beside the switch was reworded, so it showed
+words the code no longer writes.  Then **31 573 B more**, then **9 260 B less**: the
+editor's field dropdown became a row per field, and the fresh window went to 1440x1024
+with the splitter asked for 532/540/356 - the capture is now framed at the window's own
+fresh default, so the README's picture is what a first run actually gets rather than a
+hand-picked size.
 
 The set grew in 0.5, which is what moved the total by 3 418 272 B: the two live
 captures the README carries were never in the accounting, though `debian/rules` dropped

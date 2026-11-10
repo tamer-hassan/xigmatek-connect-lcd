@@ -748,8 +748,11 @@ What has been measured on glass, by whom, with how many frames - and what has no
   is painted out now (`docs/packaging.md` keeps the account and the byte cost), and
   `tools/selftest.sh` searches both halves of the serial through every published text file
   and every published PNG, by OCR where `tesseract` is installed and saying so where it
-  is not.  The published history still holds the file as it was: rewriting it would move
-  the tagged releases, which is the owner's call rather than a quiet edit.
+  is not.  The published history still holds the file as it was, and the owner decided on
+  2026-11-10 to **leave it**: a device serial number on a panel nobody else can address is
+  not a credential, and rewriting history would move the tagged releases and the assets
+  published from them for no gain.  What is enforced from here forward is the picture, not
+  the past.
   **What that costs, said plainly:** a clone cannot re-run `tools/verify_protocol.py`,
   `tools/theme_check.py --arc`, or the two `tools/selftest.sh` sections that call them.
   Every wall-clock, byte-count and pixel figure in this README and in `PROTOCOL.md` names the

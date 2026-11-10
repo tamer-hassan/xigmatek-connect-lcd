@@ -45,28 +45,29 @@ DEFAULTS: dict = {
     # the same idea was `clip_customized`: `_clean` reads it once and says so through
     # `load(notes=...)`, and the next save writes only the new name.
     "keep_my_clip": False,
-    "size": [1320, 800],       # the window as you left it.  The three columns have
-                               # floors of their own - 532 px to show the 480 px frame
-                               # 1:1, and what the controls and the library contents
-                               # measure (see `split`) - and this is the smallest
-                               # window that holds all three without a column having to
-                               # scroll inside itself, while still being short enough
-                               # for a 1080p screen.  0.4 shipped 1180, which was 1180
-                               # px of window trying to hold about 1 240 px of column.
-    "split": [560, 400, 420],  # the three columns, as you left the splitter between
+    "size": [1440, 1024],       # the window as you left it, and the size a fresh one
+                               # starts at.  The floor below it is the owner's rule -
+                               # a 1280x1024 desktop at minimum, up to a 3840x2160 one
+                               # - and app.py clamps both this and the floor to what
+                               # the screen actually offers, logging the sentence when
+                               # either clamp bites.  0.4 shipped 1180x780 and 0.5
+                               # opened at 1320x800: neither had room for the editor's
+                               # rows, which is what this number is now for.
+    "split": [532, 540, 356],  # the three columns, as you left the splitter between
                                # them.  The left one is capped by the window at the
                                # width of the 480 px frame plus its chrome (app.py:
                                # _fit never scales *up*), so these numbers decide how
                                # much of the window the controls and the library get.
-                               # They are deliberately wider than the space available:
-                               # QSplitter scales an over-wide request down
-                               # proportionally, which keeps one shape at every window
-                               # width.  They were 520/460/560 when 0.4 shipped, which
-                               # at that window made the controls column 300 px - under
-                               # the 329 px its always-visible layout editor needs - so
+                               # They ask for barely less than the fresh window holds,
+                               # so the preview keeps its 532 px and the picture stays
+                               # 1:1; wider windows hand their slack to the controls
+                               # and the library by the splitter's stretch factors.
+                               # They were 520/460/560 when 0.4 shipped, which at that
+                               # window made the controls column 300 px - under the
+                               # 329 px its always-visible layout editor needs - so
                                # that column grew a horizontal scrollbar *inside
                                # itself*, and the library column sat under its own
-                               # 359 px floor as well (both measured).  The suite
+                               # 359 px floor as well (all measured).  The suite
                                # builds a fresh window and says so if that ever drifts.
     "tray": True,              # close hides it to the tray; False quits on close
 }

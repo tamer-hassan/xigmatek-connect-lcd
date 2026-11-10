@@ -39,12 +39,15 @@ this script; that is why nothing in the README quotes them.
 timer tick and they are the slow part of a first paint, so the loop is run until N rows
 have icons or the budget runs out.
 
-`--size WxH` (default 1380x860) resizes the window before the grab.  That is a framing
-choice, not a claim about a fixed layout: the window's own fresh default is
-`settings.DEFAULTS["size"]` - quoted in docs/tools.md and checked against that constant by
-the suite, so neither sentence can go stale - and the window is resizable.  1380x860 is what
-puts the three columns side by side with seven rows of the clip list in frame, which is the
-point of the picture; the suite checks the column rules themselves (docs/gui.md).
+`--size WxH` (default 1440x1024, the window's own fresh default) resizes the
+window before the grab.  That is a framing choice, not a claim about a fixed
+layout: the fresh default is `settings.DEFAULTS["size"]`, quoted in
+docs/tools.md and checked against that constant by the suite, so neither
+sentence can go stale - and the window is resizable, with a floor of
+1280x1024 and three columns that reflow.  1440x1024 puts the three columns
+side by side with nine rows of the clip list in frame, which is the point:
+the capture shows what a first run actually gets.  The column rules
+themselves are checked by the suite, not by this picture (docs/gui.md).
 """
 from __future__ import annotations
 
@@ -65,13 +68,17 @@ def main() -> int:
                     help=f"port path the window names (default {DEFAULT_DEVICE}); it "
                          "must not exist, because in this mode the window would open it")
     ap.add_argument("-o", "--out", default=DEFAULT_OUT, help="where to write the PNG")
-    ap.add_argument("--size", default="1380x860", metavar="WxH",
+    ap.add_argument("--layout", default="", metavar="NAME",
+                    help="open this layout in the editor before grabbing, so the "
+                         "picture shows the field rows a widget carries (default "
+                         "none: the capture is a first run, editor closed)")
+    ap.add_argument("--size", default="1440x1024", metavar="WxH",
                     help="resize the window to this before grabbing it (default "
-                         "1380x860, what the README's picture uses: the three "
-                         "columns side by side with seven rows of the clip list). "
-                         "The window's own fresh default is settings.DEFAULTS"
-                         "['size'] and the window is resizable, so this is a "
-                         "framing choice, not a claim about a fixed layout)")
+                         "1440x1024, the fresh default, shown in the README's "
+                         "picture: the three columns side by side with nine rows of "
+                         "the clip list).  The window is resizable down to its own "
+                         "floor, so this is a framing choice and not a claim about "
+                         "its size")
     ap.add_argument("--seconds", type=float, default=14.0,
                     help="how long to pump the event loop for thumbnails")
     ap.add_argument("--keep-thumbnails", type=int, default=26,
@@ -129,6 +136,14 @@ def main() -> int:
         return 2
     win.resize(wide, tall)
     win.show()
+    if a.layout:
+        # the picture with a layout open: what the field rows of one widget look like,
+        # and the pane drawing *that file* rather than the live theme
+        win.adv_toggle.setChecked(True)
+        app.processEvents()
+        win.ed_name.setCurrentText(a.layout)
+        for _ in range(8):
+            app.processEvents()
     t0 = time.monotonic()
     while time.monotonic() - t0 < a.seconds or len(win.all_clips) - len(
             getattr(win, "_pending", [])) < a.keep_thumbnails:
