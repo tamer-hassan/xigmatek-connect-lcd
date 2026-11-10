@@ -72,13 +72,22 @@ jobs:
         # CI run failed exactly there: `AssertionError: ('Theme_25.mp4', 0.0)`,
         # 2026-11-07.  The .deb has the same thing in `Suggests: ffmpeg`, and the
         # figures the assertion compares against are the ones README and docs/ quote.
+        #
+        # tesseract-ocr is here for the other reason: the suite searches every published
+        # PNG for this panel's serial number, and a byte grep cannot see a picture - that
+        # is how the serial got into the README's advanced-mode capture and stayed there
+        # from 2026-11-08 to 2026-11-10.  The gate says out loud when the tool is missing,
+        # so on 2026-11-10 the first CI run of it printed "the pixel half of this check
+        # did NOT run"; installing it is what makes that half run where the tree is
+        # published from.  It stays out of the package: this is a check, not a feature.
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             python3 python3-pil python3-serial python3-pyqt6 python3-setuptools \
-            fonts-dejavu-core fonts-liberation desktop-file-utils ffmpeg
+            fonts-dejavu-core fonts-liberation desktop-file-utils ffmpeg tesseract-ocr
           python3 -c 'import PIL, serial, PyQt6.QtWidgets, sys; print(" ", sys.version.split()[0], "Pillow", PIL.__version__)'
           ffmpeg -version | head -1
+          tesseract --version | head -1
 
       - name: tools/selftest.sh
         run: tools/selftest.sh

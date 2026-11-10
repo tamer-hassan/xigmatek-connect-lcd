@@ -22,12 +22,13 @@ xigmatek-connect-lcd (0.5) resolute; urgency=medium
     widest row the layout editor can put in its widget menu measures
     247 px (`data  Motherboard Temperature  at 452,136`, swept across all
     28 layouts it can open), and a closed box in a 300 px column is 241
-    px - a list opens at its box's width, so every longer entry was cut
-    off exactly where a reader is choosing between them.  The box still
-    stretches to its column and never asks for more than its longest
-    entry - that is what once put a floor under the whole column - and
-    the popup's view gets the extra width instead (323 px for that row),
-    which costs the column no pixel at all.
+    px - on the author's bench; 264 and 248 px on CI's runner, whose
+    fonts differ.  A list opens at its box's width, so every longer entry
+    was cut off exactly where a reader is choosing between them.  The box
+    still stretches to its column and never asks for more than its
+    longest entry - that is what once put a floor under the whole column
+    - and the popup's view gets the extra width instead (323 px for that
+    row), which costs the column no pixel at all.
 
   * The fresh window is 1320x800 with the splitter asked for
     560/400/420, and those numbers are floors rather than a preference.
@@ -37,22 +38,26 @@ xigmatek-connect-lcd (0.5) resolute; urgency=medium
     folded and 375 px with the editor open: it grew a horizontal
     scrollbar *inside itself*, 89 px of its own contents off screen, and
     the library column overflowed by 7 px the same way.  Today the
-    column measures 329 px and the library's rows want 359 px; the suite
-    builds a fresh window, reads the three columns back and fails if any
-    of them has to scroll sideways to be read.
+    column measures 329 px and the library's rows want 359 px on the
+    author's bench (337 and 376 on CI's runner, where the fonts differ);
+    the suite builds a fresh window, reads the three columns back and
+    fails if any of them has to scroll sideways to be read.
 
   * Gates for the layout itself, in the same twenty-two offline sections.
     A fresh window is checked against its own contents: no column
     narrower than what it holds, no horizontal scrollbar in any of the
-    three.  The splitter is then dragged back to a 300 px controls
-    column, where the box really is narrower than its entries, to check
-    the list-width fix in the case it exists for.  The switch's note,
-    its tooltip and docs/gui.md are held to one list of what folds -
-    nine controls in two boxes, and the layout editor deliberately not
-    among them.  The window and split figures docs/gui.md,
-    docs/theme-editor.md and docs/tools.md quote are read back off the
-    code and the live widgets, and so is the number of clip rows the
-    README's capture frame puts in view.
+    three.  The controls pane is then pinned to a 300 px column - the
+    width 0.4's window handed it - where the box really is narrower than
+    its entries, to check the list-width fix in the case it exists for.
+    The switch's note, its tooltip and docs/gui.md are held to one list
+    of what folds - nine controls in two boxes, and the layout editor
+    deliberately not among them.  The window and split figures
+    docs/gui.md, docs/theme-editor.md and docs/tools.md quote are read
+    back off the code and the live widgets, and so is the number of clip
+    rows the README's capture frame puts in view.  Where a figure follows
+    the machine's fonts the page says which machine: CI's runner measures
+    337 and 376 px for the two columns this bench measures at 329 and
+    359, so the gate asserts the relation, never the digits.
 
   * The README's advanced-mode live capture no longer shows this panel's
     serial number.  The `conn 1` reply the window prints names it, and the

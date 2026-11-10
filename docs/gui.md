@@ -132,26 +132,31 @@ number in that shape comes from a measurement, most of them of a failure:
   dragging a splitter handle never fired the window's `resizeEvent`, which is why the
   preview used to stay at its old scale while its pane changed shape;
 * and a column is never narrower than what it holds.  Each column's contents have a
-  minimum width of their own: today the controls column measures **329 px** with a
-  layout open in its editor and the library's rows want **359 px**.  Checked out at the
-  `v0.4` tag and measured the same way, that column wanted **265 px** folded and
-  **375 px** with the editor open while 0.4's window and split gave it **300 px**, so it
-  grew a horizontal scrollbar *inside itself* with **89 px** of its own contents off
-  screen - and the library column overflowed by **7 px** the same way.  Those 0.4
-  figures were re-measured against the tag on 2026-11-10 rather than kept in a gate: a
-  gate can only hold this tree, and what this tree asserts is that the same failure
-  cannot come back - the suite builds a fresh window and checks both halves, no column
-  narrower than its contents' own minimum and no horizontal scrollbar in any of the
-  three;
+  minimum width of their own, and those widths follow the fonts of the machine they are
+  measured on: on the author's bench the controls column measures **329 px** with a
+  layout open in its editor and the library's rows want **359 px**, while GitHub's runner
+  - no `simsun`, another default face - answers **337** and **376** for the same two.
+  The suite prints both and asserts the relation, never the digits.  Checked out at the
+  `v0.4` tag and measured on this bench the same way, that column wanted **265 px**
+  folded and **375 px** with the editor open while 0.4's window and split gave it
+  **300 px**, so it grew a horizontal scrollbar *inside itself* with **89 px** of its own
+  contents off screen - and the library column overflowed by **7 px** the same way.  Those
+  0.4 figures were re-measured against the tag on 2026-11-10 rather than kept in a gate: a
+  gate can only hold this tree, and what this tree asserts is that the same failure cannot
+  come back - the suite builds a fresh window and checks both halves, no column narrower
+  than its contents' own minimum and no horizontal scrollbar in any of the three;
 * and a drop-down's list is wider than the box that opens it.  Swept across all **28**
   layouts the editor can open, the widest row it can put in its widget menu measures
-  **247 px** (`data  Motherboard Temperature  at 452,136`), and a closed box in a 300 px
-  column is **241 px** - so the list, which opens at its box's width, cuts every entry
-  past that in the one place a reader is choosing between entries.  The popup's own
-  view gets the width instead (**323 px** for that row) and costs the column nothing,
-  while the box never asks for more than its longest entry: a box that did was the floor
-  under the whole controls column once.  The suite drags the splitter back to a 300 px
-  column to check the fix in exactly the case it exists for, and checks the box half too.
+  **247 px** on this bench (`data  Motherboard Temperature  at 452,136`) and 264 px on the
+  runner, and a closed box in a 300 px column is **241 px** there, 248 px on the runner -
+  so the list, which opens at its box's width, cuts every entry past that in the one place
+  a reader is choosing between entries.  The popup's own view gets the width instead
+  (**323 px** for that row, 340 px on the runner) and costs the column nothing, while the
+  box never asks for more than its longest entry: a box that did was the floor under the
+  whole controls column once.  The suite pins the pane's ceiling at 300 px to check the
+  fix in exactly the case it exists for, and asserts list-wider-than-entry and
+  entry-wider-than-box rather than any of those four numbers - which is the half no
+  machine's fonts can rot.
 
 The fresh window default is **1320×800** (`xigmaui/settings.py`), with the splitter
 asked for **560 / 400 / 420**. That request is deliberately wider than the window:
