@@ -1015,7 +1015,7 @@ class Window(QMainWindow):
         #
         # The rows live in a grid that reflows between one, two and three columns
         # depending on the width this splitter happens to give the box (see
-        # `EditorBox`), so the 18 rows of an `arc` widget make this box 779 px tall in
+        # `EditorBox`), so the 18 rows of an `arc` widget make this box 796 px tall in
         # one column at a 1280x1024 window and 403 px in three at 1919x1055 (measured in
         # the window; the suite's sizing gate prints both) instead of pushing a
         # scrollbar under the column - the failure mode 0.5 was written to catch.
@@ -1340,6 +1340,13 @@ class Window(QMainWindow):
     #: measured 375 px, so it grew a horizontal scrollbar inside itself.
     PANE_FLOORS = (200, 300, 320)
 
+    #: How many times the floors may be re-measured before the window stops chasing them.
+    #: A floor is derived from the contents and the contents move when the floor does, so
+    #: one pass cannot see its own effect - but a chain that never settles is a defect in
+    #: the sizing rule, not something to keep iterating on.  See `_pane_floors`.
+    _FLOOR_PASSES = 4
+    _floor_pass = 0
+
     def _pane_floors(self) -> None:
         """No column narrower than what it holds, by construction rather than by hope.
 
@@ -1347,25 +1354,56 @@ class Window(QMainWindow):
         the sideways scrollbar the 0.4 window shipped with is not something a later
         change has to remember to avoid - it is unreachable.  The measured contents are
         used rather than remembered constants because they follow the fonts of the
-        machine (the same column is 329 px on the author's bench and 337 px on CI's
-        runner) and the number of editor columns the width just allowed.
+        machine (the library column is 359 px on the author's bench and 376 px on CI's
+        runner) and the number of editor rows the width just allowed - and because a
+        closed drop-down has to *show* the widest entry it holds, which is what
+        `_ed_box_readable` arranges for the two boxes at the top of the editor.  It also
+        reserves the extent of a vertical scrollbar, because that width comes off the
+        viewport rather than off the contents - see the comment in the loop.
 
-        The controls column gets one more term, and it is the one that paid for itself
-        twice: a closed drop-down shows its current entry, so the pane has to be wide
-        enough for the *widest entry any layout can put in that box*, not merely wide
-        enough for the box's own `minimumSizeHint` - which, since the row controls were
-        allowed to give way, is deliberately smaller than what they hold.  The furniture
-        (the form's label column, the pane's margins, the scrollbar) is read off the
-        layout as it stands, so the arithmetic says what this style costs instead of
-        guessing at another's.
+        The pass is repeated once on the event loop, and that is not decoration: the
+        floor is read from the contents, and the contents change when this very call
+        makes the splitter redistribute width and the field grid re-flow into another
+        number of columns.  A single pass can therefore only see the state before it -
+        CI's runner found a 366 px column floor under 380 px of contents, which is the
+        overflow this function exists to prevent.  `_FLOOR_PASSES` bounds the follow-ups,
+        so a floor that keeps moving is a thing the suite fails on rather than a loop
+        that runs; a pass that changes nothing ends the chain.
         """
+        changed = False
         for i, floor in enumerate(self.PANE_FLOORS):
             area = self.split.widget(i)
             if area is None:
                 continue
             inner = area.widget()
             need = inner.minimumSizeHint().width() if inner is not None else 0
-            area.setMinimumWidth(max(floor, need))
+            # A pane is a scroll area, so the width its *contents* need is not the width
+            # the *viewport* gets: a vertical scrollbar takes its extent off the width.
+            # Ignoring that is how 0.5's own fix produced a new instance of the 0.4 bug -
+            # a 411 px floor around 411 px of contents, a 397 px viewport, and 14 px of
+            # horizontal travel under the editor's rows.  The bar is reserved whether or
+            # not it is showing, and that is not laziness: those states chase each other.
+            # Pinning a column narrower re-flows the rows into fewer columns, the rows get
+            # taller, the bar arrives, the width goes - so the state a floor is measured in
+            # is not the state it gets used in, and a minimum that depends on which of them
+            # Qt happened to decide last is a minimum that can be wrong.  The extent is the
+            # style's number to know, and a column pays for it once.
+            if (need and area.verticalScrollBarPolicy()
+                    != Qt.ScrollBarPolicy.ScrollBarAlwaysOff):
+                need += area.verticalScrollBar().sizeHint().width()
+            want = max(floor, need)
+            if want != area.minimumWidth():
+                area.setMinimumWidth(want)
+                changed = True
+        if changed and self._floor_pass < self._FLOOR_PASSES:
+            self._floor_pass += 1
+            QTimer.singleShot(0, self._settle_floors)
+        else:
+            self._floor_pass = 0
+
+    def _settle_floors(self) -> None:
+        """Measure the floors again, now that the last change has been laid out."""
+        self._pane_floors()
 
     def _ed_box_readable(self, box: QComboBox) -> int:
         """Make one editor head box wide enough to show the widest entry it holds.
@@ -2396,7 +2434,7 @@ class Window(QMainWindow):
         """One, two or three columns of rows, by the width the *pane* has.
 
         This is the responsive half, and it is here because the alternative is a
-        scrollbar: the 18 rows of an `arc` widget make this box **779 px** tall in one
+        scrollbar: the 18 rows of an `arc` widget make this box **796 px** tall in one
         column at a 1280x1024 window and **403 px** in three at 1919x1055 (measured in
         the window, and printed by the suite's sizing gate with the grid's own ask of
         171 / 344 / 512 px), and a controls column that cannot hold what it is shown is

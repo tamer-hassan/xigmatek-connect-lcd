@@ -63,12 +63,16 @@ DEFAULTS: dict = {
                                # 1:1; wider windows hand their slack to the controls
                                # and the library by the splitter's stretch factors.
                                # They were 520/460/560 when 0.4 shipped, which at that
-                               # window made the controls column 300 px - under the
-                               # 329 px its always-visible layout editor needs - so
-                               # that column grew a horizontal scrollbar *inside
-                               # itself*, and the library column sat under its own
-                               # 359 px floor as well (all measured).  The suite
-                               # builds a fresh window and says so if that ever drifts.
+                               # window made the controls column 300 px while its own
+                               # contents measured 375 px with the editor open, and the
+                               # library column 352 px against its 359 px of rows: both
+                               # grew a horizontal scrollbar *inside themselves*.  Today
+                               # those columns' floors come from their own contents plus
+                               # a reserved vertical scrollbar - 376 px and 373 px on
+                               # this bench, and 425 px when the widest widget row the
+                               # editor can be handed is on show - so no handle can drag
+                               # a column under what it holds.  The suite builds a fresh
+                               # window at these three numbers and checks that.
     "tray": True,              # close hides it to the tray; False quits on close
 }
 

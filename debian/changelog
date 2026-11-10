@@ -39,12 +39,11 @@ xigmatek-connect-lcd (0.5) resolute; urgency=medium
     columns while the controls column's own contents measured 265 px
     folded and 375 px with the editor open: it grew a horizontal
     scrollbar *inside itself*, 89 px of its own contents off screen, and
-    the library column overflowed by 7 px the same way.  Today the
-    controls column's contents want 362 px and the library's rows 359 px
-    on the author's bench (that library column is 376 px on CI's runner,
-    where the fonts differ); the suite builds a fresh window, reads the
-    three columns back and fails if any of them has to scroll sideways
-    to be read.
+    the library column overflowed by 7 px the same way.  Today those two
+    columns' floors are 376 px and 373 px on the author's bench - their own
+    contents, 362 px and 359 px, plus the width a vertical scrollbar
+    reserves - and the suite builds a fresh window, reads the three columns
+    back and fails if any of them has to scroll sideways to be read.
 
   * The layout editor shows its fields instead of hiding them behind a
     menu.  Picking a widget now lays out every field that kind carries,
@@ -77,19 +76,17 @@ xigmatek-connect-lcd (0.5) resolute; urgency=medium
   * Every measured figure a page quotes now carries the machine it was
     read on, and the suite holds it by that label.  The clip list fits 9
     rows at the fresh 1440x1024 window here and 10 on GitHub's runner (11
-    at 1919x1055 where this bench reads 10); the library column's floor
-    is 359 px here and 376 px there; the 18-row `arc` box stands 779 px
-    in one column of rows and 403 px in three against 723 and 378 on the
-    runner, its grid asking 171/344/512 px against 180/361/533.  The
-    gate reads those pairs out of docs/gui.md, requires this run's
-    numbers to be one of them, and prints a third machine's case rather
-    than letting it slide: 28 clip rows at 3840x2160 on either machine is
-    a fact, a lone "359 px" is not.  A figure that follows how many
-    editor columns a width happened to allow - the controls floor,
-    362/386/554 px as the rows take one, two and three here - is stated
-    for one bench and asserted as an order, because the other machine's
-    digits for it have not been measured since the box started showing
-    its entry.
+    at 1919x1055 where this bench reads 10); a fresh window reads its
+    split back as 532/527/373 px here, the 18-row `arc` box stands 796 px
+    in one column of rows and 403 px in three, its grid asking
+    171/344/512 px, and the controls floor runs 376/400/568 px as the rows
+    take one, two and three columns.  The gate reads those digits out of
+    docs/gui.md, requires this run's numbers to be one of the labelled
+    pairs, and prints a third machine's case rather than letting it slide:
+    28 clip rows at 3840x2160 on either machine is a fact, a lone "373
+    px" is not.  Where the runner's pair has not been re-read since the
+    last rule changed, the page says so instead of carrying the old
+    number, and the suite's print is where the new one comes from.
 
   * The editor's rows say what the row paints.  For a `text` or `data`
     widget the keys that choose the line - `content`, `source`, `xigma.format`,
@@ -134,12 +131,25 @@ xigmatek-connect-lcd (0.5) resolute; urgency=medium
     the suite read a stale `draws as "57 C"` off a row that paints nothing.
 
   * The controls column's floor counts what a closed drop-down has to
-    display, not just its own size hint: 362 px on this bench at one
-    column of rows where it was 329, because the widest entry any layout
-    puts in that menu is 247 px and the box now shows it.  At the
-    narrowest column this bench allows (411 px) the box is 323 px around
-    that 247 px entry, and the popup's list is 323 px.  docs/gui.md
-    carries those as this bench's digits; the suite prints its own.
+    display, not just its own size hint: the widest entry any layout puts
+    in that menu is 247 px, and the box now shows it instead of eliding
+    it.  At the narrowest column this bench allows (425 px) the box is
+    323 px around that 247 px entry and the popup's list is 323 px.
+    docs/gui.md carries those as this bench's digits; the suite prints
+    its own.
+
+  * A column's floor reserves the width a vertical scrollbar takes off the
+    viewport, and is re-measured once the splitter has settled.  Both
+    halves were needed.  The floor was read from the contents' width, and
+    a 411 px floor around 411 px of contents left a 397 px viewport with
+    14 px of horizontal travel: the 0.4 defect, arriving through the rule
+    written to prevent it.  And one pass cannot see its own effect,
+    because raising a floor moves the splitter, and a narrower column
+    re-flows the editor's rows into another number of columns - so the
+    window settles the number over a bounded chain of queued passes.  The
+    suite now fails on a pinned column that scrolls sideways at all, and
+    on any pane whose floor sits under its own contents, at each of the
+    five widths the sizing rule names.
 
   * A family spelled the file's way is folded once, and said.  The vendor's
     rows write `Arial` while `layout.FONTS` names `arial`, and

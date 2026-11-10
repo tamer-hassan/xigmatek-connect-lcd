@@ -133,10 +133,11 @@ number in that shape comes from a measurement, most of them of a failure:
   preview used to stay at its old scale while its pane changed shape;
 * and a column is never narrower than what it holds.  Each column's contents have a
   minimum width of their own, and those widths follow the fonts of the machine they are
-  measured on: on the author's bench the controls column measures **329 px** with a
-  layout open in its editor and the library's rows want **359 px**, while GitHub's runner
-  - no `simsun`, another default face - answers **337** and **376** for the same two.
-  The suite prints both and asserts the relation, never the digits.  Checked out at the
+  measured on, so the suite reads them on whichever machine is running it: on the author's
+  bench the controls column's contents measure **362 px** with a layout open in its editor
+  and the library's rows want **359 px**, and a column's floor is that number plus the
+  **14 px** a vertical scrollbar takes off the viewport - **376** and **373 px** of floor.
+  The suite prints the runner's pair beside them on every push.  Checked out at the
   `v0.4` tag and measured on this bench the same way, that column wanted **265 px**
   folded and **375 px** with the editor open while 0.4's window and split gave it
   **300 px**, so it grew a horizontal scrollbar *inside itself* with **89 px** of its own
@@ -154,18 +155,20 @@ number in that shape comes from a measurement, most of them of a failure:
   that row, 340 px on the runner) and costs the column nothing, and `_ed_box_readable`
   makes the closed box ask for its longest entry, because an elided
   `data  Motherboard Tempe…` in the box that says *which row you are editing* is the same
-  complaint one widget later.  That second half is what the controls column pays for: its
-  floor went from **329 px** to **362 px** on this bench.  It is not the 0.4 failure coming
-  back - `_pane_floors` raises a pane to what its contents insist on, so the column cannot
-  be dragged under them and a sideways scrollbar is unreachable; the library column, whose
-  contents the editor never touches, sits at **359 px** here and **376 px** on the runner.
-  The suite pins the controls pane to *its own floor*, reads the width back before it claims
-  anything about it, and asserts the half that has to hold at every width - the list a
-  reader chooses from is never narrower than the widest entry any of the 28 layouts puts in
-  that row - then prints which branch the closed box landed in: **411 px** of column,
-  **323 px** of box around a **247 px** entry on this bench, so the entry fits both.  A
-  box's own `minimumSizeHint` is still held under its longest entry, so the column is not
-  paying for anything the text itself does not need.
+  complaint one widget later.  That second half is what the controls column pays for: with
+  the widest menu on show its contents measure **411 px** here and its floor is **425 px**.
+  It is not the 0.4 failure coming back - `_pane_floors` raises a pane to what its contents
+  insist on *plus* the width a vertical scrollbar takes off the viewport, and that plus is
+  how this rule was found: the column had a 411 px floor around 411 px of contents, which
+  left a 397 px viewport and **14 px** of horizontal travel, the 0.4 defect arriving one
+  fix later.  The suite pins the controls pane to *its own floor*, reads the width back
+  before it claims anything about it, fails if the pinned column scrolls sideways at all,
+  and asserts the half that has to hold at every width - the list a reader chooses from is
+  never narrower than the widest entry any of the 28 layouts puts in that row.  Then it
+  prints which branch the closed box landed in: **425 px** of column, **323 px** of box
+  around a **247 px** entry on this bench, so the entry fits box and list alike.  A box's
+  own `minimumSizeHint` is still held under its longest entry, so the column is not paying
+  for anything the text itself does not need.
 
 The window's floor is the owner's rule, written in `xigmaui/app.py` as `MIN_WIDTH,
 MIN_HEIGHT = 1280, 1024`: a 1280×1024 desktop at minimum, up to a 3840×2160 one, and
@@ -178,13 +181,13 @@ row of controls fall off the edge. The fresh default is **1440×1024**
 
 The splitter is asked for **532 / 540 / 356** at that window - the left column capped at
 the 480 px frame plus its chrome, the controls given enough for two columns of editor
-rows, the library the rest - and a fresh window reads them back as **532 / 541 / 359** on
+rows, the library the rest - and a fresh window reads them back as **532 / 527 / 373** on
 this bench and **532 / 524 / 376** on CI's runner: the first digit is the cap the code
-sets, the other two are each pane's floor, which is what its contents measure, so they
-follow the machine's fonts. Every column comes back wider than its own contents measure.
+sets, the other two are each pane's floor, which is what its contents measure plus the
+width a vertical scrollbar reserves, so they follow the machine's fonts. Every column comes back wider than its own contents measure.
 The same three numbers are a shape at other widths: `QSplitter` scales an over-wide
 request down proportionally and its stretch factors hand a wide window's slack to the
-controls and the library, so at 3840×2160 the library column is 1 318 px across on this
+controls and the library, so at 3840×2160 the library column is 1 348 px across on this
 bench and shows **28** clip rows on either machine, while the preview stays capped at its
 532 px - it is never scaled up, because pixels the glass does not have would only be a
 bigger lie. The suite builds a window at these defaults, reads the splitter back, asserts
@@ -194,13 +197,14 @@ exceeds the room that justified them; every figure above is then read out of thi
 held to whichever of the two labelled machines is running the suite.
 
 And the columns' floors are not remembered constants: `_pane_floors()` raises each pane's
-minimum to its own contents' `minimumSizeHint`, so the two text columns sit at **362** and **359 px** on this bench
-where the code's lower bounds are 300 and 320 - and the library column, the half of that
-pair the editor never touches, was **376 px** the last time CI's runner was read. A pane
+minimum to its own contents' `minimumSizeHint` plus a reserved vertical scrollbar, so the
+two text columns sit at **376** and **373 px** on this bench where the code's lower bounds
+are 300 and 320 - and the library column, the half of that pair the editor never touches,
+was **376 px** the last time CI's runner was read. A pane
 that cannot be dragged under what it holds cannot grow a horizontal scrollbar inside
 itself, so the 0.4 failure mode is unreachable rather than merely avoided. The controls
-floor is the editor's own footprint, so it moves twice over: one column of editor rows asks for **362 px** of controls on this bench, two columns for **386**, three for **554** - a closed drop-down that has to show the longest entry it holds is part of what those columns carry - and the window's own minimum rises with them. Those three are this bench's digits; the suite prints its own three beside them on every machine and holds the order rather than a second machine's numbers, because a floor that follows the fonts is not a constant to compare.
-The 18 rows of an `arc` widget stand **779 px** tall in one column and **403 px** in three there, the grid's own ask going **171 / 344 / 512 px** - **723** and **378 px**, asking **180 / 361 / 533**, on CI's runner - which is the reflow buying height without buying a scrollbar, and all twelve figures come off the sizing pass the suite runs on every machine.
+floor is the editor's own footprint, so it moves twice over: one column of editor rows asks for **376 px** of controls on this bench, two columns for **400**, three for **568** - a closed drop-down that has to show the longest entry it holds is part of what those columns carry - and the window's own minimum rises with them. Those three are this bench's digits; the suite prints its own three beside them on every machine and holds the order rather than a second machine's numbers, because a floor that follows the fonts is not a constant to compare.
+The 18 rows of an `arc` widget stand **796 px** tall in one column and **403 px** in three there, the grid's own ask going **171 / 344 / 512 px** - **723** and **378 px**, asking **180 / 361 / 533**, on CI's runner - which is the reflow buying height without buying a scrollbar, and all twelve figures come off the sizing pass the suite runs on every machine.
 
 ### The preview plays, or shows one frame
 

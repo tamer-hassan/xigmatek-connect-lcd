@@ -5992,13 +5992,21 @@ assert {"layout", "widget"} <= set(_lists), _lists
 # check measured a 340 px column while believing it was pinning 300.
 _area = fresh.split.widget(1)
 _ceil = _area.maximumWidth()
-# the narrowest column the window allows is the *larger* of what the pane was told and
-# what its contents insist on: Qt lets the contents win over a requested ceiling, and the
-# first version of this check read the number before the ceiling was applied and then
-# asserted a width that had since moved.
-_floor = max(_area.minimumWidth(), _area.widget().minimumSizeHint().width())
+# The floor is not a constant to read once: a pane's minimum is derived from its contents,
+# and its contents move when that minimum moves the splitter, so the window settles the
+# number over a few queued passes (`_pane_floors`).  Take it after that has run - the
+# first version of this check pinned a 340 px column while claiming to pin 300, the second
+# pinned 411 px around a floor that had since grown to 425, and both then asserted
+# something about a width that was no longer the narrowest the window allowed.
+for _ in range(12):
+    appq.processEvents()
+_floor = _area.minimumWidth()
+assert _floor >= _area.widget().minimumSizeHint().width(), (
+    _floor, _area.widget().minimumSizeHint().width(),
+    "the controls column's floor is under what it holds, so the handle can drag it into a "
+    "horizontal scrollbar")
 _area.setMaximumWidth(_floor)
-for _ in range(6):
+for _ in range(8):
     appq.processEvents()
 _narrow = (_area.width(), fresh.ed_widget.view().minimumWidth(),
            fresh.ed_widget.width(), _worst[0])
@@ -6006,13 +6014,21 @@ assert _narrow[0] == _floor, (_narrow, _floor,
                               "this is not the narrow column the window allows")
 # The half that has to hold at every width is the popup's: the list a reader chooses from
 # is never narrower than the widest entry any layout puts in it.  Whether the *closed* box
-# fits that entry is a font question and depends on how many columns of editor rows the
-# width allowed (the pane's floor is the rows' floor, and one column asks for less than
-# three): 241 px of box against a 247 px entry here, which is exactly the case the popup
-# half exists for.  Both branches are reported; neither is folklore.
+# fits that entry follows this machine's fonts and the number of editor columns the width
+# allowed, so the gate reports which branch it measured instead of pinning a digit.
 assert _narrow[1] >= _narrow[3], (
     _narrow, "a narrow column cut the list down with it, which is the elision this fix is "
              "about")
+# And the floor's whole purpose, checked at the width the floor is the limit at: the
+# column must not be scrolling sideways.  It was.  The pane's minimum came from its
+# contents' width, but a pane is a scroll area, and the vertical scrollbar the editor's
+# rows make it show takes its extent off the viewport - a 411 px floor around a 411 px
+# set of contents left a 397 px viewport and 14 px of horizontal travel, which is the
+# 0.4 defect arriving one rule later.
+_hb = _area.horizontalScrollBar()
+assert _hb.maximum() == 0 and not _hb.isVisible(), (
+    _narrow, _hb.maximum(), "pinned to its own floor the controls column still scrolls "
+                            "sideways, so that floor is not its contents' width")
 _box_cuts = _narrow[2] < _narrow[3]
 _says = "the box cuts it, so the list carries it" if _box_cuts else "the box shows it in full"
 print(f"                        at the narrowest column the window allows "
@@ -6112,8 +6128,9 @@ from xigmaui import edit as _ed_api        # the model behind the rows
 assert len(_sized.ed_rows) == (len(_ed_api.field_names("arc"))
                                + len(_ed_api.extension_fields("arc"))), _sized.ed_rows
 _rows_at, _cols_at, _floor_at = {}, {}, {}
-_host_at, _box_at = {}, {}      # columns in use -> the grid's own minimum width;
-                                # window width -> (columns, editor box height)
+_host_at, _box_at, _lib_at = {}, {}, {}      # columns in use -> the grid's own minimum
+                                # width; window width -> (columns, editor box height);
+                                # window width -> the library column's viewport width
 for _W, _H in ((1280, 1024), (1440, 1024), (1919, 1055), (2560, 1440), (3840, 2160)):
     _sized.resize(_W, _H)
     for _ in range(14):
@@ -6132,12 +6149,22 @@ for _W, _H in ((1280, 1024), (1440, 1024), (1919, 1055), (2560, 1440), (3840, 21
         assert _area.viewport().width() >= _inner.minimumSizeHint().width(), (
             _W, _nm, _area.viewport().width(), _inner.minimumSizeHint().width(),
             "a column is narrower than what it holds")
-        assert not _area.horizontalScrollBar().isVisible() and \
-            _area.horizontalScrollBar().maximum() == 0, (
-            _W, _nm, "a column scrolls sideways at this window size")
+        # ...and the *floor*, not merely the width this window happens to hand out.  A
+        # pane whose minimum sits under its own contents can still be dragged into
+        # overflow, which is the whole failure this rule exists to make unreachable - and
+        # it is the half a single measuring pass misses, because the grid's contents
+        # change when the floor moves the splitter.
+        assert _area.minimumWidth() >= _inner.minimumSizeHint().width(), (
+            _W, _nm, _area.minimumWidth(), _inner.minimumSizeHint().width(),
+            "a column's floor is under what it holds, so the handle can drag it into a "
+            "horizontal scrollbar")
+        _hs = _area.horizontalScrollBar()
+        assert _hs.maximum() == 0 and not _hs.isVisible(), (
+            _W, _nm, _hs.maximum(), "this width hands that column a horizontal scrollbar")
     _rows_at[_W] = _sized.clips.viewport().height() // max(1, _sized.clips.sizeHintForRow(0))
     _cols_at[_W] = _sized._ed_cols
     _floor_at[_W] = [_sized.split.widget(i).minimumWidth() for i in range(3)]
+    _lib_at[_W] = _sized.split.widget(2).viewport().width()
     # what one column of rows actually costs, at the number of columns in use: the
     # per-column threshold in app.py is only honest if a column of rows fits inside it,
     # and the box's own height is the other half of "uses the screen real estate"
@@ -6250,11 +6277,13 @@ assert _ga[0] < _ga[1] < _ga[2] and _ga[3] < _ga[4] < _ga[5], (_ga, "the ask doe
                                                                 "with its columns")
 assert _ga[2] <= 3 * _sized._ED_COL_PX and _ga[5] <= 3 * _sized._ED_COL_PX, (
     _ga, _sized._ED_COL_PX, "three columns of rows ask for more than the threshold says")
-_w = _re.search(r"the library column is 1 318 px across on this bench and shows \*\*(\d+)\*\*"
-                r" clip rows on either machine", _gf)
+_w = _re.search(r"the library column is ([\d ]+) px across on this bench and shows "
+                r"\*\*(\d+)\*\* clip rows on either machine", _gf)
 assert _w, ("docs/gui.md's 3840x2160 sentence no longer labels its width as this bench's "
             "and its row count as both machines'")
-assert int(_w[1]) == _rows_at[3840], (_rows_at[3840], _w[1],
+assert int(_w[1].replace(" ", "")) == _lib_at[3840], (
+    _lib_at[3840], _w[1], "docs/gui.md's wide-window library column is not this wide here")
+assert int(_w[2]) == _rows_at[3840], (_rows_at[3840], _w[2],
     "the wide window's clip-row count is not what the page says it is on either machine")
 assert _rows_at[1280] <= _rows_at[1440] <= _rows_at[1919] <= _rows_at[2560] <= \
     _rows_at[3840], (_rows_at, "a taller window shows fewer clip rows")
@@ -6266,7 +6295,8 @@ print("                        the page's labelled digits and this run's: split 
       f"library floor {_fl[1]} here-labelled / {_fl[2]} runner-labelled / "
       f"{_floor_at[1280][2]} measured; controls floor {_cl} on the page (this bench) / "
       f"{(_floor_at[1280][1], _floor_at[1440][1], _floor_at[1919][1])} measured here; "
-      f"wide-window rows {_w[1]} either machine [{_wide}]")
+      f"at 3840 the library column is {_lib_at[3840]} px wide here (the page says "
+      f"{_w[1].strip()}) and {_w[2]} clip rows fit on either machine [{_wide}]")
 # the row census docs/theme-editor.md's editor bullet quotes is the model's, so the
 # digits are counted here rather than remembered there.  Whitespace is flattened on both
 # sides: that page wraps, and a compare that broke on a newline would fail for the
