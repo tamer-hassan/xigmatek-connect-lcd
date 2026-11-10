@@ -105,10 +105,15 @@ them here instead, and both are gated in `tools/selftest.sh` rather than asserte
   choice rather than measured off the vendor's picture (`Time`, `CPU Frequency`,
   `Pump Speed`) are named in the same note.
 
-What is **not** built is an editor drawn from live readings, and resizing a row by its
-edge: a row is moved one point at a time, and a row is added only as a copy of one that
-already draws, removed never past the last, and reordered through the list that is the
-draw order (the four bullets, and the digits they hold, are in docs/gui.md). What **is**
+What is **not** built is an editor drawn from live readings, and a resize that ignores
+what a kind owns: there is no scale-everything handle, and no snapping to a grid or to a
+neighbour.  Stretching a row by dragging one of the squares on its box went in on
+2026-11-10, through the size keys the painter reads for that kind - `width`/`height`
+for a `bar`, the pair `line_rect` declares (swapped for a row turned 90°) for a `line`,
+the ring of an `arc` scaled with its box, the `fontSize` of a `text` row, the pitch or
+the face of a `special`; and so did the rows themselves - added only as a copy of one
+that already draws, removed never past the last, reordered through the list that is the
+draw order (the bullets, and the digits they hold, are in docs/gui.md).  What **is**
 built, since
 2026-11-08, is the window's `Layout` box - one layout, one widget, **every field that
 widget carries as a row of its own** (10 rows for a `text` widget through 18 for an

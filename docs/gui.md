@@ -430,6 +430,59 @@ editor commonly gets wrong:
   reaches is the file, and the check is made against the file rather than against the object
   in memory: the rows come back out of it in the same order, and the file on disk draws the
   frame the pane was showing when `save` was pressed.
+* **A row's edge resizes it, and what the drag writes is that kind's own size - read off
+  the painter, not chosen.** The pane paints eight small squares on the selected row's box,
+  and which of them exist is the model's answer: `edit.Editor.size_edges` puts every edge
+  through its own resize door and the pane paints what comes back, so a handle the model
+  would refuse is never offered. A `bar` gets all eight, because its box *is* `x,y` to
+  `x+width,y+height` - every `bar` row this run draws a box for has exactly that box, and the
+  rows that do not are the ones whose source this machine reports no reading for, which have
+  no edge to grab. A `line` gets all eight, and it is the one kind whose resize needs no
+  drawing: `layout.line_rect` predicts the drawn box of **4** of the **4** line rows exactly,
+  including the two the vendor turns 90°, where the box's horizontal extent comes from
+  `height` - and where that rect's pivot, or a `lineWidth` recentring the thickness, puts the
+  box somewhere other than where the drag left it, `x`/`y` are corrected from the same
+  prediction and the sentence says they were. An `arc` gets all eight, and a drag scales the
+  ring with its box rather than stretching a band around a fixed ring, because `radius` and
+  `width` move the ink and leave the box exactly where it was (a +8 px push on `radius` moved
+  the box 0 px and the picture by thousands of pixels): the drag writes `sizeWidth`,
+  `sizeHeight`, `radius` and `width` together, keeping `sizeWidth == 2*radius + 2*width` and
+  `sizeWidth == sizeHeight`, the arithmetic **6** of the **6** `arc` rows in the library obey.
+  A one-axis drag on one of those squares makes the box no longer square, and the note says
+  so instead of quietly squaring it back.
+* **A `text` or `data` row is resized by its face, because it owns no other size.** Not one
+  of the **145** `text`/`data` rows carries a `width` or `height` key: their box is the ink
+  the face lays down, and a +8 px push on `fontSize` moves that box's width by an amount
+  that is never 8 px, differs from row to row, and belongs to this machine's fonts rather
+  than to the file (the suite measures the spread on every row and prints it). So the pane
+  paints no square on a text row's left or right side, and its top, bottom and corner
+  squares ask for a height the model reaches by *searching* faces (bracket the target, then
+  bisect, drawing every candidate), which lands on a face whose box is near the ask but
+  rarely exactly it: the sentence quotes the box that reached, and the amber rectangle on the
+  glass quotes the box that was asked. A `special` row's two axes are two different keys -
+  `width` is the pitch between the figures' centres, `fontSize` is their face - so it has no
+  corner squares at all.
+* **Two things a handle never writes, and the caps that own an extent instead.** `cornerRadius`
+  is carried by **25** of the `bar`/`arc` rows, and pushing it +8 left every box those
+  rows have exactly where it was; `rotate` is carried by **12** `bar` rows and pushing it +8 changed
+  **0 px** on all **12**, because nothing in `layout.py` reads it on a `bar`. Where a cap owns
+  the extent the drag is refused in that cap's name rather than writing a face nobody asked
+  for: `xigma.autoFitMax` fits a row to a width and `xigma.fitArc` fits a `special`'s figures
+  into a ring, and both refusals say which of the two it is and that the row to change is that
+  one. A row that draws no box at this fixture has no edge to drag, and the sentence carries
+  the painter's own reason (`Fan 3 Name`, `Fan 3 Speed`, …).
+* **The pane shows the ask; the model returns the result.** While the mouse is down, the pane
+  paints - in a solid line, next to the dashed box that is - the box `edit.Editor.resize_box`
+  says the release would ask for. That door is the one `resize_row` answers through, so the
+  amber rectangle is not a second guess kept in the window; a repaint in the middle of a drag
+  (the note line growing, the splitter refitting the pane) puts that ask back rather than
+  dropping it. A press on a square belongs to the row that is selected even when another
+  row's ink lies under it - the pane's later-row-wins rule is a rule about ink, and a grabbed
+  square that moved some other row would be a surprise nobody could see coming - and when that
+  happens the note says whose ink is under the square. One press-drag-release is exactly one
+  undo step, moves pixels, and writes no file: every accepted drag the suite drove put the
+  layout object back byte for byte under one press of undo, and every refusal left `dirty`,
+  the undo count and the picture exactly where they were found.
 * **Where a new row lands is decided by the painter's boxes, and the sentence says what
   happened.** A trial draw with the row in it reports the box that row *actually* paints - an
   anchor does not mean the same thing for every kind and every `xigma.anchor` - and that box
@@ -563,12 +616,13 @@ display.
 
 What it does **not** do, said plainly: nothing is sent to the panel (PROTOCOL.md §11 - the
 panel is never handed a layout file), so what a save changes is what *this machine's*
-daemon draws next time it names that theme; no row is resized by dragging an edge; a
-row can be added only as a copy of a row that already draws, removed down to but never
-including the last one, and reordered only through the list that *is* the draw order;
-the editor draws from the pinned fixture and not live readings; and the theme combo
-above still lists only the five, because that combo picks what the loop draws from this
-machine's sensors.
+daemon draws next time it names that theme; a row can be added only as a copy of a row
+that already draws, removed down to but never including the last one, and reordered only
+through the list that *is* the draw order; a row's size changes only through the keys its
+kind owns - there is no scale-everything handle, and no grid or snap to drag against -
+and nothing about a row's *position* is guessed at; the editor draws from the pinned
+fixture and not live readings; and the theme combo above still lists only the five,
+because that combo picks what the loop draws from this machine's sensors.
 
 ### The colour of the text
 

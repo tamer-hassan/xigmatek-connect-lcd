@@ -98,7 +98,8 @@ layout files — or one of the five themes generated from our own drawing code �
 the fields this program's painter actually reads, with the picture under the preview
 redrawn from the file as it changes. The rows themselves too: a row can be added —
 always a copy of a row this program already draws, never a table of defaults — removed,
-and reordered through the list that decides which one paints on top. The panel is never
+reordered through the list that decides which one paints on top, and stretched by
+dragging one of the squares on its box, through the size keys that kind owns. The panel is never
 handed a layout file, so what that editor changes is what a loop on *this* machine draws
 the next time it names that theme ([docs/gui.md](docs/gui.md) has the row and its limits).
 

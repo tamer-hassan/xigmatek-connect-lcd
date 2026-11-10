@@ -282,12 +282,13 @@ shell over that model, and the gates say so in counts.
   count by four, which printed 905 where the honest number is 1 163 - a fifth out, in the
   direction that flatters the edit.
 
-Not built, and not claimed, as of the 0.5 tree this section describes: resizing a row by
-dragging an edge, renaming a copy, drawing the editor from live readings. Landed on
-2026-11-10 (0.6) instead: rows added as a copy of a real row, removed, and reordered -
-the four bullets and every digit they hold are in docs/gui.md. The window's theme combo
-still lists the five, because that combo picks what the loop draws from this machine's
-sensors.
+Not built, and not claimed, as of the 0.5 tree this section describes: renaming a copy,
+drawing the editor from live readings, snapping to a grid or to a neighbour. Landed on
+2026-11-10 (0.6) instead: rows added as a copy of a real row, removed, reordered, and
+resized by dragging the squares on their box - each kind through the size keys the
+painter actually reads for it, which is a sentence per kind rather than one handle - and
+the bullets and every digit they hold are in docs/gui.md. The window's theme combo still
+lists the five, because that combo picks what the loop draws from this machine's sensors.
 
 ### What the canvas half measured (stage 4, 2026-11-08)
 
@@ -345,12 +346,14 @@ plan expected editing **only at 1:1** - it is offered at any scale instead, beca
 the rounding above, said out loud rather than hidden behind a mode.
 
 Not built, and not claimed: live readings under the editor (the pane still draws the pinned
-fixture, so an edit is judged against the picture the documents describe), resizing a row
-by dragging an edge, snapping to a grid or to another row, and anything at all to the
-panel.  What landed on 2026-11-10 instead is the structural edit itself - a row added is a
-copy of a row that already draws, its position chosen by the painter's boxes rather than
-guessed, its order the list's order, and its removal refused at the last row in the
-library's own words; docs/gui.md carries the four bullets and the digits they hold.
+fixture, so an edit is judged against the picture the documents describe), snapping to a
+grid or to another row, and anything at all to the panel.  What landed on 2026-11-10 is
+the structural edit - a row added is a copy of a row that already draws, its position
+chosen by the painter's boxes rather than guessed, its order the list's order, its removal
+refused at the last row in the library's own words - and the edges: eight squares on the
+selected row's box, only the ones the model says its kind can write, and a drag that goes
+through the same door as the field rows, one undo step, no file until `save`. docs/gui.md
+carries the bullets and the digits they hold.
 
 ## What generating an export actually found
 
@@ -765,7 +768,7 @@ number gated, the docs updated in the same change.
 | 1 | **landed 2026-11-08.** the 23 `1:1` layouts selectable in the loop: name→layout resolver, human names from `background.mediaFile`, the source→`sensors.collect()` table, `--list-themes`, `notes["missing"]` printed as "no pump tachometer here, widget skipped" and again over the socket's `status`, the four `4:3` themes excluded by a gate on `ratio` so a future 480 layout cannot be dropped by a filter, and a `--theme` name that is canonicalised once at parse time so the CLI, the log and the socket all spell it the same | 1-1½ | 3-4½ |
 | 2 | **machinery landed 2026-11-08,** `--export-theme NAME`, `--list-specials`, the `special` kind and its injected registry, the `xigma` extension keys, byte-stability and parity gates over four readings; four of five generate today: `alpha` (12 widgets, 6 312 chars), `clock` (3, 1 448), `gauge` (5, 2 314) and `dual` (10, 4 677) each reach a **zero-pixel diff** on every reading that answers what they ask; `bars` does not, and the table under "What settled the ring and the bar" says what it still needs - including that `bars` may not be expressible as one file at all. (`--print-theme-fields`, listed here as unbuilt, landed with stage 3.) | 2-2½ | 6-7½ **Completed 2026-11-09:** `bars` joined them - 32 widgets, zero differing pixels at all 13 readings the gate gives it - which took a change to that theme's own drawing (ten reserved rows, a row with no reading keeping its place) and one key the schema had never had, `xigma.showIf`. |
 | 3 | **landed 2026-11-08.** the file model: the user root `~/.config/xigmalcd/themes` read before the checkout and before `/usr/share`, so an edited copy shadows the vendor's by file operation alone and deleting it puts the vendor's back; `canonical()`/`shape_of()`, `validate()` split into hard (will not draw) and soft (worth saying), `save()` (atomic tmp + `os.replace`, `.bak`, trailing newline, user root only, the five code names refused, traversal names refused), `copy_for_edit()`, `delete_user_theme()`, `user_copies()`, `themes.draw()` for an object that never touched a disk, and `--check-theme NAME` as the review door. The round-trip gate is in: **27/27 layouts reproduce byte for byte** and **23/23 copies are byte-identical to their source**. Not built: the window that drives it | 1-1½ | 3-4½ |
-| 4 | **landed 2026-11-08, in the two changes the plan named.** First the model (`xigmaui/edit.py`, no Qt, driven headless by the suite) and the window's layout-editor row over it: one layout combo (3 generated + 23 files), one widget, one field, one value; opening writes nothing; the field list is derived from `themes.keys_read()`; colours are stored in the vendor's `rgba()` spelling; refusals move nothing; 20 keystrokes are 1 undo step; the saved file redraws byte-identically what was on screen (1 163 px for the `(20, 0)` nudge, through both doors). Then the canvas inside that same pane: press a row's ink box to select it (the file's row index, later row wins an overlap), drag to move it - one drag, one undo step, the row follows the cursor and the pane repaints as it goes - and the arrow keys nudge 1 px / 10 px. **Amended 2026-11-10 (0.5):** the field dropdown became rows - every field the kind carries, one row each, **10 for `text` up to 18 for `arc`** counted off the model's lists across 185 widgets, one to three columns as the window's width allows (the window's floor is 1280x1024 now, per the owner), and each row carries a note line saying what that row paints at the pinned fixture - `edit.drawn_text` walking the painter's rules in the painter's order, proved by drawing every text-bearing row twice and requiring the two frames to be byte-identical. **Amended 2026-11-10 (0.6):** the rows themselves became editable - `add`, `remove`, `up`, `down` under the fields - and a new row is always a copy of a row that already draws: this layout's own row of that kind, otherwise a real row from the 28 layouts the editor opens, this repo's five exports ranked first because every row in them is carried to a zero-pixel diff. There is no default table, and none was invented: the vendor's application bundles are not in this tree, so the files are the only evidence of what a row of a kind looks like, and the suite re-counts that evidence (the 5-key envelope, the mandatory keys per kind, the id reuse, what `layerIndex` does not mean) on every run. Where a copy lands is decided by a trial draw and the painter's own boxes, and what a reorder does is proved by pixels in both directions. Still to build: drawing the editor from live readings, and resizing a row by its edge | 3-3½ | 9-10½ |
+| 4 | **landed 2026-11-08, in the two changes the plan named.** First the model (`xigmaui/edit.py`, no Qt, driven headless by the suite) and the window's layout-editor row over it: one layout combo (3 generated + 23 files), one widget, one field, one value; opening writes nothing; the field list is derived from `themes.keys_read()`; colours are stored in the vendor's `rgba()` spelling; refusals move nothing; 20 keystrokes are 1 undo step; the saved file redraws byte-identically what was on screen (1 163 px for the `(20, 0)` nudge, through both doors). Then the canvas inside that same pane: press a row's ink box to select it (the file's row index, later row wins an overlap), drag to move it - one drag, one undo step, the row follows the cursor and the pane repaints as it goes - and the arrow keys nudge 1 px / 10 px. **Amended 2026-11-10 (0.5):** the field dropdown became rows - every field the kind carries, one row each, **10 for `text` up to 18 for `arc`** counted off the model's lists across 185 widgets, one to three columns as the window's width allows (the window's floor is 1280x1024 now, per the owner), and each row carries a note line saying what that row paints at the pinned fixture - `edit.drawn_text` walking the painter's rules in the painter's order, proved by drawing every text-bearing row twice and requiring the two frames to be byte-identical. **Amended 2026-11-10 (0.6):** the rows themselves became editable - `add`, `remove`, `up`, `down` under the fields - and a new row is always a copy of a row that already draws: this layout's own row of that kind, otherwise a real row from the 28 layouts the editor opens, this repo's five exports ranked first because every row in them is carried to a zero-pixel diff. There is no default table, and none was invented: the vendor's application bundles are not in this tree, so the files are the only evidence of what a row of a kind looks like, and the suite re-counts that evidence (the 5-key envelope, the mandatory keys per kind, the id reuse, what `layerIndex` does not mean) on every run. Where a copy lands is decided by a trial draw and the painter's own boxes, and what a reorder does is proved by pixels in both directions. Still to build: drawing the editor from live readings, and snapping a row to a grid or a neighbour | 3-3½ | 9-10½ |
 | 5 | docs and gates: docs/themes.md's "not in the picker, and that is not an oversight" section brought up to date, docs/usage.md's CLI table, docs/gui.md's window census, README's five-theme claims, the window's own theme tooltip (it still says the vendor files are for the panel's firmware, which §11 contradicts), `smoke` rendering every installed layout offline against a pinned values dict. The suite grows by at least one section - stage 1's gates belong in the vendor-library section that already re-derives docs/themes.md's colour census, not in a new one - and then every place `twenty` is a gate moves with it: README, docs/tools.md, docs/packaging.md, the top changelog stanza, and the count `.github/workflows/ci.yml` compares against | 1 | 3 |
 | 6 | on glass, with the panel attached and the owner watching: the runnable set at 1 and 2 fps, achieved fps, loop seams for the vendor clips, the dark-ink-over-bright question that docs/limits.md still carries, `--no-clock` on `clock` (that frame changed in 0.4 - docs/limits.md's knob map), the quiet-box re-measurement docs/gui.md's cost paragraph owes to `bars`, and the transcript kept the way docs/packaging/ keeps installs | 1 | 3 |
 | | **total** | **10-12** | **30-36 h** |
@@ -795,15 +798,15 @@ PROTOCOL.md §10 - so this needs the installed app off the Windows machine again
 
 This document was written before any of it existed, and it is now part record, part plan.
 What does **not** exist in this tree: live readings under the editor (the pane draws the
-pinned fixture, and a row is moved one point at a time - no resizing a row by its edge,
-no snapping to a grid or to a neighbour); the layout export for `bars` - `alpha` assembled
+pinned fixture), and no snapping to a grid or to a neighbour; the layout export for `bars` - `alpha` assembled
 2026-11-08 into 12 rows at a zero pixel diff, its three pairs of lettering as `special`s
 (`fan-figures`, `temp-values`, `temp-labels`), its rings and usage bars as `arc`/`bar` rows
 naming a painter convention; any unit for the `space` the panel reports.  What does: stages
 1-3 as their rows say, stage 4's model with the window's row over it and the canvas in the
 pane over that, and since 2026-11-10 the rows themselves - added as a copy of a row that
-already draws, removed down to but never including the last one, and reordered through the
-list that *is* the draw order; `--export-theme`, `--list-specials`, `--check-theme` and
+already draws, removed down to but never including the last one, reordered through the
+list that *is* the draw order, and stretched at its edges through the size keys its kind
+owns; `--export-theme`, `--list-specials`, `--check-theme` and
 `--print-theme-fields`, each gated in `tools/selftest.sh`.
 
 And the census rows are no longer a one-off `python3 -` pass: the library counts, the

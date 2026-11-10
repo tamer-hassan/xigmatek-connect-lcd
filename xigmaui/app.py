@@ -314,6 +314,15 @@ class Canvas(QLabel):
     `xigmaui/edit.py`, so a dragged row and a typed one go through the same `set`/`move` and
     land on one undo stack.
 
+    A press on one of the squares painted on the selected row's box resizes that row; a press
+    anywhere else in its ink moves it.  Which squares are painted is the model's answer -
+    `edit.Editor.size_edges` puts each of its eight edges through its own resize door - so a
+    kind with no size key gets none, and a `text` row, which owns no width, gets none on its
+    left or right side.  The squares are chrome belonging to the selected row: the pane's
+    later-row-wins rule is about ink, and a grabbed square that moved some other row would be
+    a surprise nobody could see coming.  What the drag writes, and the box it reaches, come
+    back from the model in words.
+
     The coordinate mapping is whatever `_fit` chose, not a second decision: the picture is
     centred in the label and never scaled above 1:1, so `side` is the pixmap's own width and
     the slack on either side is the offset.  A point outside the picture is no row's.
@@ -327,9 +336,82 @@ class Canvas(QLabel):
         self.setMouseTracking(False)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
+    #: A handle's reach, and where it comes from.  Handles are the eight small squares on
+    #: the selected row's box, so a thin row (the vendor's `line` widgets are 2 px thick) is
+    #: still grabbable at its ends instead of being nothing but an edge.  `HANDLE` is in
+    #: **panel** px because that is the space the marks are kept in, and `HANDLE_MIN` is in
+    #: **widget** px because that is the space a cursor can aim at: the pane is never scaled
+    #: above 1:1, so the reach is the larger of the two once the scale is applied.
+    HANDLE = 4
+    HANDLE_MIN = 3
+
+    #: The cursor each edge asks for while its drag is in flight.  The names come from
+    #: `edit.Editor.EDGES`, because an edge the model does not know has no handle and no
+    #: cursor; a press that is not on an edge goes back to the pane's own arrow.
+    CURSORS = {
+        "left": Qt.CursorShape.SizeHorCursor, "right": Qt.CursorShape.SizeHorCursor,
+        "top": Qt.CursorShape.SizeVerCursor, "bottom": Qt.CursorShape.SizeVerCursor,
+        "top-left": Qt.CursorShape.SizeFDiagCursor,
+        "bottom-right": Qt.CursorShape.SizeFDiagCursor,
+        "top-right": Qt.CursorShape.SizeBDiagCursor,
+        "bottom-left": Qt.CursorShape.SizeBDiagCursor,
+    }
+
+    def set_edge_cursor(self, edge: str) -> None:
+        """Point like the edge being dragged, or stop pointing."""
+        if edge:
+            self.setCursor(self.CURSORS.get(edge, Qt.CursorShape.SizeAllCursor))
+        else:
+            self.unsetCursor()
+
+    def handles(self) -> tuple:
+        """The live handles as `((edge, x, y), ...)` in panel px.
+
+        Which edges are live is the window's to say - it asks the model, whose answer comes
+        from its own resize door (`edit.Editor.size_edges`) - and where those edges *sit* is
+        the pane's, because the pane is the thing holding the box.  The names are the same
+        eight both files use: `edit.Editor.EDGES`, which the suite holds this table to.
+        """
+        if not self.marks or len(self.marks) < 4:
+            return ()
+        x0, y0, x1, y1 = self.marks[0]
+        mx, my = (x0 + x1) // 2, (y0 + y1) // 2
+        where = {"left": (x0, my), "right": (x1, my), "top": (mx, y0),
+                 "bottom": (mx, y1), "top-left": (x0, y0), "top-right": (x1, y0),
+                 "bottom-left": (x0, y1), "bottom-right": (x1, y1)}
+        return tuple((e,) + where[e] for e in (self.marks[3] or ()) if e in where)
+
+    def handle_at(self, pt: tuple) -> tuple:
+        """The handle under this panel point, as `(edge, x, y)`, or `("", 0, 0)`.
+
+        A square reach rather than a round one, because the handle painted on the glass is a
+        square: Chebyshev distance, nearest wins, and a point inside the box but not inside a
+        handle is a move - which is a visible act, not a silent nothing.
+        """
+        if not self.marks or self.side <= 0:
+            return "", 0, 0
+        reach = max(float(self.HANDLE), self.HANDLE_MIN * render.W / max(1, self.side))
+        best, best_d = ("", 0, 0), None
+        for name, hx, hy in self.handles():
+            d = max(abs(int(pt[0]) - hx), abs(int(pt[1]) - hy))
+            if d <= reach and (best_d is None or d < best_d):
+                best, best_d = (name, hx, hy), d
+        return best
+
+    def edge_at(self, pt: tuple) -> str:
+        """Which edge this point would drag, or "" when it would move the row."""
+        return self.handle_at(pt)[0]
+
     # ------------------------------------------------------------------ marks --
     def set_marks(self, marks) -> None:
-        """What to draw over the picture: None, or a panel-px box and one line."""
+        """What to draw over the picture.
+
+        None, or `(box, one line)` in panel px - plus, while a resize drag is in flight, a
+        third item: the box the release would ask for, painted in a solid line next to the
+        dashed one that is.  The fourth item is always there when the window is editing: the
+        live handles, as `(edge, x, y)` triples, which are the only places a press means a
+        resize.
+        """
         if marks != self.marks:
             self.marks = marks
             self.update()
@@ -357,7 +439,8 @@ class Canvas(QLabel):
         super().paintEvent(event)
         if not self.marks or self.side <= 0:
             return
-        box, text = self.marks
+        box, text = self.marks[0], self.marks[1]
+        target = self.marks[2] if len(self.marks) > 2 else None
         ox, oy = self._origin()
         k = self.side / render.W
         x0, y0 = ox + box[0] * k, oy + box[1] * k
@@ -369,6 +452,29 @@ class Canvas(QLabel):
         p.setPen(pen)
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRect(int(round(x0)), int(round(y0)), int(round(w)), int(round(h)))
+        # the handles, filled: a row's box is a thin thing (the vendor's `line` widgets are
+        # 2 px of ink), and a rule about dragging an edge is only honest if the places that
+        # mean an edge are visible.  These are the model's live edges, not a decoration:
+        # `handle_at` grabs the same squares this paints.
+        reach = max(float(self.HANDLE), self.HANDLE_MIN * render.W / max(1, self.side))
+        p.setPen(QPen(QColor("#0b0b0d")))
+        p.setBrush(QBrush(QColor("#7fd0ff")))
+        for _edge, hx, hy in self.handles():
+            p.drawRect(int(round(ox + (hx - reach) * k)),
+                       int(round(oy + (hy - reach) * k)),
+                       max(1, int(round(2 * reach * k))),
+                       max(1, int(round(2 * reach * k))))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        if target:
+            # what the release would ask for, in a solid line, beside what is on the glass
+            # now in a dashed one.  The model may still land elsewhere - a `text` row's box
+            # is its ink and the face reaches the height *nearest* the drag, and an `arc`'s
+            # ring grows from its own centre - which is what the sentence printed on release
+            # says, so the pane promises the ask, not a result it has not computed.
+            p.setPen(QPen(QColor("#ffd166")))
+            p.drawRect(int(round(ox + target[0] * k)), int(round(oy + target[1] * k)),
+                       max(1, int(round((target[2] - target[0]) * k))),
+                       max(1, int(round((target[3] - target[1]) * k))))
         p.setPen(QColor("#000000"))
         p.drawText(int(round(x0)), max(11, int(round(y0)) - 3), text)
         p.setPen(QColor("#7fd0ff"))
@@ -380,7 +486,9 @@ class Canvas(QLabel):
         if event.button() == Qt.MouseButton.LeftButton:
             pt = self.to_panel(event.position().toPoint())
             if pt is not None:
-                self.win._canvas_press(*pt)
+                # which handle, if any - the model decides later whether this kind has a
+                # size that a drag may write at all, and says so in words if it has not
+                self.win._canvas_press(*pt, self.edge_at(pt))
                 event.accept()
                 return
         super().mousePressEvent(event)
@@ -395,7 +503,8 @@ class Canvas(QLabel):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):   # noqa: N802
-        if event.button() == Qt.MouseButton.LeftButton and self.win._drag:
+        if event.button() == Qt.MouseButton.LeftButton and (self.win._drag
+                                                           or self.win._resize):
             self.win._canvas_release()
             event.accept()
             return
@@ -1110,6 +1219,11 @@ class Window(QMainWindow):
         self._drag = None                     # (px, py, row x, row y) while dragging
         self._drag_refused = False            # a drag that ran into the canvas edge
         self._drag_note = ""                  # and the sentence it was refused with
+        self._resize = None                   # (px, py, edge, row, box) while resizing a row
+        self._resize_ask = (0, 0)             # the distance its last move showed
+        self._resize_note = ""                # and the last refusal said during that drag
+        self._resize_over = ""                # plus what lay under the handle being dragged
+        self._resize_target = None            # the ask it is painting, box or nothing
         self._off_glass = ""                    # what the last marks said about ink
         # nothing to edit until a layout is open: a row that offers fields before there
         # is a file behind it is a row that will write to nothing
@@ -2868,44 +2982,98 @@ class Window(QMainWindow):
     # ------------------------------------------------------- the canvas door --
     # Pointing at the picture is the other half of the editor: a row's ink box is where
     # that row is on the glass, so a press can select it and a drag can move it.  Nothing
-    # in these four methods decides anything about a layout - a distance goes to
-    # `edit.Editor`, the same door the field spinbox uses, with the same refusals and the
-    # same undo stack - and the pane's marks are chrome painted by `Canvas`, never pixels
-    # added to the composite.
+    # in these methods decides anything about a layout - a distance goes to `edit.Editor`,
+    # the same door the field spinbox uses, with the same refusals and the same undo stack,
+    # and for a resize the same `SIZE_KEYS` table - and the pane's marks are chrome painted
+    # by `Canvas`, never pixels added to the composite.
+    def _mark_box(self, wi: int):
+        """The box row `wi` put ink in, from the last editor paint, or None.
+
+        One lookup for three doors: the pane's rectangle, the pane's hit test (which reads
+        the same records) and the model's resize all start here, so nobody keeps a private
+        copy of where a row sits.
+        """
+        for _kind, _what, box, ri in (self._ed_notes.get("boxes") or []):
+            if ri == wi and box:
+                return box
+        return None
+
     def _canvas_marks(self) -> None:
-        """Mark the box the selected row actually put ink in, as the last paint reported."""
+        """Mark the box the selected row actually put ink in, as the last paint reported.
+
+        This is the resting state: it paints the box that *is*.  While a resize drag is in
+        flight `_canvas_resize_move` paints a second box beside it, the one the release
+        would ask for, and this method drops that mark again when the drag ends.
+        """
         self._off_glass = ""
         if self.ed is None:
             self.preview.set_marks(None)
+            self.preview.setToolTip("")
             return
-        for _kind, _what, box, wi in (self._ed_notes.get("boxes") or []):
-            if wi == self.ed.index and box:
-                text = self.ed.label(wi)
-                w = int(self.ed.obj.get("width") or render.W)
-                h = int(self.ed.obj.get("height") or render.H)
-                if box[0] < 0 or box[1] < 0 or box[2] >= w or box[3] >= h:
-                    # the model refuses an *anchor* off the canvas and says nothing about
-                    # ink that hangs off it, because that is the vendor's rule too (a
-                    # `property` is checked by x,y).  So the pane says it out loud: a row
-                    # dragged to the edge is drawing pixels the glass will not show.
-                    self._off_glass = (f"its ink runs to {box[2]},{box[3]} - off the "
-                                       f"{w}x{h} canvas")
-                    text = f"{text}  [{self._off_glass}]"
-                self.preview.set_marks((box, text))
-                return
-        # a row the machine could not draw has no box, and a rectangle around nothing
-        # would be the pane inventing a position for it
-        self.preview.set_marks(None)
+        box = self._mark_box(self.ed.index)
+        if box is None:
+            # a row the machine could not draw has no box, and a rectangle around nothing
+            # would be the pane inventing a position for it
+            self.preview.set_marks(None)
+            return
+        text = self.ed.label(self.ed.index)
+        w = int(self.ed.obj.get("width") or render.W)
+        h = int(self.ed.obj.get("height") or render.H)
+        if box[0] < 0 or box[1] < 0 or box[2] >= w or box[3] >= h:
+            # the model refuses an *anchor* off the canvas and says nothing about
+            # ink that hangs off it, because that is the vendor's rule too (a
+            # `property` is checked by x,y).  So the pane says it out loud: a row
+            # dragged to the edge is drawing pixels the glass will not show.
+            self._off_glass = (f"its ink runs to {box[2]},{box[3]} - off the "
+                               f"{w}x{h} canvas")
+            text = f"{text}  [{self._off_glass}]"
+        handles = self.ed.size_edges(self.ed.index, box)
+        # a repaint can arrive in the middle of a resize drag: the note line under the rows
+        # changes height, the splitter refits the pane, `_repaint` runs and lands back here.
+        # The ask the reader is aiming at has to survive that, so the target comes from the
+        # drag's own state instead of being dropped on every repaint.
+        self.preview.set_marks((box, text, self._resize_target if self._resize else None,
+                                handles))
+        # the tooltip is where the pane says, before a press, what its edge is for - and
+        # the answer is the model's, not a sentence written here about kinds
+        keys, why = self.ed.size_door(self.ed.index)
+        self.preview.setToolTip(
+            "press a row's box to select it, and drag it to move it.  "
+            + (f"Drag one of the squares on that box to resize the row: this row's size is "
+               f"decided by {', '.join(f'`{k}`' for k in keys)}, at its "
+               f"{', '.join(handles)} handles.  {why}."
+               if keys else f"That row's edges are not handles: {why}.")
+            + "  None of it reaches the panel: a save writes your copy.")
 
-    def _canvas_press(self, px: int, py: int) -> None:
+    def _canvas_press(self, px: int, py: int, edge: str = "") -> None:
         if self.ed is None:
             return                        # the pane is a live preview: nothing to move
         idx = self.ed.hit(self._ed_notes, px, py)
+        box = self._mark_box(self.ed.index)
+        if edge and box:
+            # the eight squares the pane paints are chrome owned by the row that is
+            # selected, so a press on one resizes *that* row even where another row's ink
+            # lies underneath.  The other rule - the later row wins an overlap - is about
+            # ink, and a handle is not ink: grabbed by a reader who can see the square and
+            # not the overlap, it would move a row nobody selected.
+            handles = self.ed.size_edges(self.ed.index, box)
+            self._resize = [px, py, edge, self.ed.index, box, handles]
+            self._resize_ask = (0, 0)
+            self._resize_note = ""
+            self._resize_target = None
+            self._resize_over = (f"row {idx}'s ink lies under the handle being dragged: the "
+                                 f"row resized is row {self.ed.index}, the one selected"
+                                 if idx is not None and idx != self.ed.index else "")
+            self.preview.set_edge_cursor(edge)
+            self.preview.set_marks((box, self.ed.label(self.ed.index), None, handles))
+            return
         if idx is None:
             self.preview.set_marks(None)
             self.ed_note.setText(f"nothing is drawn at {px},{py}: that press selects no "
                                  "row and moves nothing")
             return
+        # this press is a move, not a resize: whatever the last press was doing, it ended
+        self._resize = None
         if self.ed_widget.currentIndex() == idx:
             self._editor_pick_widget(idx)     # same row: bring its fields up to date
         else:
@@ -2923,6 +3091,9 @@ class Window(QMainWindow):
         model says the anchor would leave the canvas, the sentence is printed and the row
         stays at the last position it was allowed to hold.
         """
+        if self._resize:
+            self._canvas_resize_move(px, py)
+            return
         if self.ed is None or not self._drag:
             return
         x0, y0, ax, ay = self._drag
@@ -2934,7 +3105,42 @@ class Window(QMainWindow):
         self._repaint()
         self._canvas_marks()
 
+    def _canvas_resize_move(self, px: int, py: int) -> None:
+        """Paint the box a resize drag is asking for; write nothing yet.
+
+        The ask comes from `edit.Editor.resize_box`, which is the same door `resize_row`
+        answers through, so the amber rectangle is the model's arithmetic rather than the
+        pane's guess.  Nothing is drawn into the frame and no key is touched: a row's face
+        and a ring's radius are decided on release, once, because each of them needs the
+        painter to answer first.
+        """
+        if self.ed is None:
+            return
+        x0, y0, edge, i, box, handles = self._resize
+        dx, dy = px - x0, py - y0
+        self._resize_ask = (dx, dy)
+        over = f"  {self._resize_over}" if self._resize_over else ""
+        nb, bad = self.ed.resize_box(dx, dy, edge, i, box)
+        self._resize_target = None if bad else nb
+        if bad:
+            # the refusal changes as the cursor crosses the glass, so it is said whenever
+            # it is a different refusal rather than once per press
+            if bad != self._resize_note:
+                self.ed_note.setText(bad + over)
+                self._resize_note = bad
+            self.preview.set_marks((box, self.ed.label(i), None, handles))
+            return
+        self.preview.set_marks((box, self.ed.label(i), nb, handles))
+        asked = (f"dragging row {i}'s {edge} edge: asking for "
+                 f"{nb[2] - nb[0]}x{nb[3] - nb[1]} px against the "
+                 f"{box[2] - box[0]}x{box[3] - box[1]} px it has. Nothing is written until "
+                 f"you let go.")
+        self.ed_note.setText(asked + over)
+
     def _canvas_release(self) -> None:
+        if self._resize:
+            self._canvas_resize_release()
+            return
         if not self._drag:
             return
         if self.ed is None:
@@ -2967,6 +3173,38 @@ class Window(QMainWindow):
             self.ed_note.setText(f"{self.ed_note.text()}. {self._off_glass}")
         if dx or dy:
             self._log(f"canvas drag: {self.ed.name} row {self.ed.index} by "
+                      f"({dx:+d}, {dy:+d})")
+
+    def _canvas_resize_release(self) -> None:
+        """One press, one drag, one act: hand the ask to the model and say what it wrote.
+
+        The distance is the one the last mouse-move reported, because that is the box the
+        reader was shown.  A press on a handle that never moved writes nothing at all, and
+        says that rather than calling the door with a zero drag - which would be an act
+        whose whole result is a refusal.
+        """
+        x0, y0, edge, i, box, _handles = self._resize
+        dx, dy = self._resize_ask
+        over = f"  {self._resize_over}" if self._resize_over else ""
+        self._resize, self._resize_ask = None, (0, 0)
+        self._resize_over, self._resize_target = "", None
+        self.preview.set_edge_cursor("")
+        if self.ed is None:
+            self._canvas_marks()
+            return
+        if not dx and not dy:
+            self.ed_note.setText(f"the press landed on row {i}'s {edge} edge and the "
+                                 f"mouse never moved: nothing was written" + over)
+            self._canvas_marks()
+            return
+        ok, said = self.ed.resize_row(dx, dy, edge, i)
+        self.ed_note.setText(said + over)
+        self._ed_bind_rows()            # the field rows show the keys that moved
+        self._repaint()
+        self._canvas_marks()
+        self._editor_state()
+        if ok:
+            self._log(f"canvas resize: {self.ed.name} row {i} from its {edge} edge by "
                       f"({dx:+d}, {dy:+d})")
 
     def _canvas_nudge(self, dx: int, dy: int) -> None:

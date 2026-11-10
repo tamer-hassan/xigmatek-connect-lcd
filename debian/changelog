@@ -115,6 +115,56 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     at `v0.5` plus lintian on the `.dsc` answers that warning and exit 2;
     the same build with the paragraph added answers 0 errors, 0 warnings.
 
+  * A row's edge resizes it, and the drag writes the size keys the kind
+    actually owns. The pane paints eight small squares on the selected row's
+    box, and `edit.Editor.size_edges` decides which of them exist by putting
+    every edge through the model's own resize door, so a handle the model
+    would refuse is never offered. All eight on a `bar`, whose box is `x,y`
+    to `x+width,y+height`. All eight on a `line`, the one kind decided
+    without drawing: `layout.line_rect` predicts the drawn box of 4 of its 4
+    rows exactly, and on a row turned 90 degrees the horizontal extent comes
+    from `height` - which is also why `x`/`y` are corrected from that
+    prediction when the rect's own pivot, or a `lineWidth` recentring the
+    thickness, puts the box somewhere other than where the drag left it. All
+    eight on an `arc`, scaling the ring with its box, because `radius` and
+    the stroke's `width` move the ink and leave the box where it was (a +8
+    px push on `radius` moved the box 0 px and the picture by thousands of
+    pixels), and keeping `sizeWidth == 2*radius + 2*width` - the arithmetic
+    6 of the 6 arc rows in the library obey, all 6 of them square, so a one-
+    axis drag says the box is no longer square rather than squaring it back.
+    Six on a `text` or `data` row, which owns no width: not one of the 145
+    carries a `width` or `height` key, so that drag searches faces - bracket
+    the height, then bisect, drawing every candidate - and quotes the box
+    that reached instead of the one that was asked. Four on a `special`,
+    because its two axes are two different keys: `width` is the pitch
+    between the figures, `fontSize` their face, and a corner has no meaning
+    there.
+
+  * Two keys no handle writes, measured rather than listed. `cornerRadius`
+    is carried by 25 of the `bar`/`arc` rows and pushing it +8 left every
+    one of their boxes exactly where it was; `rotate` is carried by 12 `bar`
+    rows and changed 0 px on all 12 of them, because nothing in `layout.py`
+    reads it on a `bar`. Where a cap owns the extent, the drag is refused in
+    that cap's name - `xigma.autoFitMax` fits a row to a width,
+    `xigma.fitArc` fits a `special`'s figures into a ring - and the sentence
+    says which of the two it is, and that the row to change is that one. A
+    row that draws no box at this fixture has no edge to grab, and the
+    reason comes from the painter rather than from a paraphrase of it.
+
+  * The pane promises the ask; the model returns the result. While the mouse
+    is down the pane paints, in a solid line beside the dashed box that is,
+    the box `edit.Editor.resize_box` says the release would ask for - the
+    same door `resize_row` answers through, so no second copy of that
+    arithmetic lives in the window. A repaint in the middle of a drag (the
+    note line growing, the splitter refitting the pane) puts that ask back
+    rather than dropping it. A square belongs to the selected row even under
+    another row's ink, because "the later row wins an overlap" is a rule
+    about ink, and the note says whose ink is lying under the square. One
+    press, drag and release is exactly one undo step, moves pixels, and
+    writes no file: every accepted drag the suite drove put the layout back
+    byte for byte under one press of undo, and every refusal left `dirty`,
+    the undo count and the picture where they were found.
+
   * Gates for all of it, in the same twenty-two offline sections, no port
     opened by any of them.  The new checks take their shape from the files
     on this run - the envelope, the mandatory key sets, the id reuse, the
@@ -122,12 +172,21 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     docs/limits.md and `edit.py`'s own comments to that count.  A figure
     that follows a face is printed with the machine it was read on, and the
     page labels whose machine each half of the pair belongs to; a run that
-    matches neither half fails rather than loosening the claim.
+    matches neither half fails rather than loosening the claim.  The resize
+    gates add the per-kind sweep - every drawn row, every edge its own rules
+    call live, the arc identity re-checked after each accepted drag, and the
+    box followed 1:1 wherever the geometry is declared - and the three `line`
+    cases no shipped file carries, built in memory: a `rotate: 90` row with a
+    `lineWidth`, a plain `lineWidth`, and a row whose extent belongs to a cap.
+    The window half drives its own marks: the squares it paints are the ones
+    the model named, each square grabs its own edge, the ask on the glass is
+    that door's answer, the cursor says which way the row grows, and both the
+    refusal and the overlap are said in the pane's note line.
 
   * Still not built, and said in the pages rather than left to be found: an
     editor drawing live readings (the pane draws the pinned fixture, which
-    is the picture the documents describe), resizing a row by its edge,
-    snapping to a grid or to a neighbour, and the half only glass can
+    is the picture the documents describe), snapping a row to a grid or to a
+    neighbour, renaming a copy from the window, and the half only glass can
     answer - `--no-clock` on the panel, the quiet-box re-measure `bars`
     owes, the pairing note seen on the panel, and the transcript stage 6
     asks for.

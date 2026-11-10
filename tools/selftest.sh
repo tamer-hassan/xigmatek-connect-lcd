@@ -7869,6 +7869,451 @@ print(f"  the buttons too       add / remove / up / down driven through the wind
       f"either point - the controls column follows the *selected* kind's grid, not the "
       f"number of rows")
 
+# ---- resizing a row by its edge.  The promise this cycle makes is per kind, so the gate
+# ---- asks the painter rather than the model: which keys an edge drag writes, whether the
+# ---- box follows the drag, whether the row's own arithmetic survives, and whether one
+# ---- press of undo puts the file back.  The size census the pages quote - which bar boxes
+# ---- are exact, how many arc rows keep `sizeWidth == 2*radius + 2*width`, how many
+# ---- `text`/`data` rows carry a width key - is counted again here from the files.
+_read_prop, _read_xigma = themes.keys_read()
+_D_NEVER = ("cornerRadius", "rotate", "autoFitMax", "fitArc", "angleStart", "angleEnd",
+            "minValue", "maxValue", "source", "content", "name", "textColor",
+            "fontFamily", "fontFace", "family", "bold", "anchor", "arcPaint", "barPaint",
+            "id", "layerIndex", "type", "widgetContent")
+_d_ed = list(generated) + [gui_edit.Editor.open_theme(r["name"]) for r in pick]
+_d_rows = [(_e, _i, _w) for _e in _d_ed for _i, _w in enumerate(_e.widgets())]
+_d_by_kind = {}
+for _e, _i, _w in _d_rows:
+    _k = str(_w.get("type") or "")
+    _d_by_kind[_k] = _d_by_kind.get(_k, 0) + 1
+assert sorted(_d_by_kind) == sorted(layout.KINDS), sorted(_d_by_kind)
+
+# the outer bound, taken from the painter's own source rather than from a list kept here:
+# every key the door may write is one `layout.py` is proven to read
+for _k, _keys in gui_edit.Editor.SIZE_KEYS.items():
+    for _key in _keys:
+        assert _key in _read_prop, (_k, _key, "a size key that `layout.py` does not read")
+assert set(gui_edit.Editor.SIZE_KEYS) <= set(layout.KINDS), gui_edit.Editor.SIZE_KEYS
+for _key in ("autoFitMax", "fitArc"):
+    assert _key in _read_xigma, (_key, "the door names a cap nothing reads")
+
+# ---- what the files say about size.  A `box` here is always the one the painter reports.
+_bar_exact = _bar_total = _bar_boxed = 0
+_arc_rows = _arc_ident = _arc_square = 0
+_line_exact = _line_total = _txt_rows = _txt_with_wh = 0
+_rot_rows = _rot_inert = 0
+_corner_rows = _corner_boxed = _corner_box_same = 0
+
+
+def _poke_draw(e, index, key, value):
+    """Draw a copy of a layout with one `property` key set straight into the dict.
+
+    Deliberately not `Editor.set`: this measures what the *painter* does with a key, and a
+    key the inspector refuses to offer is exactly the one worth measuring.
+    """
+    out = copy.deepcopy(e.obj)
+    (out["osd"]["widget"][index]["property"][0])[key] = value
+    t = gui_edit.Editor(out, origin="gate", name=e.name)
+    return t.paint(*t.fixture())
+
+
+for _e, _i, _w in _d_rows:
+    _k = str(_w.get("type") or "")
+    _p = (_w.get("property") or [{}])[0]
+    _b0, _n0 = _e.paint(*_e.fixture())
+    _bx = {r[3]: r[2] for r in (_n0.get("boxes") or []) if r[2]}.get(_i)
+    if _k == "bar":
+        _bar_total += 1
+        _bar_boxed += 1 if _bx else 0
+        if _bx and _bx == (int(_p["x"]), int(_p["y"]),
+                           int(_p["x"]) + int(_p["width"]),
+                           int(_p["y"]) + int(_p.get("height") or 0)):
+            _bar_exact += 1
+        if str(_p.get("rotate", "")).lstrip("-").isdigit():
+            _rot_rows += 1
+            _b1, _n1 = _poke_draw(_e, _i, "rotate", int(_p["rotate"]) + 8)
+            _rot_inert += 1 if not px_differ(_b0, _b1) else 0
+    if _k in ("bar", "arc") and str(_p.get("cornerRadius", "")).lstrip("-").isdigit():
+        _corner_rows += 1
+        if _bx:                     # a row that draws nothing has no box to keep still
+            _corner_boxed += 1
+            _b1, _n1 = _poke_draw(_e, _i, "cornerRadius", int(_p["cornerRadius"]) + 8)
+            _nb = {r[3]: r[2] for r in (_n1.get("boxes") or []) if r[2]}.get(_i)
+            _corner_box_same += 1 if _nb == _bx else 0
+    elif _k == "arc":
+        _arc_rows += 1
+        _arc_ident += int(_p.get("sizeWidth") or 0) == 2 * int(_p.get("radius") or 0) \
+            + 2 * int(_p.get("width") or 0)
+        _arc_square += int(_p.get("sizeWidth") or 0) == int(_p.get("sizeHeight") or 0)
+    elif _k == "line":
+        _line_total += 1
+        _rx, _ry, _rw, _rh = layout.line_rect(_p)
+        if _bx and _bx == (_rx, _ry, _rx + _rw, _ry + _rh):
+            _line_exact += 1
+    elif _k in ("text", "data"):
+        _txt_rows += 1
+        _txt_with_wh += "width" in _p or "height" in _p
+# what a face is worth in width: the page says "tens of pixels ... never by 8", which is a
+# measurement rather than an impression.  One row at a time, because the box is the ink and
+# the answer belongs to this machine's fonts - so the range is printed, not kept in prose.
+_face_w = []
+for _e, _i, _w in _d_rows:
+    if str(_w.get("type") or "") not in ("text", "data"):
+        continue
+    _p = (_w.get("property") or [{}])[0]
+    _fs = int(_p.get("fontSize") or 12)
+    _one = {"width": render.W, "height": render.H, "osd": {"widget": [copy.deepcopy(_w)]}}
+    _a = gui_edit.Editor(_one, origin="gate", name="gate-face")._row_box(_one, 0)
+    _up = copy.deepcopy(_one)
+    _up["osd"]["widget"][0]["property"][0]["fontSize"] = _fs + 8
+    _b = gui_edit.Editor(_up, origin="gate", name="gate-face")._row_box(_up, 0)
+    if not _a or not _b:
+        continue
+    _face_w.append((_b[2] - _b[0]) - (_a[2] - _a[0]))
+assert _face_w, "no `text`/`data` row drew a box, so the face claim cannot be measured here"
+_moved = [x for x in _face_w if x]
+# the rule the page writes: the width a face push buys is never the push itself, it is not
+# the same from row to row, and its size belongs to this machine's fonts - so no `width` key
+# could carry it, and the door writes the face instead.
+assert all(x != 8 for x in _face_w), (
+    min(_face_w), max(_face_w), "+8 px of face moved some row's box exactly +8 px of width")
+assert _moved and len(set(_face_w)) > 3, (
+    _face_w[:8], "a face push bought the same width everywhere, which is not what the sweep "
+    "found and not what the page says")
+# the rows that did not move at all must be rows that name a cap
+_still = [x for x in _face_w if not x]
+_cap_bound = 0
+for _e, _i, _w in _d_rows:
+    if str(_w.get("type") or "") not in ("text", "data"):
+        continue
+    _xg = (_w.get("property") or [{}])[0].get("xigma") or {}
+    _cap_bound += 1 if int(_xg.get("autoFitMax") or 0) else 0
+assert len(_still) <= _cap_bound, (
+    len(_still), _cap_bound, "a row with no cap did not answer its face at all")
+_cap_note = (f"{min(_moved)}..{max(_moved)} px of box width on {len(_moved)}"
+             f"/{len(_face_w)} drawn rows, never 8 px; {len(_still)} did not move at all, "
+             f"of {_cap_bound} rows that name `xigma.autoFitMax`")
+print(f"                        a +8 px push on `fontSize`: {_cap_note}")
+
+# the rule, not the fraction: every `bar` row the painter draws a box for has exactly its
+# declared rect as that box, and every `line` row's box is what `line_rect` says.  The
+# fractions are printed below, and they move with this machine's readings - a `Fan 3 Speed`
+# with no reading draws no box at all, so it is not in the numerator or the denominator.
+assert _bar_exact == _bar_boxed, (_bar_exact, _bar_boxed, "a drawn `bar` row's box is not "
+                                  "its declared `x,y,x+width,y+height`")
+assert _line_exact == _line_total, (_line_exact, _line_total,
+                                    "`line_rect` did not predict a drawn line's box")
+assert _corner_box_same == _corner_boxed, (
+    _corner_box_same, _corner_boxed, "pushing `cornerRadius` moved a box, and the page "
+    "says a handle never writes that key")
+assert _rot_inert == _rot_rows, (_rot_inert, _rot_rows,
+                                 "a `bar` row's `rotate` changed the picture, so something "
+                                 "reads it and the refusal sentence is wrong")
+assert _arc_ident == _arc_rows and _arc_square == _arc_rows, (
+    _arc_ident, _arc_square, _arc_rows, "an `arc` row in the library does not keep the "
+    "arithmetic its ring is drawn with")
+assert _txt_with_wh == 0, (
+    "a `text`/`data` row carries a `width` or `height` key now, and the door's rule for "
+    "those kinds is that their box is the ink their face lays down")
+
+# ---- the sweep.  A 12 px push on every edge the row's own rules say is live; `text` and
+# ---- `data` take the straight edges, plus one corner on a sample, because a face search
+# ---- costs a dozen solo draws and a corner goes down the same path.
+_d_ok, _d_refused, _d_soft = 0, [], []
+_d_wrote, _d_box, _d_face, _d_undo = {}, 0, [], 0
+for _e, _i, _w in _d_rows:
+    _k = str(_w.get("type") or "")
+    _base = themes.canonical(_e.obj)
+    _frame, _notes = _e.paint(*_e.fixture())
+    _box = {r[3]: r[2] for r in (_notes.get("boxes") or []) if r[2]}.get(_i)
+    _live = _e.size_edges(_i, _box)
+    if _k in ("text", "data"):
+        # the sides the door says nothing about are still asked, and still refused: the
+        # pane hides those handles, but the model's answer is the claim, not the marks
+        _t = gui_edit.Editor(copy.deepcopy(_e.obj), origin="gate", name=_e.name)
+        _t.select(_i)
+        for _bad in ("right", "left"):
+            _ok, _said = _t.resize_row(12, 0, _bad, _i)
+            # two different refusals, and which one applies is this machine's picture: a row
+            # whose source has no reading paints no box, so it has no edge at all
+            assert not _ok, (_e.name, _i, _bad, _said, "a `text` row owns no width")
+            assert ("owns no width" in _said) if _box else ("paints no box" in _said), (
+                _e.name, _i, _bad, _said, _box)
+            assert _t.steps == 0 and themes.canonical(_t.obj) == _base, (
+                _e.name, _i, _bad, "the refusal wrote something")
+        assert not ({"left", "right"} & set(_live)), (_e.name, _i, _live,
+                                                     "a side handle on a kind with no width")
+    if _k == "special":
+        assert not any("-" in x for x in _live), (_e.name, _i, _live,
+                                                  "a corner handle on a `special`")
+    if not _box or not _live:
+        _d_refused.append((_e.name, _i, _k, "no-box" if _live else "no-edge", ""))
+        continue
+    _edges = tuple(x for x in _live if "-" not in x)
+    _corners = tuple(x for x in _live if "-" in x)
+    if _k not in ("text", "data"):
+        _edges += _corners
+    elif _i % 4 == 0 and _corners:
+        _edges += _corners[:1]
+    for _edge in _edges:
+        # grow first, because that is the direction the sentence about a row's edges reads
+        # in; if the glass is in the way, the same edge pushed the other way is the test
+        sx = 12 if "right" in _edge else -12 if "left" in _edge else 0
+        sy = 12 if "bottom" in _edge else -12 if "top" in _edge else 0
+        for _mult in (1, -1):
+            _dx, _dy = sx * _mult, sy * _mult
+            _t = gui_edit.Editor(copy.deepcopy(_e.obj), origin="gate", name=_e.name)
+            _t.select(_i)
+            _steps0 = _t.steps
+            _ok, _said = _t.resize_row(_dx, _dy, _edge, _i)
+            if _ok:
+                break
+            assert _t.steps == _steps0 and themes.canonical(_t.obj) == _base, (
+                _e.name, _i, _edge, "a refused resize took an undo step or wrote a key")
+        else:
+            _d_refused.append((_e.name, _i, _k, _edge, _said))
+            continue
+        _d_ok += 1
+        assert _t.steps == _steps0 + 1, (_e.name, _i, _edge, _t.steps,
+                                         "one resize is not exactly one undo step")
+        _pa = (_t.widgets()[_i].get("property") or [{}])[0]
+        _pb = (_w.get("property") or [{}])[0]
+        _changed = sorted(x for x in set(_pa) | set(_pb) if _pa.get(x) != _pb.get(x))
+        for _key in _changed:
+            _d_wrote[_key] = _d_wrote.get(_key, 0) + 1
+            assert _key in _read_prop, (_e.name, _i, _edge, _key,
+                                        "a handle wrote a key `layout.py` does not read")
+        _stray = [x for x in _changed if x in _D_NEVER]
+        assert not _stray, (_e.name, _i, _edge, _stray, "no edge owns those keys")
+        _b1, _n1 = _t.paint(*_t.fixture())
+        _nb = {r[3]: r[2] for r in (_n1.get("boxes") or []) if r[2]}.get(_i)
+        assert _nb, (_e.name, _i, _edge, "the resized row paints no box any more")
+        if not px_differ(_frame, _b1):
+            _d_soft.append((_e.name, _i, _k, _edge))
+        _had = (_box[2] - _box[0], _box[3] - _box[1])
+        _got = (_nb[2] - _nb[0], _nb[3] - _nb[1])
+        if _k in ("bar", "line", "arc"):
+            if ("right" in _edge and _got[0] != _had[0] + _dx) or \
+               ("left" in _edge and _got[0] != _had[0] - _dx) or \
+               ("bottom" in _edge and _got[1] != _had[1] + _dy) or \
+               ("top" in _edge and _got[1] != _had[1] - _dy):
+                raise AssertionError((_e.name, _i, _k, _edge, _had, _got, _dx, _dy,
+                                      "the box did not follow the drag 1:1"))
+            _d_box += 1
+        if _k == "arc":
+            assert int(_pa["sizeWidth"]) == 2 * int(_pa["radius"]) + 2 * int(_pa["width"]), (
+                _e.name, _i, _edge, "the ring no longer meets its own box")
+            if _dx and _dy and _had[0] == _had[1]:
+                assert _got[0] == _got[1], (_e.name, _i, _edge,
+                                            "a corner drag on a square ring left it skewed")
+        if _k in ("text", "data"):
+            assert _changed == ["fontSize"], (_e.name, _i, _edge, _changed,
+                                              "a text row's resize wrote more than the face")
+            _want = _had[1] + (_dy if "bottom" in _edge else -_dy)
+            if _got[1] == _had[1]:
+                raise AssertionError((_e.name, _i, _edge, "the face left the height alone",
+                                      _had, _got, _want))
+            assert abs(_got[1] - _want) <= abs(_had[1] - _want) + 1, (
+                _e.name, _i, _edge, _had, _got, _want, "the face moved away from the ask")
+            _d_face.append(abs(_got[1] - _want))
+        if _k == "special":
+            assert set(_changed) <= {"width", "fontSize"}, (_e.name, _i, _edge, _changed)
+        _t.undo()
+        assert themes.canonical(_t.obj) == _base, (
+            _e.name, _i, _edge, "one press of undo did not put the layout back")
+        _d_undo += 1
+assert _d_undo == _d_ok, (_d_ok, _d_undo)
+_d_nothing = [x for x in _d_refused if not x[4]]
+_d_said = [x for x in _d_refused if x[4]]
+
+# ---- the cases no shipped file carries, built in memory: a `rotate: 90` line carrying a
+# ---- `lineWidth`, a plain `lineWidth`, and a row whose extent belongs to a cap.
+_syn = {"width": render.W, "height": render.H, "osd": {"widget": [
+    {"id": "gate-rot-line", "layerIndex": 0, "type": "line", "widgetContent": "",
+     "property": [{"x": 165, "y": 305, "width": 150, "height": 2, "rotate": 90,
+                   "lineWidth": 9}]},
+    {"id": "gate-plain-line", "layerIndex": 0, "type": "line", "widgetContent": "",
+     "property": [{"x": 10, "y": 60, "width": 100, "height": 4, "rotate": 0,
+                   "lineWidth": 30}]},
+    {"id": "gate-capped", "layerIndex": 0, "type": "data", "widgetContent": "",
+     "property": [{"x": 20, "y": 20, "source": "CPU Temperature", "fontSize": 140,
+                   "fontFamily": "dejavu", "bold": False,
+                   "textColor": "rgba(255,255,255,1)", "xigma": {"autoFitMax": 120}}]}]}}
+_se = gui_edit.Editor(copy.deepcopy(_syn), origin="gate", name="gate-syn")
+_syn_ok, _syn_ref = [], []
+for _i, _edge, _dx, _dy, _want in ((0, "bottom", 0, 12, "lineWidth"),
+                                   (0, "right", 12, 0, "height"),
+                                   (1, "bottom", 0, -2, "lineWidth"),
+                                   (2, "bottom", 0, 12, None)):
+    _se.select(_i)
+    _b0, _n0 = _se.paint(*_se.fixture())
+    _bx0 = {r[3]: r[2] for r in (_n0.get("boxes") or []) if r[2]}.get(_i)
+    _ok, _said = _se.resize_row(_dx, _dy, _edge, _i)
+    if not _ok:
+        assert _se.steps == 0, (_i, _edge, "the refusal took an undo step")
+        _syn_ref.append((_i, _edge, _said))
+        continue
+    _b1, _n1 = _se.paint(*_se.fixture())
+    _bx1 = {r[3]: r[2] for r in (_n1.get("boxes") or []) if r[2]}.get(_i)
+    _pp = (_se.widgets()[_i].get("property") or [{}])[0]
+    assert _bx1 and (_bx1[2] - _bx1[0], _bx1[3] - _bx1[1]) == \
+        (_bx0[2] - _bx0[0] + _dx, _bx0[3] - _bx0[1] + _dy), (
+        _i, _edge, _bx0, _bx1, "a synthetic line's box did not follow the drag")
+    assert _pp.get(_want) is not None, (_i, _want, "the key that drag owns is missing")
+    _syn_ok.append((_edge, _want, _pp[_want]))
+    _se.undo()
+    assert themes.canonical(_se.obj) == themes.canonical(_syn), (
+        _i, _edge, "undo of the synthetic resize did not return the file")
+assert len(_syn_ok) == 3 and len(_syn_ref) == 1, (_syn_ok, _syn_ref)
+assert any("xigma.autoFitMax" in x[2] for x in _syn_ref), (
+    _syn_ref, "the cap-bound refusal does not name the key that owns the extent")
+# the same sentence for a `special` whose figures are fitted into a ring: `xigma.fitArc`
+_fit = ""
+for _e, _i, _w in _d_rows:
+    if str(_w.get("type")) != "special":
+        continue
+    _t = gui_edit.Editor(copy.deepcopy(_e.obj), origin="gate", name=_e.name)
+    _t.select(_i)
+    _ok, _said = _t.resize_row(0, 40, "bottom", _i)
+    if not _ok and "xigma.fitArc" in _said:
+        assert _t.steps == 0 and themes.canonical(_t.obj) == themes.canonical(_e.obj), (
+            _e.name, _i, "the fitArc refusal wrote something")
+        _fit = f"{_e.name} row {_i}"
+        break
+assert _fit, "no `special` row refused a face drag by naming `xigma.fitArc`"
+print(f"  rows you can resize   {len(_d_rows)} drawn rows in {len(_d_ed)} layouts, per kind "
+      f"{_d_by_kind}; {_d_ok} accepted drags wrote {sum(_d_wrote.values())} keys, every one "
+      f"a key `layout.py` reads and none of the {len(_D_NEVER)} no edge owns "
+      f"({', '.join(f'{k} {v}' for k, v in sorted(_d_wrote.items()))}); each exactly one "
+      f"undo step, all {_d_undo} put the layout object back byte for byte; {_d_box} "
+      f"declared-geometry boxes followed the drag 1:1, and {len(_d_face)} face-bound rows "
+      f"landed within {max(_d_face) if _d_face else 0} px of the height asked for; "
+      f"{len(_d_said)} drags refused in words with the file untouched "
+      f"({len(_d_nothing)} rows the painter draws no box for at this fixture)")
+print(f"                        what the files say about size, counted this run: "
+      f"{_bar_exact}/{_bar_total} bar boxes exactly `x,y,x+width,y+height`, "
+      f"{_line_exact}/{_line_total} line boxes exactly as `line_rect` predicts, "
+      f"{_arc_ident}/{_arc_rows} arc rows keeping `sizeWidth == 2*radius + 2*width` and "
+      f"{_arc_square}/{_arc_rows} with `sizeWidth == sizeHeight`, {_txt_rows} `text`/`data` "
+      f"rows of which {_txt_with_wh} carry a `width` or `height` key; `rotate` pushed +8 on "
+      f"{_rot_rows} bar rows changed 0 px on {_rot_inert} of them, and `cornerRadius` "
+      f"pushed +8 on {_corner_rows} bar/arc rows left the box where it was on "
+      f"{_corner_box_same}; +8 px of `fontSize` moved a `text`/`data` box's width "
+      f"by {min(_face_w)}..{max(_face_w)} px on this machine, never by 8; "
+f"{_corner_box_same}; the synthetic line cases ({_syn_ok}), {_syn_ref[0][2][:50]}"
+      f", and {_fit} refusing a face drag by naming `xigma.fitArc`")
+print(f"                        refused in words: "
+      + "; ".join(f"{_n} {_k} {_ed} -> {_cut(_s, 60)}" for _n, _i, _k, _ed, _s
+                  in _d_said[:5]))
+
+# ---- feature D's sentences, held to the counts this run makes.  The same two rules as the
+# ---- cycle before: a figure is re-measured from the files or the painter and the sentence
+# ---- has to carry *that* number, and a code comment is a sentence like any other - the
+# ---- installed tree carries it to a reader, so a stale one is a wrong claim in the library.
+for _what, _pat, _mine in (
+        ("the `line_rect` prediction, on the page",
+         r"predicts the drawn box of \*\*(\d+)\*\* of the \*\*(\d+)\*\* line rows exactly",
+         (_line_exact, _line_total)),
+        ("the arc identity, on the page",
+         r"the arithmetic \*\*(\d+)\*\* of the \*\*(\d+)\*\* `arc` rows in the library obey",
+         (_arc_ident, _arc_rows)),
+        ("the text/data row count, on the page",
+         r"Not one of the \*\*(\d+)\*\* `text`/`data` rows carries a `width` or "
+         r"`height` key", (_txt_rows,)),
+        ("who carries a `cornerRadius`, on the page",
+         r"`cornerRadius` is carried by \*\*(\d+)\*\* of the `bar`/`arc` rows",
+         (_corner_rows,)),
+        # every bar row that carries `rotate` changed not one pixel, which is what the
+        # page's "0 px on all N" says; the count of them is this run's census.
+        ("the unread `rotate`, on the page",
+         r"`rotate` is carried by \*\*(\d+)\*\* `bar` rows and pushing it \+8 changed "
+         r"\*\*(\d+) px\*\* on all \*\*(\d+)\*\*",
+         (_rot_rows, 0 if _rot_inert == _rot_rows else _rot_inert, _rot_rows)),
+):
+    _stated(_what, _gf, _pat, _mine)
+assert _gf.count("The pane paints eight small squares") == 1 and \
+    len(gui_edit.Editor.EDGES) == len(app.Canvas.CURSORS) == 8, (
+    len(gui_edit.Editor.EDGES), len(app.Canvas.CURSORS),
+    "the page says eight squares and the two files do not have eight edges to match")
+for _phrase, _why in (
+        ("never 8 px, differs from row to row",
+         "that a face push buys a width no `width` key could carry"),
+        ("paints no square on a text row's left or right side",
+         "which handles a `text` row does not get, the visible half of `size_edges`"),
+        ("no corner squares at all", "that a `special`'s two axes are two keys"),
+        ("`edit.Editor.size_edges` puts every edge through its own resize door",
+         "that the pane's handles are the model's answer, not a table in `app.py`"),
+        ("the amber rectangle on the glass quotes the box that was asked",
+         "the ask/result split the window gate drives"),
+):
+    assert _phrase in _gf, (_phrase, _why, "docs/gui.md no longer says it")
+
+# `edit.py`'s own size comment: the same digits, in the source a reader of the installed
+# tree gets.  Every one of these is a file fact, so both machines should answer the same;
+# a run that disagrees is a library that changed under the sentence.
+for _what, _pat, _mine in (
+        ("the line case in `edit.py`",
+         r"predicts the drawn box exactly, (\d+) rows out of (\d+)",
+         (_line_exact, _line_total)),
+        ("the arc push census in `edit.py`",
+         r"measured on all (\d+) arc rows", (_arc_rows,)),
+        ("the arc squares in `edit.py`",
+         r"and (\d+) of (\d+) are square", (_arc_square, _arc_rows)),
+        ("the text/data count in `edit.py`",
+         r"- (\d+) rows, none with either", (_txt_rows,)),
+):
+    _stated(_what, _edit_src, _pat, _mine)
+# ...and the words the library uses when it refuses.  `_flat` joins a file's lines with a
+# space, so a Python string split across two lines keeps its closing and opening quotes in
+# the middle: each probe here is a fragment that lives on one line, which is what makes it
+# match the source rather than the prose around it.
+for _phrase, _why in (
+        ("the suite asserts that as a rule", "the `bar` claim is a rule, not a fraction, "
+         "because which rows draw a box is a reading question"),
+        ("left every box where it was", "the `cornerRadius` rule in the code's own words"),
+        ("owns no width", "the side-drag refusal for a kind with no width key"),
+        ("pushing `fontSize` did not move this row's box at",
+         "the cap-bound refusal, said the same way in the sweep and in the window"),
+        ("some other key owns its extent",
+         "that refusal names the cap rather than guessing"),
+        ("`xigma.fitArc` is the ring the figures are fitted into",
+         "which cap owns a `special`'s extent"),
+        ("`xigma.autoFitMax` fits it to a width", "which cap owns a `data` row's extent"),
+        ("its box is already off the", "a row hanging off the glass gets its own sentence"),
+        ("2*radius + 2*width", "the arc identity the door keeps"),
+        ("amount that is never 8 px, differs from row to row",
+         "the face claim in the library's own comment: no `width` key could carry it"),
+        ("is not an edge this pane puts a handle on",
+         "the model, not the pane, owns the edge vocabulary"),
+        ("The room from here", "an off-canvas ask names the room each edge still has")):
+    assert _phrase in _edit_src, (_phrase, _why,
+                                  "`edit.py` no longer says it in those words")
+for _phrase, _why in (
+        ("asking for", "the live note while a resize drag is in flight"),
+        ("ink lies under the handle", "the overlap sentence, in the pane's note"),
+        ("never moved: nothing was written", "a click on a square that never dragged"),
+):
+    assert _phrase in _app_src, (_phrase, _why, "`app.py` no longer says it in those words")
+
+# the 0.6 stanza's resize sentences, so a bullet cannot outlive the door it describes
+_cl_top = " ".join(open("debian/changelog", encoding="utf-8").read()
+                   .split("\n -- ")[0].split())
+for _phrase in ("`edit.Editor.size_edges` decides which of them exist",
+                "keeping `sizeWidth == 2*radius + 2*width`",
+                "not one of the 145 carries a `width` or `height` key",
+                "changed 0 px on all 12 of them",
+                "`xigma.autoFitMax` fits a row to a width",
+                "`edit.Editor.resize_box` says the release would ask for"):
+    assert _phrase in _cl_top, (_phrase, "the 0.6 stanza no longer says what the gates "
+                                         "measure")
+print(f"                        D's sentences, from this run: {_bar_exact}/{_bar_total} bar "
+      f"boxes exactly their declared rect, {_line_exact}/{_line_total} line as `line_rect` "
+      f"predicts, {_arc_ident}/{_arc_rows} arc keeping the ring's own arithmetic "
+      f"({_arc_square}/{_arc_rows} square), {_txt_rows} `text`/`data` rows none of them "
+      f"carrying a width, `rotate` on {_rot_rows} bar rows and `cornerRadius` on "
+      f"{_corner_rows}; the sweep's counts ({_d_ok} accepted, {len(_d_said)} refused in "
+      f"words, {len(_d_nothing)} for want of a box) are printed above for this machine")
+
 # ---- one more kind of row the inspector can be handed: a `special` that draws a *pair*.
 # ---- No shipped file carries one yet (`alpha` is not exported), so this probe builds the
 # ---- row and asks the model what it may edit, and what the edit does to the picture.
@@ -8784,6 +9229,257 @@ win.ed_undo.click()
 for _ in range(6):
     appq.processEvents()
 assert int(win.ed.prop()["x"]) == _x0, win.ed.prop()
+
+# ---- the same door, driven through the pane: the handles the model says it has, the ask
+# ---- the pane paints while the mouse is still down, and one press-drag-release that writes
+# ---- keys, moves pixels, costs one undo step and writes no file.
+assert set(app.Canvas.CURSORS) == set(gui_edit.Editor.EDGES), (
+    set(app.Canvas.CURSORS) ^ set(gui_edit.Editor.EDGES),
+    "the pane has a cursor or a handle for an edge the model does not know")
+assert set(gui_edit.Editor.SIZE_KEYS) | {"special"} == set(layout.KINDS), (
+    gui_edit.Editor.SIZE_KEYS, "a kind this program draws has no size rule of its own")
+
+
+def _exact(px, py):
+    """Is this panel point addressable?  A pane scaled below 1:1 rounds the cursor's widget
+    px to whole pixels, so a mark on the glass is not always something a press can hit."""
+    wx, wy = _wpoint(px, py)
+    return win.preview.to_panel(_QP(wx, wy)) == (px, py)
+
+
+def _aim(px, py, edge):
+    """The nearest panel point to that mark that the pane reads as `edge` and can hit."""
+    for ox in (0, 1, -1, 2, -2, 3, -3, 4, -4):
+        for oy in (0, 1, -1, 2, -2, 3, -3):
+            if win.preview.edge_at((px + ox, py + oy)) == edge and _exact(px + ox, py + oy):
+                return px + ox, py + oy
+    raise AssertionError((px, py, edge, win.preview.handles(),
+                          "no addressable point reads as that handle"))
+
+
+def _pick(rec):
+    """Select a row by a click in ink the pane gives to it, with no marks in the way."""
+    _b = rec[2]
+    for _y in range(_b[1] + 1, _b[3]):
+        for _x in range(_b[0] + 1, _b[2]):
+            if win.ed.hit(win._ed_notes, _x, _y) == rec[3] and _exact(_x, _y):
+                win.preview.set_marks(None)
+                _press(_x, _y)
+                _release(_x, _y)
+                return _x, _y
+    raise AssertionError((rec[0], rec[3], "no ink of this row is addressable"))
+
+
+_d_live, _d_kind = {}, {}
+for _want in ("bar", "arc", "text", "data", "special"):
+    _rec = next(b for b in win._ed_notes["boxes"] if b[0] == _want)
+    _pick(_rec)
+    assert win.ed.index == _rec[3], (_want, win.ed.index, _rec[3],
+                                     "the pane selected another row than it was asked to")
+    _live = win.preview.handles()
+    assert [e for e, _x, _y in _live] == list(win.ed.size_edges(_rec[3], _rec[2])), (
+        _want, _live, "the pane painted handles the model did not name")
+    for _e, _x, _y in _live:
+        assert win.preview.edge_at((_x, _y)) == _e, (
+            _want, _e, (_x, _y), "the square painted for one edge grabs another")
+    _d_live[_want], _d_kind[_want] = _live, _rec
+    if _want in ("text", "data"):
+        assert not ({"left", "right"} & {e for e, _x, _y in _live}), (
+            _want, _live, "a `text` row owns no width, so its sides are not handles")
+        assert "no `width` or `height` key" in win.preview.toolTip(), (
+            _want, win.preview.toolTip()[:120],
+            "the tooltip promises a width a `text` row does not own")
+    if _want == "special":
+        assert not any("-" in e for e, _x, _y in _live), (
+            _live, "a `special`'s two axes are two keys, so a corner is not a handle")
+    if _want in ("bar", "arc"):
+        assert len(_live) == len(gui_edit.Editor.EDGES), (_want, _live)
+    assert "resize" in win.preview.toolTip(), (
+        _want, win.preview.toolTip()[:80], "the tooltip does not say what the squares do")
+print(f"  the squares on the box  {', '.join(f'{k} {len(v)}' for k, v in _d_live.items())}, "
+      f"each one the model's `size_edges` and each square grabbing its own edge; "
+      f"{len(app.Canvas.CURSORS)} cursors for {len(gui_edit.Editor.EDGES)} edges; a `text` "
+      f"row has no left or right handle, a `special` no corner")
+
+# one real drag on a `bar` row's right handle
+_bar, _bb = _d_kind["bar"], _d_kind["bar"][2]
+_bi = _bar[3]
+_pick(_bar)
+_hx, _hy = _aim(*next((x, y) for e, x, y in win.preview.handles() if e == "right"), "right")
+_press(_hx, _hy)
+assert win._resize and win._resize[2] == "right" and not win._drag, (
+    win._resize, win._drag, "a press on a handle did not begin a resize")
+assert win.preview.cursor().shape() == app.Canvas.CURSORS["right"], (
+    win.preview.cursor().shape(), "the cursor does not say which way this edge grows")
+_move_to(_hx + 18, _hy)
+_dx_ask, _dy_ask = win._resize_ask
+_asks, _bad = win.ed.resize_box(_dx_ask, _dy_ask, "right", _bi, _bb)
+assert _asks and not _bad, (_asks, _bad, "the pane's drag is not a legal ask")
+assert win.preview.marks[2] == _asks, (
+    win.preview.marks[2], _asks, "the pane is not painting the model's ask")
+assert "asking for" in win.ed_note.text(), win.ed_note.text()[:90]
+assert win.preview.marks[3] == win.ed.size_edges(_bi, _bb)
+_marks_png = _pane_png()
+win.preview.set_marks(None)
+assert _marks_png == _pane_png(), (
+    "handles and the ask are painted into the picture rather than over it")
+_win_osd, _rows0, _steps0 = win._osd.copy(), len(win.ed.widgets()), win.ed.steps
+_width0 = win._ed_ctl("width").value()
+_release(_hx + 18, _hy)
+_pb = (win.ed.widgets()[_bi].get("property") or [{}])[0]
+assert win._resize is None, "the release left a resize in flight"
+assert win.preview.cursor().shape() != app.Canvas.CURSORS["right"], "the cursor stayed"
+assert win.ed.steps == _steps0 + 1, (win.ed.steps, _steps0,
+                                     "one window drag is not one undo step")
+assert win.ed.dirty and themes.user_copies() == [], themes.user_copies()
+assert int(_pb["width"]) == _width0 + _dx_ask, (
+    _pb["width"], _width0, _dx_ask, "the drag did not write the width it asked for")
+assert px_differ(_win_osd, win._osd) > 0, "the drag wrote a key and the frame did not move"
+assert win._ed_ctl("width").value() == int(_pb["width"]), (
+    "the inspector's `width` row still shows the old number")
+assert "resized row" in win.ed_note.text(), win.ed_note.text()[:60]
+assert win.preview.marks[2] is None, (
+    win.preview.marks, "the ask is still on the glass after the release")
+print(f"                        one `bar` right drag of {_dx_ask} px: `width` {_width0} -> "
+      f"{int(_pb['width'])}, {px_differ(_win_osd, win._osd)} px of the pane's layer moved, "
+      f"one undo step, no file")
+win.ed_undo.click()
+for _ in range(6):
+    appq.processEvents()
+assert win._ed_ctl("width").value() == _width0, "undo did not put the field row back"
+assert px_differ(_win_osd, win._osd) == 0, "undo did not put every pixel back in the pane"
+assert len(win.ed.widgets()) == _rows0 and win.ed.steps == _steps0
+
+# the blind spot the pane cannot see coming: a drag whose box is legal and whose row will
+# not follow.  Found on this run's picture rather than assumed, so the sentence is met by
+# the window on any machine that has one.
+_spot = None
+for _rec in (win._ed_notes["boxes"] or []):
+    if not _rec[2]:
+        continue
+    _i, _b = _rec[3], _rec[2]
+    for _e in win.ed.size_edges(_i, _b):
+        _sx = 12 if "right" in _e else -12 if "left" in _e else 0
+        _sy = 12 if "bottom" in _e else -12 if "top" in _e else 0
+        if win.ed.resize_box(_sx, _sy, _e, _i, _b)[1]:
+            continue
+        _t = gui_edit.Editor(copy.deepcopy(win.ed.obj), origin="gate", name=win.ed.name)
+        _t.select(_i)
+        if not _t.resize_row(_sx, _sy, _e, _i)[0]:
+            _spot = (_rec, _e, _sx, _sy)
+            break
+    if _spot:
+        break
+if _spot:
+    (_rec, _e, _sx, _sy), _b = _spot, _spot[0][2]
+    _pick(_rec)
+    _x, _y = _aim(*next((xx, yy) for ee, xx, yy in win.preview.handles() if ee == _e), _e)
+    _press(_x, _y)
+    _move_to(_x + _sx, _y + _sy)
+    assert win.preview.marks[2], (win.preview.marks, "the pane painted no ask for a "
+                                  "geometry the model itself called legal")
+    _steps_ref = win.ed.steps
+    _osd_ref = win._osd.copy()
+    _release(_x + _sx, _y + _sy)
+    assert win.ed.steps == _steps_ref and not win.ed.dirty, (
+        win.ed.steps, win.ed.dirty, "the refusal wrote a step or a key")
+    assert px_differ(_osd_ref, win._osd) == 0, "the refusal moved the picture"
+    assert "row" in win.ed_note.text(), win.ed_note.text()[:60]
+    print(f"                        the ask the pane paints and the model takes back: "
+          f"{_rec[0]} row {_rec[3]}, {_e} handle, legal box, refused -> "
+          f"{_cut(win.ed_note.text(), 120)}")
+else:
+    print("                        every legal ask on this machine's picture is met, so "
+          "there is no refusal for the pane to learn about here")
+
+# the overlap: the squares belong to the selected row even under another row's ink.  If
+# this layout happens not to put one there, one is made - another row dragged over the
+# square, and put back - because the rule is worth checking wherever the glass allows it.
+_ar, _ab = _d_kind["arc"], _d_kind["arc"][2]
+_ai = _ar[3]
+_steps_ov_all = win.ed.steps
+_pick(_ar)
+_live_arc = win.preview.handles()
+_under = next(((e, x, y, win.ed.hit(win._ed_notes, x, y))
+               for e, x, y in _live_arc
+               if win.ed.hit(win._ed_notes, x, y) not in (None, _ai)), None)
+_made = None
+if not _under:
+    # a bounded search: which row could be standing on which square, with which small move
+    _cand = [r for r in win._ed_notes["boxes"] if r[2] and r[3] != _ai][:4]
+    for _rec in _cand:
+        _i2 = _rec[3]
+        _p2 = (win.ed.widgets()[_i2].get("property") or [{}])[0]
+        _ax, _ay = int(_p2.get("x") or 0), int(_p2.get("y") or 0)
+        for _e, _hx, _hy in _live_arc[:3]:
+            for _ddx, _ddy in ((0, 0), (2, 2), (-2, -2), (4, 4), (-4, -4), (8, 8), (-8, -8)):
+                _t = gui_edit.Editor(copy.deepcopy(win.ed.obj), origin="gate",
+                                     name=win.ed.name)
+                _t.select(_i2)
+                if not _t.move_to(_ax + _ddx, _ay + _ddy)[0]:
+                    continue
+                _b1 = {r[3]: r[2] for r in (_t.paint(*_t.fixture())[1].get("boxes") or [])
+                       if r[2]}.get(_i2)
+                if _b1 and _b1[0] <= _hx <= _b1[2] and _b1[1] <= _hy <= _b1[3]:
+                    win.ed.select(_i2)
+                    _made = win.ed.move_to(_ax + _ddx, _ay + _ddy)
+                    win._repaint()
+                    _under = (_e, _hx, _hy, _i2)
+                    break
+            if _under:
+                break
+        if _under:
+            break
+if _under:
+    _e, _x, _y, _o = _under
+    _x, _y = _aim(_x, _y, _e)
+    _press(_x, _y)
+    assert win._resize and win._resize[3] == _ai, (
+        win._resize, _ai, "the handle grabbed a row nobody selected")
+    _move_to(_x + 6, _y + 6 if "-" in _e else _y)
+    assert "ink lies under the handle" in win.ed_note.text(), win.ed_note.text()[:180]
+    _release(_x + 6, _y + 6 if "-" in _e else _y)
+    assert "ink lies under the handle" in win.ed_note.text(), win.ed_note.text()[:200]
+    assert win.ed.index == _ai, "the overlap moved the selection"
+    while win.ed.steps > _steps_ov_all:
+        win.ed_undo.click()
+        for _ in range(6):
+            appq.processEvents()
+    assert win.ed.steps == _steps_ov_all and not win.ed.dirty, (
+        win.ed.steps, win.ed.dirty, "undoing the overlap act did not clear the editor")
+    print(f"                        the overlap said out loud: row {_o}'s ink under row "
+          f"{_ai}'s {_e} square{' (laid down for this check)' if _made else ''}, and the "
+          f"row resized stayed row {_ai}")
+else:
+    print("                        no handle in this layout lies under another row's ink "
+          "and none could be laid there, so the overlap sentence has nothing to check here")
+
+# a press on a square that never moved writes nothing, and says so
+_pick(_d_kind["bar"])
+_hx, _hy = _aim(*next((x, y) for e, x, y in win.preview.handles() if e == "right"), "right")
+_steps_click = win.ed.steps
+_press(_hx, _hy)
+_release(_hx, _hy)
+assert win.ed.steps == _steps_click and not win.ed.dirty, (
+    win.ed.steps, win.ed.dirty, "a click on a handle wrote something")
+assert "never moved" in win.ed_note.text(), win.ed_note.text()[:90]
+
+# everything this passage did, undone: the file is the file, and nothing was ever written
+while win.ed.steps > _steps_ov_all:
+    win.ed_undo.click()
+    for _ in range(6):
+        appq.processEvents()
+assert win.ed.steps == _steps_ov_all and not win.ed.dirty, (
+    win.ed.steps, win.ed.dirty, "the resize passage left the editor changed")
+assert themes.user_copies() == [], themes.user_copies()
+
+# and the marks stay chrome: the layer the caption counts is what the painter returned
+_marked_osd = win._osd.copy()
+win.preview.set_marks((_bb, win.ed.label(_bi), (0, 0, 12, 12),
+                       win.ed.size_edges(_bi, _bb)))
+win.preview.update()
+assert win._osd.tobytes() == _marked_osd.tobytes(), "the marks changed the layer"
+win.preview.set_marks(None)
 
 # a press on empty glass names the point and selects nothing, and closing the layout takes
 # the mark with it - the pane goes back to a live preview, with nothing drawn on it

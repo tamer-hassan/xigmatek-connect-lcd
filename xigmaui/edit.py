@@ -733,6 +733,516 @@ class Editor:
                       f"`{ws[j].get('id')}` is now under `{ws[i].get('id')}` where the two "
                       f"meet")
 
+    # ------------------------------------------------------ resizing a row's box --
+    #: Which keys an edge drag may write, per kind, and what each one *is* on the glass.
+    #:
+    #: Not a preference: this is what `layout.py` reads as an extent, and every line of it
+    #: was measured against the painter before the door was written.  The suite re-checks the
+    #: outer bound on every run - `themes.keys_read()` walks the painter's own source with
+    #: `ast`, so a key nothing reads cannot be offered here - and re-measures the rest by
+    #: drawing.  A figure that follows a face is printed per machine, not kept here.
+    #:
+    #:   `bar`    `width`, `height`.  The box *is* `(x, y, x+width, y+height)` for every
+    #:            `bar` row the painter draws a box for - the suite asserts that as a rule,
+    #:            and prints how many rows had a box to check this run, because a `Fan 3` or
+    #:            `Fan 4` speed with no reading on this machine draws nothing and so has no
+    #:            edge to grab.  `cornerRadius` moves the ink and not the box: of the rows
+    #:            that carry one and draw one, pushing it +8 left every box where it was, so
+    #:            no handle writes it.
+    #:   `line`   `width`, `height`.  `layout.line_rect()` predicts the drawn box exactly,
+    #:            4 rows out of 4, and this is the one kind whose resize can be decided
+    #:            without drawing.  For a `rotate: 90` row the two swap - +8 px of `height`
+    #:            is +8 px of box width - and the rect pivots about its own centre, so the
+    #:            box's corner is not the declared rect's corner: `x`/`y` are corrected from
+    #:            that same prediction and the sentence says they were.  When a row carries a
+    #:            non-zero `lineWidth`, `draw_line` replaces the thickness with it, so the
+    #:            drag writes `lineWidth` instead - no shipped file carries one, so the suite
+    #:            builds that case rather than waiting for a file.
+    #:   `arc`    `sizeWidth`, `sizeHeight`, and with them `radius` and `width`.  The box is
+    #:            that band, while `radius` and the stroke's `width` move the ink inside it
+    #:            and leave the box exactly where it was - measured on all 6 arc rows: +8 px
+    #:            on `radius` moves the box 0 px and the picture by thousands of pixels - so
+    #:            a drag scales the ring with its box.  It keeps the arithmetic every arc row
+    #:            in the library obeys, `sizeWidth == 2*radius + 2*width`, and 6 of 6 are
+    #:            square; a one-axis drag leaves a box that is not, and says so rather than
+    #:            squaring it back.  Rounding the four keys independently breaks the
+    #:            identity: `Theme_35`'s row comes out a pixel off at 1.25x, a ring that no
+    #:            longer meets its own box.
+    #:   `text`,  `fontSize` only.  No `text` or `data` row in the library carries `width` or
+    #:   `data`   `height` at all - 145 rows, none with either - because the box is the ink
+    #:            the face lays down: pushing the face +8 moves that box's width by an
+    #:            amount that is never 8 px, differs from row to row, and belongs to this
+    #:            machine's fonts - the suite measures the spread and prints it.
+    #:            So the pane offers no side handles on those kinds, the drag searches faces
+    #:            by drawing them, and the sentence names the box that *reached* instead of
+    #:            claiming the edge followed the cursor.  A row fitted to `xigma.autoFitMax`
+    #:            is the exception the sweep finds in `clock`: pushing its face moved that
+    #:            box 0 px either way, because the cap owns the extent - said, and refused,
+    #:            not written.
+    #:   `special` by the door that draws it (`themes.special_door`).  On the `pair` and
+    #:            `values` doors `width` is the pitch between the two figures' centres rather
+    #:            than a box width - +8 px of it is +8 px of box, the origin moving -4 px
+    #:            because the figures sit at `x +/- width/2` - and `fontSize` is a ceiling
+    #:            that door reaches in some rows and not others; the `line` door takes the
+    #:            text rule.  The two axes are different keys with different meanings, so a
+    #:            corner drag is refused, and where `xigma.fitArc` or `xigma.autoFitMax` owns
+    #:            the extent the face cannot move it: the refusal names whichever it is.
+    SIZE_KEYS: dict = {
+        "bar": ("width", "height"),
+        "line": ("width", "height"),
+        "arc": ("sizeWidth", "sizeHeight"),
+        "text": ("fontSize",),
+        "data": ("fontSize",),
+    }
+    #: The face sizes the `fontSize` search will try, and why they are bounded: `layout.
+    #: font_for` builds a truetype face at `fontSize * SS`, and Pillow refuses a pixel size
+    #: of 0 or of millions with an `OSError` from inside the frame loop.  10 is the floor the
+    #: painter's own auto-fit loop stops at (`layout.draw_text`: `while size > 10 ...`), and
+    #: 400 is four times the largest face any row in the library carries (140, in `clock`).
+    MIN_FACE = 10
+    MAX_FACE = 400
+
+    #: The edges the pane puts a handle on.  A `special` row's two axes are different keys,
+    #: so the corner entries are refused there rather than being a compromise.
+    EDGES = ("right", "left", "bottom", "top",
+             "bottom-right", "top-right", "bottom-left", "top-left")
+    #: How far `size_edges` pushes an edge when it asks the door whether that edge is live.
+    #: It is a question about the *rules*, so the distance only has to be big enough to tell
+    #: a refusal from an acceptance: 8 px clears the 2 px floor and the rounding of an
+    #: `arc`'s stroke, and no row's door is open at 8 px and shut at 9.
+    EDGE_PROBE = 8
+
+    def size_door(self, index: int | None = None) -> tuple:
+        """`(keys, the sentence naming what each one is)` for one row's resize.
+
+        `keys` is empty when this program cannot resize that row, and then the sentence is
+        the reason - the same shape every other refusal in this model has.
+        """
+        w = self.selected() if index is None else self.widgets()[int(index)]
+        kind = str(w.get("type") or "")
+        prop = (w.get("property") or [{}])[0]
+        if kind == "special":
+            name = str(prop.get("name") or "")
+            door = themes.special_door(name) if name in themes.SPECIALS else ""
+            if door == "line":
+                return ("fontSize",), (f"`{name}` is drawn through the line door, so its "
+                                       f"extent is the face it sets: `fontSize`")
+            if door in ("pair", "values"):
+                return ("width", "fontSize"), (
+                    f"`{name}` is a `{door}` row: `width` is the pitch between the two "
+                    f"figures' centres, not a box width, and `fontSize` is a ceiling "
+                    f"the door reaches only when the figures' own fit allows it")
+            return (), (f"`{name or '(unnamed)'}` is not a drawing this program has, "
+                        f"so there is no extent for a handle to write")
+        if kind in self.SIZE_KEYS:
+            keys = self.SIZE_KEYS[kind]
+            if kind in ("text", "data"):
+                return keys, ("a `text`/`data` row carries no `width` or `height` key: "
+                              "the box is the ink its face lays down, so the size to "
+                              "write is `fontSize`")
+            if kind == "arc":
+                return keys, ("an `arc`'s box is its `sizeWidth` x `sizeHeight` band, while "
+                              "`radius` and `width` move the ring inside it, so the drag "
+                              "scales the ring and keeps `sizeWidth == 2*radius + 2*width`")
+            if kind == "line":
+                return keys, ("a `line`'s box comes from `layout.line_rect`: `width` and "
+                              "`height`, the axes swapped for a `rotate: 90` row, and "
+                              "`lineWidth` replacing the thickness when the row carries one")
+            return keys, ("a `bar`'s box is `x,y` to `x+width,y+height`, so its edges are "
+                          "`width` and `height`")
+        return (), f"`{kind or '(no type)'}` has no size key this program reads"
+
+    def size_edges(self, index: int | None = None, box: tuple | None = None) -> tuple:
+        """Which of `EDGES` give this row a handle, in the order `EDGES` lists them.
+
+        Not a second table kept here: each of the eight is put through `_resize_plan` with a
+        small push in both directions, and the ones that door refuses are the ones the pane
+        paints no handle for.  So the squares on the glass and the model's own answer cannot
+        drift apart, and a press somewhere other than a handle is a move - a visible act
+        rather than a silent nothing.  Pass `box` when the caller already knows it (the pane
+        does), because this is asked on every repaint and asking the painter again would be
+        the slow way to agree.
+
+        What it answers is whether an edge has *any* legal push of that size, not whether
+        every distance is legal: a `special`'s bottom handle is live because its face does
+        decide its height sometimes, and a particular drag can still be refused because that
+        row's `xigma.fitArc` fit is what owns the extent.  The refusal on release says so.
+        """
+        i = self.index if index is None else int(index)
+        if box is None:
+            box = self._row_box(self.obj, i)
+        out = []
+        for edge in self.EDGES:
+            dx = self.EDGE_PROBE if ("right" in edge or "left" in edge) else 0
+            dy = self.EDGE_PROBE if ("top" in edge or "bottom" in edge) else 0
+            for sign in (1, -1):
+                if not self._resize_plan(dx * sign, dy * sign, edge, i, box)[5]:
+                    out.append(edge)
+                    break
+        return tuple(out)
+
+    def _row_box(self, obj: dict, index: int) -> tuple:
+        """The box one row of `obj` paints, read off the painter rather than computed."""
+        _img, notes = themes.draw(obj, dict(FIXTURE), FIXTURE_WHEN)
+        for rec in (notes.get("boxes") or []):
+            if rec[3] == index and rec[2]:
+                return rec[2]
+        return None
+
+    def _skip_words(self, obj: dict) -> list:
+        """The painter's own reasons for putting no ink on the glass."""
+        return [str(m) for m in (themes.draw(obj, dict(FIXTURE), FIXTURE_WHEN)[1]
+                                 .get("missing") or [])]
+
+    def _font_for_height(self, row: dict, want: int) -> tuple:
+        """The `fontSize` that puts a row's ink box nearest `want` px tall.
+
+        A search, not a formula: the box comes from `draw.textbbox`, so the only answer that
+        can be right is one that drew.  Bracket the target, then bisect - a dozen or so solo
+        draws - and return the box that reached beside the size, because a face is stepped by
+        the font and the box that reaches is rarely the box that was asked for.
+        `(None, None, the reason)` covers the two cases the door has to refuse: a row that
+        paints no box, and a row whose box does not answer its face at all because
+        `xigma.autoFitMax` fits it to a width.
+        """
+        now = int((row.get("property") or [{}])[0].get("fontSize") or 12)
+
+        def probe(size):
+            t = copy.deepcopy(row)
+            tp = (t.get("property") or [{}])[0]
+            tp["fontSize"] = int(size)
+            return self._row_box({"width": render.W, "height": render.H,
+                                  "osd": {"widget": [t]}}, 0)
+
+        base = probe(now)
+        if base is None:
+            return None, None, ("that row paints no box at this fixture, so it has no "
+                                "height for a face to be chosen against")
+        h0 = base[3] - base[1]
+        bigger = want > h0
+        lo, hi, step = now, now, 4
+        boxed = False
+        for _ in range(20):
+            hi = min(self.MAX_FACE, max(self.MIN_FACE, hi + step if bigger else hi - step))
+            edge_box = probe(hi)
+            if edge_box is None:
+                break
+            h = edge_box[3] - edge_box[1]
+            if (h >= want) if bigger else (h <= want):
+                boxed = True
+                break
+            if h == h0:
+                return None, None, ("pushing `fontSize` did not move this row's box at "
+                                    "all, so some other key owns its extent")
+            step *= 2
+            if hi == self.MAX_FACE or hi <= self.MIN_FACE:
+                break
+        if not boxed:
+            return None, None, ("no face in the search reached that height: something "
+                                "other than `fontSize` decides this row's extent")
+        a, b = (lo, hi) if lo < hi else (hi, lo)
+        if bigger:
+            a, b = now, hi
+        box_a, box_b = probe(a), probe(b)
+        for _ in range(20):
+            if b - a <= 1:
+                break
+            mid = (a + b) // 2
+            box_m = probe(mid)
+            if box_m is None:
+                b, box_b = mid - 1, probe(b)
+                continue
+            if (box_m[3] - box_m[1]) >= want:
+                b, box_b = mid, box_m
+            else:
+                a, box_a = mid, box_m
+        nearer = (b, box_b) if (box_a and box_b
+                                and abs((box_b[3] - box_b[1]) - want)
+                                <= abs((box_a[3] - box_a[1]) - want)) else (a, box_a)
+        return nearer[0], nearer[1], ""
+
+    def _resize_plan(self, dx: int, dy: int, edge: str, index: int | None = None,
+                     box: tuple | None = None) -> tuple:
+        """Everything one resize drag decides before it writes a key or searches a face.
+
+        `(row index, kind, its `property`, the box it paints now, the box the drag asks
+        for, "")` when the ask is legal, and `(i, kind, prop, box, None, the reason)` when
+        it is not.
+
+        This is split out for one reason: the pane draws the box the release would ask for
+        while the drag is still in flight, and a second copy of this arithmetic in
+        `app.py` would be a second rule free to drift from the first.  So the window asks
+        this door and paints its answer.  `box` lets a caller that already knows the box -
+        the window does, it is the one the last paint reported in `_ed_notes` - skip asking
+        the painter again on every mouse-move event, which is the slow way of agreeing.
+        """
+        ws = self.widgets()
+        i = self.index if index is None else int(index)
+        if not 0 <= i < len(ws):
+            return i, "", {}, None, None, f"row {i}: this layout has {len(ws)} rows"
+        if edge not in self.EDGES:
+            return i, "", {}, None, None, (
+                f"`{edge}` is not an edge this pane puts a handle on: "
+                f"{', '.join(self.EDGES)}")
+        row = ws[i]
+        prop = (row.get("property") or [{}])[0]
+        kind = str(row.get("type") or "")
+        keys, why = self.size_door(i)
+        if not keys:
+            return i, kind, prop, None, None, f"row {i}: {why}"
+        if box is None:
+            box = self._row_box(self.obj, i)
+        if box is None:
+            skipped = self._skip_words(self.obj)
+            return i, kind, prop, None, None, (
+                f"row {i} paints no box at this fixture"
+                f"{': ' + ', '.join(skipped) if skipped else ''}, so it has no edge to drag")
+        x0, y0, x1, y1 = box
+        cw = int(self.obj.get("width") or render.W)
+        ch = int(self.obj.get("height") or render.H)
+        hx = int(dx) if ("right" in edge or "left" in edge) else 0
+        vy = int(dy) if ("top" in edge or "bottom" in edge) else 0
+
+        if kind in ("text", "data") and not vy:
+            cap = int(((prop.get("xigma") or {}).get("autoFitMax")) or 0)
+            return i, kind, prop, box, None, (
+                f"row {i}: a `text`/`data` row owns no width, so a side-to-side drag "
+                f"writes nothing.  Its box is {x1 - x0}x{y1 - y0} px of ink"
+                + (f", fitted to `xigma.autoFitMax` {cap} px" if cap else "")
+                + "; its face is the size, and that is a top/bottom drag")
+        if kind == "special":
+            if hx and vy:
+                return i, kind, prop, box, None, (
+                    f"row {i}: a `{str(prop.get('name') or '')}` row's two axes are "
+                    f"different keys - `width` is the pitch between the figures, "
+                    f"`fontSize` their face - so a corner drag has no meaning here; drag "
+                    f"one axis at a time")
+            if not hx and not vy:
+                return i, kind, prop, box, None, (
+                    f"row {i}: that drag asks for no change on either axis")
+
+        nb = [x0, y0, x1, y1]
+        if "left" in edge:
+            nb[0] += hx
+        if "right" in edge:
+            nb[2] += hx
+        if "top" in edge:
+            nb[1] += vy
+        if "bottom" in edge:
+            nb[3] += vy
+        if nb[2] - nb[0] < 2 or nb[3] - nb[1] < 2:
+            return i, kind, prop, box, None, (
+                f"row {i}: that leaves a {nb[2] - nb[0]}x{nb[3] - nb[1]} px box, and a "
+                f"row that small is not a row")
+        if not (0 <= nb[0] and 0 <= nb[1] and nb[2] <= cw and nb[3] <= ch):
+            was_off = not (0 <= x0 and 0 <= y0 and x1 <= cw and y1 <= ch)
+            return i, kind, prop, box, None, (
+                f"row {i}: "
+                + (f"its box is already off the {cw}x{ch} glass at {x0},{y0}..{x1},{y1}, "
+                   f"and this drag does not bring it back "
+                   f"({nb[0]},{nb[1]}..{nb[2]},{nb[3]}), so nothing is written - drag the "
+                   f"row inside first" if was_off else
+                   f"that puts the box at {nb[0]},{nb[1]}..{nb[2]},{nb[3]}, off the "
+                   f"{cw}x{ch} canvas, so nothing is written")
+                + f". The room from here: left {x0} px, top {y0} px, right {cw - x1} px, "
+                f"bottom {ch - y1} px")
+        return i, kind, prop, box, tuple(nb), ""
+
+    def resize_box(self, dx: int, dy: int, edge: str = "bottom-right",
+                   index: int | None = None, box: tuple | None = None) -> tuple:
+        """The box a drag of `(dx, dy)` on `edge` is asking for, or the reason it cannot.
+
+        `(box, "")` or `(None, the sentence)`.  This is the door the pane uses while the
+        mouse is still down: it paints that box in a solid line next to the dashed one the
+        row has, so what is being promised is visible before anything is written.  It
+        decides nothing about the file - no key is chosen, no face searched, no step taken -
+        which is why it can run on every mouse-move event without drawing.
+        """
+        _i, _kind, _prop, _had, nb, bad = self._resize_plan(dx, dy, edge, index, box)
+        return (None, bad) if bad else (nb, "")
+
+    def resize_row(self, dx: int, dy: int, edge: str = "bottom-right",
+                   index: int | None = None) -> tuple:
+        """Grow or shrink one row's box.  Returns `(ok, what_was_said)`; one act, one step.
+
+        The drag's ask is settled first by `_resize_plan` - every refusal that needs no
+        drawing, in its words - and what is left here is the part that knows the kind: the
+        keys *that kind* owns (`SIZE_KEYS` above) are what gets written, and the answer
+        quotes the box the painter reports afterwards instead of the arithmetic that got
+        there.  The refusals left in this half write nothing and take no undo step: a face
+        that would not move the box, a `special` whose figures' pitch cannot go negative, an
+        `arc` whose stroke would leave no hole, and a `line` whose declared keys cannot come
+        out at the extent asked for.  A `line` is the one kind decided without drawing -
+        `layout.line_rect` is pure arithmetic and predicts the drawn box exactly - and where
+        its pivot or its `lineWidth` centring puts the box somewhere other than the drag's,
+        `x`/`y` are corrected from that prediction and the sentence says so.
+        """
+        i, kind, prop, box, nb, bad = self._resize_plan(dx, dy, edge, index)
+        if bad:
+            return False, bad
+        x0, y0, x1, y1 = box
+        row = self.widgets()[i]
+        hx = int(dx) if ("right" in edge or "left" in edge) else 0
+        vy = int(dy) if ("top" in edge or "bottom" in edge) else 0
+        keys, why = self.size_door(i)
+        rot90 = kind == "line" and int(prop.get("rotate") or 0) % 180 == 90
+
+        wrote: dict = {}
+        said: list = []
+        all_wrote: dict = {}
+        face = (kind in ("text", "data")
+                or (kind == "special" and "fontSize" in keys and not hx))
+        if face:
+            want = nb[3] - nb[1]
+            size, got, bad = self._font_for_height(row, want)
+            if bad:
+                owner = ("`xigma.fitArc` is the ring the figures are fitted into"
+                         if (kind == "special" and themes.special_door(
+                                 str(prop.get("name") or "")) == "values")
+                         else "`xigma.autoFitMax` fits it to a width")
+                return False, f"row {i}: {bad} - {owner}, and that is the row to change"
+            now = int(prop.get("fontSize") or 12)
+            if size == now:
+                return False, (f"row {i}: `fontSize` {now} already puts the box nearest "
+                               f"{want} px tall ({got[2] - got[0]}x{got[3] - got[1]} px), "
+                               f"so that drag would write a value the row already has")
+            wrote["fontSize"] = all_wrote["fontSize"] = size
+            said.append(f"the face went {now} -> {size} and the box reached "
+                        f"{got[2] - got[0]}x{got[3] - got[1]} px against the "
+                        f"{nb[2] - nb[0]}x{want} px the drag asked for; a text row's "
+                        f"extent is the ink its face lays down")
+            if hx and kind != "special":
+                said.append("the width the drag asked for is not a key this row owns")
+        elif kind == "arc":
+            sw, sh = nb[2] - nb[0], nb[3] - nb[1]
+            r0, th0 = int(prop.get("radius") or 0), int(prop.get("width") or 0)
+            base = int(prop.get("sizeWidth") or (2 * r0 + 2 * th0)) or 1
+            thick = max(1, int(round(th0 * sw / base)))
+            inner = sw - 2 * thick
+            if inner <= 0:
+                return False, (f"row {i}: a {sw} px band with a {thick} px stroke leaves no "
+                               f"hole: that row's rule is `sizeWidth == 2*radius + 2*width` "
+                               f"and the radius it needs would be {inner} px")
+            sq = int(prop.get("sizeWidth") or 0) == int(prop.get("sizeHeight") or 0)
+            if sw != sh and sq:
+                said.append(f"the box is no longer square ({sw}x{sh}); all 6 arc rows in "
+                            f"this library are, and nothing here quietly repairs that")
+            if "left" in edge:
+                wrote["x"] = all_wrote["x"] = int(prop.get("x") or 0) + hx
+            if "top" in edge:
+                wrote["y"] = all_wrote["y"] = int(prop.get("y") or 0) + vy
+            wrote.update({"sizeWidth": sw, "sizeHeight": sh, "radius": inner // 2,
+                          "width": thick})
+            all_wrote.update(wrote)
+            said.append(f"the ring scales with its box: `radius` {r0} -> {inner // 2}, "
+                        f"stroke `width` {th0} -> {thick}, so 2*radius + 2*width is "
+                        f"still {sw}")
+        elif kind == "line":
+            # `layout.line_rect` is pure arithmetic - it predicts the drawn box exactly,
+            # measured on 4 rows out of 4 - so a `line` is the one kind whose resize can be
+            # decided without drawing.  The box's two extents come from different declared
+            # keys depending on the row's own `rotate`, and the corner of the declared rect
+            # is *not* the corner of the box when the row is rotated (the rect pivots about
+            # its own centre) or when `lineWidth` recentres the thickness: so `x`/`y` are
+            # corrected from the prediction, and the sentence says that they were.
+            lw = int(prop.get("lineWidth") or 0)
+            prop_h = int(prop.get("height") or 2)
+            box_w, box_h = nb[2] - nb[0], nb[3] - nb[1]
+            wrote["height" if rot90 else "width"] = max(1, box_w)
+            thick_key = "lineWidth" if (lw and lw != prop_h) else (
+                "width" if rot90 else "height")
+            wrote[thick_key] = max(1, box_h)
+            if lw and thick_key == "lineWidth":
+                said.append(f"the row carries `lineWidth` {lw} and `draw_line` replaces "
+                            f"the declared thickness with it, centred on the rect's middle "
+                            f"line, so that is what was written")
+            probe_p = dict(prop)
+            probe_p.update({k: v for k, v in wrote.items() if k in ("width", "height",
+                                                                   "lineWidth")})
+            px0, py0, pw, ph = layout.line_rect(probe_p)
+            if (pw, ph) != (box_w, box_h):
+                return False, (f"row {i}: the keys this row's rules offer come out "
+                               f"{pw}x{ph} px, not the {box_w}x{box_h} px the drag asked "
+                               f"for, so nothing is written")
+            if (px0, py0) != (nb[0], nb[1]):
+                wrote["x"] = int(prop.get("x") or 0) + (nb[0] - px0)
+                wrote["y"] = int(prop.get("y") or 0) + (nb[1] - py0)
+                said.append("the declared rect's corner is not this box's corner, so "
+                            f"`x`/`y` were set from `line_rect` to put the box at "
+                            f"{nb[0]},{nb[1]} where the drag left it")
+            if rot90:
+                said.append(f"`rotate: {int(prop.get('rotate') or 0)}` turns the rect about "
+                            f"its own centre, so the box's horizontal extent is `height` on "
+                            f"this row")
+        elif kind == "bar":
+            wrote["width"] = all_wrote["width"] = max(1, nb[2] - nb[0])
+            wrote["height"] = all_wrote["height"] = max(1, nb[3] - nb[1])
+            if "left" in edge:
+                wrote["x"] = int(prop.get("x") or 0) + hx
+            if "top" in edge:
+                wrote["y"] = int(prop.get("y") or 0) + vy
+        elif kind == "special" and "width" in keys:
+            pitch = int(prop.get("width") or 0) + ((nb[2] - nb[0]) - (x1 - x0))
+            if pitch < 0:
+                return False, (f"row {i}: the pitch between the two figures cannot be "
+                               f"negative ({pitch}); `width` is their centres' distance and "
+                               f"a negative one swaps them")
+            wrote["width"] = all_wrote["width"] = pitch
+            said.append(f"`width` is the pitch between the figures' centres: "
+                        f"{int(prop.get('width') or 0)} -> {pitch}, each figure moving "
+                        f"{((nb[2] - nb[0]) - (x1 - x0)) // 2} px outward")
+        for key in list(wrote):
+            if str(prop.get(key)) == str(wrote[key]):
+                del wrote[key]
+        if not wrote:
+            return False, (f"row {i}: that drag leaves "
+                           + ", ".join(f"`{k}` {prop.get(k)}" for k in sorted(keys))
+                           + ", which is what the row already has")
+        unwritten = sorted(k for k in set(all_wrote) - set(wrote)
+                           if str(prop.get(k)) == str(all_wrote[k]))
+        if unwritten:
+            said.append("left unwritten because the row already holds them: "
+                        + ", ".join(f"`{k}` {prop.get(k)}" for k in unwritten))
+        if not wrote:
+            return False, f"row {i}: {why}, and this drag asks for none of those keys"
+
+        # the library's answer first: a key that field's own rule refuses is refused here, in
+        # that rule's words, before a step is taken or a byte is written
+        self.select(i)
+        ext = set(extension_fields(kind))
+        for key, val in sorted(wrote.items()):
+            bad = self._check(kind, key, val, ext)
+            if bad:
+                return False, (f"row {i}: `{key}` = {val} is refused by that field's "
+                               f"own rule: {bad}")
+
+        # one act, one undo step: close any field run still open (so a resize cannot be
+        # swallowed by a keystroke that was mid-drag), then let these writes form the run
+        # that `commit` turns into a single step.
+        self.commit()
+        soft = []
+        for key, val in sorted(wrote.items()):
+            good, note = self.set(key, val, commit=False)
+            if not good:
+                return False, f"row {i}: the model refused `{key}` after all: {note}"
+            if note:
+                soft.append(note)
+        self.commit()
+        after = self._row_box(self.obj, i)
+        moved = ""
+        if after:
+            edges = [("left", x0, after[0]), ("top", y0, after[1]),
+                     ("right", x1, after[2]), ("bottom", y1, after[3])]
+            moved = ("  the edges that moved: "
+                     + ", ".join(f"{n} {a}->{b}" for n, a, b in edges if b != a))
+        return True, (f"resized row {i} ({kind}) with a {edge} drag of {dx},{dy}: wrote "
+                      + ", ".join(f"`{k}` {v}" for k, v in sorted(wrote.items()))
+                      + f"; the box went {x0},{y0}..{x1},{y1} -> "
+                      + (f"{after[0]},{after[1]}..{after[2]},{after[3]}" if after
+                         else "nothing at all")
+                      + ".  " + "; ".join(said) + moved
+                      + ("  said, not repaired: " + "; ".join(soft) if soft else ""))
+
     def commit(self) -> None:
         """End a coalesced run of writes: a spinbox settling, one drag, one nudge.
 
