@@ -7425,6 +7425,16 @@ for _e in (generated + [gui_edit.Editor.open_theme(r["name"]) for r in pick]):
         assert _t.undo() and themes.canonical(_t.obj) == _base, (
             _e.name, _k, "one press of undo did not put the file back byte for byte")
 
+def _cut(text, n):
+    """A sentence quoted to the end of a word, not to a character count.
+
+    These excerpts land in the suite's own printed line, and a cut in mid-phrase reads as a
+    claim the model never made: the refusal this one exists because of came out as "a
+    `special` row has to name one of clock".
+    """
+    return text if len(text) <= n else text[:n].rsplit(" ", 1)[0] + " ..."
+
+
 # the refusals, each one moving nothing at all.  The last-row refusal is compared
 # against `themes.validate`'s own hard string, because the claim is that the model
 # repeats the library rather than paraphrasing it.
@@ -7441,7 +7451,7 @@ for _bad, _want in (("nope", "is not a kind this program draws"),
     assert not _good and _want in _said, (_bad, _said)
     assert (_t.steps, _t.dirty, len(_t.widgets())) == (_steps0, _dirty0, _n0), (
         _bad, "a refusal moved the layout")
-    _ref.append(f"`{_bad}` -> {_said[:40]}")
+    _ref.append(f"`{_bad}` -> {_cut(_said, 64)}")
 _t = gui_edit.Editor(copy.deepcopy(generated[0].obj), origin="suite probe",
                      name=generated[0].name, theme=generated[0].theme)
 while len(_t.widgets()) > 1:
@@ -7452,7 +7462,7 @@ _good, _said = _t.delete_widget()
 assert not _good and _EMPTY_PHRASE in _said, (_said, _EMPTY_PHRASE,
                    "the model does not refuse the last row in `validate`'s words")
 assert _t.steps == _steps0 and len(_t.widgets()) == 1, "the refusal still removed the row"
-_ref.append(f"the last row -> {_said[:44]}")
+_ref.append(f"the last row -> {_cut(_said, 72)}")
 _t = gui_edit.Editor(copy.deepcopy(generated[0].obj), origin="suite probe",
                      name=generated[0].name, theme=generated[0].theme)
 _t.select(0)
@@ -7460,7 +7470,7 @@ assert _t.delete_widget()[0], "deleting row 0 was refused"
 _t.select(0)
 _good, _said = _t.move_widget(-1)
 assert not _good and "already the first drawn" in _said, _said
-_ref.append(f"move past the front -> {_said[:36]}")
+_ref.append(f"move past the front -> {_cut(_said, 64)}")
 
 # ---- the reorder, measured per adjacent pair.  Three numbers per pair: whether the two
 # ---- boxes meet at all, whether the swap moves any pixel, and - inside the rectangle the
@@ -7542,7 +7552,7 @@ print(f"                        reorder: {_swap_zero} adjacent pairs whose boxes
       f"({'; '.join(f'{n} {a}/{b} rows {i}/{i + 1}' for n, i, o, a, b in _silent[:4])}"
       + (f"; +{len(_silent) - 4} more)" if len(_silent) > 4 else ")"))
 print(f"                        one add, in the model's own sentence: "
-      f"{_add_notes.get('text', '')[:140]}")
+      f"{_cut(_add_notes.get('text', ''), 220)}")
 
 # ---- the figures this cycle's pages write down.  Each one is counted again from the files
 # ---- or the code on this run, and the sentence has to carry that answer: a digit that goes
@@ -7645,6 +7655,27 @@ _stated("the placement step, on the page", _gf,
         r"walked over the canvas in \*\*(\d+) px\*\* steps", (gui_edit.PLACE_STEP,))
 _stated("the layerIndex census, on the page", _gf, _LAYER,
         (_pos_same, len(_f_rows), len(_f_rows) - _pos_same))
+# ...and the counts that follow a face, now that both halves are on the page: the gate holds
+# this run to its own half, exactly as it does for a column's width.  Membership, not a
+# tolerance - a third machine's answer is a sentence to add, not a range to widen.
+_stated("the adds, on the page", _gf,
+        r"the \*\*(\d+)\*\* adds across the \*\*(\d+)\*\* layouts come out",
+        (_add_ok, len(generated) + len(pick)))
+_pb = _pair("the three ways an add can end",
+            r"come out \*\*(\d+) / (\d+) / (\d+)\*\* on this bench.*?"
+            r"\*\*(\d+) / (\d+) / (\d+)\*\* on CI's runner",
+            (_place_clear, _place_moved, _place_stuck))
+assert _pb[:3] == _pb[3:], (_pb, "the page claims both machines answer the same three "
+                                 "placement counts, and they no longer do")
+_rp = _pair("the pairs whose boxes never meet",
+            r"\*\*(\d+)\*\* adjacent pairs of drawn rows have boxes that never meet on this "
+            r"bench and \*\*(\d+)\*\* on CI's runner", (_swap_zero,))
+_stated("the pairs whose boxes meet, on the page", _gf,
+        r"of the \*\*(\d+)\*\* whose boxes do meet \*\*(\d+)\*\* moved ink and \*\*(\d+)\*\* "
+        r"did not - the same (\d+) / (\d+) / (\d+) on both",
+        (len(_silent) + _swap_move, _swap_move, len(_silent),
+         len(_silent) + _swap_move, _swap_move, len(_silent)))
+
 # ...and `app.py`, whose comment *and* docstring quote the same arc heights the page
 # labels.  Four digits each, and they have to be the page's four digits: a code comment
 # stating a third machine's pixels is a claim nobody labelled.

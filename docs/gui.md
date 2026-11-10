@@ -434,9 +434,11 @@ editor commonly gets wrong:
   copied from. Where there is no such position the row stays where its source sits and the
   sentence says so, and the row is left selected so the reader can drag it; quietly moving a
   row nobody asked to move, or parking one where it is invisible without saying, is the same
-  repair this model refuses elsewhere. Which of the adds landed, moved or found no room
-  follows this machine's faces, so the suite prints those three counts per machine instead of
-  promising them here.
+  repair this model refuses elsewhere.  How an add ends is a picture question, so it is
+  measured rather than reasoned about: the **159** adds across the **28** layouts come out
+  **35 / 109 / 15** on this bench - clear where their source sits, moved to the nearest free
+  spot, still meeting another box and saying so in the sentence - and **35 / 109 / 15** on
+  CI's runner, and the gate holds whichever machine is running it to its half of that pair.
 * **A reorder is the draw order, and it is proved with pixels.** The rule, asserted in both
   directions over every adjacent pair of drawn rows in all 28 layouts: a swap moves ink
   **exactly** where the two rows both cover some pixel opaquely and in different colours.
@@ -444,7 +446,9 @@ editor commonly gets wrong:
   pixel; pairs whose boxes meet but whose ink never both lie opaque in the overlap also swap
   0 px, which is what an `arc`'s box (mostly the hole its ring is drawn around) and two vendor
   `line` rows crossing in sub-pixel coverage look like. Which pair falls on which side is a
-  font question, so those counts are printed per machine and the rule is what is held.
+  font question, so it is measured, and both machines are named: **120** adjacent pairs of
+  drawn rows have boxes that never meet on this bench and **118** on CI's runner, and of the
+  **12** whose boxes do meet **6** moved ink and **6** did not - the same 12 / 6 / 6 on both.
   `layerIndex` is left exactly where it was: over the vendor's files it equals the row's
   position in **23** of their **123** rows and differs in **100** (`Theme_01` gives six of its
   eight rows 0), nothing in `layout.py` reads it, and inventing a meaning the files do not

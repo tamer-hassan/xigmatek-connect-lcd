@@ -42,9 +42,14 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     stays where its source sits and the sentence says so out loud; the row
     is left selected so the reader can drag it.  Quietly moving a row nobody
     asked to move, and parking one out of sight without saying, are both the
-    silent repair this model refuses elsewhere.  Which of the adds landed,
-    moved or found no room follows this machine's faces, so those three
-    counts are printed per machine rather than promised in prose.
+    silent repair this model refuses elsewhere.  How an add ends follows
+    this machine's faces, so the counts are labelled pairs: the 159 adds
+    across the 28 layouts come out 35 / 109 / 15 - clear where their source
+    sits, moved to the nearest free spot, still meeting a box - on the
+    author's bench, and 35 / 109 / 15 on GitHub's runner.  The reorder pair
+    differs by two rows' worth of ink: 120 adjacent pairs whose boxes never
+    meet here and 118 there, and of the 12 whose boxes do meet, 6 moved ink
+    and 6 did not, on either machine.
 
   * A reorder moves no ink: the order of `osd.widget` is the draw order, and
     what a swap does is proved with pixels in both directions.  Over every
