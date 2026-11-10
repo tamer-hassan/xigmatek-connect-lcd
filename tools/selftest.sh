@@ -7693,6 +7693,13 @@ for _pat in (r"make this box (\d+) px tall in one column at a \d+x\d+ window and
         _m.groups(), _hh, "the code's comment and the page's labelled pair disagree about "
                           "whose pixels those are")
 
+# ...and the sentence that says a structural save is judged against the file on disk, which
+# is the one claim in the bullet no in-memory assert can make.
+assert ("the rows come back out of it in the same order, and the file on disk draws the frame "
+        "the pane was showing when `save` was pressed") in _gf, (
+    "docs/gui.md no longer promises the structural save round trip that the window's own gate "
+    "measures: rows in order out of the file, and the file drawing the saved frame")
+
 # ...and the refusal the page promises "in the library's own words": the phrase is taken
 # from `themes.validate` on this run, and both the model and the page have to carry it.
 assert _EMPTY_PHRASE in _gf, (
@@ -8498,6 +8505,61 @@ for _ in range(6):
     appq.processEvents()
 assert themes.user_copies() == [], themes.user_copies()
 assert not win.ed.dirty, "revert left an edit claimed as saved"
+
+# ...and the same door carrying a row the editor *added*, not a field it changed.  The
+# claim worth having is the one a field edit cannot make: that a structural change goes
+# into the file as the rows the editor holds, in the order it holds them, and that the file
+# read back from disk draws the frame the pane was showing when Save was pressed.  A save
+# that dropped the row, or wrote it somewhere else in the list, is the failure mode every
+# editor of this shape has, and the only way to see it is to compare the picture against
+# the file rather than against the object in memory.
+_rows_b = len(win.ed.widgets())
+_added_kind = ""
+for _k in ("text", "data", "bar", "line", "arc"):
+    _add_a = [x for x in win.ed_add_menu.actions() if x.text() == _k]
+    assert _add_a, f"the add menu lost its `{_k}` entry"
+    _add_a[0].trigger()
+    for _ in range(6):
+        appq.processEvents()
+    if len(win.ed.widgets()) == _rows_b + 1:
+        _added_kind = _k
+        break
+    # refused, and said: this layout's own rows of that kind can be rows that paint nothing
+    # at the pinned fixture, and a copy of one of those is refused rather than parked.
+    assert len(win.ed.widgets()) == _rows_b and win.ed_note.text(), (
+        _k, len(win.ed.widgets()), "a refused add moved the layout or said nothing")
+assert _added_kind, ("every kind the add menu offers was refused for this layout",
+                     _rows_b, win.ed_note.text())
+_frame_b = win._osd.copy()
+win.ed_save.click()
+for _ in range(6):
+    appq.processEvents()
+assert themes.user_copies() == ["Theme_28"], themes.user_copies()
+_disk_b = gui_edit.Editor.open_theme("Theme_28")
+assert [str(w.get("id")) for w in _disk_b.widgets()] == [
+    str(w.get("id")) for w in win.ed.widgets()], (
+    "the saved file's rows, in order, are not the editor's rows")
+_new_i = win.ed.index
+assert str(_disk_b.widgets()[_new_i].get("id")) == str(win.ed.selected().get("id")), (
+    "the row the add menu inserted is not the row the file holds at that position")
+_pic_b, _dn_b = _disk_b.paint(*_disk_b.fixture())
+assert _pic_b.tobytes() == _frame_b.tobytes(), (
+    "the file on disk redraws a different frame than the pane showed when Save was pressed")
+# undo now takes the row out of the *layout*, not out of the file: the copy on disk still
+# carries it, which is what `dirty` means here, and revert is what removes the copy.
+win.ed_undo.click()
+for _ in range(6):
+    appq.processEvents()
+assert len(win.ed.widgets()) == _rows_b and win.ed.dirty, (
+    len(win.ed.widgets()), win.ed.dirty, "undo of a structural save did not leave the "
+                                         "layout back and the file still outstanding")
+assert themes.user_copies() == ["Theme_28"], (
+    "undo rewrote the file, which is not what an undo promises")
+win.ed_revert.click()
+for _ in range(6):
+    appq.processEvents()
+assert themes.user_copies() == [], themes.user_copies()
+assert not win.ed.dirty, "the structural save left a copy behind"
 win.ed_name.setCurrentText(app.NO_EDITOR)
 for _ in range(6):
     appq.processEvents()
@@ -8523,8 +8585,11 @@ print(f"  the window's row        offers {win.ed_name.count() - 1} layouts "
       + (f"; a vendor arc with no `arcPaint` shows {unset!r} rather than a default"
          if unset else "")
       + f". Save wrote Theme_28.json and that file redraws the frame that was on screen;"
-      f" undo brought the first frame back; revert removed the copy. The pane is still"
-      f" capped at {win.preview.pixmap().width()} px for a {render.W} px glass.")
+      f" undo brought the first frame back; revert removed the copy.  A `{_added_kind}` row"
+      f" added through the menu takes the same round trip: {_rows_b} rows in,"
+      f" {_rows_b + 1} back out of the file in the same order, and that file draws the frame"
+      f" the pane was showing when Save was pressed.  The pane is still capped at"
+      f" {win.preview.pixmap().width()} px for a {render.W} px glass.")
 # ---- the canvas door in the window: presses, one drag and two arrow keys, delivered as
 # ---- the same QMouseEvent/QKeyEvent objects Qt would hand the pane.  There is no QTest in
 # ---- this environment, so the handlers receive real event objects rather than a helper, and

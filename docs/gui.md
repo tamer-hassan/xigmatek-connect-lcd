@@ -426,7 +426,10 @@ editor commonly gets wrong:
   `special:<name>` note says. Ids follow the spelling of the file being edited (UUIDs in the
   vendor's, `xigma-…` in ours) and stay unique inside a layout, which `themes.validate` only
   asks softly - those **23** files' **123** rows answer to **25** distinct ids, one id
-  shared by **18** of those rows - and the model obeys it anyway.
+  shared by **18** of those rows - and the model obeys it anyway.  What a structural edit
+  reaches is the file, and the check is made against the file rather than against the object
+  in memory: the rows come back out of it in the same order, and the file on disk draws the
+  frame the pane was showing when `save` was pressed.
 * **Where a new row lands is decided by the painter's boxes, and the sentence says what
   happened.** A trial draw with the row in it reports the box that row *actually* paints - an
   anchor does not mean the same thing for every kind and every `xigma.anchor` - and that box
