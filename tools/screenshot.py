@@ -44,10 +44,11 @@ window before the grab.  That is a framing choice, not a claim about a fixed
 layout: the fresh default is `settings.DEFAULTS["size"]`, quoted in
 docs/tools.md and checked against that constant by the suite, so neither
 sentence can go stale - and the window is resizable, with a floor of
-1280x1024 and three columns that reflow.  1440x1024 puts the three columns
-side by side with nine rows of the clip list in frame, which is the point:
-the capture shows what a first run actually gets.  The column rules
-themselves are checked by the suite, not by this picture (docs/gui.md).
+1280x1024 and three columns that reflow.  1440x1024 puts the three columns side by
+side with nine rows of the clip list in frame on this bench - ten rows of the clip
+list with CI's fonts, because a row is 66 px of *its* metrics - which is the point:
+the capture shows what a first run actually gets on the machine that took it.  The
+column rules themselves are checked by the suite, not by this picture (docs/gui.md).
 """
 from __future__ import annotations
 

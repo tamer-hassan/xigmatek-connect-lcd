@@ -347,10 +347,13 @@ runner could write different bytes of the same animation.
   if the `--device` path exists, because in this mode the window's own status read opens the
   port, and a screenshot is not the thing to take someone's panel over with; the default is
   `/dev/xigmatek-lcd`, which on a capture machine has nothing behind it.  `--size WxH`
-  frames it (`--size`, 1440x1024, the window's own fresh default, for the README's picture: the three
-columns side by side, nine rows of the clip list). The window's own fresh default is 1440x1024 - `settings.DEFAULTS
-  ["size"]` - and the suite asserts that both figures named here appear in the code as
-  constants or defaults, so neither sentence can go stale. Nothing about the layout is fixed
+  frames it (`--size`, default 1440x1024, the window's own fresh default, which is what
+the README's picture shows: the three columns side by side, nine rows of the clip list on
+this bench and ten rows of the clip list with CI's fonts).  The window is resizable down to
+its own floor of 1280x1024, so that framing is a choice and not a claim about the layout:
+  the suite checks the size against `settings.DEFAULTS["size"]`, checks the row count that
+page states against what it measures on the machine running it, and checks the column
+rules themselves, so none of those sentences can go stale.  Nothing about the layout is fixed
   by the picture: the preview column caps itself at the 480 px frame, the clip library is a
   column of its own, and the splitter is the user's, which is what the suite asserts instead
   - along with the floors under those columns, which is what a 1180 px window could not hold.

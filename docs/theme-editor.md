@@ -704,7 +704,7 @@ per-theme milliseconds in docs/gui.md stay labelled as owed a quiet-box re-measu
   frame could never be shown 1:1" - and `pane_l.width() == pane_l.maximumWidth()`), and
   docs/gui.md carries the rest of the pixel census: pane floors 200/300/320, each raised
   to what that column's own contents measure, 66 px
-  clip rows with room for 9 clips at the 1440×1024 default, a 150 px list floor and an 84 px
+  clip rows with room for 9 clips at the 1440×1024 default on this bench, 10 on CI's runner, a 150 px list floor and an 84 px
   log floor, and a fresh split (532/540/356) that leaves every column at least its
   contents' own minimum width - which 0.4's 1180 px window and 520/460/560 split did
   not, and is what the controls column's horizontal scrollbar came from. Keeping the

@@ -108,7 +108,7 @@ number in that shape comes from a measurement, most of them of a failure:
   (`CLIP_ICON`), and `ResizeMode.Adjust` - which lays rows out against the viewport
   and is what painted one selected clip as a block taller than the list - went to
   `Fixed` with uniform rows. Measured afterwards, and printed by the suite:
-  **66 px rows, and room for 9 clips at the fresh 1440×1024 window, 10 at 1919×1055**
+  **66 px rows, and room for 9 clips at the fresh 1440×1024 window on this bench (10 on CI's runner), 10 at 1919×1055 (11 there)**
   — rows in view, which is capacity: this bench has 40 distinct clips to
   put in them (204 files behind them on the author's bench), while a checkout of this
   repository on its own - no installed package, no second partition - walks the 46 mp4 files
@@ -153,10 +153,14 @@ number in that shape comes from a measurement, most of them of a failure:
   a reader is choosing between entries.  The popup's own view gets the width instead
   (**323 px** for that row, 340 px on the runner) and costs the column nothing, while the
   box never asks for more than its longest entry: a box that did was the floor under the
-  whole controls column once.  The suite pins the pane's ceiling at 300 px to check the
-  fix in exactly the case it exists for, and asserts list-wider-than-entry and
-  entry-wider-than-box rather than any of those four numbers - which is the half no
-  machine's fonts can rot.
+  whole controls column once.  That column is not reachable any more - `_pane_floors`
+  raises the pane to its own contents, **329 px** on this bench and 337 px on the runner -
+  so the suite pins the pane to *its own floor*, reads the width back before it claims
+  anything about it, and checks both halves there: the list is never narrower than the
+  widest entry any of the 28 layouts puts in that row, and neither is the closed box
+  (**280 px** around that 247 px entry here).  Those two relations are what the gate
+  asserts; the digits beside them are this bench's, and the runner's are in brackets the
+  same way, because a column's width is a font question and not a constant.
 
 The window's floor is the owner's rule, written in `xigmaui/app.py` as `MIN_WIDTH,
 MIN_HEIGHT = 1280, 1024`: a 1280×1024 desktop at minimum, up to a 3840×2160 one, and
@@ -169,27 +173,30 @@ row of controls fall off the edge. The fresh default is **1440×1024**
 
 The splitter is asked for **532 / 540 / 356** at that window - the left column capped at
 the 480 px frame plus its chrome, the controls given enough for two columns of editor
-rows, the library the rest - and a fresh window reads them back as **532 / 541 / 359**
-(each pane's floor is its contents' own width),
-every column wider than its own contents measure. The same three numbers are a shape at
-other widths: `QSplitter` scales an over-wide request down proportionally and its
-stretch factors hand a wide window's slack to the controls and the library, so at
-3840×2160 the library column is 1 318 px across and shows **28** clip rows while the
-preview stays capped at its 532 px - it is never scaled up, because pixels the glass does
-not have would only be a bigger lie. The suite builds a window at these defaults, reads
-the splitter back, asserts each column is at least as wide as what it holds, that none of
-the three scrolls sideways, and that the editor grid's column count times its per-column
-threshold is never less than what that grid asked for; it checks both triples against
-this page, so neither can go stale.
+rows, the library the rest - and a fresh window reads them back as **532 / 541 / 359** on
+this bench (each pane's floor is its contents' own width, so the second and third digits
+follow the machine's fonts; the request itself is a constant, and that is the half the
+gate pins). Every column comes back wider than its own contents measure. The same three
+numbers are a shape at other widths: `QSplitter` scales an over-wide request down
+proportionally and its stretch factors hand a wide window's slack to the controls and the
+library, so at 3840×2160 the library column is **1 318 px** across and shows **28** clip
+rows on this bench, while the preview stays capped at its 532 px - it is never scaled up,
+because pixels the glass does not have would only be a bigger lie. The suite builds a
+window at these defaults, reads the splitter back, asserts each column is at least as wide
+as what it holds, that none of the three scrolls sideways, that the field grid's columns
+arrive as the window widens, and that its own minimum never exceeds the room that
+justified them; it holds the request and the read-back apart, so a machine with different
+fonts cannot make the code's constant look wrong.
 
 And the columns' floors are not remembered constants: `_pane_floors()` raises each pane's
-minimum to its own contents' `minimumSizeHint`, so the two text columns sit at **329** and **359 px**
-on this bench where the code's lower bounds are 300 and 320 - and they move with the
-machine's fonts, which is precisely why the gate compares the relation and not the
-digits. A pane that cannot be dragged under what it holds cannot grow a horizontal
-scrollbar inside itself, so the 0.4 failure mode is unreachable rather than merely
-avoided. The floor also moves with the form: one column of editor rows asks for 329 px of controls, two columns for 386, three for 554, and the window's own minimum rises with them.
-The 18 rows of an `arc` widget stand **779 px** tall in one column and **403 px** in three, the grid's own ask going **171 / 344 / 512 px** - the reflow buying height without buying a scrollbar, all six figures off the same sizing pass the suite runs.
+minimum to its own contents' `minimumSizeHint`, so the two text columns sit at **329** and **359 px** on this bench
+where the code's lower bounds are 300 and 320 - and they move with the machine's fonts
+(the same two columns measure 337 and 376 px on CI's runner), which is precisely why the
+gate compares the relation and not the digits. A pane that cannot be dragged under what it
+holds cannot grow a horizontal scrollbar inside itself, so the 0.4 failure mode is
+unreachable rather than merely avoided. The floor also moves with the form: on this bench
+one column of editor rows asks for 329 px of controls, two columns for 386, three for 554, and the window's own minimum rises with them.
+The 18 rows of an `arc` widget stand **779 px** tall in one column and **403 px** in three, the grid's own ask going **171 / 344 / 512 px** - the reflow buying height without buying a scrollbar, all six figures this bench's, off the same sizing pass the suite runs and prints on every machine.
 
 ### The preview plays, or shows one frame
 

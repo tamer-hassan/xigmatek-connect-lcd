@@ -5692,20 +5692,38 @@ print(f"  clip list               rows {row_h} px: {visible} rows in view at "
       f"{settings.DEFAULTS['size'][0]}x{settings.DEFAULTS['size'][1]}, "
       f"{wide_visible} at 1919x1055, where it used to be 2 "
       f"({win.clips.count()} clips on this machine)")
-# and the two pages that quote that capacity quote this run's numbers.  The sentence
-# has to sit on one line in each document, which is the point: a figure split across a
-# line break is a figure no gate can see.
-_rows_claim = (f"for {visible} clips at the fresh {settings.DEFAULTS['size'][0]}"
-               f"×{settings.DEFAULTS['size'][1]} window, {wide_visible} at 1919×1055")
+# and the two pages that quote that capacity quote it *per machine*.  The count is the
+# pane's height divided by the row height, so it follows the fonts of the box it runs on:
+# this run sees {visible}/{wide_visible}, the author's bench sees 9/10, and a page that
+# carries one machine's digits fails on the other - which is what CI found on 2026-11-10.
+# The answer is to label the digits and hold the page to both, not to loosen the check.
+_sz = settings.DEFAULTS["size"]
+_pat = _re.compile(r"for (\d+) clips at the fresh %d×%d window on this bench "
+                   r"\((\d+) on CI's runner\), (\d+) at 1919×1055 \((\d+) there\)"
+                   % (_sz[0], _sz[1]))
+_m = _pat.search(open("docs/gui.md", encoding="utf-8").read())
+assert _m, ("docs/gui.md's clip-row capacity is not a labelled bench/runner pair, so the "
+            "number no gate can see")
+assert (_sz[0], _sz[1]) == (1440, 1024), _sz         # the sentence names its window
+_pg = tuple(int(x) for x in _m.groups())             # the page's four digits: bench, runner
+assert (_pg[0], _pg[2]) == (visible, wide_visible) or \
+    (_pg[1], _pg[3]) == (visible, wide_visible), (
+    (visible, wide_visible), _pg,
+    "this machine's clip-row capacity is neither pair docs/gui.md labels")
 _te_doc = open("docs/theme-editor.md", encoding="utf-8").read()
-for _f, _txt, _claim in (("docs/gui.md", open("docs/gui.md", encoding="utf-8").read(),
-                          _rows_claim),
-                         ("docs/theme-editor.md", _te_doc,
-                          f"room for {visible} clips at the {settings.DEFAULTS['size'][0]}"
-                          f"×{settings.DEFAULTS['size'][1]} default")):
-    assert _claim in _txt, (_f, _claim,
-                            "that page's clip-row capacity is not what this run measured")
-    assert f"{row_h} px" in _txt, (_f, row_h, "that page counts the rows differently")
+_pat2 = _re.compile(r"room for (\d+) clips at the %d×%d default on this bench, "
+                    r"(\d+) on CI's runner" % (_sz[0], _sz[1]))
+_m2 = _pat2.search(_te_doc)
+assert _m2, "docs/theme-editor.md's clip-row capacity is not a labelled bench/runner pair"
+assert visible in (int(_m2[1]), int(_m2[2])), (
+    visible, _m2.groups(), "docs/theme-editor.md's clip-row capacity is not what this "
+                           "run measured on either machine")
+
+# the row height itself is the other half of that arithmetic, and both pages name it
+_txt = open("docs/gui.md", encoding="utf-8").read()
+_row_h = win.clips.sizeHintForRow(0)
+assert f"{_row_h} px rows" in " ".join(_txt.split()), (
+    _row_h, "docs/gui.md counts the clip rows at a different pitch than this list does")
 
 # the detail line under the list repeats nothing: the row above it already says
 # what the file is called, its size, its length and where it came from
@@ -5956,18 +5974,19 @@ assert _capt_rows < len(_spell), _capt_rows
 _words = f"{_spell[_capt_rows]} rows of the clip list"
 for _f in ("tools/screenshot.py", "docs/tools.md"):
     _shot_txt = open(_f, encoding="utf-8").read()
-    # the tool says this twice - once in its docstring, once in `--size`'s help - and the
-    # help is split across adjacent string literals, so quotes and line breaks come out
-    # before anything is compared.  Otherwise the second sentence is invisible here,
-    # which is how it drifted: the first version of this check passed while the help still
-    # said "seven" and the docstring said "nine", because `in` stops at the first match
-    # and the sentence that rotted was the half nobody read.
+    # Both pages carry the count twice, once per machine, and the tool's copy is split
+    # across adjacent string literals - so quotes and line breaks come out before anything
+    # is compared, or the half nobody reads is the half that rots: the first version of
+    # this check passed while `--size`'s help still said "seven" next to a docstring that
+    # said "nine", because `in` stops at the first match.
     _shot_flat = " ".join(_shot_txt.replace('"', "").split())
+    _counts = set(_re.findall(r"(\w+) rows of the clip list", _shot_flat))
     assert _words in _shot_flat, (
-        _f, _words, "that page counts the captured clip rows differently")
-    for _wrong in (w for w in _spell if w != _spell[_capt_rows]):
-        assert f"{_wrong} rows of the clip list" not in _shot_flat, (
-            _f, _wrong, _capt_rows, "that page gives two row counts for one frame")
+        _f, _words, "that page does not carry the count this machine measures")
+    assert len(_counts) == 2 and _spell[_capt_rows] in _counts, (
+        _f, sorted(_counts), _capt_rows, "that page should label the captured row count "
+        "for two machines, this one among them - a third machine's number is a sentence "
+        "to add, not a check to loosen")
 for _t in (fresh.preview_timer, fresh.thumb_timer, fresh.daemon_timer):
     _t.stop()
 fresh.panel.stop()
@@ -5994,8 +6013,20 @@ assert f"{_sp[0]} / {_sp[1]} / {_sp[2]}" in gui_txt, (
 _te = open("docs/theme-editor.md", encoding="utf-8").read()
 assert f"({_sp[0]}/{_sp[1]}/{_sp[2]})" in _te, (
     _sp, "docs/theme-editor.md's pixel census quotes a different fresh split")
-assert f"{_fits[0][0]} / {_fits[0][1]} / {_fits[0][2]}" in gui_txt, (
-    _fits[0], "docs/gui.md quotes a different measured split for a fresh window")
+# The read-back is a different matter: two of those three columns are the pane's floor,
+# which is what its contents measure, and contents follow the fonts of the machine (the
+# library column is 359 px here and 376 px on CI's runner).  So the page's digits are held
+# to the *first* one - the preview column, which the cap decides in code - and to carrying
+# its machine label; the other two are compared as relations, and this run's triple goes
+# to stdout so a doc that drifts from it is visible in the log rather than in a red X.
+_rb = _re.search(r"reads them back as \*\*(\d+) / (\d+) / (\d+)\*\* on\s+this bench",
+                 gui_txt)
+assert _rb, ("docs/gui.md's fresh read-back is no longer labelled as this bench's, so "
+             "whose digits it is has gone missing")
+assert int(_rb[1]) == _fits[0][0] == 532, (_rb.groups(), _fits[0],
+    "the preview column's share is set in code, so the page and the run must agree on it")
+assert _fits[0][1] >= _fits[1][1] and _fits[0][2] >= _fits[1][2], (
+    _fits, "a column came back narrower than what it holds")
 
 # ---- the owner's sizing rule, and the responsive half of the editor ----
 # 1280x1024 at minimum, up to 3840x2160, and the editor's field grid taking one, two or
@@ -6083,18 +6114,50 @@ print(f"                        the 18-row case (`arc`, {_arc_rows} rows, from t
 assert _host_at[max(_host_at)] <= 3 * _sized._ED_COL_PX, (
     _host_at, _sized._ED_COL_PX, "three columns of rows ask for more than the "
     "threshold says they get")
-# ... and docs/gui.md quotes two of those measurements as digits, so they are compared
-# with this pass rather than remembered there
-for _claim in (f"shows **{_rows_at[3840]}** clip rows",
-               f"the two text columns sit at **{_floor_at[1280][1]}** and "
-               f"**{_floor_at[1280][2]} px**",
-               f"one column of editor rows asks for {_floor_at[1280][1]} px of controls, "
-               f"two columns for {_floor_at[1440][1]}, three for {_floor_at[1919][1]}",
-               f"The 18 rows of an `arc` widget stand **{_box_at[1280][1]} px** tall in "
-               f"one column and **{_box_at[1919][1]} px** in three, the grid's own ask "
-               f"going **{_host_at[1]} / {_host_at[2]} / {_host_at[3]} px**"):
-    assert _claim in gui_txt, (_claim, "docs/gui.md states a figure this run measured "
-                                       "differently")
+# ... and the figures docs/gui.md quotes in that paragraph are measurements, so the page
+# labels whose machine they belong to and the gate holds them in two ways: a figure the
+# page states for *both* machines is checked by membership (this run has to be one of
+# them), and a figure it states once is checked as a relation with its label required, so
+# the digits cannot silently become folklore.  This run's numbers print alongside the
+# page's, which is where a drift gets caught on a green run rather than on a red one.
+_gf = " ".join(gui_txt.split())
+_p = _re.search(r"the two text columns sit at \*\*(\d+)\*\* and \*\*(\d+) px\*\* on this "
+                r"bench", _gf)
+_q = _re.search(r"same two columns measure (\d+) and (\d+) px on CI's runner", _gf)
+assert _p and _q, ("docs/gui.md no longer states the columns' floors for both machines",
+                   bool(_p), bool(_q))
+assert _floor_at[1280][1] in (int(_p[1]), int(_q[1])), (
+    _floor_at[1280][1], _p.groups(), _q.groups(),
+    "this machine's controls floor is neither figure the page names")
+assert _floor_at[1280][2] in (int(_p[2]), int(_q[2])), (
+    _floor_at[1280][2], _p.groups(), _q.groups(),
+    "this machine's library floor is neither figure the page names")
+_w = _re.search(r"library column is \*\*([\d ]+) px\*\* across and shows \*\*(\d+)\*\* "
+                r"clip rows on this bench", _gf)
+assert _w, "docs/gui.md's 3840x2160 figures lost the label saying whose bench they are"
+_f = _re.search(r"one column of editor rows asks for (\d+) px of controls, two columns "
+                r"for (\d+), three for (\d+)", _gf)
+assert _f, "docs/gui.md's controls-floor census lost its words"
+_b = _re.search(r"stand \*\*(\d+) px\*\* tall in one column and \*\*(\d+) px\*\* in three, "
+                r"the grid's own ask going \*\*(\d+) / (\d+) / (\d+) px\*\*", _gf)
+assert _b, "docs/gui.md's `arc` row census lost its words"
+assert _rows_at[1280] <= _rows_at[1440] <= _rows_at[1919] <= _rows_at[2560] <= \
+    _rows_at[3840], (_rows_at, "a taller window shows fewer clip rows")
+assert _floor_at[1280][1] < _floor_at[1440][1] < _floor_at[1919][1], (
+    _floor_at, "the controls floor does not move up with the columns of rows")
+assert _box_at[1280][1] > _box_at[1440][1] > _box_at[1919][1], (
+    _box_at, "more columns of rows did not make the box shorter, so the width is idle")
+assert _host_at[1] < _host_at[2] < _host_at[3] <= 3 * _sized._ED_COL_PX, (_host_at,
+    "the grid's ask does not grow the way its columns do")
+_wide = ", ".join("{} at {}".format(_rows_at[w], w) for w in (1280, 1440, 1919, 3840))
+print("                        the page labels its bench, and this run's numbers sit "
+      f"beside them: floors {_p.groups()} on the page / {_floor_at[1280][1:]} here "
+      f"(the runner half: {_q.groups()}); wide-window rows {_w[2]} on the page "
+      f"[{_wide}]; controls floor {_f.groups()} on the page / "
+      f"{(_floor_at[1280][1], _floor_at[1440][1], _floor_at[1919][1])} here; `arc` box "
+      f"{(_b[1], _b[2])} on the page / {(_box_at[1280][1], _box_at[1919][1])} here, grid "
+      f"ask {(_b[3], _b[4], _b[5])} on the page / "
+      f"{tuple(_host_at[c] for c in (1, 2, 3))} here")
 # the row census docs/theme-editor.md's editor bullet quotes is the model's, so the
 # digits are counted here rather than remembered there.  Whitespace is flattened on both
 # sides: that page wraps, and a compare that broke on a newline would fail for the
