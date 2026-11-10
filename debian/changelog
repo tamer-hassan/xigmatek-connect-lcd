@@ -71,6 +71,19 @@ xigmatek-connect-lcd (0.5) resolute; urgency=medium
     at 1440, three from 1919 up; 28 clip rows at 3840, with the preview
     still capped at 532 px because the 480 px frame is never scaled up.
 
+  * Every measured figure a page quotes now carries the machine it was
+    read on, and the suite holds it by that label.  The clip list fits 9
+    rows at the fresh 1440x1024 window here and 10 on GitHub's runner (11 at
+    1919x1055 where this bench reads 10); the two text columns' floors are
+    329 and 359 px here, 337 and 376 px there; the controls floor runs
+    329/386/554 as the field rows take one, two and three columns here and
+    337/403/575 there; the 18-row `arc` box stands 779 px in one column and
+    403 px in three against 723 and 378, its grid asking 171/344/512 px
+    against 180/361/533.  The gate reads both pairs out of docs/gui.md,
+    requires this run's numbers to be one of them, and prints the third case
+    rather than letting it slide: 28 clip rows at 3840x2160 on either
+    machine is a fact, a lone "359 px" is not.
+
   * Gates for the layout itself, in the same twenty-two offline sections.
     A fresh window is checked against its own contents: no column
     narrower than what it holds, no horizontal scrollbar in any of the

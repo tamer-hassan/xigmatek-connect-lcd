@@ -6115,49 +6115,71 @@ assert _host_at[max(_host_at)] <= 3 * _sized._ED_COL_PX, (
     _host_at, _sized._ED_COL_PX, "three columns of rows ask for more than the "
     "threshold says they get")
 # ... and the figures docs/gui.md quotes in that paragraph are measurements, so the page
-# labels whose machine they belong to and the gate holds them in two ways: a figure the
-# page states for *both* machines is checked by membership (this run has to be one of
-# them), and a figure it states once is checked as a relation with its label required, so
-# the digits cannot silently become folklore.  This run's numbers print alongside the
-# page's, which is where a drift gets caught on a green run rather than on a red one.
+# labels whose machine each belongs to and the suite holds them two ways: a figure stated
+# for *both* machines is checked by membership (this run has to be one of the two), and a
+# figure stated once has to carry its label, with this run's number printed beside it so a
+# drift shows up on a green run instead of only on a red one.  The two labelled machines
+# are the author's bench and GitHub's runner; a third machine is a sentence to add, which
+# is what its own numbers are printed for.
 _gf = " ".join(gui_txt.split())
-_p = _re.search(r"the two text columns sit at \*\*(\d+)\*\* and \*\*(\d+) px\*\* on this "
-                r"bench", _gf)
-_q = _re.search(r"same two columns measure (\d+) and (\d+) px on CI's runner", _gf)
-assert _p and _q, ("docs/gui.md no longer states the columns' floors for both machines",
-                   bool(_p), bool(_q))
-assert _floor_at[1280][1] in (int(_p[1]), int(_q[1])), (
-    _floor_at[1280][1], _p.groups(), _q.groups(),
-    "this machine's controls floor is neither figure the page names")
-assert _floor_at[1280][2] in (int(_p[2]), int(_q[2])), (
-    _floor_at[1280][2], _p.groups(), _q.groups(),
-    "this machine's library floor is neither figure the page names")
-_w = _re.search(r"library column is \*\*([\d ]+) px\*\* across and shows \*\*(\d+)\*\* "
-                r"clip rows on this bench", _gf)
-assert _w, "docs/gui.md's 3840x2160 figures lost the label saying whose bench they are"
-_f = _re.search(r"one column of editor rows asks for (\d+) px of controls, two columns "
-                r"for (\d+), three for (\d+)", _gf)
-assert _f, "docs/gui.md's controls-floor census lost its words"
-_b = _re.search(r"stand \*\*(\d+) px\*\* tall in one column and \*\*(\d+) px\*\* in three, "
-                r"the grid's own ask going \*\*(\d+) / (\d+) / (\d+) px\*\*", _gf)
-assert _b, "docs/gui.md's `arc` row census lost its words"
+
+
+def _pair(what, pattern, mine, unit="px"):
+    """One measured figure the page states for two machines: this run must be one of them."""
+    m = _re.search(pattern, _gf)
+    assert m, (what, "docs/gui.md no longer writes this figure as a labelled bench/runner "
+                     f"pair, so nobody knows whose {unit} it is")
+    got = tuple(int(x.replace(" ", "")) for x in m.groups())
+    assert mine in (got[:len(mine)], got[len(mine):]), (
+        what, mine, got, f"this machine's {unit} figure is neither one the page labels")
+    return got
+
+
+_b = _pair("the fresh split read back",
+           r"reads them back as \*\*(\d+) / (\d+) / (\d+)\*\* on this bench and "
+           r"\*\*(\d+) / (\d+) / (\d+)\*\* on CI's runner", tuple(_fits[0]))
+assert _b[0] == _b[3] == 532, (_b, "the preview column's share is set in code, so both "
+                                   "machines must read the same first digit")
+_fl = _pair("the two text columns' floors",
+            r"the two text columns sit at \*\*(\d+)\*\* and \*\*(\d+) px\*\* on this "
+            r"bench.*?and \*\*(\d+)\*\* and \*\*(\d+) px\*\* on CI's runner",
+            tuple(_floor_at[1280][1:]))
+_cl = _pair("the controls floor by columns of rows",
+            r"one column of editor rows asks for (\d+) px of controls, two columns for "
+            r"(\d+), three for (\d+) on this bench, and (\d+) / (\d+) / (\d+) on CI's "
+            r"runner", (_floor_at[1280][1], _floor_at[1440][1], _floor_at[1919][1]))
+assert _cl[0] < _cl[1] < _cl[2] and _cl[3] < _cl[4] < _cl[5], (
+    _cl, "a machine's controls floors do not rise with its columns of rows")
+_hh = _pair("the `arc` box heights",
+            r"stand \*\*(\d+) px\*\* tall in one column and \*\*(\d+) px\*\* in three "
+            r"there.*?\*\*(\d+)\*\* and \*\*(\d+) px\*\*, asking",
+            (_box_at[1280][1], _box_at[1919][1]))
+_ga = _pair("the grid's own ask",
+            r"the grid's own ask going \*\*(\d+) / (\d+) / (\d+) px\*\* - \*\*\d+\*\* and "
+            r"\*\*\d+ px\*\*, asking \*\*(\d+) / (\d+) / (\d+)\*\*",
+            tuple(_host_at[c] for c in (1, 2, 3)))
+assert _hh[0] > _hh[1] and _hh[2] > _hh[3], (_hh, "more columns did not shorten the box")
+assert _ga[0] < _ga[1] < _ga[2] and _ga[3] < _ga[4] < _ga[5], (_ga, "the ask does not grow "
+                                                                "with its columns")
+assert _ga[2] <= 3 * _sized._ED_COL_PX and _ga[5] <= 3 * _sized._ED_COL_PX, (
+    _ga, _sized._ED_COL_PX, "three columns of rows ask for more than the threshold says")
+_w = _re.search(r"the library column is 1 318 px across on this bench and shows \*\*(\d+)\*\*"
+                r" clip rows on either machine", _gf)
+assert _w, ("docs/gui.md's 3840x2160 sentence no longer labels its width as this bench's "
+            "and its row count as both machines'")
+assert int(_w[1]) == _rows_at[3840], (_rows_at[3840], _w[1],
+    "the wide window's clip-row count is not what the page says it is on either machine")
 assert _rows_at[1280] <= _rows_at[1440] <= _rows_at[1919] <= _rows_at[2560] <= \
     _rows_at[3840], (_rows_at, "a taller window shows fewer clip rows")
-assert _floor_at[1280][1] < _floor_at[1440][1] < _floor_at[1919][1], (
-    _floor_at, "the controls floor does not move up with the columns of rows")
 assert _box_at[1280][1] > _box_at[1440][1] > _box_at[1919][1], (
     _box_at, "more columns of rows did not make the box shorter, so the width is idle")
-assert _host_at[1] < _host_at[2] < _host_at[3] <= 3 * _sized._ED_COL_PX, (_host_at,
-    "the grid's ask does not grow the way its columns do")
 _wide = ", ".join("{} at {}".format(_rows_at[w], w) for w in (1280, 1440, 1919, 3840))
-print("                        the page labels its bench, and this run's numbers sit "
-      f"beside them: floors {_p.groups()} on the page / {_floor_at[1280][1:]} here "
-      f"(the runner half: {_q.groups()}); wide-window rows {_w[2]} on the page "
-      f"[{_wide}]; controls floor {_f.groups()} on the page / "
-      f"{(_floor_at[1280][1], _floor_at[1440][1], _floor_at[1919][1])} here; `arc` box "
-      f"{(_b[1], _b[2])} on the page / {(_box_at[1280][1], _box_at[1919][1])} here, grid "
-      f"ask {(_b[3], _b[4], _b[5])} on the page / "
-      f"{tuple(_host_at[c] for c in (1, 2, 3))} here")
+print("                        the page's two labelled machines and this run: split "
+      f"{(_b[0], _b[1], _b[2])} bench / {(_b[3], _b[4], _b[5])} runner / {_fits[0]} here; "
+      f"floors {(_fl[0], _fl[1])} / {(_fl[2], _fl[3])} / {_floor_at[1280][1:]} here; "
+      f"controls by columns {(_cl[0], _cl[1], _cl[2])} / {(_cl[3], _cl[4], _cl[5])} / "
+      f"{(_floor_at[1280][1], _floor_at[1440][1], _floor_at[1919][1])} here; wide-window "
+      f"rows {_w[1]} either machine [{_wide}]")
 # the row census docs/theme-editor.md's editor bullet quotes is the model's, so the
 # digits are counted here rather than remembered there.  Whitespace is flattened on both
 # sides: that page wraps, and a compare that broke on a newline would fail for the
