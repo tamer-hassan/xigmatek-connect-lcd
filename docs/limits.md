@@ -829,8 +829,11 @@ offline figures from `--dry-run`, and the glass pass is stage 6 of
 [theme-editor.md](theme-editor.md).
 
 **The file model's limits: where a theme may live, and what a save refuses.** Reading your
-own copy is in the tree (stage 3 there); the window that writes one is not, and no flag
-writes a theme today. What the model does and does not allow, all of it gated:
+own copy is stage 3 there, and the window that writes one landed in 0.4: its `save as your
+copy` button, with `themes.save()` behind it, is the only writer in this program.  No flag
+writes a theme - `--export-theme NAME` prints a generated layout on stdout and writes
+nothing, because a committed `gauge.json` goes stale the first time anyone edits
+`theme_gauge`. What the model does and does not allow, all of it gated:
 
 * **One directory is written to: `~/.config/xigmalcd/themes`** (`$XDG_CONFIG_HOME`), and
   it is also scanned first - before the checkout and before `/usr/share/xigmalcd/themes/alpha`.

@@ -842,3 +842,179 @@ runner nor the bench judges from these bytes is the glass itself - and the tag's
 message says the same thing at the front instead: what 0.4 has not yet been measured on is
 the exported layouts on the panel, the pairing rules in a window a person is using, and the
 quiet-box re-measure `bars` still owes.
+
+
+### The 0.5 tag, built here and built by the runner: the same bytes, four times
+
+```
+tag v0.5               annotated tag object `f34835a0da55cca2665cc0a451b66d902e5d5231`, on
+                       commit `5bf130e91e4efc2fb37e7a58b313d0fd3cd22727` - the `main` tip at
+                       the moment of tagging
+stanza                 `xigmatek-connect-lcd (0.5) resolute; urgency=medium`, stamped
+                       `Tue, 10 Nov 2026 14:27:56 +0200`; the two bench `.changes` both print
+                       that `Date:` line, and the runner's archive census prints the same
+                       instant as `2026-11-10 12:27 UTC` while its build ran at 12:43Z
+runner                 this commit was built there twice: once as the `main` push (run
+                       42817642108) and once as the tag (run 42817643653). Each ran the
+                       suite, the doc / manifest / link gates, the build, lintian, and
+                       install + `debian/tests/smoke`; only the tag's run then published, so
+                       the tag's run is 4 jobs green and the branch's run is 3 green with the
+                       release job skipped. Published 2026-11-10T12:46:11Z
+bench, same commit     two `dpkg-buildpackage -us -uc -d -i -I` in separate detached worktrees
+                       of the tag, ending 14:40:54 and 14:43:17 local
+```
+
+Four builds of one tree - two runners, two benches - and the two containers agree byte for
+byte across all of them. The bench pair matches each other; each matches the published
+asset; and the runner's own second run of that commit, read back out of that run's artifacts
+with `gh run download`, compares clean against the tag's.
+
+```
+xigmatek-connect-lcd_0.5_all.deb
+  runner     5 360 530 B  sha256 82838da858b036678427a2b92a75808facb9140059fdf536542c1e15ae35b1b8
+  bench      5 360 530 B  same digest, and `cmp` clean against the other bench build and
+             against either runner's copy
+xigmatek-connect-lcd-themes_0.5_all.deb
+  runner    79 852 282 B  sha256 065a3859fa74023cc97f36c1bad8c83648f891d7a3edd2a3d57376a177059166
+  bench     79 852 282 B  same digest, and `cmp` clean
+archive members, the runner's own census of the pair: "1 distinct date(s): 2026-11-10 12:27"
+for each - the stanza's instant, not four build clocks'
+lintian on the two `.deb` files: 0 errors, 0 warnings, 0 infos, on the runner (lintian
+2.129.0ubuntu2.2) and here (2.129.0ubuntu2.1)
+```
+
+**The vendor library did not move, and the payload digest now has a recipe written down.**
+The 0.3 and 0.4 sections above each print a `payload digest` with its file and byte totals
+but never print the command that made it, and that gap is why the 0.5 number is worth
+stating carefully: the totals reproduce, the recipe was reconstructed, and it gives the
+earlier sections' digests exactly. Read out of `dpkg -x` of the themes package, that
+package's own `usr/share/doc/` left out:
+
+```
+0.3   100 files / 85 034 557 B   46fb6f2da1effd1b4e82522df530cbef7bc08016ee0f9e15a44fa864f88a0b17
+0.4   100 files / 85 035 542 B   3940e5bb2f4d2e483e1d1ced4e5cc25e689bdf77f51ca930ef64c62528839e44
+0.5   100 files / 85 035 542 B   3940e5bb2f4d2e483e1d1ced4e5cc25e689bdf77f51ca930ef64c62528839e44
+```
+
+The recipe, so this stops being folklore - and each of the three lines above was built from
+its own tag on this bench (`v0.3` at 14:53:34, `v0.4` at 14:44:09, `v0.5` at 14:43:17
+local), which is also what confirms the two digests those older sections printed from memory:
+
+```
+dpkg -x xigmatek-connect-lcd-themes_0.5_all.deb p05
+(cd p05 && find . -type f ! -path './usr/share/doc/*' -printf '%P\n' | sort \
+     | xargs -d'\n' sha256sum) > list-themes-05
+sha256sum list-themes-05          # the first two fields of that output *are* the digest
+diff list-themes-04 list-themes-05
+```
+
+For 0.4 to 0.5 that `diff` is empty: same 100 names, same 100 digests. The library the
+themes package ships is the library 0.4 shipped, and the release that spent its work on the
+painter and the window touched none of it. For 0.3 to 0.4 the same `diff` is one row -
+`usr/share/xigmalcd/themes/alpha/README.md`, `fb202289…` at 29 945 B becoming `b41a66d8…`
+at 30 930 B - which is what that section said it was, arithmetic included: 85 034 557 B plus
+985 B is 85 035 542 B.
+
+The themes `.deb` did grow at 0.5, by 3 654 B (`79 848 628` to `79 852 282`), and the file
+that grew is the package's own changelog: `usr/share/doc/xigmatek-connect-lcd-themes/changelog.gz`
+is 13 787 B at 0.4 and 18 680 B at 0.5, the 0.5 stanza added on top of the 0.4 one. That is
+the only row in its `md5sums` that moves. `Installed-Size` follows it - `83 111 KB` at 0.3,
+`83 116 KB` at 0.4, `83 121 KB` here - while the 125 files under
+`/usr/share/xigmalcd/themes/alpha` still hash clean on both machines.
+
+The code package is where 0.5 actually is. Same recipe, its own `usr/share/doc/` left out:
+35 files at both releases, 5 725 642 B at 0.4 and 5 781 796 B at 0.5, list digests
+`5570ea88177f54fc…` to `7c0f65e20540b1dd…`. Eleven rows move, and they are the whole of the
+release in one list:
+
+```
+usr/lib/python3/dist-packages/xigmalcd/__init__.py      526 B -> 526 B   the version string
+usr/lib/python3/dist-packages/xigmalcd/layout.py     53 179 B -> 53 878 B  the `format:` note
+usr/lib/python3/dist-packages/xigmaui/app.py        154 172 B -> 192 437 B  rows, faces, floors
+usr/lib/python3/dist-packages/xigmaui/edit.py        32 326 B -> 46 984 B  drawn_text, the fold
+usr/lib/python3/dist-packages/xigmaui/settings.py     9 590 B -> 11 433 B  window and split
+```
+
+plus the six rows under `xigmalcd-0.4.dist-info/`, which at 0.5 live under
+`xigmalcd-0.5.dist-info/`: five of them are byte-identical apart from the directory name
+(`INSTALLER` 7 B, `WHEEL` 91 B, `entry_points.txt` 116 B, `top_level.txt` 17 B, and
+`licenses/LICENSE` 35 149 B), and `METADATA` grows from 14 043 B to 14 732 B - and the
+689 B of that is exactly the installed README's own growth, 13 646 B to 14 335 B, because
+`pyproject.toml` says `readme = "README.md"` and the wheel's metadata embeds that file.
+
+Then the installed doc set, which is 12 markdown files at both releases: eight changed
+(README and the seven pages under `docs/` that this release's work touched), four did not
+(`PROTOCOL.md`, `docs/install.md`, `docs/troubleshooting.md`, `docs/handoff-2026-11-05.md`).
+The container follows all of that: `5 230 088 B` at 0.3, `5 335 138 B` at 0.4, `5 360 530 B`
+here, and `Installed-Size` `6 184 KB` to `6 269 KB`.
+
+One thing the bench build sees that every runner build has missed, because the CI job builds
+binary-only (`-us -uc -b`) and this bench builds with a source package: lintian's source pass
+prints one warning that has never appeared in a CI log -
+
+```
+W: xigmatek-connect-lcd source: missing-license-paragraph-in-dep5-copyright
+   gpl-3.0-or-later+other [debian/copyright:37]
+```
+
+and `lintian --fail-on error,warning` exits 2 on it. It changes nothing about the two
+`.deb` files, both of which come back 0 / 0 / 0 above, so it is not worth moving a tag for:
+it is a `debian/copyright` stanza, and it belongs in a release that has not been stamped yet.
+The runner's summary line stays `errors=0 warnings=0 infos=0`, which is true of what that
+job looks at, and this is the sentence that says what it does not.
+
+The runner's install job read the pair back, as it does for every release:
+
+* `xigmatek-connect-lcd 0.5 all installed-size 6269 KB`,
+  `xigmatek-connect-lcd-themes 0.5 all installed-size 83121 KB`; installing the pair is
+  `Need to get 543 kB/85.8 MB of archives … 93.8 MB of additional disk space`, after
+  `Need to get 14.7 MB … 58.1 MB` of runtime dependencies. At 0.4 the same reads were
+  6 184 KB and 83 116 KB with `85.7 MB … 93.7 MB`.
+* `12 markdown files under /usr/share/doc/xigmatek-connect-lcd, none compressed`,
+  `50 links inside the doc set, all resolving; 5 image link(s) repo-only by design;
+  3 pointer(s) into the source tree`, `2 kept log(s) under docs/packaging/`, and
+  `manifest 125/125 files hashed clean under /usr/share/xigmalcd/themes/alpha` - every one
+  of those four counts the same as at 0.4, which is the same fact the empty payload `diff`
+  says from the other side of the build.
+* the library drawn on that machine: `113 widget boxes painted across the 23 selectable
+  layouts, from one pinned dict at one pinned instant, no port opened`, and the vendor-pixels
+  line names both machines in one breath - `113 boxes, 314 367 lit px on this machine (the
+  bench of 2026-11-08 records 114 / 315 287 with all 16 face combinations installed)`.
+  Unchanged from 0.4, as it has to be when the payload is unchanged: the difference between
+  the machines is one installed face, and docs/limits.md says so with both named.
+* `all installed checks passed`, with smoke's own two lines about what this machine cannot
+  judge: `one frame, drawn with no panel in the loop`, and `the GUI, offscreen and with no
+  panel: window, clips, and the reset gate`.
+* and the suite's hardware guard, from the same runner with no such device: `reset: one
+  destructive link in 17 opens, everything else non-destructive; it then waited for
+  '/dev/ttyACM*' (answered here - this host has 0 such node(s) of its own)`.
+
+### The published v0.5 release
+
+* **v0.5**: <https://github.com/tamer-hassan/xigmatek-connect-lcd/releases/tag/v0.5>,
+  published 2026-11-10T12:46:11Z by run 42817643653, and GitHub marks it **Latest** - so
+  `gh release download --latest` now answers 0.5, which is what README's quick start pulls.
+
+| file | B | sha256 |
+|---|---|---|
+| `xigmatek-connect-lcd_0.5_all.deb` | 5 360 530 | `82838da858b036678427a2b92a75808facb9140059fdf536542c1e15ae35b1b8` |
+| `xigmatek-connect-lcd-themes_0.5_all.deb` | 79 852 282 | `065a3859fa74023cc97f36c1bad8c83648f891d7a3edd2a3d57376a177059166` |
+| `xigmatek-connect-lcd_0.5_amd64.changes` | 15 325 | `d6136d112ad855eb71b2eee6bd90a9b89b220ba64571fecd82b63b46b0698fb0` |
+| `xigmatek-connect-lcd_0.5_amd64.buildinfo` | 8 633 | `c64a9fe7e2100895ebf07701364a4dba7a9865f496636b48e94c7090b92fe577` |
+
+The `.changes` and `.buildinfo` rows are the runner's again, and the bench's copies of the
+same two files differ in the ways they are allowed to - `15 868 B` and `7 692 B` here,
+naming this machine and its paths - while the two `.deb` rows do not differ at all. The
+release body is generated by the job that uploads it: the two `.deb` sizes and hashes, the
+"unofficial, not affiliated with, endorsed by or approved by XIGMATEK" line, and the
+sentence that the hashes are reproducible from the source because every archive member is
+dated from `debian/changelog`. What it does not carry is any claim about glass, and the tag's
+own message says which half of 0.5 has not been measured on it: the layout editor's rows on
+the panel, `--no-clock` there, and the quiet-box re-measure `bars` still owes.
+
+The same caveat as at 0.2, 0.3 and 0.4, stated before it bites anyone: this section was
+committed *after* `v0.5`, so the published code `.deb` carries an earlier copy of this page.
+The byte counts above are read off the published assets and off two builds of the tag itself;
+a build of any later commit differs by exactly this page - which is why the payload digest
+above is the number that survives an edit here, and why it is now a recipe rather than a
+memorised string.
