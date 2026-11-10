@@ -3808,6 +3808,305 @@ print(f"  why every draw pins  the same `clock` layout drawn twice with no pinne
       f"instant it differs by {_still} px. That is why `themes.draw`, `themes.parity` and "
       f"every gate above pass an instant: without it a pixel comparison is a stopwatch")
 
+# ---- naming a copy: the two acts that invent a name, and the one name rule they share.
+# ---- These refusals are not a taste list.  `resolve()` answers a name, that name folded,
+# ---- and the `id` inside the file, and `scan()` keeps one record per name with the user
+# ---- root first - so a copy put at a name another layout holds does not sit beside it: it
+# ---- takes that layout out of reach by name *and* by id (measured: after that,
+# ---- `resolve(<vendor id>)` answers None, and a copy at `theme_07` beside the vendor's
+# ---- `Theme_07` leaves `--list-themes` showing two layouts while every spelling resolves
+# ---- to one file).  So "a name of your own" has to mean unused by name, by case-fold and
+# ---- by id.  And the acts are measured for what they change: one path, one id.
+_n_had = sorted(themes.user_copies())
+assert _n_had == [], _n_had                      # the gates above leave the root clean
+import hashlib as _hash
+
+
+def _n_vhash():
+    """Every layout file in the two vendor trees, as {path: sha256}.
+
+    Hashed off the directory rather than off `scan()`, because `scan()` deliberately shows
+    one record per name - a copy of yours hides the vendor's record, and this gate is about
+    the vendor's *files*, which are the evidence every figure in the docs was read from.
+    """
+    out = {}
+    for _root, _pat in themes.roots():
+        if _root == themes.user_root():
+            continue
+        for _p in themes._glob.glob(os.path.join(_root, _pat), recursive=True):
+            out[_p] = _hash.sha256(open(_p, "rb").read()).hexdigest()
+    return out
+
+
+_n_vendor0 = _n_vhash()
+assert len(_n_vendor0) >= 54, len(_n_vendor0)    # 27 in the checkout, 27 in the package
+_n_lim = themes.NAME_LIMIT
+assert themes._safe_name("x" * _n_lim) == "x" * _n_lim, "the limit itself must be usable"
+try:
+    themes._safe_name("x" * (_n_lim + 1))
+    raise AssertionError("a name longer than the limit was accepted")
+except ValueError as _exc:
+    assert f"longer than {_n_lim} characters" in str(_exc), _exc
+for _suf in themes.WRITER_SUFFIXES:
+    try:
+        themes._safe_name(f"copy{_suf}")
+        raise AssertionError(f"a name ending in {_suf!r} was accepted")
+    except ValueError as _exc:
+        assert f"copy{_suf}.json" in str(_exc), _exc
+
+_n_pick, _n_rej = themes.scan()
+_n_all = list(_n_pick) + list(_n_rej)
+_n_names = {r["name"] for r in _n_all}
+_n_ids = {str(r["id"]) for r in _n_all}
+assert not [n for n in _n_names if n.lower().endswith(themes.WRITER_SUFFIXES)], (
+    "a layout here already has a name ending in one of the writer's own suffixes, so "
+    "refusing such a name would be refusing something that exists")
+assert len(_n_names) == len({n.lower() for n in _n_names}), (
+    "two layouts here differ only in case, which a case-folding resolver cannot reach both "
+    "halves of - the name rule below depends on that not being so")
+assert len(_n_ids) == len(_n_all), "two layout files share an id already"
+assert len(themes.name_space()) == len(_n_names) + len(_n_ids), themes.name_space()[:4]
+
+# ---- the three ways a name is spoken for, and the two ways it is not
+_n_taken = []
+for _nm in (sorted(_n_names)[0], sorted(_n_names)[0].lower(), sorted(_n_names)[0].swapcase(),
+            sorted(_n_ids)[0]):
+    _why = themes.why_taken(_nm)
+    assert _why and "not a free name" in _why, (_nm, _why,
+                                                "a name the library answers read as free")
+    _n_taken.append(_nm)
+_n_free = [themes.why_taken("plain-new-name"), themes.why_taken("Theme_07",
+                                                                free_of="Theme_07"),
+           themes.why_taken("theme_07", free_of="Theme_07")]
+assert not any(_n_free), (_n_free, "a free name, or a copy's own name in another case")
+_n_refused = {}
+for _nm, _phrase in (("gauge", "one of the five"), ("../escape", "path element"),
+                     (".hidden", "leading dot"), ("bad.json", "suffix"),
+                     ("x" * (_n_lim + 1), "longer than"), ("a/b", "path element"),
+                     ("Theme_07", "not a free name"), ("theme_07", "not a free name"),
+                     (sorted(_n_ids)[0], "not a free name")):
+    try:
+        themes.new_name(_nm)
+        raise AssertionError(f"new_name took {_nm!r}")
+    except ValueError as _exc:
+        assert _phrase in str(_exc), (_nm, _phrase, _exc)
+        _n_refused[_nm] = _phrase
+
+# ---- a fresh id: the corpus's shape, and clear of every id in the corpus
+_n_vids = sorted(int(i) for i in _n_ids if str(i).isdigit())
+assert len(_n_vids) == len(_n_ids), (sorted(_n_ids)[:3], "a vendor layout id is not digits")
+assert {len(str(i)) for i in _n_vids} == {13}, _n_vids[:3]
+_n_spread = _n_vids[-1] - _n_vids[0]
+_n_new = [themes.new_id() for _ in range(6)]
+assert all(len(i) == 13 and i.isdigit() for i in _n_new), _n_new
+assert len(set(_n_new)) == 6, (_n_new, "two fresh ids in one run collided")
+assert not set(_n_new) & set(map(str, _n_vids)), (_n_new[:2],
+                                                  "a fresh id landed on an answered one")
+assert all(int(i) > _n_vids[-1] for i in _n_new), (_n_new[0], _n_vids[-1],
+                                                   "a fresh id was not above the library's")
+
+# ---- the act: a copy of a vendor layout, renamed
+_n_src, _n_rec = themes.copy_for_edit("Theme_07")[1], themes.resolve("Theme_07")
+_n_raw0, _n_obj0 = open(_n_src, "rb").read(), themes.load(_n_src)
+_n_pic0 = themes.draw(_n_obj0, {}, WHEN)[0]
+import xigmalcd.main as _main
+_n_path, _n_notes = themes.rename_copy("Theme_07", "my-renamed-copy")
+_n_obj1 = themes.load(_n_path)
+_n_diff = sorted(k for k in set(_n_obj0) | set(_n_obj1)
+                 if themes.canonical(_n_obj0.get(k), True)
+                 != themes.canonical(_n_obj1.get(k), True))
+assert _n_diff == ["id"], (_n_diff, "a rename changed more than the id: the rows, the "
+                           "canvas, the background and the ratio are the layout itself")
+assert themes.canonical({k: v for k, v in _n_obj1.items() if k != "id"}, True) == \
+    themes.canonical({k: v for k, v in _n_obj0.items() if k != "id"}, True), \
+    "everything but the id is byte-identical"
+_n_pic1 = themes.draw(_n_obj1, {}, WHEN)[0]
+assert _n_pic0.tobytes() == _n_pic1.tobytes(), (
+    "renaming a copy moved its pixels, which is a change of layout and not of name")
+assert themes.shape_of(_n_path) is not None, "the renamed file is not canonical-shaped"
+assert not os.path.exists(_n_src), "the old path is still there after the move"
+assert themes.user_copies() == ["my-renamed-copy"], themes.user_copies()
+_n_back = themes.resolve("Theme_07")
+assert _n_back and not _n_back.get("edited"), (_n_back and themes.origin(_n_back),
+                                               "the vendor's layout did not come back")
+assert themes.resolve(str(_n_obj0["id"]))["path"] == _n_back["path"], \
+    "the vendor's own id did not go back to the vendor's file"
+_n_said = " ".join(_n_notes)
+for _phrase in ("your copy moved: Theme_07.json is now my-renamed-copy.json",
+                "its id went", "answers checkout again",
+                "a copy written at a vendor's own name takes the name"):
+    assert _phrase in _n_said, (_phrase, _n_notes)
+assert _main.theme_name("my-renamed-copy") == "my-renamed-copy"
+assert _main.theme_name("MY-RENAMED-COPY") == "my-renamed-copy", "the resolver folds case"
+assert themes.pair("my-renamed-copy") == themes.pair("Theme_07"), (
+    themes.pair("my-renamed-copy"), themes.pair("Theme_07"),
+    "the renamed copy stopped naming the background its own file names")
+assert themes.is_copy("my-renamed-copy") and not themes.is_copy("Theme_07")
+
+# ---- the backup comes with the copy; a crash's scratch file stays where it is
+themes.save(_n_obj1, "my-renamed-copy")                 # a second save leaves a .bak behind
+open(_n_path + ".tmp", "w", encoding="utf-8").write("{ half written")
+_n_p2, _n_notes2 = themes.rename_copy("my-renamed-copy", "moved-again")
+assert os.path.exists(_n_p2 + ".bak"), (_n_notes2, "the .bak did not travel with the copy")
+assert any("came with it" in n for n in _n_notes2), _n_notes2
+assert open(_n_path + ".tmp", encoding="utf-8").read() == "{ half written", \
+    "a half-written .tmp was moved or rewritten"
+assert any("half-written" in n for n in _n_notes2), _n_notes2
+assert not os.path.exists(_n_path), "the layout file itself stayed at the old name"
+assert not os.path.exists(_n_path + ".bak"), "the .bak was left behind under the old name"
+
+# ---- a name nobody was shadowing: what a loop drawing that name ends up drawing
+_n_p3, _n_notes3 = themes.rename_copy("moved-again", "a-name-of-mine")
+_n_args = _main.build_parser().parse_args(["--theme", "a-name-of-mine"])
+_n_loop0 = _main.paint(_n_args, {})
+_n_p4, _n_notes4 = themes.rename_copy("a-name-of-mine", "and-now-another")
+_n_loop1 = _main.paint(_n_args, {})
+assert _n_loop1.tobytes() == render.draw({}, "gauge").tobytes(), (
+    "a loop that loses the name it was drawing does not fall back to `gauge`, so the "
+    "sentence in the note is wrong")
+assert any("falls back to `gauge`" in n for n in _n_notes4), _n_notes4
+try:
+    _main.build_parser().parse_args(["--theme", "a-name-of-mine"])
+    raise AssertionError("a fresh --theme took a name nothing answers")
+except SystemExit as _exc:
+    assert _exc.code == 2, _exc.code
+assert themes.resolve("a-name-of-mine") is None
+
+# ---- the refusals: each one says why, and none of them moves a byte
+_n_watch = sorted(themes._glob.glob(os.path.join(themes.user_root(), "*")))
+_n_bytes = {p: open(p, "rb").read() for p in _n_watch}
+_n_copies = themes.user_copies()
+for _nm, _phrase in (("Theme_14", "not a free name"), ("theme_14", "not a free name"),
+                     (str(_n_vids[0]), "not a free name"),
+                     ("and-now-another", "already the name this copy has"),
+                     ("bad.json", "suffix"), ("", "path element"),
+                     ("gauge", "one of the five"), ("x" * (_n_lim + 1), "longer than"),
+                     ("..", "path element")):
+    try:
+        themes.rename_copy("and-now-another", _nm)
+        raise AssertionError(f"rename accepted {_nm!r}")
+    except ValueError as _exc:
+        assert _phrase in str(_exc), (_nm, _phrase, _exc)
+for _nm, _phrase in (("Theme_14", "is not one of your copies"),
+                     ("nowhere-to-be-found", "is not one of your copies")):
+    try:
+        themes.rename_copy(_nm, "whatever")
+        raise AssertionError(f"rename accepted a source called {_nm!r}")
+    except ValueError as _exc:
+        assert _phrase in str(_exc), (_nm, _exc)
+assert sorted(themes._glob.glob(os.path.join(themes.user_root(), "*"))) == _n_watch
+assert {p: open(p, "rb").read() for p in _n_watch} == _n_bytes
+assert themes.user_copies() == _n_copies
+
+# ---- save-as at the file layer: one layout, two copies, two ids
+_n_src2 = themes.copy_for_edit("Theme_14")[1]
+_n_src2_raw = open(_n_src2, "rb").read()
+import copy as _copy
+_n_two = _copy.deepcopy(themes.load(_n_src2))     # `load` caches: copy before changing it
+_n_id2 = themes.new_id()
+_n_two["id"] = _n_id2
+_n_p5, _n_warn5 = themes.save(_n_two, "second-copy-of-14")
+assert open(_n_src2, "rb").read() == _n_src2_raw, \
+    "the first copy moved when a second was written"
+assert themes.load(_n_src2)["id"] != _n_id2, "two copies answering the same id"
+assert themes.resolve(str(themes.load(_n_src2)["id"]))["path"] == _n_src2
+assert themes.resolve(_n_id2)["path"] == _n_p5
+for _nm in ("Theme_14", "second-copy-of-14"):
+    try:
+        themes.new_name(_nm)
+        raise AssertionError(f"{_nm!r} read as free while a copy held it")
+    except ValueError as _exc:
+        assert "not a free name" in str(_exc), _exc
+assert themes.draw(themes.load(_n_src2), {}, WHEN)[0].tobytes() == \
+    themes.draw(themes.load(_n_p5), {}, WHEN)[0].tobytes(), "one layout, two names, " \
+    "two pictures - the copy is a copy"
+
+# ---- one process, two readers: the editor's memory is not the library's cache.  Measured
+# ---- here because it is a file-model fact: `themes.load` caches by (path, mtime) so an
+# ---- edited theme shows up on the loop's next frame, and the editor edits in place.
+_n_ed_src = themes.copy_for_edit("Theme_25")[1]
+_n_w0 = _copy.deepcopy(themes.load(_n_ed_src)["osd"]["widget"])
+import xigmaui.edit as _edit
+_n_ed = _edit.Editor.open_theme("Theme_25")
+_n_ed.select(0)
+_n_ok0, _n_say0 = _n_ed.set("x", int(_n_ed.value("x")) + 30)
+assert _n_ok0, _n_say0
+assert themes.load(_n_ed_src)["osd"]["widget"] == _n_w0, (
+    "an unsaved keystroke reached the object `themes.load` caches, so `scan()`, `pair()` "
+    "and `describe()` would read edits that no file holds")
+assert themes.canonical(_n_ed.obj, True) != themes.canonical(themes.load(_n_ed_src), True), \
+    "the editor and the file agreed while they were supposed to disagree (unsaved)"
+_n_src_id = str(themes.load(_n_ed_src)["id"])
+
+# ---- the editor's two naming doors: a file act, never an undo step, and memory follows it
+_n_ed_dirty, _n_ed_steps = _n_ed.dirty, _n_ed.steps
+_n_ed_x = int(_n_ed.value("x"))
+_n_bad = _n_ed.rename("Theme_07")
+assert _n_bad[0] is None and "not a free name" in _n_bad[1][0], _n_bad[1]
+assert _n_ed.dirty == _n_ed_dirty and _n_ed.steps == _n_ed_steps, (_n_ed.dirty,)
+_n_p6, _n_notes6 = _n_ed.rename("edited-by-the-model")
+assert _n_ed.name == "edited-by-the-model" and _n_ed.path == _n_p6, _n_ed.name
+assert _n_ed.dirty == _n_ed_dirty and _n_ed.steps == _n_ed_steps, (
+    _n_ed.dirty, _n_ed.steps, "a rename took an undo step or changed what was unsaved")
+assert int(_n_ed.value("x")) == _n_ed_x, "the rename rewrote the row the reader had moved"
+_n_id_now = str(_n_ed.obj["id"])
+assert _n_id_now == str(themes.load(_n_p6)["id"]) != _n_src_id, \
+    (_n_id_now, _n_src_id, "memory and the moved file agree on the new id, and the file "
+                           "before the move kept the old one")
+_n_ed.undo()                               # one step back: the row, never the identity
+assert str(_n_ed.obj["id"]) == _n_id_now, (_n_ed.obj["id"], _n_id_now,
+                                           "an undo step put the retired id back")
+assert int(_n_ed.value("x")) != _n_ed_x, "undo did not undo the edit it was asked to"
+assert _n_ed.where == "your copy", _n_ed.where
+_n_p6_raw = open(_n_p6, "rb").read()
+_n_p7, _n_notes7 = _n_ed.save_as("a-third-one")
+assert _n_p7 and _n_ed.name == "a-third-one" and not _n_ed.dirty, (_n_p7, _n_ed.dirty)
+assert open(_n_p6, "rb").read() == _n_p6_raw, \
+    "save_as wrote over the copy it was started from, instead of beside it"
+assert themes.load(_n_p6)["id"] != themes.load(_n_p7)["id"], (
+    "two copies of one layout answering one id")
+_n_say7 = " ".join(_n_notes7)
+for _phrase in ("is yours, under the name", "stays where it was"):
+    assert _phrase in _n_say7, (_phrase, _n_notes7)
+for _nm in ("Theme_14", "gauge", "bad.json"):
+    _n_no = _n_ed.save_as(_nm)
+    assert _n_no[0] is None, (_nm, _n_no[0])
+assert _n_ed.rename("")[0] is None and _n_ed.save_as("")[0] is None
+themes.delete_user_theme(_n_ed.name)
+themes.delete_user_theme(os.path.basename(_n_p6)[:-5])
+themes.delete_user_theme(os.path.basename(_n_ed_src)[:-5])
+
+# ---- and nothing about any of it reached the vendor's trees
+_n_ok2, _n_rej2 = themes.scan()
+_n_ids2 = [str(r["id"]) for r in list(_n_ok2) + list(_n_rej2)]
+assert len(set(_n_ids2)) == len(_n_ids2), (_n_ids2, "two layouts left answering one id")
+_n_vendor1 = _n_vhash()
+assert _n_vendor1 == _n_vendor0, (sorted(set(_n_vendor1) ^ set(_n_vendor0))[:3],
+                                  sorted((p for p in _n_vendor0 if _n_vendor0[p] !=
+                                          _n_vendor1.get(p)))[:3],
+                                  "a vendor layout file changed on disk")
+for _nm in themes.user_copies():
+    themes.delete_user_theme(_nm)
+assert themes.user_copies() == [], themes.user_copies()
+assert len(themes.scan()[0]) == len(_n_pick), (len(themes.scan()[0]), len(_n_pick),
+                                               "the vendor's pickable count moved")
+print(f"  naming a copy       the two acts that invent a name. {len(_n_refused)} names "
+      f"refused by `new_name` ({', '.join(f'{k}' for k in sorted(_n_refused))[:80]}), on a "
+      f"rule taken from the library itself: {len(_n_names)} names, all distinct folded, and "
+      f"{len(_n_ids)} ids, all distinct, every one answered by `resolve()`. A rename moved "
+      f"one file and changed exactly one key (`id`: 13 digits, and the vendor's "
+      f"{len(_n_vids)} fall inside {_n_spread:,} ms of one another), left every row and "
+      f"every pixel where they were, gave the hidden vendor layout back, carried its `.bak` "
+      f"with it and reported a half-written `.tmp` where it found one. Through the editor "
+      f"the same act took no undo step and left `dirty` as it was, and one press of undo "
+      f"afterwards went back a row and not an identity. A save-as left the first file byte "
+      f"for byte and drew the same picture twice under two ids. A loop that loses the name "
+      f"it is drawing falls back to `gauge` - measured, pixel for pixel - while a fresh "
+      f"--theme of that same name exits 2, which is why the note tells the reader to "
+      f"re-point it over the socket. And `themes.load`'s cache stays the library's own: an "
+      f"unsaved keystroke in an editor moves no byte of what `scan()`, `pair()` and "
+      f"`describe()` read")
+
 img_mem, notes_mem = themes.draw(themes.export("clock"), {}, WHEN)
 path, soft = themes.save(themes.export("clock"), "clock-as-file")
 img_file, notes_file = themes.draw(themes.load(path), {}, WHEN)
@@ -6876,15 +7175,20 @@ print(f"  the fixture, and both doors  every key is one `sensors.collect()` repo
 # The layout combo's tooltip counts layouts out in prose, and it was wrong for a while: it
 # said "three generated layouts" after the fifth export landed.  So its numbers are read back
 # out of the widget and held to `themes.EXPORTS` and `themes.scan()` - the same pair
-# `--list-themes` prints, which the doc-doors section already holds the documents to.
+# `--list-themes` prints, which the doc-doors section already holds the documents to.  The
+# sentence used to call that total "the vendor's", which is only true while the user root is
+# empty: `scan()` counts a copy of yours as pickable, so the sum stops being a count of the
+# vendor's files at the first save, and the tooltip is a sentence about what this window can
+# open today.  docs/themes.md still says "23 of the vendor's 27" - that page is talking about
+# the vendor's library, and its own gate holds it to the same two counts.
 _tip = win.ed_name.toolTip()
 for _want in (f"the {len(generated)} generated layouts",
-              f"{len(pick)} of the vendor's {len(pick) + len(_rej)}"):
+              f"{len(pick)} of the {len(pick) + len(_rej)} today"):
     assert _want in _tip, (_want, _tip[:120],
                            "the window and the library disagree about how many layouts there "
                            "are, in a sentence written to answer that question")
 print(f"  the window's own words   its layout tooltip states {len(generated)} generated "
-      f"layouts and {len(pick)} of the vendor's {len(pick) + len(_rej)} - the counts "
+      f"layouts and {len(pick)} of the {len(pick) + len(_rej)} today - the counts "
       f"`themes.EXPORTS` and `themes.scan()` report, read back off the widget")
 
 # ---- a run of keystrokes, one undo, and a picture that moves by exactly the edit ----
@@ -9500,6 +9804,370 @@ win.preview.set_marks((_bb, win.ed.label(_bi), (0, 0, 12, 12),
 win.preview.update()
 assert win._osd.tobytes() == _marked_osd.tobytes(), "the marks changed the layer"
 win.preview.set_marks(None)
+
+# ---- the two acts that invent a name, driven through the window: the box, the buttons,
+# ---- the menu that lists layouts, and the sentence each one leaves under the rows.
+_e_had = sorted(themes.user_copies())
+_e_open0 = win.ed_name.currentText()
+_e_vendor07 = open(themes.resolve("Theme_07")["path"], "rb").read()
+_e_combo_n = win.ed_name.count()
+
+
+def _e_combo():
+    return [win.ed_name.itemText(i) for i in range(win.ed_name.count())]
+
+
+def _e_files():
+    return sorted(os.path.basename(p) for p in
+                  _cg.glob(os.path.join(themes.user_root(), "*")))
+
+
+def _e_open(name):
+    win.ed_name.setCurrentText(name)
+    for _ in range(4):
+        appq.processEvents()
+
+
+_e_open("Theme_07")
+assert win.ed is not None and win.ed.name == "Theme_07", win.ed.name
+assert win.ed_newname.text() == "Theme_07", win.ed_newname.text()
+_e_long = "x" * (themes.NAME_LIMIT + 7)
+win.ed_newname.setText(_e_long)
+assert win.ed_newname.text() == _e_long, (
+    len(win.ed_newname.text()), "the box dropped the characters past the writer's limit: a "
+    "press would then have renamed the copy to a name nobody typed")
+win.ed_newname.setText("Theme_07")
+assert not win.ed_rename.isEnabled(), (
+    "rename was offered for a layout that is not one of my copies")
+assert win.ed_copy.isEnabled() and not win.ed_revert.isEnabled(), (
+    win.ed_copy.isEnabled(), win.ed_revert.isEnabled())
+assert "vendor's file in this checkout" in win.ed_state.text(), win.ed_state.text()
+_e_tip = win.ed_newname.toolTip()
+_e_pick, _e_rej = themes.scan()
+_e_names_n = len({r["name"] for r in list(_e_pick) + list(_e_rej)})
+_e_ids_n = len({str(r["id"]) for r in list(_e_pick) + list(_e_rej)})
+for _num in (str(themes.NAME_LIMIT), str(_e_names_n), str(_e_ids_n)):
+    assert _num in _e_tip, (_num, _e_tip[:120],
+                            "the name box's tooltip is remembering a number the library "
+                            "owns, instead of counting it from the library")
+assert "never ending in" in _e_tip and "PROTOCOL" in _e_tip, _e_tip[:160]
+
+# ---- save-as: one layout becomes a copy of mine, under a name nothing was answering
+_e_layer0 = win._osd.copy()
+win.ed_newname.setText("e-gate-copy")
+_steps_pre = win.ed.steps
+win.ed_copy.click()
+for _ in range(6):
+    appq.processEvents()
+assert win.ed.name == "e-gate-copy", win.ed.name
+assert "e-gate-copy.json is yours" in win.ed_note.text(), win.ed_note.text()[:150]
+assert "had no copy of its own, so nothing was left behind" in win.ed_note.text(), \
+    win.ed_note.text()[:200]
+assert themes.user_copies() == sorted(_e_had + ["e-gate-copy"]), themes.user_copies()
+assert open(themes.resolve("Theme_07")["path"], "rb").read() == _e_vendor07, \
+    "the vendor's file moved when I wrote a copy beside it"
+assert win.ed.obj["id"] != themes.resolve("Theme_07")["id"], (
+    "my copy answers the vendor's id as well as its own name: one layout, two names")
+assert themes.resolve(str(win.ed.obj["id"]))["path"] == win.ed.path
+assert win.ed.where == "your copy", win.ed.where
+assert "your copy under" in win.ed_state.text(), win.ed_state.text()
+assert win._ed_ctl("x") is not None                    # the rows are the same rows
+assert px_differ(_e_layer0, win._osd) == 0, (
+    px_differ(_e_layer0, win._osd), "a name act repainted the pane's layer")
+_e_combo_now = _e_combo()
+assert "e-gate-copy" in _e_combo_now and "Theme_07" in _e_combo_now, _e_combo_now
+assert win.ed_name.count() == 1 + len(themes.EXPORTS) + len(themes.scan()[0]), \
+    (win.ed_name.count(), len(themes.scan()[0]), "the menu and the library disagree")
+assert win.ed_name.currentText() == "e-gate-copy", win.ed_name.currentText()
+assert win._pair_target == themes.pair("Theme_07")[0] == "Theme_07.mp4", win._pair_target
+_e_tip2 = win.ed_name.toolTip()
+assert f"{len(_e_pick) + 1} of the {len(_e_pick) + 1 + len(_e_rej)}" in _e_tip2, _e_tip2[:190]
+print(f"  the name in the box   the two buttons and the box between them. `save as` wrote "
+      f"e-gate-copy.json beside the vendor's file (byte-identical still), took a fresh id "
+      f"so its name and its number answer one file each, and the pane's layer moved "
+      f"{px_differ(_e_layer0, win._osd)} px. The menu followed: {win.ed_name.count() - 1} "
+      f"entries for {len(themes.scan()[0])} pickable files, its tooltip recounting from the "
+      f"library, and the backdrop it names is still Theme_07.mp4")
+
+# ---- rename, with an unsaved keystroke in hand: the file moves, the work stays
+win.ed_widget.setCurrentIndex(0)
+for _ in range(3):
+    appq.processEvents()
+_x_row = win._ed_ctl("x")
+_x_before = _x_row.value()
+_x_row.setValue(_x_before + 21)
+for _ in range(3):
+    appq.processEvents()
+win.ed.commit()                            # a spinbox run is one step once it settles
+_dirty0, _steps0 = win.ed.dirty, win.ed.steps
+assert _dirty0 and _steps0 == _steps_pre + 1, (_dirty0, _steps0, _steps_pre)
+_e_file0 = open(win.ed.path, "rb").read()
+win.ed_newname.setText("e-gate-renamed")
+win.ed_rename.click()
+for _ in range(6):
+    appq.processEvents()
+assert win.ed.name == "e-gate-renamed", win.ed.name
+assert os.path.basename(win.ed.path) == "e-gate-renamed.json", win.ed.path
+assert win.ed.dirty is _dirty0 and win.ed.steps == _steps0, (
+    win.ed.dirty, win.ed.steps, "a rename took an undo step, or cleared what was unsaved")
+assert win._ed_ctl("x").value() == _x_before + 21, (
+    win._ed_ctl("x").value(), "the rename re-read the file and dropped the row I moved")
+assert themes.user_copies() == sorted([c for c in _e_had if c != "e-gate-copy"]
+                                      + ["e-gate-renamed"]), themes.user_copies()
+assert not os.path.exists(os.path.join(themes.user_root(), "e-gate-copy.json")), \
+    "the old name is still there: two files, one layout"
+assert "your copy moved: e-gate-copy.json is now e-gate-renamed.json" in \
+    win.ed_note.text(), win.ed_note.text()[:160]
+assert "its id went" in win.ed_note.text(), win.ed_note.text()[:200]
+assert str(win.ed.obj["id"]) == str(themes.load(win.ed.path)["id"]), \
+    "memory and the moved file disagree about the id"
+assert "e-gate-copy" not in _e_combo() and "e-gate-renamed" in _e_combo(), _e_combo()
+assert win.ed_name.currentText() == "e-gate-renamed", win.ed_name.currentText()
+_e_id_now = str(win.ed.obj["id"])
+win.ed_undo.click()
+for _ in range(6):
+    appq.processEvents()
+assert win._ed_ctl("x").value() == _x_before, (
+    win._ed_ctl("x").value(), _x_before, "undo did not go back over the row")
+assert str(win.ed.obj["id"]) == _e_id_now, (
+    win.ed.obj["id"], _e_id_now, "undo put a retired id back in the layout")
+
+# ---- the refusals, in the library's words, with not one byte moved
+_e_watch = _e_files()
+_e_bytes = {os.path.join(themes.user_root(), f): open(os.path.join(themes.user_root(), f),
+                                                      "rb").read() for f in _e_watch}
+for _nm, _rn, _sa in (("Theme_14", "is not a free name", "is not a free name"),
+                      ("theme_14", "is not a free name", "is not a free name"),
+                      # the one sentence the two doors differ in: moving onto the name this
+                      # copy already has is no act at all, writing a second file there would
+                      # be an overwrite - both refused, and each says which door it is
+                      ("e-gate-renamed", "already the name this copy has",
+                       "is not a free name"),
+                      ("bad.json", "suffix", "suffix"),
+                      ("", "path element", "path element"),
+                      ("gauge", "one of the five", "one of the five"),
+                      ("x" * 65, "longer than", "longer than"),
+                      ("../out", "path element", "path element"),
+                      (str(themes.resolve("Theme_14")["id"]), "is not a free name",
+                       "is not a free name")):
+    for _btn, _what, _phrase in ((win.ed_rename, "rename", _rn),
+                                 (win.ed_copy, "save as", _sa)):
+        win.ed_newname.setText(_nm)
+        _btn.click()
+        for _ in range(4):
+            appq.processEvents()
+        assert _phrase in win.ed_note.text(), (_what, _nm, win.ed_note.text()[:120])
+        assert win.ed.name == "e-gate-renamed", (_what, _nm, win.ed.name)
+        assert win.ed.steps == _steps0 - 1, (_what, win.ed.steps, "a refusal took a step")
+assert _e_files() == _e_watch and all(
+    open(os.path.join(themes.user_root(), f), "rb").read() == _e_bytes[
+        os.path.join(themes.user_root(), f)] for f in _e_watch), \
+    "a refusal wrote something"
+assert themes.user_copies() == sorted(_e_had + ["e-gate-renamed"]), themes.user_copies()
+
+# ---- picking the entry for the layout that is *already* open must not re-read the file:
+# ---- the menu holds your copy's name, and whatever you have typed since the last save lives
+# ---- only in memory.  Measured rather than guarded: `currentTextChanged` cannot fire with
+# ---- the text the menu already holds, so nothing re-opens here - and if a future rebuild of
+# ---- the menu ever fires that signal while the same layout is open, this is what fails.
+win.ed_widget.setCurrentIndex(0)
+for _ in range(3):
+    appq.processEvents()
+_e_x0 = win._ed_ctl("x").value()
+win._ed_ctl("x").setValue(_e_x0 + 13)
+for _ in range(3):
+    appq.processEvents()
+win.ed.commit()                             # a spinbox run is one step once it settles
+_e_x1, _e_dirty1 = win._ed_ctl("x").value(), win.ed.dirty
+assert _e_x1 == _e_x0 + 13 and _e_dirty1, (_e_x1, _e_dirty1)
+assert win.ed_name.currentText() == win.ed.name, (
+    win.ed_name.currentText(), win.ed.name, "the menu is not holding the open layout's name")
+win.ed_name.setCurrentText(win.ed.name)     # the entry for the layout that is open
+for _ in range(4):
+    appq.processEvents()
+assert win.ed is not None and win.ed.name == "e-gate-renamed", win.ed.name
+assert win._ed_ctl("x").value() == _e_x1 and win.ed.dirty == _e_dirty1, (
+    win._ed_ctl("x").value(), win.ed.dirty,
+    "re-picking the open layout's entry re-read the file and dropped what was typed")
+
+# ---- the box keeps what was typed into it, and refills for a different layout
+win.ed_newname.setText("half-typed")
+win._editor_state()
+assert win.ed_newname.text() == "half-typed", (
+    win.ed_newname.text(), "the window retyped the name box over what the reader typed")
+_e_open("dual")
+assert win.ed_newname.text() == "dual", win.ed_newname.text()
+
+# ---- a layout drawn from code: the save button refuses, `save as` does not
+win.ed_widget.setCurrentIndex(0)
+for _ in range(3):
+    appq.processEvents()
+_g_x = win._ed_ctl("x")
+_g_x.setValue(_g_x.value() + 5)
+for _ in range(3):
+    appq.processEvents()
+assert win.ed.dirty and win.ed_save.isEnabled(), (
+    win.ed.dirty, win.ed_save.isEnabled(), "a generated layout's save button is only ever "
+    "pressable with an unsaved change in hand, which is the state the refusal is for")
+win.ed_save.click()
+for _ in range(4):
+    appq.processEvents()
+assert "is one of the five themes drawn from render.py" in win.ed_note.text(), \
+    win.ed_note.text()[:150]
+assert themes.user_copies() == sorted(_e_had + ["e-gate-renamed"]), themes.user_copies()
+win.ed_newname.setText("e-gate-gauge")
+win.ed_copy.click()
+for _ in range(6):
+    appq.processEvents()
+assert win.ed.name == "e-gate-gauge" and win.ed.where == "your copy", (win.ed.name,
+                                                                       win.ed.where)
+assert "there was no file for 'dual'" in win.ed_note.text(), win.ed_note.text()[:200]
+assert "gauge" in render.THEMES and themes.resolve("gauge") is None, \
+    "`--theme gauge` stopped drawing the code's picture"
+
+# ---- revert on a name the library never had: the line asks the library, it does not recall
+win.ed_revert.click()
+for _ in range(6):
+    appq.processEvents()
+assert "nothing answers 'e-gate-gauge'" in win.ed_note.text(), win.ed_note.text()[:190]
+assert "no file answers this name" in win.ed_state.text(), win.ed_state.text()
+assert not win.ed_revert.isEnabled() and not win.ed_rename.isEnabled(), (
+    win.ed_revert.isEnabled(), win.ed_rename.isEnabled())
+assert "e-gate-gauge" not in _e_combo(), _e_combo()
+
+# ---- and the passage leaves the window and the library exactly as it found them
+for _nm in themes.user_copies():
+    if _nm not in _e_had:
+        themes.delete_user_theme(_nm)
+assert sorted(themes.user_copies()) == _e_had, themes.user_copies()
+win._ed_refresh_layouts()            # the window's own door: a name removed leaves the menu
+_e_open(_e_open0)
+assert win.ed_name.count() == _e_combo_n == 1 + len(themes.EXPORTS) + \
+    len(themes.scan()[0]), (win.ed_name.count(), _e_combo_n, len(themes.scan()[0]),
+                            "the menu no longer matches the library it is built from")
+assert open(themes.resolve("Theme_07")["path"], "rb").read() == _e_vendor07
+print(f"                        the refusals ({len(_e_watch)} "
+      f"{'file' if len(_e_watch) == 1 else 'files'} on disk byte-identical through them), "
+      f"the box that keeps what was typed, and a revert whose line asked the library "
+      f"what answers the name now: on a renamed copy the answer is `nothing`, because that "
+      f"name was never the library's to fall back on")
+
+# ---- feature E's sentences, held to the counts this run makes.  Same two rules as the last
+# ---- two cycles: every figure a page states is re-counted from the files, and a comment in
+# ---- the shipped library is a sentence like any other - an installed tree carries it to a
+# ---- reader, so a stale one is a wrong claim in the code.
+_e_pick2, _e_rej2 = themes.scan()
+_e_all2 = list(_e_pick2) + list(_e_rej2)
+_e_names2 = {r["name"] for r in _e_all2}
+_e_folded2 = {n.lower() for n in _e_names2}
+_e_ids2 = {str(r["id"]) for r in _e_all2}
+_e_nums2 = sorted(int(i) for i in _e_ids2 if str(i).isdigit())
+_e_spread2 = _e_nums2[-1] - _e_nums2[0]
+_e_dig2 = {len(str(i)) for i in _e_nums2}
+assert len(_e_nums2) == len(_e_ids2), (sorted(_e_ids2)[:3],
+                                       "an id in this library is not the digits the "
+                                       "pages say it is")
+assert _e_dig2 == {13}, _e_dig2
+assert len(_e_folded2) == len(_e_names2), (
+    len(_e_names2), len(_e_folded2),
+    "two layouts here differ only in case, so the page's sentence about folded names is "
+    "describing a state the library does not have")
+_themes_src = _flat("xigmalcd/themes.py")
+_cl_top_e = " ".join(open("debian/changelog", encoding="utf-8").read()
+                     .split("\n -- ")[0].split())
+
+for _what, _pat, _mine in (
+        ("the three-way name rule, on the page",
+         r"the \*\*(\d+)\*\* layout names the library holds, those names folded \(to the "
+         r"resolver `theme_07` and `Theme_07` are one name\), and the \*\*(\d+)\*\* `id` "
+         r"numbers inside the files",
+         (len(_e_names2), len(_e_ids2))),
+        ("the writer's length, on the page",
+         r"the writer's \*\*(\d+)\*\*-character limit", (themes.NAME_LIMIT,)),
+        ("the box that truncates nothing, on the page",
+         r"it has no length cap, because a box that stopped at the writer's", ()),
+        ("the id shape, on the page",
+         r"a fresh 13-digit number in the shape the vendor's own files use, their "
+         r"\*\*(\d+)\*\* falling inside \*\*([\d ]+) ms\*\* of one another",
+         (len(_e_nums2), _e_spread2)),
+        ("the suffix rule, on the page",
+         r"None of the \*\*(\d+)\*\* names here does, so that rule refuses nothing that "
+         r"exists", (len(_e_names2),)),
+        ("the suffixes themselves, on the page",
+         r"may not end in `.json`, `.bak` or `.tmp`", ()),
+):
+    _stated(_what, _gf, _pat, _mine)
+
+for _what, _pat, _mine in (
+        ("the suffix rule, in `themes.py`",
+         r"none of the (\d+) layout names in the three roots ends in any of these",
+         (len(_e_names2),)),
+        ("the name space, in `themes.py`",
+         r"Measured on this library: (\d+) names, all distinct even folded, and (\d+) "
+         r"distinct ids across the two vendor roots",
+         (len(_e_names2), len(_e_ids2))),
+        ("the id shape, in `themes.py`",
+         r"all (\d+) vendor layouts carry a (\d+)-digit `id`, and read as milliseconds "
+         r"since the epoch they fall inside ([\d ]+) ms",
+         (len(_e_nums2), 13, _e_spread2)),
+        ("the limit, in `themes.py`",
+         r"NAME_LIMIT = (\d+)", (themes.NAME_LIMIT,)),
+):
+    _stated(_what, _themes_src, _pat, _mine)
+
+for _what, _pat, _mine in (
+        ("the three-way rule, in the 0.6 stanza",
+         r"the (\d+) layout names in the library, those names folded, and the (\d+) ids "
+         r"inside the files", (len(_e_names2), len(_e_ids2))),
+        ("the length, in the 0.6 stanza",
+         r"at most (\d+) characters, never one of the five drawn from `render\.py`",
+         (themes.NAME_LIMIT,)),
+        ("the suffix rule, in the 0.6 stanza",
+         r"none of the (\d+) names here does, so that rule refuses nothing that exists",
+         (len(_e_names2),)),
+        ("the id shape, in the 0.6 stanza",
+         r"a fresh (\d+)-digit number in the shape the vendor's own files use "
+         r"\(their (\d+) fall inside ([\d ]+) ms of one another", (13, len(_e_nums2),
+                                                                   _e_spread2)),
+        ("the gates' counts, in the 0.6 stanza",
+         r"(\d+) names, all distinct folded, and (\d+) ids, all distinct",
+         (len(_e_names2), len(_e_ids2))),
+        ("the refusals the window gate drives, in the 0.6 stanza",
+         r"drive both buttons through the window", ()),
+):
+    _stated(_what, _cl_top_e, _pat, _mine)
+
+# ...and the words the library uses when it refuses, matched in the shape the gates use
+for _phrase, _why in (
+        ("is not a free name", "the refusal every naming gate matches on"),
+        ("already the name this copy has", "asking for the name the copy already has"),
+        ("is not one of your copies", "a rename of a file that is not yours"),
+        ("would live at", "the doubled-suffix sentence, written from the suffix table"),
+        ("falls back to", "the loop's `gauge` fallback, in the door's own note"),
+        ("by its id as well", "why a name that matches an id is spoken for too"),
+        ("now, or one past the highest id on disk", "how a fresh id is chosen"),
+        ("Widget ids in this library are uuid4 and layout ids are not",
+         "the shape was read off the files, not from the editor's own id door")):
+    assert _phrase in _themes_src, (_phrase, _why, "`themes.py` no longer says it")
+for _phrase, _why in (
+        ("no file answers this name", "the state line for a reverted renamed copy"),
+        ("nothing answers", "the revert sentence on a name the library never had"),
+        ("deliberately no `maxLength`", "why the box truncates nothing"),
+        ("the menu is rebuilt from `themes.EXPORTS`", "the comment on the refresh door")):
+    assert _phrase in _app_src, (_phrase, _why, "`app.py` no longer says it")
+for _phrase, _why in (
+        ("is yours, under the name", "what `save_as` says it wrote"),
+        ("stays where it was", "and what it left alone"),
+        ("there was no file for", "a generated layout's first file"),
+        ("an undo step is a change of *content*, never a change of identity",
+         "why the fresh id goes into every history snapshot"),
+        ("hands back the object it caches", "why `open_theme` deep-copies")):
+    assert _phrase in _edit_src, (_phrase, _why, "`edit.py` no longer says it")
+print(f"                        E's sentences, from this run: {len(_e_names2)} layout names "
+      f"({len(_e_folded2)} distinct folded) and {len(_e_ids2)} ids ({sorted(_e_dig2)} "
+      f"digits, spanning {_e_spread2:,} ms), the writer's limit {themes.NAME_LIMIT} and its "
+      f"suffixes {', '.join(themes.WRITER_SUFFIXES)} - the pages, `themes.py`'s comments and "
+      f"the 0.6 stanza all carry those numbers")
 
 # a press on empty glass names the point and selects nothing, and closing the layout takes
 # the mark with it - the pane goes back to a live preview, with nothing drawn on it

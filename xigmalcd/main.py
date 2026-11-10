@@ -433,10 +433,17 @@ def report(rec: dict, notes: dict) -> None:
         return
     _REPORTED[rec["name"]] = here
     missing, gaps, subs = here
-    where = ("checkout" if rec["root"] == os.path.abspath(themes.REPO_ROOT)
-             else "installed package")
+    # Which tree answered for this name is `themes.origin()`'s question, and it is the same
+    # door the editor's state line and `--list-themes` ask.  The words used to be a
+    # two-way guess here - checkout, else "installed package" - which called a layout in
+    # ~/.config/xigmalcd/themes an installed one, on the one line a reader looks at to find
+    # out which file the loop is drawing.
+    where = {"checkout": "the checkout's files",
+             "package": "the installed package",
+             "your copy": f"your copy in {themes.user_root()}"}.get(
+                 themes.origin(rec), themes.origin(rec))
     print(f"  theme {rec['name']} ({rec['id']}): {rec['widgets']} widgets, "
-          f"{len(notes.get('boxes') or ())} drawn, layout from the {where}")
+          f"{len(notes.get('boxes') or ())} drawn, layout from {where}")
     absent = notes.get("absent") or {}
     for src in missing:
         print(f"    skipped {src}"

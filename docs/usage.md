@@ -258,12 +258,22 @@ claim:
   had, `xigma.showIf`, for a meter that divides two readings beside a number that prints one
   (docs/theme-editor.md).
 * **Nothing in the CLI writes a theme today.** The writer is in the library -
-  `copy_for_edit`, `save`, `delete_user_theme` - and it is gated, not shipped as a flag:
-  a save is atomic (tmp then `os.replace`), keeps the previous file as `<name>.json.bak`,
-  emits the same shape the vendor's files are in (all 27 reproduce byte for byte from
-  their own parsed content; 18 of them escape non-ASCII and 9 do not, so the writer asks
-  each file which shape it is in), and refuses a name with a path separator in it. Stage 4
-  of [theme-editor.md](theme-editor.md) is the window that drives it.
+  `copy_for_edit`, `save`, `delete_user_theme`, and since 2026-11-11 `rename_copy` - and
+  it is gated, not shipped as a flag: a save is atomic (tmp then `os.replace`), keeps the
+  previous file as `<name>.json.bak`, emits the same shape the vendor's files are in (all
+  27 reproduce byte for byte from their own parsed content; 18 of them escape non-ASCII
+  and 9 do not, so the writer asks each file which shape it is in). A name is one path
+  element - no separator, no leading dot, at most 64 characters, never one of the five
+  names drawn from `render.py`, and never ending in `.json`, `.bak` or `.tmp`, the
+  suffixes this program writes beside a layout. The two acts that *invent* a name (a
+  rename, and the window's `save as`, both of which ask `themes.new_name` before they
+  write) also require it to be clear of all 27 layout names - folded, because
+  `resolve()` folds case - and of all 27 ids, because `resolve()` matches those too; and
+  a copy taking a new name takes a fresh id with it, so no two files ever answer one
+  `--theme <id>`. Writing an edited copy *at* a vendor's name is a different act - it
+  is what shadows that layout, and docs/gui.md's `Opening writes nothing` bullet says
+  why that is the file model's point rather than a hole in it. Stage 4 of
+  [theme-editor.md](theme-editor.md) is the window that drives all of it.
 
 ## Two processes, one port
 

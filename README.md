@@ -99,9 +99,12 @@ the fields this program's painter actually reads, with the picture under the pre
 redrawn from the file as it changes. The rows themselves too: a row can be added —
 always a copy of a row this program already draws, never a table of defaults — removed,
 reordered through the list that decides which one paints on top, and stretched by
-dragging one of the squares on its box, through the size keys that kind owns. The panel is never
-handed a layout file, so what that editor changes is what a loop on *this* machine draws
-the next time it names that theme ([docs/gui.md](docs/gui.md) has the row and its limits).
+dragging one of the squares on its box, through the size keys that kind owns. A copy is
+yours to rename, and one layout can be saved as a second copy under a new name — a name
+nothing in the library answers, by name, by spelling, or by the id inside the file. The
+panel is never handed a layout file, so what that editor changes is what a loop on
+*this* machine draws the next time it names that theme
+([docs/gui.md](docs/gui.md) has the row and its limits).
 
 ![xigmaui, the window in three columns: the playing preview and the log on the left -
 under the log, behind `advanced controls`, the panel's own report and the guarded

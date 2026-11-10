@@ -282,12 +282,16 @@ shell over that model, and the gates say so in counts.
   count by four, which printed 905 where the honest number is 1 163 - a fifth out, in the
   direction that flatters the edit.
 
-Not built, and not claimed, as of the 0.5 tree this section describes: renaming a copy,
-drawing the editor from live readings, snapping to a grid or to a neighbour. Landed on
-2026-11-10 (0.6) instead: rows added as a copy of a real row, removed, reordered, and
-resized by dragging the squares on their box - each kind through the size keys the
-painter actually reads for it, which is a sentence per kind rather than one handle - and
-the bullets and every digit they hold are in docs/gui.md. The window's theme combo still
+Not built, and not claimed, as of the 0.5 tree this section describes: drawing the
+editor from live readings, snapping to a grid or to a neighbour. Landed on 2026-11-10
+(0.6) instead: rows added as a copy of a real row, removed, reordered, and resized by
+dragging the squares on their box - each kind through the size keys the painter actually
+reads for it, which is a sentence per kind rather than one handle. And on 2026-11-11, the
+naming: a copy renamed, a second copy written under a new name, both taking a fresh `id`
+so one `--theme <id>` never answers two files, and a name rule shared by every door that
+invents one (`themes.new_name`) - it refuses a name any layout answers today, by name,
+by case-fold, or by id, which is what `resolve()` actually matches. The bullets and every
+digit they hold are in docs/gui.md. The window's theme combo still
 lists the five, because that combo picks what the loop draws from this machine's sensors.
 
 ### What the canvas half measured (stage 4, 2026-11-08)
@@ -352,8 +356,14 @@ the structural edit - a row added is a copy of a row that already draws, its pos
 chosen by the painter's boxes rather than guessed, its order the list's order, its removal
 refused at the last row in the library's own words - and the edges: eight squares on the
 selected row's box, only the ones the model says its kind can write, and a drag that goes
-through the same door as the field rows, one undo step, no file until `save`. docs/gui.md
-carries the bullets and the digits they hold.
+through the same door as the field rows, one undo step, no file until `save`.  And on
+2026-11-11 the two acts that invent a name: `rename` and `save as` over a name box, with
+`themes.rename_copy` and `edit.Editor.save_as` behind them and one name rule shared by
+both (`themes.new_name`: a name nothing in the library answers, by name, by case-fold or
+by id), a fresh 13-digit id for any copy that takes a new name, and a menu, a state line
+and a revert sentence that all ask `themes.resolve()` what answers the name now instead
+of remembering what answered it when the layout was opened. docs/gui.md carries the
+bullets and the digits they hold.
 
 ## What generating an export actually found
 

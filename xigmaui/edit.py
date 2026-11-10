@@ -344,7 +344,13 @@ class Editor:
         rec = themes.resolve(name)
         if rec is None:
             raise KeyError(f"no layout named {name!r}: {themes.why_not(name)}")
-        return cls(themes.load(rec["path"]), origin=themes.origin(rec),
+        # `themes.load` hands back the object it caches by (path, mtime) - that is how an
+        # edited theme shows up on the loop's next frame without a restart.  The editor
+        # edits in place, so taking that object without a copy would put unsaved keystrokes
+        # into the library's own cache, where `scan()`, `pair()` and `describe()` read them:
+        # one process, two readers, and the file said to be on disk disagreeing with the
+        # preview of it.
+        return cls(copy.deepcopy(themes.load(rec["path"])), origin=themes.origin(rec),
                    path=themes.user_theme_path(rec["name"]), name=rec["name"])
 
     # --------------------------------------------------------------- saving --
@@ -384,6 +390,114 @@ class Editor:
         self._saved = copy.deepcopy(self._baseline)
         return gone
 
+
+    # ---------------------------------------------------- naming a copy --
+    @property
+    def where(self) -> str:
+        """Where the file that answers this layout's name comes from **today**.
+
+        `origin` is what this editor read when it opened, and it stays that: "the vendor's
+        file in this checkout" is a true sentence about the bytes in memory.  What moves is
+        the file `--theme` finds, and it moves at exactly three moments - a save, a revert,
+        a rename - so an answer remembered from before one of them is a stale answer about
+        a file that no longer answers.  The window asks this door instead: it is
+        `themes.resolve()` on the current name, the same lookup `--list-themes`, the loop's
+        own log line and the control socket's `theme` command go through.
+        """
+        if not self.path and self.name in themes.EXPORTS:
+            return "generated from render.py"
+        rec = themes.resolve(self.name)
+        if rec is None:
+            return "no file at all"          # your copy is gone and the library never had
+                                            # this name: a renamed copy, then a revert
+        return themes.origin(rec)
+
+    def _retire_id(self, fresh: str) -> None:
+        """Say that this layout's id is now `fresh`, everywhere memory holds one.
+
+        `history` snapshots whole objects, so an id left behind in them would creep back on
+        the first press of undo: an undo step is a change of *content*, never a change of
+        identity.  `_baseline` is deliberately not touched - it is the bytes this editor
+        first read, under a name and an id that may both be gone by now, and it is what
+        `revert` hands back to `_saved` to say "the copy is gone, your typing is not".
+        """
+        fresh = str(fresh)
+        if str(self.obj.get("id")) == fresh:
+            return
+        self.obj["id"] = fresh
+        self._saved["id"] = fresh
+        if self._pending is not None:
+            self._pending["id"] = fresh
+        for snap in self.history:
+            snap["id"] = fresh
+
+    def rename(self, name: str) -> tuple:
+        """Move this copy to a new name.  `(path, notes)`, or `(None, [the reason])`.
+
+        A file act, not an edit: no undo step is taken, nothing in the layout's rows moves,
+        and the picture is the same picture.  What changes is the name the library answers
+        and the `id` inside the file - see `themes.rename_copy` for why an id has to come
+        along with a new name, and `why` below for the refusals.  Memory follows the file:
+        the new id is written into the object, its snapshots and its save-point, so
+        `dirty` says exactly what it said before the press.
+        """
+        try:
+            path, notes = themes.rename_copy(self.name, name)
+        except (ValueError, OSError) as exc:
+            return None, [str(exc)]
+        # the id the door chose is read back through the library's own parser rather than
+        # guessed at: `themes.load` keys on (path, mtime), and this path is brand new
+        self._retire_id(themes.load(path).get("id"))
+        self.name = os.path.basename(path)[:-len(".json")]
+        self.path = path
+        self.origin = "your copy"           # there is no vendor file behind *this* name
+        return path, notes
+
+    def save_as(self, name: str) -> tuple:
+        """Write this layout again, under a name nothing in the library answers.
+
+        `(path, notes)`, or `(None, [the reason])`.  This is how one layout becomes two of
+        yours: the file where it was stays exactly as it was - every byte, and its id - and
+        the new copy takes a fresh id (`themes.new_id`) so that no two files answer the same
+        `--theme <id>`.  From here the editor is editing the new copy; the old one is just
+        another layout, and the note says which file is which.
+
+        A layout that never had a file - one of the five drawn from `render.py` - gets its
+        first one here, and that is not the thing the save button refuses: what is refused
+        is a `gauge.json` that would be a second source of truth for `theme_gauge`.  A file
+        called `my-gauge.json` is a layout of its own, and `--theme gauge` still draws the
+        code's picture.
+        """
+        try:
+            nm = themes.new_name(name)
+        except (ValueError, OSError) as exc:
+            return None, [str(exc)]
+        fresh = themes.new_id()
+        out = copy.deepcopy(self.obj)
+        out["id"] = fresh
+        hard, _soft = themes.validate(out)
+        if hard:
+            return None, hard
+        was_name, was_path = self.name, self.path
+        try:
+            path, warnings = themes.save(out, nm)
+        except (ValueError, OSError) as exc:
+            return None, [str(exc)]
+        self._retire_id(fresh)
+        self._saved = copy.deepcopy(self.obj)
+        self.name, self.path = nm, path
+        self.origin = "your copy"
+        notes = [
+            f"{os.path.basename(path)} is yours, under the name {nm!r} and with id {fresh}",
+            (f"{os.path.basename(was_path)} stays where it was, with id "
+             f"{themes.load(was_path).get('id')}: two layouts, two ids, and the window is "
+             "now editing the new one" if was_path and os.path.exists(was_path) else
+             (f"there was no file for {was_name!r} before this: it is drawn from "
+              f"`render.py`, and `--theme {was_name}` still draws the code's picture"
+              if not was_path else
+              f"{was_name!r} had no copy of its own, so nothing was left behind"))] + \
+            list(warnings)
+        return path, notes
 
     # ------------------------------------------------------------ widgets --
     def widgets(self) -> list:

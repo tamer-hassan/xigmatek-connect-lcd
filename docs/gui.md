@@ -206,7 +206,7 @@ A pane
 that cannot be dragged under what it holds cannot grow a horizontal scrollbar inside
 itself, so the 0.4 failure mode is unreachable rather than merely avoided. The controls
 floor is the editor's own footprint, so it moves twice over: one column of editor rows asks for **376 px** of controls on this bench, two columns for **400**, three for **568** - and **394 / 417 / 589** on CI's runner - a closed drop-down that has to show the longest entry it holds is part of what those columns carry, and the window's own minimum rises with them. Every one of those digits is read out of this page and held to whichever of the two labelled machines is running the suite, because a floor that follows the fonts is not a constant to compare.
-The 18 rows of an `arc` widget stand **827 px** tall in one column and **434 px** in three there, the grid's own ask going **171 / 344 / 512 px** - **751** and **406 px**, asking **180 / 361 / 533**, on CI's runner - which is the reflow buying height without buying a scrollbar, and all twelve figures come off the sizing pass the suite runs on every machine. Those four heights are what the row of structural controls under the fields costs: 31 px of height on this bench and 28 px on the runner, never a column's width, since 0.5 read 796 / 403 and 723 / 378 in the same pass.
+The 18 rows of an `arc` widget stand **858 px** tall in one column and **465 px** in three there, the grid's own ask going **171 / 344 / 512 px** - **751** and **406 px**, asking **180 / 361 / 533**, on CI's runner as of its pass for the first of the two control rows below the fields - which is the reflow buying height without buying a scrollbar, and all twelve figures come off the sizing pass the suite runs on every machine. Those four heights are what the two rows of controls under the fields cost, in height and never in a column's width: 0.5 read 796 / 403 here and 723 / 378 there, the row of row-level controls added 31 px on the bench and 28 px on the runner, and the name box with its two buttons is another 31 px on this bench (827 / 434 to 858 / 465). What that second row costs on CI's runner is a figure only a run there prints, so it is not written here: the pair gate holds whichever machine is running the suite to the half labelled with its name, and when it disagrees the page is wrong.
 
 ### The preview plays, or shows one frame
 
@@ -525,6 +525,50 @@ editor commonly gets wrong:
   files: browsing a theme's fields must not quietly change what the loop draws. The gate
   opens 3 library layouts and 5 generated ones and then counts the user directory:
   empty.
+* **A copy can be renamed, and the new name has to be one nothing answers.** The box beside
+  the `rename` and `save as` buttons holds the name to *give*, not the name that is, and it
+  keeps what you typed: it has no length cap, because a box that stopped at the writer's
+  **64**-character limit would drop the characters under a reader's fingers and then act on
+  a name nobody typed - the door answers `longer than 64 characters` instead. A new name has
+  to clear three things at once, because `themes.resolve()` matches three: the **27** layout
+  names the library holds, those names folded (to the resolver `theme_07` and `Theme_07` are
+  one name), and the **27** `id` numbers inside the files. That is not caution, it is
+  measured: a copy put at a vendor's own name takes that layout out of reach by name *and* by
+  id - `resolve(<that id>)` answers None afterwards - and a copy at `theme_07` beside the
+  vendor's `Theme_07` leaves `--list-themes` showing two layouts while every spelling
+  resolves to one file. Only a copy of yours can be renamed; the vendor's two trees are never
+  written. A rename is a file act, not an edit: no undo step, `dirty` exactly as it was, and
+  every row and pixel where they were (the suite draws the layout before and after and
+  compares). The `id` inside the file does change - a fresh 13-digit number in the shape the
+  vendor's own files use, their **27** falling inside **1 187 564 ms** of one another -
+  because two files answering one `--theme <id>` is a name space with a hole in it.
+  `<name>.json.bak` travels with the copy, so undoing your last save is still that save; a
+  half-written `.tmp` is reported and left where it is, because its bytes belong to the old
+  name. And a name may not end in `.json`, `.bak` or `.tmp`: this program writes those beside
+  a layout, so a layout named `x.json` would live at `x.json.json` while the `x.json` in the
+  same listing is the layout named `x`. None of the **27** names here does, so that rule
+  refuses nothing that exists.
+* **`save as` writes a second copy and leaves the first one alone.** The file the layout came
+  from keeps every byte it had and the id it had; the new copy takes a fresh id, so the two
+  never answer the same `--theme <id>`, and the window goes on editing the new one. This is
+  also how a layout drawn from `render.py` gets its first file: `save as your copy` still
+  refuses `gauge.json`, because that would be a second `theme_gauge` free to disagree with
+  `render.py`, while `my-own-gauge.json` is a layout of yours and `--theme gauge` keeps
+  drawing the code's picture.
+* **Which file answers a name is asked, never remembered.** The line under the layout menu
+  reads `themes.resolve()` on the current name - the same door `--list-themes`, the loop's
+  own log line and the socket's `theme` command go through - because the three moments that
+  move a file (a save, a revert, a rename) are exactly the moments a remembered answer goes
+  stale: after a revert of a renamed copy it says *no file answers this name*, which is true
+  and was not sayable from a word kept from when the layout was opened. The menu is rebuilt
+  from the library after each of those acts - a rename retires one entry and creates another
+  - with its signals blocked while it happens, because selecting the entry for the layout
+  already in memory would re-read the file and throw away everything typed since the last
+  save. A loop re-resolves its name every frame, so a rename reaches it on the next frame;
+  and when the name was yours alone nothing answers it, because `render.draw` falls back to
+  `gauge` - measured, pixel for pixel - which is why the note says to re-point the loop over
+  the socket, whose `theme` command takes the same names `--theme` does. A *fresh* `--theme`
+  of that dead name exits 2 with `themes.why_not`'s sentence instead.
 * **The field list comes out of the code.** A kind offers the intersection of the keys
   `layout.py` is *proven* to read (`themes.keys_read()` parses the painter's own source)
   and what that kind draws - 25 names across 6 kinds today, counted in the gate. The keys

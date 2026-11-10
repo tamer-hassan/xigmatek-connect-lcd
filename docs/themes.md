@@ -113,7 +113,10 @@ for a `bar`, the pair `line_rect` declares (swapped for a row turned 90°) for a
 the ring of an `arc` scaled with its box, the `fontSize` of a `text` row, the pitch or
 the face of a `special`; and so did the rows themselves - added only as a copy of one
 that already draws, removed never past the last, reordered through the list that is the
-draw order (the bullets, and the digits they hold, are in docs/gui.md).  What **is**
+draw order - and the two acts that give a copy a name of its own, which is a rule about
+the whole library rather than about one file, because `resolve()` answers a name, that
+name folded, and the id inside it (the bullets, and the digits they hold, are in
+docs/gui.md).  What **is**
 built, since
 2026-11-08, is the window's `Layout` box - one layout, one widget, **every field that
 widget carries as a row of its own** (10 rows for a `text` widget through 18 for an

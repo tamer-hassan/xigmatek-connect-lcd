@@ -1090,16 +1090,13 @@ class Window(QMainWindow):
         # every number in it against `themes.EXPORTS` and `themes.scan()`, and it is the same
         # pair `--list-themes` prints, so the window and the CLI cannot disagree about how
         # many layouts there are.
-        _pick, _reject = themes.scan()
-        self.ed_name.setToolTip(
-            f"the {len(themes.EXPORTS)} generated layouts ({', '.join(sorted(themes.EXPORTS))}: "
-            "JSON written out of `render.py` on demand, also printed by `--export-theme NAME`) "
-            f"and every layout file this canvas can select - {len(_pick)} of the "
-            f"vendor's {len(_pick) + len(_reject)} today, the other {len(_reject)} are 4:3 and "
-            "refused on a 480x480 panel (docs/themes.md). A name you have already edited "
-            "opens your copy. No layout file is ever sent to the panel and nothing is read "
-            "back from it (PROTOCOL.md \u00a711): what a save changes is what *this "
-            "machine's* daemon draws next time it names that theme")
+        # The counts in this sentence are read out of the library rather than remembered:
+        # it said "three generated layouts" after `alpha` and `bars` joined the exports, and
+        # nothing noticed, because the numbers were typed in prose.  The GUI section asserts
+        # every number in it against `themes.EXPORTS` and `themes.scan()`, and it is the same
+        # pair `--list-themes` prints, so the window and the CLI cannot disagree about how
+        # many layouts there are.
+        self.ed_name.setToolTip(self._ed_combo_tip())
         self.ed_name.currentTextChanged.connect(self._editor_open)
         _readable(self.ed_name)
         self.ed_state = QLabel("not editing: the pane shows the theme above, drawn from "
@@ -1124,9 +1121,11 @@ class Window(QMainWindow):
         #
         # The rows live in a grid that reflows between one, two and three columns
         # depending on the width this splitter happens to give the box (see
-        # `EditorBox`), so the 18 rows of an `arc` widget make this box 827 px tall in
-        # one column at a 1280x1024 window and 434 px in three at 1919x1055 - this
-        # bench's reading, CI's runner reading 751 and 406 in the same pass - measured in
+        # `EditorBox`), so the 18 rows of an `arc` widget make this box 858 px tall in
+        # one column at a 1280x1024 window and 465 px in three at 1919x1055 - this
+        # bench's reading, CI's runner reading 751 and 406 in its pass for the row of
+        # row-level controls, which is 31 px of height here and 28 px there against the
+        # 796/403 and 723/378 that 0.5 measured - measured in
         # the window, printed by the suite's sizing gate, and held to whichever half of
         # the labelled pair the machine running it is.  It buys height rather than pushing
         # a scrollbar under the column, which is the failure mode 0.5 was written to catch.
@@ -1170,6 +1169,32 @@ class Window(QMainWindow):
         # field column is what put a 357 px floor under the whole controls column
         # (measured) while the labels and fields needed barely more
         eform.addLayout(brow)
+
+        # The two acts that invent a name.  The box holds the name to give, not the name
+        # that is: a reader who has just typed a new one should not have it replaced under
+        # their cursor, and the window only refills it when a *different* layout is opened
+        # (`_editor_state` compares the name it last showed).  Short labels for the same
+        # reason as the row above: this column's floor is measured from what it holds, and
+        # every sentence about what these do lives in the tooltip before the press and in
+        # the model's own words after it.
+        nrow = QHBoxLayout()
+        self.ed_newname = QLineEdit()
+        self.ed_newname.setPlaceholderText("a name for this copy")
+        # deliberately no `maxLength`.  A box that stops at the writer's limit would drop
+        # the characters a person typed - silently, and then press the rename button with a
+        # name that is not the one they typed.  The name belongs to them, so it goes to the
+        # door whole and comes back as `theme name '…' is longer than 64 characters`.
+        self.ed_newname.setToolTip(self._ed_name_tip())
+        self.ed_rename = QPushButton("rename")
+        self.ed_rename.setToolTip(self._ed_rename_tip())
+        self.ed_rename.clicked.connect(self._editor_rename)
+        self.ed_copy = QPushButton("save as")
+        self.ed_copy.setToolTip(self._ed_copy_tip())
+        self.ed_copy.clicked.connect(self._editor_copy)
+        nrow.addWidget(self.ed_newname)
+        nrow.addWidget(self.ed_rename)
+        nrow.addWidget(self.ed_copy)
+        eform.addLayout(nrow)
 
         # The structural controls, on a row of their own for the same reason.  Their
         # labels are short and the sentence goes where it does the work: in the tooltip
@@ -1216,6 +1241,7 @@ class Window(QMainWindow):
         col.addWidget(editor)
         self.ed = None                        # nothing open until a name is picked
         self._ed_notes = {}                   # what the last editor frame reported
+        self._ed_named = ""                   # the name the box above was filled with
         self._drag = None                     # (px, py, row x, row y) while dragging
         self._drag_refused = False            # a drag that ran into the canvas edge
         self._drag_note = ""                  # and the sentence it was refused with
@@ -2341,6 +2367,127 @@ class Window(QMainWindow):
     # back, when a file is written.  The window's job is narrow - offer the fields the
     # painter reads, show the picture that comes out of them, and never write a file
     # nobody asked for.
+    # ------------------------------------------------------ naming a layout --
+    # Renaming a copy and saving one under a second name are the two acts in this pane that
+    # invent a name rather than edit a layout.  Both go through `themes.new_name` - one rule
+    # for what a name may be, shared with the writer - and `edit.Editor.rename` /
+    # `save_as` - one place that says what the act did to the file, the id, and the loop.
+    # Nothing here decides anything about a name on its own: the refusals printed under the
+    # rows are the model's sentences, and the counts in these tooltips are counted from the
+    # library on the way past, the same discipline as the combo's own tooltip.
+    def _ed_combo_tip(self) -> str:
+        """The layout menu's tooltip, recounted from the library each time it is set."""
+        pick, reject = themes.scan()
+        return (
+            f"the {len(themes.EXPORTS)} generated layouts "
+            f"({', '.join(sorted(themes.EXPORTS))}: JSON written out of `render.py` on "
+            "demand, also printed by "
+            f"`--export-theme NAME`) and every layout file this canvas can select - "
+            f"{len(pick)} of the {len(pick) + len(reject)} today, the other {len(reject)} "
+            "are 4:3 and refused on a 480x480 panel (docs/themes.md). A name you have "
+            "already edited opens your copy. No layout file is ever sent to the panel and "
+            "nothing is read back from it (PROTOCOL.md \u00a711): what a save changes is "
+            "what *this machine's* daemon draws next time it names that theme")
+
+    def _ed_name_tip(self) -> str:
+        """What the name box will accept, said by the doors that enforce each rule."""
+        pick, reject = themes.scan()
+        names = {r["name"] for r in list(pick) + list(reject)}
+        ids = {str(r["id"]) for r in list(pick) + list(reject)}
+        return (
+            f"the name to give this copy. Up to {themes.NAME_LIMIT} characters, one path "
+            "element with no separators and no leading dot; never one of the "
+            f"{len(themes.EXPORTS)} names drawn from `render.py`; and never ending in "
+            f"{', '.join(themes.WRITER_SUFFIXES)} - this program writes those beside a "
+            f"layout, so a layout called `x.json` would live at `x.json.json` while the "
+            f"`x.json` next to it is the layout named `x`.  A new name also has to be clear "
+            f"of the {len(names)} names and {len(ids)} ids the library answers today, "
+            "counted ignoring case: `--theme` matches a name, its case-fold, and an id, so "
+            "taking any of them does not add a layout next to that one, it takes that one "
+            "out of reach.  None of this reaches the panel: a layout file is never sent "
+            "there (PROTOCOL.md \u00a711)")
+
+    def _ed_rename_tip(self) -> str:
+        """What renaming a copy does, in the order the act happens in."""
+        return ("move your copy to the name in the box.  Two things follow, and both are "
+                "said afterwards: the file `--theme <new name>` finds is yours, and its "
+                "`id` becomes a fresh one in the shape the vendor's files use, because "
+                "`--theme <id>` answers a layout by its id too and two files sharing one "
+                "id is a name space with a hole in it.  The rows, the picture and anything "
+                "you have typed stay exactly as they are - this is a file act, not an edit, "
+                "so it takes no undo step.  Only a copy of yours can be renamed: the "
+                "vendor's two trees are never written, and the library's own file under a "
+                "name you have never saved is not yours to move.")
+
+    def _ed_copy_tip(self) -> str:
+        """What `save as` does, and how it differs from the save button above it."""
+        return ("write what is on screen to the name in the box as a second copy, and keep "
+                "the file where it is with every byte it has.  The copy in front of you "
+                "then takes a fresh id, so the two layouts never answer the same "
+                "`--theme <id>`, and this window goes on editing the new one.  That is not "
+                "what `save as your copy` refuses: that refusal is about a `gauge.json` "
+                "that would be a second `theme_gauge` to disagree with `render.py`.  A "
+                "layout drawn from code gets its first file this way, and `--theme gauge` "
+                "still draws the code's picture.")
+
+    def _ed_refresh_layouts(self) -> None:
+        """Re-list the layout menu from the library, keeping the layout that is open.
+
+        A rename retires one name and creates another, and a save-as creates a name with no
+        name retired - so the menu is rebuilt from `themes.EXPORTS` and `themes.scan()`
+        rather than patched in place.  Its signals stay blocked across the rebuild:
+        selecting the entry for the layout this editor is holding would re-read the file and
+        throw away whatever the reader has typed since the last save, which is the one thing
+        this act must not do.
+        """
+        want = self.ed.name if self.ed is not None else NO_EDITOR
+        self.ed_name.blockSignals(True)
+        self.ed_name.clear()
+        self.ed_name.addItem(NO_EDITOR)
+        self.ed_name.addItems(sorted(themes.EXPORTS))
+        self.ed_name.addItems([r["name"] for r in themes.scan()[0]])
+        at = self.ed_name.findText(want)
+        if at >= 0:
+            self.ed_name.setCurrentIndex(at)
+        self.ed_name.blockSignals(False)
+        self.ed_name.setToolTip(self._ed_combo_tip())
+        self._ed_box_readable(self.ed_name)
+        self._pane_floors()
+
+    def _editor_rename(self) -> None:
+        """Move this copy to the name in the box.  One file act, no undo step, no re-read."""
+        if self.ed is None:
+            return
+        want = self.ed_newname.text()
+        path, notes = self.ed.rename(want)
+        if path is None:
+            self.ed_note.setText(" / ".join(notes))
+            self._log(f"layout not renamed: {notes[0]}")
+            self._editor_state()
+            return
+        self._log("layout renamed: " + "; ".join(notes))
+        self.ed_note.setText("  ".join(notes))
+        self._ed_refresh_layouts()
+        self._apply_pair(self.ed.name)     # the pairing follows the file, and it moved
+        self._editor_state()
+
+    def _editor_copy(self) -> None:
+        """Write a second copy under the name in the box, and start editing that one."""
+        if self.ed is None:
+            return
+        want = self.ed_newname.text()
+        path, notes = self.ed.save_as(want)
+        if path is None:
+            self.ed_note.setText(" / ".join(notes))
+            self._log(f"layout not copied: {notes[0]}")
+            self._editor_state()
+            return
+        self._log("layout copied: " + "; ".join(notes))
+        self.ed_note.setText("  ".join(notes))
+        self._ed_refresh_layouts()
+        self._apply_pair(self.ed.name)
+        self._editor_state()
+
     def _editor_open(self, name: str) -> None:
         """Open one layout in the editor.  Reads a file; writes nothing.
 
@@ -2348,6 +2495,14 @@ class Window(QMainWindow):
         theme preview, which is the difference a reader needs to see: an open layout is
         a picture of *the file*, drawn from a pinned fixture, not of what this machine's
         sensors are putting on the glass right now.
+
+        This re-reads the file, so it is only ever reached for a *different* name:
+        `currentTextChanged` cannot fire with the text the menu already holds, which is
+        what keeps unsaved changes safe when a reader clicks the entry for the layout that
+        is already open.  `_ed_refresh_layouts` blocks the same signal while it rebuilds the
+        list for the same reason - after a rename or a save-as, the layout in memory is the
+        one the menu should be showing, and re-opening it here would read the moved file
+        back and drop whatever was typed since the last save.
         """
         if not name or name == NO_EDITOR:
             self.ed = None
@@ -2391,7 +2546,14 @@ class Window(QMainWindow):
         self._repaint()
 
     def _editor_state(self) -> None:
-        """One line: where this layout came from, and whether a file holds it now."""
+        """One line: which file answers this name today, and whether a file holds it now.
+
+        The first half comes from `edit.Editor.where`, which asks `themes.resolve()` on the
+        current name - the same lookup `--list-themes`, the loop's own log line and the
+        socket's `theme` command go through.  It used to be a word remembered from the moment
+        the layout was opened, and that word went stale at exactly the three moments that
+        matter: a save, a revert, a rename.
+        """
         if self.ed is None:
             return
         where = {"generated from render.py":
@@ -2399,15 +2561,26 @@ class Window(QMainWindow):
                  "refused, because a `gauge.json` would be a second `theme_gauge`",
                  "checkout": "the vendor's file in this checkout",
                  "package": "the installed themes package",
-                 "your copy": "your copy under ~/.config/xigmalcd/themes"}.get(
-                     self.ed.origin, self.ed.origin)
-        copies = themes.user_copies()
+                 "your copy": "your copy under ~/.config/xigmalcd/themes",
+                 "no file at all": "no file answers this name - it is yours alone, and "
+                                   "your copy of it is gone"}.get(
+                     self.ed.where, self.ed.where)
         state = "edit not saved yet" if self.ed.dirty else "nothing outstanding"
         self.ed_state.setText(f"{where}; {state}")
         self.ed_save.setEnabled(self.ed.dirty)
-        self.ed_revert.setEnabled(self.ed.name in copies)
+        self.ed_revert.setEnabled(themes.is_copy(self.ed.name))
         self.ed_undo.setEnabled(self.ed.steps > 0)
         self.ed_undo.setText(f"undo ({self.ed.steps})" if self.ed.steps else "undo")
+        # the two acts that invent a name.  The box is refilled only when a *different*
+        # layout is opened: a reader typing in it has the text under their cursor, and a
+        # state refresh that retypes the name would be the window overwriting the person.
+        if self._ed_named != self.ed.name:
+            self.ed_newname.setText(self.ed.name)
+            self._ed_named = self.ed.name
+        self.ed_rename.setEnabled(themes.is_copy(self.ed.name))
+        self.ed_rename.setToolTip(self._ed_rename_tip())
+        self.ed_copy.setEnabled(True)
+        self.ed_newname.setToolTip(self._ed_name_tip())
         # the structural controls, answered from the model rather than remembered: what
         # they can do depends on how many rows this layout has and which one is selected,
         # and the menu entries say what each add would copy *before* the press
@@ -2468,7 +2641,8 @@ class Window(QMainWindow):
         could fall out of step with whichever rows exist today.
         """
         for wid in (self.ed_widget, self._ed_host, self.ed_undo, self.ed_save,
-                    self.ed_revert, self.ed_add, self.ed_del, self.ed_up, self.ed_down):
+                    self.ed_revert, self.ed_add, self.ed_del, self.ed_up, self.ed_down,
+                    self.ed_newname, self.ed_rename, self.ed_copy):
             wid.setEnabled(on)
 
     def _ed_build_rows(self, kind: str) -> None:
@@ -2597,9 +2771,11 @@ class Window(QMainWindow):
         """One, two or three columns of rows, by the width the *pane* has.
 
         This is the responsive half, and it is here because the alternative is a
-        scrollbar: the 18 rows of an `arc` widget make this box **827 px** tall in one
-        column at a 1280x1024 window and **434 px** in three at 1919x1055 - this bench's
-        digits, where CI's runner reads 751 and 406 - measured in the window and printed
+        scrollbar: the 18 rows of an `arc` widget make this box **858 px** tall in one
+        column at a 1280x1024 window and **465 px** in three at 1919x1055 - this bench's
+        digits, where CI's runner reads 751 and 406 (its pass for the first of the two
+        control rows; the name box is another 31 px here) - measured in the window and
+        printed
         by the suite's sizing gate with the grid's own ask of 171 / 344 / 512 px, and a
         controls column that cannot hold what it is shown is
         exactly the 0.4 defect the fresh-window gate now fails on.  The box asks for it
@@ -2975,8 +3151,18 @@ class Window(QMainWindow):
             return
         gone = self.ed.revert()
         self._log(f"layout copy removed: {gone or self.ed.name}")
-        self.ed_note.setText("your copy is gone: the loop reads the vendor's file "
-                             "again. What you typed is still here, unsaved.")
+        # "the loop reads the vendor's file again" is only true of a name the library also
+        # has.  A renamed copy answers a name of your own inventing, and there is no vendor
+        # file behind it to come back - so the line asks the library which file answers the
+        # name now rather than repeating a sentence about a copy that may never have had one.
+        back = themes.resolve(self.ed.name)
+        self.ed_note.setText(
+            "your copy is gone: "
+            + (f"--theme {self.ed.name} reads {back['path']} again" if back else
+               f"nothing answers {self.ed.name!r}, because that name was yours alone - "
+               f"the library has no file of that name to fall back to")
+            + ". What you typed is still here, unsaved.")
+        self._ed_refresh_layouts()
         self._editor_state()
 
     # ------------------------------------------------------- the canvas door --
