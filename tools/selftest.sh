@@ -4698,11 +4698,19 @@ def _spaced(n):
     return f"{n:,}".replace(",", " ")
 
 
+# "published" means tracked: a bench that has just run `dpkg-buildpackage` also has
+# droppings under debian/ and an untracked render sitting next to the previews, and the same
+# check then counts different files in different trees.  The list the repository ships is the
+# one the rule is about, on every machine.
+_tracked = set(subprocess.run(["git", "ls-files"], capture_output=True,
+                              text=True, check=True).stdout.split())
+assert _tracked, "the repository's own file list came back empty"
 _pics = {"the images": sorted(["docs/logo.png", "docs/screenshot-xigmaui.png",
                                "docs/xigmaui1.png", "docs/xigmaui2.png"]),
          "theme contact sheets": sorted(_pglob.glob("docs/previews/*.png")),
          "the MP4s": sorted(_pglob.glob("docs/videos/*.mp4")),
          "readings JSON": sorted(_pglob.glob("docs/videos/*.json"))}
+_pics = {k: [f for f in v if f in _tracked] for k, v in _pics.items()}
 _sizes = {k: sum(os.path.getsize(f) for f in v) for k, v in _pics.items()}
 _all = [f for v in _pics.values() for f in v]
 _total = sum(_sizes.values())
@@ -4774,7 +4782,15 @@ _text_files = (["README.md", "PROTOCOL.md"]
                + _pglob.glob("debian/*") + _pglob.glob("install/*")
                + _pglob.glob("tools/*.py")
                + _pglob.glob("xigmalcd/*.py") + _pglob.glob("xigmaui/*.py"))
-_text_files = sorted({f for f in _text_files if os.path.isfile(f)})
+# published means tracked, not "present in this working tree": a bench that has just run
+# `dpkg-buildpackage` also has debian/xigmatek-connect-lcd.substvars and six neighbours, and
+# the same check then reads 104 files here and 97 on CI.  Same rule, same count, whichever
+# tree it runs in - and a serial committed in a file this list skips is still caught by the
+# shape below, because the list is what the repository ships.
+_text_files = sorted({f for f in _text_files if os.path.isfile(f) and f in _tracked})
+assert len(_text_files) >= 90, (len(_text_files),
+                                "the published-text list fell over, so the serial "
+                                "search would be searching almost nothing")
 _text_hits = {f: _carries(f) for f in _text_files}
 _text_hits = {k: v for k, v in _text_hits.items() if v}
 assert not _text_hits, (_text_hits,
