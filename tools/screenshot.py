@@ -43,7 +43,7 @@ have icons or the budget runs out.
 choice, not a claim about a fixed layout: the window's own fresh default is
 `settings.DEFAULTS["size"]` - quoted in docs/tools.md and checked against that constant by
 the suite, so neither sentence can go stale - and the window is resizable.  1380x860 is what
-puts the three columns side by side with six rows of the clip list in frame, which is the
+puts the three columns side by side with seven rows of the clip list in frame, which is the
 point of the picture; the suite checks the column rules themselves (docs/gui.md).
 """
 from __future__ import annotations
@@ -68,7 +68,7 @@ def main() -> int:
     ap.add_argument("--size", default="1380x860", metavar="WxH",
                     help="resize the window to this before grabbing it (default "
                          "1380x860, what the README's picture uses: the three "
-                         "columns side by side with six rows of the clip list). "
+                         "columns side by side with seven rows of the clip list). "
                          "The window's own fresh default is settings.DEFAULTS"
                          "['size'] and the window is resizable, so this is a "
                          "framing choice, not a claim about a fixed layout)")

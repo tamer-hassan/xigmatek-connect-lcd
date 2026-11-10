@@ -1,3 +1,75 @@
+xigmatek-connect-lcd (0.5) resolute; urgency=medium
+
+  * The window shows its layout editor from the start.  It is the only
+    place the window lists the 23 library layouts it can draw, and behind
+    the `advanced controls` switch it stayed invisible until a reader
+    found an unrelated checkbox.  Opening it still reads files and writes
+    none.
+
+  * What that switch folds is now nine controls in two boxes at the foot
+    of the preview column, under the log: the panel's `conn 1` report and
+    the guarded factory reset, word field and button with their box.
+    `conn 1` answers with fourteen fields, and they took about ten lines
+    of a 300 px column that was spending its height on clip rows.  This
+    reverses what 0.4 documented - there the reset stayed on screen
+    whatever the switch said.  What stands between a stray click and a
+    factory reset is the word `reset` typed into the field and a button
+    disabled until it is, and the suite now checks that guard in the
+    folded state: hidden and disabled, then shown and still disabled,
+    waking only when the word is typed.
+
+  * A drop-down's list is no longer cut to the width of its box.  The
+    widest row the layout editor can put in its widget menu measures
+    247 px (`data  Motherboard Temperature  at 452,136`, swept across all
+    28 layouts it can open), and a closed box in a 300 px column is 241
+    px - a list opens at its box's width, so every longer entry was cut
+    off exactly where a reader is choosing between them.  The box still
+    stretches to its column and never asks for more than its longest
+    entry - that is what once put a floor under the whole column - and
+    the popup's view gets the extra width instead (323 px for that row),
+    which costs the column no pixel at all.
+
+  * The fresh window is 1320x800 with the splitter asked for
+    560/400/420, and those numbers are floors rather than a preference.
+    Checked out at the `v0.4` tag and measured the same way, 0.4's
+    1180 px window and 520/460/560 split came back as 520/300/352
+    columns while the controls column's own contents measured 265 px
+    folded and 375 px with the editor open: it grew a horizontal
+    scrollbar *inside itself*, 89 px of its own contents off screen, and
+    the library column overflowed by 7 px the same way.  Today the
+    column measures 329 px and the library's rows want 359 px; the suite
+    builds a fresh window, reads the three columns back and fails if any
+    of them has to scroll sideways to be read.
+
+  * Gates for the layout itself, in the same twenty-two offline sections.
+    A fresh window is checked against its own contents: no column
+    narrower than what it holds, no horizontal scrollbar in any of the
+    three.  The splitter is then dragged back to a 300 px controls
+    column, where the box really is narrower than its entries, to check
+    the list-width fix in the case it exists for.  The switch's note,
+    its tooltip and docs/gui.md are held to one list of what folds -
+    nine controls in two boxes, and the layout editor deliberately not
+    among them.  The window and split figures docs/gui.md,
+    docs/theme-editor.md and docs/tools.md quote are read back off the
+    code and the live widgets, and so is the number of clip rows the
+    README's capture frame puts in view.
+
+  * The README's advanced-mode live capture no longer shows this panel's
+    serial number.  The `conn 1` reply the window prints names it, and the
+    capture published on 2026-11-08 kept it as pixels: legible to an OCR
+    pass, invisible to a grep of the staged diff, which is the check this
+    project had been trusting for it.  Painted out with the same
+    `<redacted>` wording docs/gui.md uses for that field, at the face,
+    size and colour the window itself used.  `tools/selftest.sh` now
+    searches both halves of the serial through every published text file
+    and every picture docs/packaging.md accounts for, by OCR where
+    `tesseract` is installed and saying so where it is not;
+    docs/limits.md and docs/packaging.md keep the account, including that
+    the published history still holds the file as it was - rewriting it
+    would move tagged releases, which is the owner's call, not a quiet
+    edit.
+
+ -- Tamer Hassan <thameruddin@gmail.com>  Tue, 10 Nov 2026 06:20:00 +0200
 xigmatek-connect-lcd (0.4) resolute; urgency=medium
 
   * The vendor's own layouts are pictures this program can draw.  `--theme

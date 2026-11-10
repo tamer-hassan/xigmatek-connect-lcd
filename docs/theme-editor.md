@@ -701,8 +701,11 @@ per-theme milliseconds in docs/gui.md stay labelled as owed a quiet-box re-measu
   arithmetic (`pane_l.maximumWidth() == render.W + app.PANE_CHROME`, `>= render.W` - "the
   frame could never be shown 1:1" - and `pane_l.width() == pane_l.maximumWidth()`), and
   docs/gui.md carries the rest of the pixel census: splitter minimums 200/300/320, 66 px
-  clip rows with room for 7 clips at the 1180×780 default, a 150 px list floor and an 84 px
-  log floor, the controls column needing 742 of its 744 px. Keeping the canvas *inside*
+  clip rows with room for 6 clips at the 1320×800 default, a 150 px list floor and an 84 px
+  log floor, and a fresh split (560/400/420) that leaves every column at least its
+  contents' own minimum width - which 0.4's 1180 px window and 520/460/560 split did
+  not, and is what the controls column's horizontal scrollbar came from. Keeping the
+  canvas *inside*
   that pane keeps every one of those claims true; moving it into a pane of its own
   invalidates all of them and they all have to be re-measured.
 - **Nothing in this repo had ever delivered a pointer event to this window** when this was

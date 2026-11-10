@@ -171,11 +171,13 @@ Two measurements decided how the package carries them:
   costs about 90 KB and buys a doc set that reads on an installed machine.
 
 What the pictures do **not** do is get packaged, and since 0.3 there are two kinds of
-them. The images: `docs/logo.png` and `docs/screenshot-xigmaui.png` (1 114 379 B), the two
-theme contact sheets in `docs/previews/` (1 596 454 B). The videos: the six MP4s in
+them. The images: `docs/logo.png`, the generated window capture `docs/screenshot-xigmaui.png`
+and the two live captures the README carries - `docs/xigmaui1.png`, `docs/xigmaui2.png` -
+4 532 651 B across four of them. Then the two theme contact sheets in `docs/previews/`
+(1 596 454 B). The videos: the six MP4s in
 `docs/videos/` (5 039 178 B - the README's five previews plus the amber-ink figure
-docs/gui.md carries) and the readings JSON that drives them (13 916 B). **7 763 927 B**
-across 11 files, part of it rendered from XIGMATEK's own theme library, which is the
+docs/gui.md carries) and the readings JSON that drives them (13 916 B). **11 182 199 B**
+across 13 files, part of it rendered from XIGMATEK's own theme library, which is the
 other package's files and its own licence question - and the videos are also not package
 material for a second reason: what README links is GitHub's copy of them - the editor
 uploads the file to its CDN and writes that URL into the cell - and a URL is not a path this
@@ -185,13 +187,40 @@ So an installed README shows prose with repo-relative links that point at nothin
 and that is said here rather than discovered by a reader.
 
 Those five numbers are not kept by hand any more: the launcher section of
-`tools/selftest.sh` re-derives them from the files themselves (logo, the window capture,
-the two contact sheets, the six MP4s and the readings JSON) and fails if this page
-disagrees.  That gate earned its place the slow way - the video total had drifted by
-22 405 B when the amber-ink figure was re-rendered and nothing noticed.  Since then the
-window picture has been re-shot twice and the gate moved with it both times: 7 853 B for
-the layout editor's new row, and 44 355 B for the *keep my background* box and the pairing
-line that 0.4 put under the clip list.
+`tools/selftest.sh` re-derives them from the files themselves (the four images, the two
+contact sheets, the six MP4s and the readings JSON) and fails if this page disagrees -
+and the same total is checked against the comment in `debian/rules` that says the same
+thing to whoever builds the package next.  That gate earned its place the slow way - the
+video total had drifted by 22 405 B when the amber-ink figure was re-rendered and
+nothing noticed.  Since then the window picture has been re-shot three times and the
+gate moved with it every time: 7 853 B for the layout editor's new row, then 44 355 B
+for the *keep my background* box and the pairing line that 0.4 put under the clip list,
+then **27 719 B less** for 0.5 - the panel's report and the guarded reset left the
+controls column for the foot of the preview column, where they are folded away on first
+run, so the capture shows fewer pixels than it used to even though the layout editor is
+now open by default and the fresh window is 140 px wider (1320x800, the splitter asked
+for 560/400/420).  That one was captured twice: the first pass was taken before the note
+beside the switch was reworded, so it showed words the code no longer writes, and the
+number above is the capture that matches the tree.
+
+The set grew in 0.5, which is what moved the total by 3 418 272 B: the two live
+captures the README carries were never in the accounting, though `debian/rules` dropped
+them with the rest all along - `install -m 644 docs/*.md` puts prose in the package and
+nothing else, so every picture here is repo-only whether or not a page had said so.
+
+And one of those pictures was **edited rather than re-shot**.  The advanced-mode live
+capture shows the panel's `conn 1` reply, and that reply names this panel's serial
+number: from 2026-11-08 it sat in that PNG as pixels, whole and legible to an OCR pass,
+until 2026-11-10.  The rule it broke is the one that keeps `data/captures/` and
+`data/glass/` out of the repository altogether - the serial stays on the bench - and
+what had been holding that rule was grepping the staged diff, which reads bytes and
+cannot see a pixel.  The field is now painted with the same `<redacted>` wording
+docs/gui.md uses for that one field, in a monospace face at the size and ink colour the
+window used, and the file changed by 45 515 B, all of it the paint.  What keeps it
+painted out is a second check in the same section: both halves of the serial searched
+for in every published text file and in all thirteen of the pictures above - the byte
+half everywhere, the OCR half wherever `tesseract` is installed, which says so out loud
+on a machine where it is not rather than going quiet.
 
 Checked on the unpacked 0.3 packages, in that layout: **11** markdown files with no `.gz`
 next to any of them, **43** links from one document to another resolving (none dead),

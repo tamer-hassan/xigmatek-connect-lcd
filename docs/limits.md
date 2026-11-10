@@ -741,6 +741,15 @@ What has been measured on glass, by whom, with how many frames - and what has no
   panel's own serial number, which the captures and the logs both carry: blanking it by
   editing a log would be tampering with the evidence rather than redacting it, so those files
   stay on the bench and the serial is redacted wherever prose quotes one of their fields.
+  **The same rule, in pixels:** on 2026-11-10 an OCR pass found the serial, whole and
+  legible, inside `docs/xigmaui2.png` - a live capture published on 2026-11-08, where the
+  `conn 1` reply the window shows happens to name it.  What had been holding the rule was
+  grepping the staged diff, and a staged diff is bytes: it cannot see a picture.  The field
+  is painted out now (`docs/packaging.md` keeps the account and the byte cost), and
+  `tools/selftest.sh` searches both halves of the serial through every published text file
+  and every published PNG, by OCR where `tesseract` is installed and saying so where it
+  is not.  The published history still holds the file as it was: rewriting it would move
+  the tagged releases, which is the owner's call rather than a quiet edit.
   **What that costs, said plainly:** a clone cannot re-run `tools/verify_protocol.py`,
   `tools/theme_check.py --arc`, or the two `tools/selftest.sh` sections that call them.
   Every wall-clock, byte-count and pixel figure in this README and in `PROTOCOL.md` names the

@@ -85,30 +85,37 @@ the machine can find, watch the preview, put one frame or the whole loop on the 
 And because this panel cannot be asked what it is showing, the window says what it
 *knows*: the background the running display reported putting there, and the last six
 things it did on the port. Three columns — preview, controls, clip library — with an
-`advanced controls` switch that folds the secondary knobs away without changing their
-values, a `playing` box that decodes the background in sequence so the preview moves
-under our layer instead of showing one still frame of it, and one row that is always in
-sight, for the colour of the text it draws. This is a capture of the real program
-(`tools/screenshot.py`, no panel attached), with this machine's live readings in the
-preview:
+`advanced controls` switch that folds nine secondary controls - two boxes of them, at the
+foot of the preview column - away without changing their values, a `playing` box that
+decodes the background in sequence so the preview moves under our layer instead of showing
+one still frame of it, and one row that is always in sight, for the colour of the text it
+draws. This is a capture of the real program (`tools/screenshot.py`, no panel attached),
+with this machine's live readings in the preview:
 
-Behind the `advanced controls` switch there is also a row that opens one of the vendor's
+Behind the `advanced controls` switch sit the panel's own `conn 1` report and the guarded
+factory reset. Open in the controls column, always, is a row that opens one of the vendor's
 layout files — or one of the five themes generated from our own drawing code — and edits
 the fields this program's painter actually reads, with the picture under the preview
 redrawn from the file as it changes. The panel is never handed a layout file, so what that
 editor changes is what a loop on *this* machine draws the next time it names that theme
 ([docs/gui.md](docs/gui.md) has the row and its limits).
 
-![xigmaui, the window in three columns: the playing preview and the log on the left,
-the display's status, the theme picker and the text-colour row in the middle, and the
-background clip library on the right listing this machine's clips once per distinct
-file - 40 of them, from the 46 mp4 files this repository tracks](docs/screenshot-xigmaui.png)
+![xigmaui, the window in three columns: the playing preview and the log on the left -
+under the log, behind `advanced controls`, the panel's own report and the guarded
+factory reset - the theme picker, the text-colour row and the layout editor in the
+middle, and the background clip library on the right, one row per distinct file:
+40 rows from the 46 mp4 files this repository tracks](docs/screenshot-xigmaui.png)
 
-And these are real captures from live system (simple vs advanced mode):
+And these are real captures from live system (simple vs advanced mode), taken before
+0.5 moved the panel's report and the guarded reset to the foot of the left column — and
+with this bench's panel serial painted out of the status box: the `conn 1` reply names
+it, a screenshot keeps that as pixels rather than bytes, and the serial is the one fact
+that stays on the bench (docs/limits.md and docs/packaging.md keep the account, and the
+suite OCRs every published PNG to keep it that way):
 
 ![xigmaui, simple mode](docs/xigmaui1.png)
 
-![xigmaui, advanced mode](docs/xigmaui2.png)
+![xigmaui, advanced mode, its status box with the serial field painted out](docs/xigmaui2.png)
 
 It talks to a display loop that is already running when one is running, and drives the
 port itself when nothing is — which is the part that needs care, because the panel

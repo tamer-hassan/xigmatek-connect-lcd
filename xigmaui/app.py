@@ -4,13 +4,13 @@ Layout follows what this panel actually supports rather than what the vendor's
 window looks like:
 
     +----------------+-----------+------------+  the running display: its counters,
-    | preview        | theme     | clip list  |  and the last things it did on the
-    | (480x480,      | + clock   | (filter,   |  port; the theme and its pickers;
-    |  our           | + canvas  |  rows,     |  the library of backgrounds and the
-    |  composite,    | + advanced|  state)    |  panel's own hello; and, under the
-    |  not a mirror  | + reset   |            |  picture, the log
-    |  of the glass) |           |            |
-    +----------------+-----------+------------+
+    | preview        | theme     | clip list  |  and the last six things it did on
+    | (480x480,      | + layout  | (filter,   |  the port; the theme and its
+    |  our           |   editor  |  rows,     |  pickers; the library of
+    |  composite,    | + advanced|  state)    |  backgrounds; and, under the
+    |  not a mirror  |           |            |  picture, the log - then, behind
+    |  of the glass) |           |            |  the switch, the panel-status box
+    +----------------+-----------+------------+  and the guarded reset
 
 Three columns, not one long scroll: the clip library wants *height* (40 rows on this
 box, 115 with the Windows partition mounted) and it was sharing a single column with
@@ -21,12 +21,17 @@ the glass does not have would be a lie), so a preview column wider than 480 px i
 dead space; and a clip row follows its icon, so the thumbnails are 64 px, not the
 112 px that made every row 114 px tall.
 
-The `advanced controls` switch folds away the seven secondary things (canvas, scrim,
-fan figures, the display's event log, the panel's `conn 1` hello, the 30 second
-frame run, the layout editor).  It is pixels only, never values: what is hidden keeps
-its setting and `Apply` sends it.  The guarded factory reset stays on screen whatever
-the switch says, because a recovery that is hard to find is worse than one that is in
-the way.
+The `advanced controls` switch folds away nine secondary controls, in five
+rows and two boxes: canvas, scrim, fan figures, the display's last six port
+actions, the 30 second frame run, the panel-status box (its `conn 1` report
+and its Refresh button go with the box) and the guarded factory reset.  It is
+pixels only, never values: what is hidden keeps its setting and `Apply` sends
+it.  The reset and status boxes sit at the foot of the *preview* column, where
+a 480 px picture leaves slack nothing else can fill; the layout editor does not
+fold - it is how the window shows the 23 library layouts it can draw, and
+folding it away hid the point of the themes package.  The reset keeps its
+double guard wherever it stands: `Reset the panel` stays disabled until the
+word is typed.
 
 The preview is `tools/previews.py`'s composite running live: the stored
 background frame underneath, `render.draw` on top. It is labelled in the window
@@ -162,6 +167,33 @@ def _scroll(widget: QWidget) -> QScrollArea:
     area.setWidget(widget)
     area.setFrameShape(QScrollArea.Shape.NoFrame)
     return area
+
+
+def _readable(combo: QComboBox) -> QComboBox:
+    """Let a drop-down's list be wider than the box that opens it.
+
+    Measured, not assumed: the closed combo does stretch to the field column
+    (208 px in a 299 px box at the fresh window), but the *list* that opens is
+    the box's own width, so every entry longer than the box is elided in the one
+    place a reader is choosing from.  `data  CPU Temperature  at 166,205` needs
+    195 px, the layout editor's longest entry, and a 236 px field column with an
+    icon and an arrow leaves less than that to the text.
+
+    The box itself never asks for more than the column can give - that is what
+    put a floor under the controls column once, when one combo's entry carried a
+    whole sentence inline - so it is the popup's view that gets the extra width,
+    which costs no column pixel at all.  Called after every repopulate, because
+    the longest entry changes with the layout, with the kind, with the vocabulary.
+    """
+    view = combo.view()
+    metrics = view.fontMetrics()
+    wide = max((metrics.horizontalAdvance(combo.itemText(i))
+                for i in range(combo.count())), default=0)
+    if wide:
+        # the row's own furniture: frame, margins, the scroll bar the list may
+        # need, and any icon column the entries carry
+        view.setMinimumWidth(wide + 60 + combo.iconSize().width())
+    return combo
 
 
 class Canvas(QLabel):
@@ -497,15 +529,24 @@ class Window(QMainWindow):
         self.adv_toggle = QCheckBox("advanced controls")
         self.adv_toggle.setToolTip(
             "show the canvas and scrim pickers, the fan figures switch, the "
-            "display's event log, the panel's own `conn 1` hello, the 30 second "
-            "frame run, and the layout editor. Hiding them does not change them: "
-            "what is not shown is still what is set, and Apply sends it either way")
+            "display's last six port actions, the 30 second frame run, and - at "
+            "the foot of the preview column, under the log - the panel-status box "
+            "(the `conn 1` report and its Refresh button) and the guarded factory "
+            "reset. Hiding them does not change them: what is not shown is still "
+            "what is set, and Apply sends it either way. The layout editor is not "
+            "one of these: it stays open, because it is how this window shows the "
+            "layouts it can draw")
         self.adv_toggle.setChecked(bool(self.cfg.get("advanced")))
         self.adv_toggle.toggled.connect(self._set_advanced)
         self.anim_toggle.toggled.connect(self._set_animate)
         head.addWidget(self.adv_toggle)
-        self.adv_note = QLabel("canvas, scrim, fans, the event log, panel hello, the "
-                               "30 s run, the layout editor")
+        # the folded list, in one place: `_set_advanced` puts the same words back
+        # when it folds, and a note that drifts from what the switch hides is a map
+        # with a place missing off it
+        self._adv_folded_note = ("canvas, scrim, fans, the display's last six port "
+                                 "actions, the 30 s run, the panel-status box, the "
+                                 "factory reset")
+        self.adv_note = QLabel(self._adv_folded_note)
         self.adv_note.setStyleSheet("color:#888;font-style:italic;")
         self.adv_note.setWordWrap(True)
         head.addWidget(self.adv_note, 1)
@@ -515,10 +556,6 @@ class Window(QMainWindow):
         # everything else.  A form row whose field is hidden and whose label is
         # not is a gap with a word in it, so both go.
         self._adv_hide: list = []
-        # whole boxes the switch folds, parked here until the controls column is
-        # finished: they belong at its foot, in the slack that column has and the
-        # library column does not
-        self._adv_boxes: list = []
         # A third column, used when the window is wide: the clip library wants
         # *height* (40 distinct clips, out of the 46 mp4 files this repository tracks,
         # 204 where an installed copy and a mounted partition add theirs) and at
@@ -611,6 +648,7 @@ class Window(QMainWindow):
 
         theme = QGroupBox("Theme on the glass")
         form = QFormLayout(theme)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
 
         def adv_row(label: str, field) -> None:
             """A settings row the advanced switch covers, label and field both.
@@ -631,6 +669,7 @@ class Window(QMainWindow):
         self.theme.addItems(sorted(render.THEMES))
         self.theme.setCurrentText(self.cfg["theme"])
         self.theme.currentTextChanged.connect(self._theme_chosen)
+        _readable(self.theme)
         self.theme.setToolTip(
             "the drawings `xigmalcd` renders itself, from live sensor readings. "
             "The vendor's layouts are not in this list on purpose: this combo picks "
@@ -648,11 +687,11 @@ class Window(QMainWindow):
         # vendor's own files - .thm themes, layouts, baked overlays, clips - and
         # this project has measured one use for them: as background media.  It
         # has never sent a .thm, and it cannot draw one.
-        # one line shorter than it was, on purpose: this note is the reason the
-        # controls column at the fresh 1180x780 default needed 742 of its 744 px,
-        # and a column that scrolls by a hand's width because of a footnote is a
-        # bad trade.  The full explanation is the combo's tooltip (set just above)
-        # and docs/themes.md, which is what the parenthetical points to.
+        # one line shorter than it was, on purpose: this note is what once pushed
+        # the controls column's own minimum past its width - 742 of its 744 px,
+        # measured in 0.3 - and a column that scrolls by a hand's width because of a
+        # footnote is a bad trade.  The full explanation is the combo's tooltip (set
+        # just above) and docs/themes.md, which is what the parenthetical points to.
         vendor = QLabel(
             "the five are what this window draws; 23 of the package's layouts reach "
             "the daemon by name instead (docs/themes.md)")
@@ -663,6 +702,8 @@ class Window(QMainWindow):
         self.clock_size.setRange(16, 96)
         self.clock_size.setValue(self.cfg["clock_size"])
         self.clock_size.valueChanged.connect(self._changed)
+        self.clock_size.setSizePolicy(QSizePolicy.Policy.Expanding,
+                                      QSizePolicy.Policy.Fixed)
         form.addRow("clock size", self.clock_size)
         self.ink_choice = QComboBox()
         # the colours this module's own palette already ships with, so a choice
@@ -705,6 +746,7 @@ class Window(QMainWindow):
             "skin is measured: 6 of 6 text colours in the layout ALPHA has "
             "selected are white (PROTOCOL.md §10)")
         self.ink_choice.setToolTip(self._ink_tip)
+        _readable(self.ink_choice)
         form.addRow("text colour", self.ink_choice)
         self.canvas = QComboBox()
         # short entries, long explanations in tooltips: a combo sizes itself to
@@ -761,11 +803,18 @@ class Window(QMainWindow):
         #     this window: looking at a theme's fields must not quietly change what the
         #     loop draws.
         #
-        # It folds away with the advanced switch - one group box, one entry in
-        # `_adv_hide`.  A first run does not need a layout editor, and this column
-        # measured 742 of its 744 px at the fresh 1180x780 default before it arrived.
+        # It does not fold: the switch is about the knobs a first run does not
+        # need, and this is not one of them - it is the only place the window
+        # shows the 23 library layouts the themes package installs, and folding
+        # it away made the whole point of that package invisible.  The boxes the
+        # switch *does* fold moved to the preview column instead, so this one
+        # has the room its rows need.
         editor = QGroupBox("Layout: edit a file the loop can draw")
         eform = QFormLayout(editor)
+        # one growth policy, stated rather than inherited from whatever style
+        # this desktop happens to use: every field fills the field column, so a
+        # combo is never a strip narrower than the text it is showing.
+        eform.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         self.ed_name = QComboBox()
         # `themes.scan()` is already user-first, so a name that has been edited appears
         # once and opens the copy: reopening continues rather than starting over.  The
@@ -790,6 +839,7 @@ class Window(QMainWindow):
             "back from it (PROTOCOL.md \u00a711): what a save changes is what *this "
             "machine's* daemon draws next time it names that theme")
         self.ed_name.currentTextChanged.connect(self._editor_open)
+        _readable(self.ed_name)
         self.ed_state = QLabel("not editing: the pane shows the theme above, drawn from "
                                "this machine's readings")
         self.ed_state.setStyleSheet("color:#888;font-style:italic;")
@@ -819,6 +869,9 @@ class Window(QMainWindow):
         # metric names in the source table, drawings in `themes.SPECIALS`, painter
         # conventions in `layout.ARC_PAINT`/`BAR_PAINT`, named ramps in
         # `layout.COLOUR_RAMPS`.
+        for box in (self.ed_name, self.ed_widget, self.ed_field):
+            box.setSizePolicy(QSizePolicy.Policy.Expanding,
+                              QSizePolicy.Policy.Fixed)
         self.ed_stack = QStackedWidget()
         self.ed_num = QSpinBox()
         # Deliberately wider than any legal value. A spinbox that clamps 999 down to 479
@@ -836,7 +889,11 @@ class Window(QMainWindow):
         self.ed_bool = QCheckBox("bold")
         self.ed_bool.toggled.connect(lambda _b: self._editor_apply(True))
         for page in (self.ed_num, self.ed_menu, self.ed_text, self.ed_bool):
+            page.setSizePolicy(QSizePolicy.Policy.Expanding,
+                               QSizePolicy.Policy.Fixed)
             self.ed_stack.addWidget(page)
+        self.ed_stack.setSizePolicy(QSizePolicy.Policy.Expanding,
+                                    QSizePolicy.Policy.Fixed)
         eform.addRow("value", self.ed_stack)
 
         brow = QHBoxLayout()
@@ -859,14 +916,16 @@ class Window(QMainWindow):
         brow.addWidget(self.ed_undo)
         brow.addWidget(self.ed_save)
         brow.addWidget(self.ed_revert)
-        eform.addRow("", brow)
+        # a spanning row, not a field-column row: three buttons inside the
+        # field column is what put a 357 px floor under the whole controls
+        # column (measured) while the labels and fields needed barely more
+        eform.addRow(brow)
 
         self.ed_note = QLabel()
         self.ed_note.setWordWrap(True)
         self.ed_note.setStyleSheet("color:#999;font-style:italic;")
         eform.addRow("", self.ed_note)
         self.ed_group = editor                   # the suite's gate names it from outside
-        self._adv_hide.append(editor)
         col.addWidget(editor)
         self.ed = None                        # nothing open until a name is picked
         self._ed_notes = {}                   # what the last editor frame reported
@@ -1018,12 +1077,14 @@ class Window(QMainWindow):
         slay.addLayout(rrow)
         self.status.setMinimumHeight(70)
         self.status_box = status
-        # controls column, not library: `conn 1` answers with fourteen fields and
-        # they wrap to about ten lines in a 300 px column, which is height taken
-        # straight off the clip list.  The controls column has the slack instead
-        # (measured: ~450 px of it empty at 1 919x1 055), and this box is behind
-        # the advanced switch anyway, where it cannot push the reset box away.
-        self._adv_boxes.append(status)
+        # the foot of the preview column, not the controls column and not the
+        # library: `conn 1` answers with fourteen fields and they wrapped to
+        # about ten lines in a 300 px column, height taken straight off the
+        # clip list.  The preview column has a 480 px picture and, above a
+        # short window, slack below it that nothing else can honestly fill (the
+        # frame is never scaled up), and the same fields wrap to fewer lines at
+        # that column's ~530 px.  Behind the advanced switch with the reset box,
+        # so neither pushes anything away.
         self._adv_hide.append(status)
 
         danger = QGroupBox("Factory reset")
@@ -1044,9 +1105,8 @@ class Window(QMainWindow):
         self.btn_reset.clicked.connect(self._do_reset)
         row2.addWidget(self.btn_reset)
         dlay.addLayout(row2)
-        col.addWidget(danger)
-        for _b in self._adv_boxes:
-            col.addWidget(_b)
+        self.reset_box = danger           # the suite's gate names it from outside
+        self._adv_hide.append(danger)
         # The tail of the column: without it, QBoxLayout shares a tall window's
         # leftover height out between every box, so a one-line note label came
         # back 249 px tall (measured) and the controls column grew a blank band
@@ -1079,6 +1139,14 @@ class Window(QMainWindow):
         # `1` against the frame's `0`: the picture takes exactly what a square of
         # the pane's width is, and the log gets whatever height that leaves.
         lay.addWidget(slog, 1)
+        # the two boxes the switch folds go under the log, in this column: the
+        # calls come after the log's so the order down the column is picture,
+        # caption, metrics, log, reset, status.  Their double guard - the word
+        # `reset` typed before the button wakes - is a property of the box, not
+        # of its position or visibility: folded away, the button is hidden
+        # *and* disabled; shown, it is still disabled until the word is typed.
+        lay.addWidget(danger)
+        lay.addWidget(status)
 
         split = QSplitter()
         # The preview column gets exactly the room the picture can use and no
@@ -1148,6 +1216,7 @@ class Window(QMainWindow):
         self.ink_choice.insertItem(self.ink_choice.count() - 1, QIcon(chip),
                                    hexv, hexv)
         self.ink_choice.setCurrentIndex(self.ink_choice.count() - 2)
+        _readable(self.ink_choice)     # the new entry is a hex spelling: wider
 
     def _choose_ink(self, index: int) -> None:
         """A palette entry is a choice; the last row opens the colour dialog."""
@@ -1854,15 +1923,16 @@ class Window(QMainWindow):
         Hiding is only ever about screen area: every control keeps its value and
         `Apply` sends it, so a compact window is not a window running on defaults
         - the note beside the switch says what is folded away.  The factory-reset
-        box stays on screen whatever the switch says: a guarded recovery that is
-        hard to find is worse than one that is merely in the way.
+        box folds with the rest: what stands between a stray click and a recovery
+        is the typed word and a disabled button, not the box sitting in view.  The
+        note beside the switch names every control that folds, and the switch's own
+        tooltip says what hiding does and does not do to them.
         """
         for w in self._adv_hide:
             w.setVisible(bool(on))
         self.adv_note.setText(
-            "canvas, scrim, fans, the event log, panel hello, the 30 s run, the "
-            "layout editor"
-            if not on else "shown, and they keep their values either way")
+            self._adv_folded_note if not on
+            else "shown, and they keep their values either way")
         self.save_timer.start()
 
     # ---- the layout editor --------------------------------------------------
@@ -1917,6 +1987,7 @@ class Window(QMainWindow):
         for i in range(len(self.ed.widgets())):
             self.ed_widget.addItem(self.ed.label(i))
         self.ed_widget.blockSignals(False)
+        _readable(self.ed_widget)
         self.ed_widget.setCurrentIndex(0)
         self._editor_pick_widget(0)
         self._repaint()
@@ -1952,6 +2023,7 @@ class Window(QMainWindow):
         self.ed_field.clear()
         self.ed_field.addItems(fields)
         self.ed_field.blockSignals(False)
+        _readable(self.ed_field)
         if fields:
             self.ed_field.setCurrentIndex(0)
             self._editor_pick_field(fields[0])
@@ -1998,6 +2070,7 @@ class Window(QMainWindow):
             # there would tell a reader the row draws a different picture than it does
             self.ed_menu.setCurrentText(str(value) if value is not None else items[0])
             self.ed_menu.blockSignals(False)
+            _readable(self.ed_menu)
         elif field in edit.number_fields():
             page = self.ed_num
             self.ed_num.blockSignals(True)

@@ -72,15 +72,15 @@ one of them (see "How the three columns get their sizes", after the table):
 | the running display | controls | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. It also spells out the settings that display is running with - canvas, clock size, scrim, fans, and **the text colour it holds, as the hex it will answer again** (`text #ffc400`), which is the only place in the window you can see a colour you did not pick yourself. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Measured 1 ms for the commands Apply sends - six on the 0.2 bench ledgers below, seven in the tree, and the suite re-measures the line every run |
 | preview | preview | the background with `render.draw`'s OSD layer composited on top - playing, via one streaming ffmpeg, or as one mid-loop frame (`playing` box, see "The preview plays" below), refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How the three columns get their sizes" below | nothing |
 | theme | controls | the five themes, clock size, **the colour of the text it draws**, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
-| layout editor | controls, advanced | opens one of the layouts this machine can select (or one of the 5 generated ones), shows its widgets, and edits one field at a time; the pane under the picture then shows *that file* rather than the live theme | nothing, ever: the panel is never handed a layout file (PROTOCOL.md §11). What `save` changes is what this machine's own daemon draws next time it names that theme |
+| layout editor | controls, always on | opens one of the layouts this machine can select (or one of the 5 generated ones), shows its widgets, and edits one field at a time; the pane under the picture then shows *that file* rather than the live theme | nothing, ever: the panel is never handed a layout file (PROTOCOL.md §11). What `save` changes is what this machine's own daemon draws next time it names that theme |
 | clips | library | every MP4 the roots hold, listed once per **distinct file** - **40 rows out of the 46 mp4 files this repository tracks** (204 files on the author's bench, where the installed package and a mounted Windows partition add themselves; still 40 rows): 3 rows from the clips vendored here and 37 from the vendor's library on any of those boxes, the rest of the files being copies that collapse by content - 6 among the 46 tracked here (3 of them under another name), 164 on the bench, and the dated audit of all of it is written out under "Cost, measured on this box" below. This checkout's own `themes/alpha/clips` is one of the roots the list walks: 43 clip files, byte-identical to what `xigmatek-connect-lcd-themes` installs (the suite re-hashes every one against that package's manifest), which is what lets a clone pair all 23 layouts `--list-themes` prints and why the same 40 rows turn up on a CI runner with nothing installed. `tools/preview_gif.py --clip themes/alpha/clips/Theme_30.mp4` reaches those files by path, which is how all five README previews are made. Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
 | background state | library | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the gate refuses says so, in the gate's words, before the button is pressed | nothing: it is a readout |
 | `One frame now` | library | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
 | `Send frames for 30 s` | library, advanced | the picture loop, so you can watch the real glass | `STATE all 1` twice, then 60 uploads at 2 fps |
-| status | library, advanced | the panel's `conn 1` reply: sn, versions, `space`, `brightness`, `mode`, `logo`, `osdState`, `timeout`, each annotated only where PROTOCOL.md records what it means | `conn 1`, `power resume`, `timeout 60` - and no metrics blob, because it puts no picture on the glass. With a display running there is no fresh `conn 1` to ask for, so the box shows the one that display read at its own session start, labelled as such |
+| status | preview, under the log, advanced | the panel's `conn 1` reply: sn, versions, `space`, `brightness`, `mode`, `logo`, `osdState`, `timeout`, each annotated only where PROTOCOL.md records what it means | `conn 1`, `power resume`, `timeout 60` - and no metrics blob, because it puts no picture on the glass. With a display running there is no fresh `conn 1` to ask for, so the box shows the one that display read at its own session start, labelled as such |
 | log | preview, under the picture | the window's own last 200 lines (`LOG_KEEP`): what it sent, what the panel answered, what failed and why. Scrollable, selectable, newest at the bottom; the display's full record is its journal, `journalctl --user -u xigmalcd -f` (docs/usage.md) | nothing: it is a readout |
-| `advanced controls` | controls, top row | folds away the seven secondary things named further down; it hides pixels and never values | nothing |
-| reset | controls, always on | the vendor's `recovery` | needs the word `reset` typed in, then a confirm dialog. With a display running it goes over the socket, which refuses it unless that display was started `--allow-reset`, and the refusal is quoted in the daemon's words |
+| `advanced controls` | controls, top row | folds away the nine secondary controls named further down, in two boxes at the foot of the preview column; it hides pixels and never values | nothing |
+| reset | preview, under the log, advanced | the vendor's `recovery` | needs the word `reset` typed in, then a confirm dialog. With a display running it goes over the socket, which refuses it unless that display was started `--allow-reset`, and the refusal is quoted in the daemon's words |
 
 ### How the three columns get their sizes, and why the preview is never bigger than the glass
 
@@ -108,8 +108,8 @@ number in that shape comes from a measurement, most of them of a failure:
   (`CLIP_ICON`), and `ResizeMode.Adjust` - which lays rows out against the viewport
   and is what painted one selected clip as a block taller than the list - went to
   `Fixed` with uniform rows. Measured afterwards, and printed by the suite:
-  **66 px rows, and room for 7 clips at the fresh 1180×780 window, 12 at
-  1919×1055** — rows in view, which is capacity: this bench has 40 distinct clips to
+  **66 px rows, and room for 6 clips at the fresh 1320×800 window, 11 at 1919×1055**
+  — rows in view, which is capacity: this bench has 40 distinct clips to
   put in them (204 files behind them on the author's bench), while a checkout of this
   repository on its own - no installed package, no second partition - walks the 46 mp4 files
   it tracks and gets the same 40 rows;
@@ -130,12 +130,39 @@ number in that shape comes from a measurement, most of them of a failure:
   cannot come back as a permanent hole;
 * and the picture refits when the **label** resizes, not when the window does:
   dragging a splitter handle never fired the window's `resizeEvent`, which is why the
-  preview used to stay at its old scale while its pane changed shape.
+  preview used to stay at its old scale while its pane changed shape;
+* and a column is never narrower than what it holds.  Each column's contents have a
+  minimum width of their own: today the controls column measures **329 px** with a
+  layout open in its editor and the library's rows want **359 px**.  Checked out at the
+  `v0.4` tag and measured the same way, that column wanted **265 px** folded and
+  **375 px** with the editor open while 0.4's window and split gave it **300 px**, so it
+  grew a horizontal scrollbar *inside itself* with **89 px** of its own contents off
+  screen - and the library column overflowed by **7 px** the same way.  Those 0.4
+  figures were re-measured against the tag on 2026-11-10 rather than kept in a gate: a
+  gate can only hold this tree, and what this tree asserts is that the same failure
+  cannot come back - the suite builds a fresh window and checks both halves, no column
+  narrower than its contents' own minimum and no horizontal scrollbar in any of the
+  three;
+* and a drop-down's list is wider than the box that opens it.  Swept across all **28**
+  layouts the editor can open, the widest row it can put in its widget menu measures
+  **247 px** (`data  Motherboard Temperature  at 452,136`), and a closed box in a 300 px
+  column is **241 px** - so the list, which opens at its box's width, cuts every entry
+  past that in the one place a reader is choosing between entries.  The popup's own
+  view gets the width instead (**323 px** for that row) and costs the column nothing,
+  while the box never asks for more than its longest entry: a box that did was the floor
+  under the whole controls column once.  The suite drags the splitter back to a 300 px
+  column to check the fix in exactly the case it exists for, and checks the box half too.
 
-The fresh window default is **1180×780** (`xigmaui/settings.py`) - wide enough for
-three columns, short enough for a 1080p screen - and the README's capture frames it at
-1380×860. Both figures are asserted against the code by the suite, so neither sentence
-can go stale.
+The fresh window default is **1320×800** (`xigmaui/settings.py`), with the splitter
+asked for **560 / 400 / 420**. That request is deliberately wider than the window:
+`QSplitter` scales an over-wide request down proportionally, which keeps one shape at
+every window width, so the three numbers are a proportion rather than three widths - at
+a fresh window they come back as **560 / 367 / 385**, every column wider than its own
+contents measure. Short enough for a 1080p screen, and the README's capture frames the
+same window at 1380×860. The suite builds a window at these defaults, reads the
+splitter back and asserts each column is at least as wide as what it holds and that none
+of the three scrolls sideways; it checks both triples against this page, so neither can
+go stale.
 
 ### The preview plays, or shows one frame
 
@@ -226,25 +253,41 @@ A preview is only ever blamed for what it adds, and the suite holds each file to
 
 ### The advanced switch
 
-A checkbox at the top of the controls column, default **off**, folds away seven
-secondary things: the `canvas` and `scrim` pickers, the fan-figures switch, the
-display's event ring, the panel's own `conn 1` hello, the "send frames for 30 s"
-run, and the layout editor. It is about pixels and nothing else - every hidden
-control keeps its value and `Apply` sends it, which is what the suite checks by
-setting `scrim` while it is invisible, restarting the window and reading the same
-200 back. The choice is remembered (`advanced` in the settings file), and the note
-beside the switch names what is folded so a reader is never hunting for a control
-that exists.  The suite also checks that the note names as many things as the code
-hides (`win._adv_hide`), because a map that leaves something out is worse than no map.
+A checkbox at the top of the controls column, default **off**, folds away nine
+secondary controls: the `canvas` and `scrim` pickers, the fan-figures switch, the
+display's last six port actions, the "send frames for 30 s" run, the panel-status
+box - the `conn 1` report and its `Refresh` button go with their box - and the
+factory reset's whole box, its word field and its button with it, three controls in
+one.  They fold as two boxes at the foot
+of the preview column, under the log, rather than as loose rows in the controls
+column: `conn 1` answers with fourteen fields that wrapped to about ten lines in a
+300 px column, and the picture's column is the one with height spare below a 480 px
+frame.  It is about pixels and nothing else - every hidden control keeps its value
+and `Apply` sends it, which is what the suite checks by setting `scrim` while it is
+invisible, restarting the window and reading the same 200 back.  The choice is
+remembered (`advanced` in the settings file), and the note beside the switch names
+what is folded so a reader is never hunting for a control that exists.  The suite
+holds that note, the switch's tooltip and this document to the same list, and checks
+the set by parent as well as by length: nine controls, in the two boxes it says.
 
-The **guarded factory reset is deliberately not in there**. It stays on screen whether
-the switch is on or off: hiding the one thing that can put a panel back to its default
-would trade a wasted 90 px for a feature people search for when their panel has gone
-white (docs/troubleshooting.md).
+The **guarded factory reset moved in behind the switch**, which reverses what 0.4
+documented - there the box stayed on screen whatever the switch said, on the grounds
+that a recovery which is hard to find is worse than one in the way.  What actually
+stands between a stray click and a factory reset is the word `reset` typed into the
+field and a button that stays disabled until it is, and the suite now checks that
+guard *in the folded state*: hidden, then shown, the button is still disabled, and it
+wakes only when the word is typed.  A control that is hidden and disabled is guarded
+twice over.  The CLI route (`xigmalcd recovery --port … --yes`) is where the recovery
+is documented, and it is unaffected by any of this.
+
+The **layout editor is deliberately not in there**.  It sits in the controls column,
+open: that group box is the only place the window shows the 23 layouts the themes
+package installs, and folding it away by default meant the point of that package was
+invisible until a reader found an unrelated checkbox.
 
 ### The layout editor
 
-One group box, folded away by default, that opens a layout as data: the three
+One group box, on show by default, that opens a layout as data: the three
 generated themes (`clock`, `dual`, `gauge` - JSON written out of `render.py` on demand)
 and the 23 layout files this canvas can select, the same set `--list-themes` prints.
 A row picks a widget, a field, and a value; a second row says what happened. And the

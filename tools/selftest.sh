@@ -4698,7 +4698,8 @@ def _spaced(n):
     return f"{n:,}".replace(",", " ")
 
 
-_pics = {"the images": sorted(["docs/logo.png", "docs/screenshot-xigmaui.png"]),
+_pics = {"the images": sorted(["docs/logo.png", "docs/screenshot-xigmaui.png",
+                               "docs/xigmaui1.png", "docs/xigmaui2.png"]),
          "theme contact sheets": sorted(_pglob.glob("docs/previews/*.png")),
          "the MP4s": sorted(_pglob.glob("docs/videos/*.mp4")),
          "readings JSON": sorted(_pglob.glob("docs/videos/*.json"))}
@@ -4730,6 +4731,83 @@ print(f"  what is not packaged   {len(_all)} files, {_spaced(_total)} B, all of 
           f"{k} {_spaced(_sizes[k])} B ({len(_pics[k])} file"
           f"{'s' if len(_pics[k]) != 1 else ''})" for k in _pics) +
       f" - and docs/packaging.md states each of those five numbers as measured here")
+# debian/rules explains the same exclusion in its own comment, and that comment quoted a
+# total too - 7 749 610 B, which had already drifted twice (once by the amber-ink
+# re-render, once by the window capture) because nothing read it.  Now it is the same
+# measured number or the build recipe says something false.
+assert _spaced(_total) in open("debian/rules", encoding="utf-8").read(), (
+    _spaced(_total), "debian/rules' comment quotes a different total for what stays out")
+
+# ---- the serial stays on the bench, in the pixels as well as the bytes ----
+# Every transcript that holds this panel's serial raw - data/captures/, data/glass/ - is
+# left out of the repository outright (see .gitignore), and prose writes
+# `sn=<this panel's serial, redacted>` (docs/limits.md, docs/gui.md).  What held that
+# line was a habit: grep the staged diff.  A staged diff is bytes, and a screenshot keeps
+# a serial as *pixels*, so the habit could not see one.  On 2026-11-10 an OCR pass found
+# the serial, whole and legible, in docs/xigmaui2.png - the README's advanced-mode
+# capture, committed on 2026-11-08 and published ever since - and it was painted out the
+# same day.  This is the check that keeps it painted out: the byte half runs everywhere,
+# the pixel half runs where `tesseract` is installed and says so where it is not.
+_MARKS = ("BY" + "ZL", "WC07" + "AM")   # the two halves of this panel's serial, written
+                                       # split up on purpose: the habit that held this
+                                       # rule was grepping the staged diff for the first
+                                       # four letters of it, and a check that trips its
+                                       # own grep is a check nobody keeps running.  The
+                                       # shape below is the second net, so the literal
+                                       # halves are only ever needed one at a time.
+import re as _ser_re                   # this block's own alias: `import re` comes later
+_SHAPE = _ser_re.compile(r"[A-Z]{4}\d{4}[A-Z]{2}\d{2}[A-Z]{2}\d{6}")
+
+
+def _carries(path):
+    """either mark, as bytes, or a token with the serial's shape, in a text file"""
+    raw = open(path, "rb").read()
+    hits = [m for m in _MARKS if m.encode() in raw]
+    shape = _SHAPE.search(raw.decode("utf-8", "replace"))
+    if shape:
+        hits.append(shape.group(0))
+    return hits
+
+
+_text_files = (["README.md", "PROTOCOL.md"]
+               + _pglob.glob("docs/*.md") + _pglob.glob("docs/**/*.md")
+               + _pglob.glob("debian/*") + _pglob.glob("install/*")
+               + _pglob.glob("tools/*.py")
+               + _pglob.glob("xigmalcd/*.py") + _pglob.glob("xigmaui/*.py"))
+_text_files = sorted({f for f in _text_files if os.path.isfile(f)})
+_text_hits = {f: _carries(f) for f in _text_files}
+_text_hits = {k: v for k, v in _text_hits.items() if v}
+assert not _text_hits, (_text_hits,
+                        "the panel's serial is in published text, which is the rule "
+                        "the whole data/ tree exists to keep")
+# ... and the pictures.  Only the PNGs among them: the six MP4s film the glass, not the
+# window, so the one field that carries a serial is never in frame - the readings JSON
+# they draw from is text and was read above.  Spaces and newlines are dropped before the
+# search, because OCR splits a long token differently every run.
+_stills = [f for f in _all if f.endswith(".png")]
+try:
+    _ocr = subprocess.run(["tesseract", "--version"], capture_output=True, text=True)
+    assert _ocr.returncode == 0, _ocr.stderr[:200]
+    _img_hits = {}
+    for _f in _stills:
+        _r = subprocess.run(["tesseract", _f, "-"], capture_output=True, text=True)
+        # spaces and newlines out: OCR splits a long token differently every run
+        _flat = _r.stdout.replace(" ", "").replace("\n", "")
+        _why = [m for m in _MARKS if m in _flat]
+        _sh = _SHAPE.search(_flat)
+        if _sh:
+            _why.append(_sh.group(0))
+        if _why:
+            _img_hits[_f] = _why
+    assert not _img_hits, (
+        _img_hits, "a published picture carries the panel serial in pixels: paint it "
+                   "out the way docs/xigmaui2.png was, do not just re-shoot and hope")
+    _scanned = f"{len(_stills)} PNGs OCR'd clean"
+except FileNotFoundError:
+    _scanned = ("tesseract not installed here: the pixel half of this check did NOT run, "
+                f"{len(_stills)} pictures unread by it")
+print(f"  the serial stays home  {_scanned}; {len(_text_files)} published text files "
+      f"read, neither mark in any of them")
 
 # The unit is the always-on path, and it is a template.  Three things are checked
 # against the code rather than against a copy of the list: that the only holes in
@@ -5556,7 +5634,9 @@ print(f"  preview column          capped at {pane_l.maximumWidth()} px for a "
 # rows follow the icon size, so this is the number that decides whether the list is
 # a tool or a scroll wheel.  Both are measurements of the live widget, not of the
 # intent: `fixed` layout mode, 64 px icons, uniform sizes.
-win.resize(1180, 780)                  # the window's own default size
+win.resize(*settings.DEFAULTS["size"])   # the window's own default size, read from the
+# code, so the rows-in-view figures printed below and quoted in docs/gui.md are the
+# ones the code actually asks for
 win.split.setSizes(list(settings.DEFAULTS["split"]))
 for _ in range(10):
     appq.processEvents()
@@ -5611,6 +5691,20 @@ print(f"  clip list               rows {row_h} px: {visible} rows in view at "
       f"{settings.DEFAULTS['size'][0]}x{settings.DEFAULTS['size'][1]}, "
       f"{wide_visible} at 1919x1055, where it used to be 2 "
       f"({win.clips.count()} clips on this machine)")
+# and the two pages that quote that capacity quote this run's numbers.  The sentence
+# has to sit on one line in each document, which is the point: a figure split across a
+# line break is a figure no gate can see.
+_rows_claim = (f"for {visible} clips at the fresh {settings.DEFAULTS['size'][0]}"
+               f"×{settings.DEFAULTS['size'][1]} window, {wide_visible} at 1919×1055")
+_te_doc = open("docs/theme-editor.md", encoding="utf-8").read()
+for _f, _txt, _claim in (("docs/gui.md", open("docs/gui.md", encoding="utf-8").read(),
+                          _rows_claim),
+                         ("docs/theme-editor.md", _te_doc,
+                          f"room for {visible} clips at the {settings.DEFAULTS['size'][0]}"
+                          f"×{settings.DEFAULTS['size'][1]} default")):
+    assert _claim in _txt, (_f, _claim,
+                            "that page's clip-row capacity is not what this run measured")
+    assert f"{row_h} px" in _txt, (_f, row_h, "that page counts the rows differently")
 
 # the detail line under the list repeats nothing: the row above it already says
 # what the file is called, its size, its length and where it came from
@@ -5627,31 +5721,97 @@ print("  clip detail             the readout under the list, not a second copy o
 
 # ---- the advanced switch: what folds away, and what hiding never changes ----
 # Default: folded.  Everything hidden keeps its value and still goes out on Apply -
-# the switch is about pixels, not about defaults - and the factory reset stays put,
-# because a guarded recovery that is hard to find is worse than one in the way.
-folded = [win.canvas, win.scrim, win.fanline, win.d_events,
-          win.btn_live, win.status_box, win.ed_group]
-assert len(folded) == 7, folded          # the note names each one
-# the note beside the switch is the reader's only map of what folds away, so it is
-# checked against the code's own list: same number of things, and the layout editor is
-# in the doc that walks the window, or the doc is describing a window that no longer
-# has one
+# the switch is about pixels, not about defaults.  Nine controls fold, and they are
+# one box more than 0.4 folded: the factory reset moved in here from the controls
+# column, which is a decision deliberately reversed from the one 0.4 documented, so
+# the box keeps its typed-word gate checked here whatever is around it.  The layout
+# editor does NOT fold: it is the only place the window shows the library's layouts.
+folded = [win.canvas, win.scrim, win.fanline, win.d_events, win.btn_live,
+          win.status_box, win.reset_box, win.confirm, win.btn_reset]
+assert len(folded) == 9, folded
+assert win.ed_group not in win._adv_hide, \
+    "the layout editor folded away again, and it is the window's only layout browser"
+# the note beside the switch, the tooltip on the switch, and the two docs that walk
+# the window all have to name the same nine things.  The note counts by commas; the
+# tooltip and the docs are checked by their own wording, so the lists are written out
+# here rather than scraped from the prose.
 note_folded = win.adv_note.text()
-assert len(folded) == len([p for p in note_folded.split(",") if p.strip()]), \
-    (len(folded), note_folded)
+# The note used to be checked by counting commas, which worked while everything that
+# folded was a row of its own.  It now folds two whole boxes, and one of those boxes
+# holds three controls, so the note is checked by naming each thing it has to cover:
+# a map with the right number of commas and a box missing from it is the worse failure.
+for _what in ("canvas", "scrim", "fan", "port actions", "30 s run", "status",
+              "reset"):
+    assert _what in note_folded.lower(), (_what, note_folded,
+                                          "the note beside the switch does not name it")
+# Seven named things, nine controls: five rows of their own and two whole boxes, the
+# reset's box bringing its word field and its button with it.  Checked both ways,
+# because a note that names the panel-status box twice (an earlier draft of this one
+# called the same reply "panel hello" *and* "the panel-status box") is a map with a
+# place on it that the window does not have.
+assert len([p for p in note_folded.split(",") if p.strip()]) == 7, note_folded
+assert len(folded) - len([w for w in folded if w in (win.status_box, win.reset_box,
+                                                    win.confirm, win.btn_reset)]) == 5, \
+    [w.objectName() or type(w).__name__ for w in folded]
 gui_txt = open("docs/gui.md", encoding="utf-8").read()
 assert "layout editor" in gui_txt, "the window grew an editor and gui.md did not"
-assert all(not w.isVisible() for w in folded), [w.objectName() for w in folded
-                                                if w.isVisible()]
-assert all(w.isVisible() for w in (win.clips, win.theme, win.btn_upload,
-                                   win.btn_apply, win.btn_reset, win.log_box)), \
-    "the compact view lost something a first run needs"
+assert "nine secondary controls" in gui_txt, "gui.md counts the folded controls differently"
+_tip = win.adv_toggle.toolTip()
+assert "factory reset" in _tip and "panel-status box" in _tip and "layout editor" in _tip, (
+    _tip, "the switch's tooltip does not say what it covers and what it leaves alone")
+assert "does not change them" in _tip, (
+    _tip, "the tooltip does not say that hiding is about pixels, never values")
+# where the two boxes that folded over live: both at the foot of the *preview*
+# column, under the log, and beside each other.  Checked by parent and by order in
+# that column's layout, because `in win._adv_hide` would only prove the code agrees
+# with itself, and a box parked back in the controls column would pass that.
+def _box_items(box):
+    """every widget a QBoxLayout hands out, descending into nested layouts"""
+    out = []
+    for _i in range(box.count()):
+        _it = box.itemAt(_i)
+        if _it.widget() is not None:
+            out.append(_it.widget())
+        elif _it.layout() is not None:
+            out.extend(_box_items(_it.layout()))
+    return out
+
+
+_left = win.split.widget(0).widget()
+assert win.status_box.parent() is _left and win.reset_box.parent() is _left, \
+    "one of the two boxes is not in the preview column"
+_order = _box_items(_left.layout())
+for _b in (win.log_box, win.status_box, win.reset_box):
+    assert _b in _order, (f"{_b.title()} is not a box in the preview column",
+                          [getattr(x, "title", lambda: "?")() for x in _order])
+assert _order.index(win.log_box) < min(_order.index(win.status_box),
+                                       _order.index(win.reset_box)), \
+    "the two boxes arrived above the log, pushing the picture's column apart"
+assert all(not w.isVisible() for w in folded), [w.objectName() or str(w.parent())
+                                                for w in folded if w.isVisible()]
+assert all(w.isVisible() for w in (win.clips, win.theme, win.btn_upload, win.btn_apply,
+                                   win.log_box, win.ed_group, win.ed_name,
+                                   win.preview, win.clock_size, win.ink_choice)), \
+    "the compact view lost something a first run needs - the editor is one of them now"
 win.scrim.setValue(200)                # reachable and in force while invisible
 assert not win.scrim.isVisible() and win.scrim.value() == 200
+# the reset's double guard is a property of the box, not of its position: folded, the
+# button is hidden AND disabled; shown, it is still disabled until the word is typed -
+# and what wakes it is the word, not the switch
+assert not win.btn_reset.isVisible() and not win.btn_reset.isEnabled()
 win.adv_toggle.setChecked(True)
 for _ in range(6):
     appq.processEvents()
 assert all(w.isVisible() for w in folded), "advanced did not show what it names"
+assert not win.btn_reset.isEnabled(), "showing the box woke a button nobody armed"
+win.confirm.setText("reset")
+for _ in range(2):
+    appq.processEvents()
+assert win.btn_reset.isEnabled(), "the typed word did not wake the button"
+win.confirm.setText("")
+for _ in range(2):
+    appq.processEvents()
+assert not win.btn_reset.isEnabled(), "clearing the word left the reset armed"
 assert win.adv_toggle.text().lower().startswith("advanced")
 win._save_now()
 assert settings.load()["advanced"] is True, settings.load()
@@ -5666,9 +5826,12 @@ again2.panel.wait(2000)
 win.adv_toggle.setChecked(False)
 for _ in range(6):
     appq.processEvents()
-print(f"  advanced switch         folds the {len(folded)} secondary controls the note "
-      f"names ({note_folded}), keeps their values exactly, remembers itself, and "
-      f"leaves the reset box where it was")
+_in_boxes = sum(1 for w in folded if w in (win.status_box, win.reset_box,
+                                           win.confirm, win.btn_reset))
+print(f"  advanced switch         folds the {len(folded)} controls the note names - "
+      f"{_in_boxes} of them inside the two boxes at the foot of the preview column "
+      f"({note_folded}) - keeps their values and the reset's typed-word guard, "
+      f"remembers itself, and leaves the layout editor and the picture open")
 
 # and the split is remembered, with a collapsed pane refused rather than restored
 moved = list(win.split.sizes())
@@ -5687,10 +5850,134 @@ back.panel.stop()
 back.panel.wait(2000)
 print(f"  split remembered        {moved}, a 0-width pane rejected, a 2-number file grown to 3")
 
-# the default window size the docs quote is the one the code uses
-want = f"{settings.DEFAULTS['size'][0]}x{settings.DEFAULTS['size'][1]}"
+# ... and the fresh split actually fits a fresh window.  This is the bug the 0.5
+# defaults are for.  Re-measured against the v0.4 tag: its 1180x780 window and
+# 520/460/560 request came back as 520/300/352 columns, and the controls column's own
+# contents wanted 265 px folded but 375 px with the advanced switch on - so that column
+# grew a horizontal scrollbar *inside itself* with 89 px of its contents off screen, and
+# the library column (359 px wanted, 352 given) overflowed by 7 px the same way.  The
+# 0.4 figures are not asserted here: only this tree can be.  Advanced mode is the
+# worse case for the new defaults, because the editor's rows are on show.
+fresh = app.Window(bad, None, restore=False)
+fresh.show()                            # offscreen geometry is meaningless until shown
+fresh.resize(*settings.DEFAULTS["size"])
+fresh.adv_toggle.setChecked(True)
+fresh._editor_open(fresh.ed_name.itemText(1))   # an open layout is the wide case: its
+for _ in range(8):                              # rows name a widget, a field, a position
+    appq.processEvents()
+for _i, _name in enumerate(("preview", "controls", "library")):
+    _area, _inner = fresh.split.widget(_i), fresh.split.widget(_i).widget()
+    assert _inner.width() >= _inner.minimumSizeHint().width(), \
+        (f"{_name} column at a fresh window", _area.width(), _inner.width(),
+         _inner.minimumSizeHint().width())
+    _hs = _area.horizontalScrollBar()
+    assert not _hs.isVisible() and _hs.maximum() == 0, \
+        (f"{_name} column scrolls sideways at a fresh window",
+         _hs.maximum(), _inner.width(), _area.width())
+_fits = [fresh.split.sizes(), [i.minimumSizeHint().width() for i in
+                               (fresh.split.widget(k).widget() for k in range(3))],
+         fresh.width()]
+# and the drop-downs in that column are readable *at* that width.  A closed combo
+# stretches to whatever its column gives it; the list that opens is the box's own
+# width, so an entry longer than the box is cut off exactly where a reader is choosing
+# between entries.  The editor's own rows are the worst case, and their width depends
+# on which layout is open: a `data` row reads `type  what  at x,y`, so the name in the
+# middle decides it.  Sweeping every layout this machine can open finds the widest.
+from xigmalcd import themes as _themes          # the block below imports it again
+_worst = (0, "")
+for _nm in sorted(_themes.EXPORTS) + [r["name"] for r in _themes.scan()[0]]:
+    fresh._editor_open(_nm)
+    for _ in range(2):
+        appq.processEvents()
+    _m = fresh.ed_widget.view().fontMetrics()
+    _w = max((_m.horizontalAdvance(fresh.ed_widget.itemText(_i))
+              for _i in range(fresh.ed_widget.count())), default=0)
+    if _w > _worst[0]:
+        _worst = (_w, _nm)
+assert _worst[0] > 0, _worst
+fresh._editor_open(_worst[1])           # open the one that needs the most room
+for _ in range(4):
+    appq.processEvents()
+_lists = {}
+for _cb, _nm in ((fresh.ed_name, "layout"), (fresh.ed_widget, "widget"),
+                 (fresh.ed_field, "field")):
+    _m = _cb.view().fontMetrics()
+    _long = max((_m.horizontalAdvance(_cb.itemText(_i))
+                 for _i in range(_cb.count())), default=0)
+    if not _long:
+        continue                        # an empty row: nothing to be readable about
+    assert _cb.view().minimumWidth() >= _long + _cb.iconSize().width(), (
+        _nm, _cb.view().minimumWidth(), _long, "the list is narrower than its entries")
+    assert _cb.minimumSizeHint().width() <= _long + 40, (
+        _nm, _cb.minimumSizeHint().width(), _long,
+        "the closed box asks for more than its longest entry: the column pays for it")
+    _lists[_nm] = (_long, _cb.view().minimumWidth(), _cb.width())
+assert {"layout", "widget"} <= set(_lists), _lists
+# The case the fix exists for, made on purpose: the controls column pinned to 300 px,
+# the width 0.4's fresh window handed it (measured against the tag: 520/300/352).  A
+# request alone will not do it - QSplitter shares out spare width by its stretch
+# factors - so the pane's own ceiling is set, measured against, and put back.
+_area = fresh.split.widget(1)
+_ceil = _area.maximumWidth()
+_area.setMaximumWidth(300)
+for _ in range(6):
+    appq.processEvents()
+_narrow = (_area.width(), fresh.ed_widget.view().minimumWidth(),
+           fresh.ed_widget.width(), _worst[0])
+assert _narrow[0] == 300, (_narrow, "this is not the narrow column the report was about")
+assert _narrow[2] < _worst[0], (
+    _narrow, "the box is wide enough here, so this check would not have caught it")
+assert _narrow[1] >= _worst[0], (_narrow, "a narrow column cut the list down with it")
+_area.setMaximumWidth(_ceil)
+# and the split the docs quote is the one the code carries, in the style each page
+# writes it: "560 / 400 / 420" in docs/gui.md, "(560/400/420)" in docs/theme-editor.md.
+_sp = settings.DEFAULTS["split"]
+assert f"{_sp[0]} / {_sp[1]} / {_sp[2]}" in gui_txt, (
+    _sp, "docs/gui.md quotes a different fresh split than settings.DEFAULTS")
+_te = open("docs/theme-editor.md", encoding="utf-8").read()
+assert f"({_sp[0]}/{_sp[1]}/{_sp[2]})" in _te, (
+    _sp, "docs/theme-editor.md's pixel census quotes a different fresh split")
+# ... and what the splitter makes of that request at a fresh window, which is the
+# other half of the same sentence: docs/gui.md quotes the columns as they come back.
+assert f"{_fits[0][0]} / {_fits[0][1]} / {_fits[0][2]}" in gui_txt, (
+    _fits[0], "docs/gui.md quotes a different measured split for a fresh window")
+# The README's picture is framed wider than the fresh window, and both the capture
+# tool and docs/tools.md say how many clip rows that frame puts in view.  Read the
+# tool's own default and measure it here, in this same window, rather than carrying
+# the sentence from one release to the next: 0.4 wrote "six rows" for a frame that
+# had begun to show seven.
 shot = _re.search(r'--size",\s*default="(\d{3,4}x\d{3,4})"',
                   open("tools/screenshot.py", encoding="utf-8").read())
+assert shot, "the capture tool no longer carries a --size default to check"
+_capt_w, _capt_h = (int(x) for x in shot.group(1).split("x"))
+fresh.resize(_capt_w, _capt_h)
+for _ in range(10):
+    appq.processEvents()
+_capt_rows = fresh.clips.viewport().height() // max(1, fresh.clips.sizeHintForRow(0))
+_spell = "zero one two three four five six seven eight nine ten eleven twelve".split()
+assert _capt_rows < len(_spell), _capt_rows
+_words = f"{_spell[_capt_rows]} rows of the clip list"
+for _f in ("tools/screenshot.py", "docs/tools.md"):
+    assert _words in open(_f, encoding="utf-8").read(), (
+        _f, _words, "that page counts the captured clip rows differently")
+for _t in (fresh.preview_timer, fresh.thumb_timer, fresh.daemon_timer):
+    _t.stop()
+fresh.panel.stop()
+fresh.panel.wait(2000)
+print(f"  a fresh window fits     {settings.DEFAULTS['split']} asked, {_fits[0]} as the "
+      f"splitter scales them across {_fits[2]} px, minimums "
+      f"{_fits[1]}: no column scrolls sideways to be read. The editor's lists give "
+      f"{_lists['layout'][1]} px to a {_lists['layout'][0]} px layout name and "
+      f"{_lists['widget'][1]} px to a {_lists['widget'][0]} px row (boxes "
+      f"{_lists['layout'][2]} and {_lists['widget'][2]} px); the widest row any of "
+      f"the {len(_themes.EXPORTS) + len(_themes.scan()[0])} layouts puts there is "
+      f"{_worst[0]} px in {_worst[1]!r}, and in a {_narrow[0]} px column that is a "
+      f"{_narrow[1]} px list around a {_narrow[2]} px box. The README's "
+      f"{_capt_w}x{_capt_h} frame puts {_capt_rows} clip rows in view, and the two "
+      f"pages that say so spell it the same")
+
+# the default window size the docs quote is the one the code uses
+want = f"{settings.DEFAULTS['size'][0]}x{settings.DEFAULTS['size'][1]}"
 assert shot, "the capture tool no longer carries a --size default to check"
 # the prose figure is the one that can rot; the tool's own default is read back
 # out of the tool, and both have to agree with what docs/tools.md says
@@ -6633,12 +6920,12 @@ was_adv = win.adv_toggle.isChecked()
 win.adv_toggle.setChecked(False)
 for _ in range(6):
     appq.processEvents()
-assert win.ed_group not in win._adv_hide or not win.ed_group.isVisible(), \
-    "the editor group ignores the advanced switch"
+assert win.ed_group not in win._adv_hide and win.ed_group.isVisible(), \
+    "advanced off, and the layout editor went with it"
 win.adv_toggle.setChecked(True)
 for _ in range(6):
     appq.processEvents()
-assert win.ed_group.isVisible(), "advanced on, and the layout editor stayed hidden"
+assert win.ed_group.isVisible(), "the layout editor is not on show"
 assert win.ed_name.count() == 1 + len(themes.EXPORTS) + len(pick), win.ed_name.count()
 assert win.ed_name.itemText(0) == app.NO_EDITOR, win.ed_name.itemText(0)
 assert win.ed is None and not win.ed_widget.isEnabled(), \
@@ -6904,8 +7191,8 @@ assert win.preview.pixmap().width() == render.W, win.preview.pixmap().size()
 win.adv_toggle.setChecked(was_adv)
 for _ in range(6):
     appq.processEvents()
-assert win.ed_group.isVisible() == bool(was_adv), (was_adv,
-                                                   win.ed_group.isVisible())
+assert win.ed_group.isVisible() is True, \
+    (was_adv, win.ed_group.isVisible(), "the editor folded away with the switch again")
 print(f"  the window's row        offers {win.ed_name.count() - 1} layouts "
       f"({len(themes.EXPORTS)} generated, {len(pick)} files) and lists the model's own "
       f"fields - {len(listed)} for a `{kind0}`. x through the spinbox moved {moved_win:,}"

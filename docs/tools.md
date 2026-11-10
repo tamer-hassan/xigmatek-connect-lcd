@@ -348,11 +348,12 @@ runner could write different bytes of the same animation.
   port, and a screenshot is not the thing to take someone's panel over with; the default is
   `/dev/xigmatek-lcd`, which on a capture machine has nothing behind it.  `--size WxH`
   frames it (`--size`, 1380x860 for the README's picture: the three columns side by side,
-  six rows of the clip list). The window's own fresh default is 1180x780 - `settings.DEFAULTS
+  seven rows of the clip list). The window's own fresh default is 1320x800 - `settings.DEFAULTS
   ["size"]` - and the suite asserts that both figures named here appear in the code as
   constants or defaults, so neither sentence can go stale. Nothing about the layout is fixed
   by the picture: the preview column caps itself at the 480 px frame, the clip library is a
-  column of its own, and the splitter is the user's, which is what the suite asserts instead.
+  column of its own, and the splitter is the user's, which is what the suite asserts instead
+  - along with the floors under those columns, which is what a 1180 px window could not hold.
 * `tools/asar_extract.py ASAR` — read an Electron `.asar` without node: list, unpack,
   `--cat` one file, or `--find TEXT` to grep file *contents*, which is how the string
   constants in the app's compiled main process (`out/main/index.jsc`) get mined.
