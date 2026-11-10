@@ -1016,9 +1016,11 @@ class Window(QMainWindow):
         # The rows live in a grid that reflows between one, two and three columns
         # depending on the width this splitter happens to give the box (see
         # `EditorBox`), so the 18 rows of an `arc` widget make this box 827 px tall in
-        # one column at a 1280x1024 window and 434 px in three at 1919x1055 (measured in
-        # the window; the suite's sizing gate prints both) instead of pushing a
-        # scrollbar under the column - the failure mode 0.5 was written to catch.
+        # one column at a 1280x1024 window and 434 px in three at 1919x1055 - this
+        # bench's reading, CI's runner reading 751 and 406 in the same pass - measured in
+        # the window, printed by the suite's sizing gate, and held to whichever half of
+        # the labelled pair the machine running it is.  It buys height rather than pushing
+        # a scrollbar under the column, which is the failure mode 0.5 was written to catch.
         self._ed_host = QWidget()
         self.ed_grid = QGridLayout(self._ed_host)
         self.ed_grid.setContentsMargins(0, 0, 0, 0)
@@ -2482,9 +2484,10 @@ class Window(QMainWindow):
 
         This is the responsive half, and it is here because the alternative is a
         scrollbar: the 18 rows of an `arc` widget make this box **827 px** tall in one
-        column at a 1280x1024 window and **434 px** in three at 1919x1055 (measured in
-        the window, and printed by the suite's sizing gate with the grid's own ask of
-        171 / 344 / 512 px), and a controls column that cannot hold what it is shown is
+        column at a 1280x1024 window and **434 px** in three at 1919x1055 - this bench's
+        digits, where CI's runner reads 751 and 406 - measured in the window and printed
+        by the suite's sizing gate with the grid's own ask of 171 / 344 / 512 px, and a
+        controls column that cannot hold what it is shown is
         exactly the 0.4 defect the fresh-window gate now fails on.  The box asks for it
         through `EditorBox.resizeEvent`, because the window's own `resizeEvent` never
         fires when a splitter handle is what changed.

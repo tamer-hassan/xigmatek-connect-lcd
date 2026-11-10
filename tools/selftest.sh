@@ -7559,9 +7559,26 @@ assert len(_f_ids) < len(_f_rows), (
 assert 0 < _pos_same < len(_f_rows), (
     "layerIndex now *is* the position in every row, which is the one finding that would "
     "make a reorder have to rewrite it")
-_edit_src = " ".join(open("xigmaui/edit.py", encoding="utf-8").read().split())
-# the comment block's own continuation markers, and whatever spacing they leave behind
-_edit_src = " ".join(_edit_src.replace(" #:", " ").split())
+def _flat(path):
+    """A source file as one line, with comment markers gone.
+
+    Both `edit.py`'s `#:` blocks and `app.py`'s comments quote the same counts the pages
+    quote, and a comment that drifts is a claim nobody checked: flattening the file is what
+    lets one regex hold it to the run.
+    """
+    out = []
+    for ln in open(path, encoding="utf-8"):
+        t = ln.strip()
+        while t.startswith("#"):
+            t = t[1:]
+            if t.startswith(":"):          # the `#:` doc-comment marker, not punctuation
+                t = t[1:]
+            t = t.lstrip()
+        out.append(t)
+    return " ".join(" ".join(out).split())
+
+
+_edit_src = _flat("xigmaui/edit.py")
 
 
 def _stated(what, source, pattern, mine):
@@ -7628,6 +7645,23 @@ _stated("the placement step, on the page", _gf,
         r"walked over the canvas in \*\*(\d+) px\*\* steps", (gui_edit.PLACE_STEP,))
 _stated("the layerIndex census, on the page", _gf, _LAYER,
         (_pos_same, len(_f_rows), len(_f_rows) - _pos_same))
+# ...and `app.py`, whose comment *and* docstring quote the same arc heights the page
+# labels.  Four digits each, and they have to be the page's four digits: a code comment
+# stating a third machine's pixels is a claim nobody labelled.
+_app_src = _flat("xigmaui/app.py")
+for _pat in (r"make this box (\d+) px tall in one column at a \d+x\d+ window and (\d+) px "
+             r"in three at \d+x\d+ - this bench's reading, CI's runner reading (\d+) and "
+             r"(\d+)",
+             r"make this box \*\*(\d+) px\*\* tall in one column at a \d+x\d+ window "
+             r"and \*\*(\d+) px\*\* in three at \d+x\d+ - this bench's digits, where "
+             r"CI's runner reads (\d+) and (\d+)"):
+    _m = _re.search(_pat, _app_src)
+    assert _m, ("app.py's `arc` height sentence",
+                "no longer names both machines in a shape the gate can read")
+    assert tuple(int(x) for x in _m.groups()) == _hh, (
+        _m.groups(), _hh, "the code's comment and the page's labelled pair disagree about "
+                          "whose pixels those are")
+
 # ...and the refusal the page promises "in the library's own words": the phrase is taken
 # from `themes.validate` on this run, and both the model and the page have to carry it.
 assert _EMPTY_PHRASE in _gf, (

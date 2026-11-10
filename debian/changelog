@@ -87,14 +87,14 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     four bullets about structural editing into that list, which is what
     reading a page cover to cover does that reading a diff does not.
 
-  * The window's sizing figures move, in height only.  The row of structural
-    controls costs 31 px: an `arc`'s 18 field rows stand 827 px tall in one
-    column and 434 px in three on the author's bench, where 0.5 measured 796
-    and 403, and GitHub's runner re-reads its own halves of those pairs when
-    the suite next runs there.  The three columns' floors, the controls
-    floor by columns of rows, the fresh split and the narrowest column the
-    window allows are unchanged, and the suite still fails any pane that has
-    to scroll sideways to be read.
+  * The window's sizing figures move, in height only.  An `arc`'s 18 field
+    rows stand 827 px tall in one column and 434 px in three on the author's
+    bench, where 0.5 read 796 and 403; GitHub's runner read 751 and 406, where
+    that release read 723 and 378.  So the row of structural controls costs 31
+    px of height here and 28 px there, and no column's width: the three
+    columns' floors, the controls floor by columns of rows, the fresh split and
+    the narrowest column the window allows are unchanged, and the suite still
+    fails any pane that has to scroll sideways to be read.
 
   * lintian has been printing one warning that no CI run has ever seen,
     because the CI job builds binary-only (`-us -uc -b`) while a source
