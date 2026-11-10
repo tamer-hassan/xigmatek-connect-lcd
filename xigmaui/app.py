@@ -3013,8 +3013,11 @@ class Window(QMainWindow):
         box = self._mark_box(self.ed.index)
         if box is None:
             # a row the machine could not draw has no box, and a rectangle around nothing
-            # would be the pane inventing a position for it
+            # would be the pane inventing a position for it.  Its tooltip says why there is
+            # nothing to drag, in the same words the model refuses with.
             self.preview.set_marks(None)
+            self.preview.setToolTip("this row paints no box at this fixture, so it has no "
+                                    "edge to grab and no square to drag")
             return
         text = self.ed.label(self.ed.index)
         w = int(self.ed.obj.get("width") or render.W)

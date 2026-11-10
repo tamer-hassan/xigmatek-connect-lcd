@@ -142,7 +142,7 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
 
   * Two keys no handle writes, measured rather than listed. `cornerRadius`
     is carried by 25 of the `bar`/`arc` rows and pushing it +8 left every
-    one of their boxes exactly where it was; `rotate` is carried by 12 `bar`
+    box those rows have exactly where it was; `rotate` is carried by 12 `bar`
     rows and changed 0 px on all 12 of them, because nothing in `layout.py`
     reads it on a `bar`. Where a cap owns the extent, the drag is refused in
     that cap's name - `xigma.autoFitMax` fits a row to a width,

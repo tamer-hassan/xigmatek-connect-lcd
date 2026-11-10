@@ -8298,10 +8298,30 @@ for _phrase, _why in (
 # the 0.6 stanza's resize sentences, so a bullet cannot outlive the door it describes
 _cl_top = " ".join(open("debian/changelog", encoding="utf-8").read()
                    .split("\n -- ")[0].split())
+# The 0.6 stanza is this cycle's own record, so its file-fact digits are measured against
+# the run exactly like the page's: the line case, the arc arithmetic, the text/data census
+# and the two never-written keys all answer the same on the bench and on the runner, and a
+# stanza whose digits drift is a stanza describing a door that is no longer in the tree.
+for _what, _pat, _mine in (
+        ("the line case, in the 0.6 stanza",
+         r"`layout\.line_rect` predicts the drawn box of (\d+) of its (\d+) rows "
+         r"exactly", (_line_exact, _line_total)),
+        ("the arc arithmetic, in the 0.6 stanza",
+         r"the arithmetic (\d+) of the (\d+) arc rows in the library obey, all "
+         r"(\d+) of them square", (_arc_ident, _arc_rows, _arc_square)),
+        ("the text/data census, in the 0.6 stanza",
+         r"not one of the (\d+) carries a `width` or `height` key", (_txt_rows,)),
+        ("who carries a `cornerRadius`, in the 0.6 stanza",
+         r"`cornerRadius` is carried by (\d+) of the `bar`/`arc` rows", (_corner_rows,)),
+        ("the unread `rotate`, in the 0.6 stanza",
+         r"`rotate` is carried by (\d+) `bar` rows and changed (\d+) px on all "
+         r"(\d+) of them", (_rot_rows, 0, _rot_rows)),
+        ("the ring push, in the 0.6 stanza",
+         r"a \+8 px push on `radius` moved the box (\d+) px", (0,)),
+):
+    _stated(_what, _cl_top, _pat, _mine)
 for _phrase in ("`edit.Editor.size_edges` decides which of them exist",
-                "keeping `sizeWidth == 2*radius + 2*width`",
-                "not one of the 145 carries a `width` or `height` key",
-                "changed 0 px on all 12 of them",
+                "left every box those rows have exactly where it was",
                 "`xigma.autoFitMax` fits a row to a width",
                 "`edit.Editor.resize_box` says the release would ask for"):
     assert _phrase in _cl_top, (_phrase, "the 0.6 stanza no longer says what the gates "
