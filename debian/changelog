@@ -32,9 +32,11 @@ xigmatek-connect-lcd (0.5) resolute; urgency=medium
     The box's own `minimumSizeHint` is still held under that width, so
     the column pays for the text and not for the widget.
 
-  * The fresh window is 1320x800 with the splitter asked for
-    560/400/420, and those numbers are floors rather than a preference.
-    Checked out at the `v0.4` tag and measured the same way, 0.4's
+  * The fresh window is 1440x1024 with the splitter asked for
+    532/540/356, and those numbers are floors rather than a preference.
+    (They were 1320x800 and 560/400/420 for most of this cycle, and that
+    pair is what 0.5's own sizing rule replaced.)  Checked out at the
+    `v0.4` tag and measured the same way, 0.4's
     1180 px window and 520/460/560 split came back as 520/300/352
     columns while the controls column's own contents measured 265 px
     folded and 375 px with the editor open: it grew a horizontal
@@ -188,9 +190,10 @@ xigmatek-connect-lcd (0.5) resolute; urgency=medium
     docs/gui.md, docs/theme-editor.md and docs/tools.md quote are read
     back off the code and the live widgets, and so is the number of clip
     rows the README's capture frame puts in view.  Where a figure follows
-    the machine's fonts the page says whose machine's: the library column
-    is 359 px here and 376 px on CI's runner, so the gate asserts the
-    relation and this run's digits print beside the page's.
+    the machine's fonts the page states a labelled pair, and the gate
+    holds this run to one half of it: the three columns' floors are
+    272/376/373 px here and 282/394/390 px on CI's runner, and a run
+    that matches neither half fails rather than loosening the gate.
 
   * The README's advanced-mode live capture no longer shows this panel's
     serial number.  The `conn 1` reply the window prints names it, and the
@@ -207,7 +210,7 @@ xigmatek-connect-lcd (0.5) resolute; urgency=medium
     would move tagged releases, which is the owner's call, not a quiet
     edit.
 
- -- Tamer Hassan <thameruddin@gmail.com>  Tue, 10 Nov 2026 06:20:00 +0200
+ -- Tamer Hassan <thameruddin@gmail.com>  Tue, 10 Nov 2026 14:27:56 +0200
 xigmatek-connect-lcd (0.4) resolute; urgency=medium
 
   * The vendor's own layouts are pictures this program can draw.  `--theme
