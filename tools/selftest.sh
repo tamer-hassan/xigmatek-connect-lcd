@@ -6225,45 +6225,33 @@ def _pair(what, pattern, mine, unit="px"):
     return got
 
 
-def _bench(what, pattern, mine, order=True):
-    """Digits the page labels as *this bench's*: read them, hold the order, print both.
-
-    A floor that is its contents' width follows the fonts of the machine, so a second
-    machine's number is not a fact the page can carry and this run's number is not a fact
-    the page can be held to.  What can be held is the shape - the digits are there, they
-    are labelled, and they rise the way the measured ones rise.
-    """
-    m = _re.search(pattern, _gf)
-    assert m, (what, "docs/gui.md no longer states this figure as this bench's")
-    got = tuple(int(x.replace(" ", "")) for x in m.groups())
-    if order:
-        assert all(a < b for a, b in zip(got, got[1:])), (
-            what, got, "the page's own digits do not rise the way the form does")
-        assert all(a < b for a, b in zip(mine, mine[1:])), (
-            what, mine, "this run's figures do not rise the way the page says the form does")
-    return got
-
-
 _b = _pair("the fresh split read back",
            r"reads them back as \*\*(\d+) / (\d+) / (\d+)\*\* on this bench and "
            r"\*\*(\d+) / (\d+) / (\d+)\*\* on CI's runner", tuple(_fits[0]))
 assert _b[0] == _b[3] == 532, (_b, "the preview column's share is set in code, so both "
                                    "machines must read the same first digit")
-_flm = _re.search(r"the two text columns sit at \*\*(\d+)\*\* and \*\*(\d+) px\*\* on this "
-                  r"bench.*?the library column, the half of that pair the editor never "
-                  r"touches, was \*\*(\d+) px\*\* the last time CI's runner was read", _gf)
-assert _flm, ("the library column's floor", "docs/gui.md no longer states that floor for "
-              "both machines")
-_fl = (int(_flm[1]), int(_flm[2]), int(_flm[3]))
-assert _floor_at[1280][2] in (_fl[1], _fl[2]), (
-    _floor_at[1280][2], _fl, "this machine's library floor is neither figure the page "
-    "names - the clip list is what that column holds, so a third machine is a label to add")
-_cl = _bench("the controls floor by columns of rows",
-             r"one column of editor rows asks for \*\*(\d+) px\*\* of controls on this "
-             r"bench, two columns for \*\*(\d+)\*\*, three for \*\*(\d+)\*\*",
-             (_floor_at[1280][1], _floor_at[1440][1], _floor_at[1919][1]))
+_fl = _pair("the three columns' floors at the minimum window",
+            r"the three columns' floors are \*\*(\d+) / (\d+) / (\d+) px\*\* on this "
+            r"bench and \*\*(\d+) / (\d+) / (\d+) px\*\* on CI's runner",
+            tuple(_floor_at[1280]))
+# Each half is one labelled machine's three floors, and `_pair` has already required this
+# run's triple to be one of them - which is also how the gate knows *which* half to hold to
+# the code's bounds.  Nothing here invents a rule about how the two machines differ: that
+# is a fact about two boxes, not a property of the window.
+_mine = tuple(_floor_at[1280])
+_off = 0 if _fl[:3] == _mine else 3
+assert all(_fl[_off + j] >= _sized.PANE_FLOORS[j] for j in range(3)), (
+    _fl, _mine, _sized.PANE_FLOORS, "this machine's column floors are under the bounds the "
+                                    "code sets for those columns")
+_cl = _pair("the controls floor by columns of rows",
+            r"one column of editor rows asks for \*\*(\d+) px\*\* of controls on this "
+            r"bench, two columns for \*\*(\d+)\*\*, three for \*\*(\d+)\*\* - and "
+            r"\*\*(\d+) / (\d+) / (\d+)\*\* on CI's runner",
+            (_floor_at[1280][1], _floor_at[1440][1], _floor_at[1919][1]))
 assert _cl[0] >= _sized.PANE_FLOORS[1], (_cl, _sized.PANE_FLOORS,
     "the page's controls floor is under the bound the code sets for that column")
+assert _cl[0] < _cl[1] < _cl[2] and _cl[3] < _cl[4] < _cl[5], (
+    _cl, "a machine's controls floors do not rise with its columns of rows")
 _hh = _pair("the `arc` box heights",
             r"stand \*\*(\d+) px\*\* tall in one column and \*\*(\d+) px\*\* in three "
             r"there.*?\*\*(\d+)\*\* and \*\*(\d+) px\*\*, asking",
@@ -6277,12 +6265,16 @@ assert _ga[0] < _ga[1] < _ga[2] and _ga[3] < _ga[4] < _ga[5], (_ga, "the ask doe
                                                                 "with its columns")
 assert _ga[2] <= 3 * _sized._ED_COL_PX and _ga[5] <= 3 * _sized._ED_COL_PX, (
     _ga, _sized._ED_COL_PX, "three columns of rows ask for more than the threshold says")
-_w = _re.search(r"the library column is ([\d ]+) px across on this bench and shows "
-                r"\*\*(\d+)\*\* clip rows on either machine", _gf)
-assert _w, ("docs/gui.md's 3840x2160 sentence no longer labels its width as this bench's "
-            "and its row count as both machines'")
-assert int(_w[1].replace(" ", "")) == _lib_at[3840], (
-    _lib_at[3840], _w[1], "docs/gui.md's wide-window library column is not this wide here")
+# The wide window's clip-row count is the same fact on both labelled machines, so it is
+# held exactly; its column *width* follows the fonts, so the page states a floor either
+# machine clears and the gate prints the width the machine running it measures.
+_w = _re.search(r"the library column is \*\*over ([\d ]+) px\*\* across on either "
+                r"machine and shows \*\*(\d+)\*\* clip rows on both", _gf)
+assert _w, ("docs/gui.md's 3840x2160 sentence no longer states its width as a floor either "
+            "machine clears and its row count for both")
+assert _lib_at[3840] >= int(_w[1].replace(" ", "")), (
+    _lib_at[3840], _w[1], "this machine's wide library column is under the width the page "
+                          "promises on either machine")
 assert int(_w[2]) == _rows_at[3840], (_rows_at[3840], _w[2],
     "the wide window's clip-row count is not what the page says it is on either machine")
 assert _rows_at[1280] <= _rows_at[1440] <= _rows_at[1919] <= _rows_at[2560] <= \
@@ -6290,13 +6282,14 @@ assert _rows_at[1280] <= _rows_at[1440] <= _rows_at[1919] <= _rows_at[2560] <= \
 assert _box_at[1280][1] > _box_at[1440][1] > _box_at[1919][1], (
     _box_at, "more columns of rows did not make the box shorter, so the width is idle")
 _wide = ", ".join("{} at {}".format(_rows_at[w], w) for w in (1280, 1440, 1919, 3840))
-print("                        the page's labelled digits and this run's: split "
+print("                        the page's labelled pairs and this run's: split "
       f"{(_b[0], _b[1], _b[2])} bench / {(_b[3], _b[4], _b[5])} runner / {_fits[0]} here; "
-      f"library floor {_fl[1]} here-labelled / {_fl[2]} runner-labelled / "
-      f"{_floor_at[1280][2]} measured; controls floor {_cl} on the page (this bench) / "
-      f"{(_floor_at[1280][1], _floor_at[1440][1], _floor_at[1919][1])} measured here; "
-      f"at 3840 the library column is {_lib_at[3840]} px wide here (the page says "
-      f"{_w[1].strip()}) and {_w[2]} clip rows fit on either machine [{_wide}]")
+      f"floors at 1280 {_fl[:3]} bench / {_fl[3:]} runner / {tuple(_mine)} here; controls "
+      f"by columns {(_cl[0], _cl[1], _cl[2])} / {(_cl[3], _cl[4], _cl[5])} / "
+      f"{(_floor_at[1280][1], _floor_at[1440][1], _floor_at[1919][1])} here; at 3840 the "
+      f"library column is {_lib_at[3840]} px wide here against the page's floor of "
+      f"{_w[1].strip()} px, and {_w[2]} clip rows fit on either machine [{_wide}]")
+
 # the row census docs/theme-editor.md's editor bullet quotes is the model's, so the
 # digits are counted here rather than remembered there.  Whitespace is flattened on both
 # sides: that page wraps, and a compare that broke on a newline would fail for the

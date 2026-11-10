@@ -1347,7 +1347,7 @@ class Window(QMainWindow):
     _FLOOR_PASSES = 4
     _floor_pass = 0
 
-    def _pane_floors(self) -> None:
+    def _pane_floors(self, settling: bool = False) -> None:
         """No column narrower than what it holds, by construction rather than by hope.
 
         A pane whose minimum is its contents' minimum cannot be dragged under them, so
@@ -1395,15 +1395,18 @@ class Window(QMainWindow):
             if want != area.minimumWidth():
                 area.setMinimumWidth(want)
                 changed = True
-        if changed and self._floor_pass < self._FLOOR_PASSES:
-            self._floor_pass += 1
-            QTimer.singleShot(0, self._settle_floors)
+        if changed:
+            if not settling:
+                self._floor_pass = 0      # a change the reader made: a fresh budget
+            if self._floor_pass < self._FLOOR_PASSES:
+                self._floor_pass += 1
+                QTimer.singleShot(0, self._settle_floors)
         else:
             self._floor_pass = 0
 
     def _settle_floors(self) -> None:
         """Measure the floors again, now that the last change has been laid out."""
-        self._pane_floors()
+        self._pane_floors(settling=True)
 
     def _ed_box_readable(self, box: QComboBox) -> int:
         """Make one editor head box wide enough to show the widest entry it holds.

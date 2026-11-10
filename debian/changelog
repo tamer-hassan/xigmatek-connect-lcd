@@ -74,19 +74,20 @@ xigmatek-connect-lcd (0.5) resolute; urgency=medium
     still capped at 532 px because the 480 px frame is never scaled up.
 
   * Every measured figure a page quotes now carries the machine it was
-    read on, and the suite holds it by that label.  The clip list fits 9
-    rows at the fresh 1440x1024 window here and 10 on GitHub's runner (11
-    at 1919x1055 where this bench reads 10); a fresh window reads its
-    split back as 532/527/373 px here, the 18-row `arc` box stands 796 px
-    in one column of rows and 403 px in three, its grid asking
-    171/344/512 px, and the controls floor runs 376/400/568 px as the rows
-    take one, two and three columns.  The gate reads those digits out of
-    docs/gui.md, requires this run's numbers to be one of the labelled
-    pairs, and prints a third machine's case rather than letting it slide:
-    28 clip rows at 3840x2160 on either machine is a fact, a lone "373
-    px" is not.  Where the runner's pair has not been re-read since the
-    last rule changed, the page says so instead of carrying the old
-    number, and the suite's print is where the new one comes from.
+    read on, and the suite holds it by that label - as a pair wherever the
+    two machines differ.  At a 1280x1024 desktop the three columns' floors
+    are 272/376/373 px here and 282/394/390 px on GitHub's runner; a fresh
+    window reads its split back as 532/527/373 px and 532/510/390 px; the
+    controls floor runs 376/400/568 px as the editor's rows take one, two
+    and three columns here against 394/417/589 px there; the 18-row `arc`
+    box stands 796 px in one column and 403 px in three against 723 and
+    378, its grid asking 171/344/512 px against 180/361/533.  The gate
+    reads every pair out of docs/gui.md and requires this run's numbers to
+    be one half of it - twice now that has caught a runner digit that had
+    gone stale.  What both machines agree on is stated once and asserted
+    exactly (28 clip rows at 3840x2160); a width no two machines see alike
+    is stated as a floor either clears, with the running machine's actual
+    number printed beside the page's.
 
   * The editor's rows say what the row paints.  For a `text` or `data`
     widget the keys that choose the line - `content`, `source`, `xigma.format`,
