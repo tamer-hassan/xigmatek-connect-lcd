@@ -118,6 +118,18 @@ jobs:
           ffmpeg -version | head -1
           tesseract --version | head -1
 
+      - name: tests/ - the checks that are moving out of the suite
+        # 0.7 cycle: `tools/selftest.sh` (13,869 lines, 22 sections) is being replaced by ordinary
+        # test files in `tests/`, run by the standard library. Both run for now; the suite is the
+        # one that goes. Nothing here needs a dependency the step above does not already install.
+        run: python3 -m unittest discover -s tests -v
+
+      - name: the copied vendor library against its own manifest
+        # One tool, all 125 entries: paths, byte counts, sha256, nothing extra sitting in the
+        # scanned directories, and the 27 encrypted `.thm` containers recorded but absent. This is
+        # what replaces the suite's 2,910-line version of the same claim.
+        run: tools/verify_manifest.py
+
       - name: tools/selftest.sh
         run: tools/selftest.sh
 
