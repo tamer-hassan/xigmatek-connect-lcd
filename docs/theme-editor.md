@@ -283,16 +283,19 @@ shell over that model, and the gates say so in counts.
   direction that flatters the edit.
 
 Not built, and not claimed, as of the 0.5 tree this section describes: drawing the
-editor from live readings, snapping to a grid or to a neighbour. Landed on 2026-11-10
-(0.6) instead: rows added as a copy of a real row, removed, reordered, and resized by
-dragging the squares on their box - each kind through the size keys the painter actually
-reads for it, which is a sentence per kind rather than one handle. And on 2026-11-11, the
+editor from live readings, and snapping to a grid - the files carry none. Landed on
+2026-11-10 (0.6) instead: rows added as a copy of a real row, removed, reordered, and
+resized by dragging the squares on their box - each kind through the size keys the
+painter actually reads for it, which is a sentence per kind rather than one handle. And
+on 2026-11-11, the snapping a *neighbour* implies: a drag pulled onto a number the same
+file already uses, 2 px at most, only within one anchor class, plus the centre and the
+mirror on x, with the line you left never offered back to you. Also that day, the
 naming: a copy renamed, a second copy written under a new name, both taking a fresh `id`
 so one `--theme <id>` never answers two files, and a name rule shared by every door that
 invents one (`themes.new_name`) - it refuses a name any layout answers today, by name,
-by case-fold, or by id, which is what `resolve()` actually matches. The bullets and every
-digit they hold are in docs/gui.md. The window's theme combo still
-lists the five, because that combo picks what the loop draws from this machine's sensors.
+by case-fold, or by id, which is what `resolve()` actually matches. The bullets and
+every digit they hold are in docs/gui.md. The window's theme combo still lists the five,
+because that combo picks what the loop draws from this machine's sensors.
 
 ### What the canvas half measured (stage 4, 2026-11-08)
 
@@ -349,15 +352,19 @@ plan expected editing **only at 1:1** - it is offered at any scale instead, beca
 `to_panel` derives the mapping from the size `_fit` drew at, and the cost of that choice is
 the rounding above, said out loud rather than hidden behind a mode.
 
-Not built, and not claimed: live readings under the editor (the pane still draws the pinned
-fixture, so an edit is judged against the picture the documents describe), snapping to a
-grid or to another row, and anything at all to the panel.  What landed on 2026-11-10 is
-the structural edit - a row added is a copy of a row that already draws, its position
-chosen by the painter's boxes rather than guessed, its order the list's order, its removal
-refused at the last row in the library's own words - and the edges: eight squares on the
-selected row's box, only the ones the model says its kind can write, and a drag that goes
-through the same door as the field rows, one undo step, no file until `save`.  And on
-2026-11-11 the two acts that invent a name: `rename` and `save as` over a name box, with
+Not built, and not claimed: live readings under the editor (the pane still draws the
+pinned fixture, so an edit is judged against the picture the documents describe),
+snapping to a grid (the corpus has none: the gcd of every declared placement is 1), and
+anything at all to the panel. What landed on 2026-11-10 is the structural edit - a row
+added is a copy of a row that already draws, its position chosen by the painter's boxes
+rather than guessed, its order the list's order, its removal refused at the last row in
+the library's own words - and the edges: eight squares on the selected row's box, only
+the ones the model says its kind can write, and a drag that goes through the same door
+as the field rows, one undo step, no file until `save`. And on 2026-11-11 the drag that
+lines up: `edit.Editor.snap_lines` / `snap_move` over the numbers this same layout
+already declares, the pane painting the model's line and quoting the model's sentence,
+the arrow keys and the typed rows left exact. Also that day, the two acts that invent a
+name: `rename` and `save as` over a name box, with
 `themes.rename_copy` and `edit.Editor.save_as` behind them and one name rule shared by
 both (`themes.new_name`: a name nothing in the library answers, by name, by case-fold or
 by id), a fresh 13-digit id for any copy that takes a new name, and a menu, a state line
@@ -808,7 +815,8 @@ PROTOCOL.md §10 - so this needs the installed app off the Windows machine again
 
 This document was written before any of it existed, and it is now part record, part plan.
 What does **not** exist in this tree: live readings under the editor (the pane draws the
-pinned fixture), and no snapping to a grid or to a neighbour; the layout export for `bars` - `alpha` assembled
+pinned fixture), and no snap to a grid - the corpus carries none, so a snap answers a
+neighbour's own number instead; the layout export for `bars` - `alpha` assembled
 2026-11-08 into 12 rows at a zero pixel diff, its three pairs of lettering as `special`s
 (`fan-figures`, `temp-values`, `temp-labels`), its rings and usage bars as `arc`/`bar` rows
 naming a painter convention; any unit for the `space` the panel reports.  What does: stages

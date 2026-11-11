@@ -594,6 +594,218 @@ class Editor:
         return self.move_to(int(pr.get("x") or 0) + int(dx),
                             int(pr.get("y") or 0) + int(dy), commit=commit)
 
+    # ------------------------------------------------------------ snapping a drag --
+    #: How close a row has to come to a line before it is pulled onto it, in panel px.
+    #: The number comes out of counting the library's own declarations, not out of taste:
+    #: of the **185** rows that carry an `x` or a `y` in the **28** layouts this pane can
+    #: open, **89** hold an `x` another row of the same file holds exactly and **44** do
+    #: the same with `y` - **317** pairs of rows holding one number between them.  And the
+    #: rest are apart on purpose: the nearest other row's `x` is 1 px away for **0** of
+    #: those rows, 2 px away for **12**, and 3 px away for **4**, with nothing at all 6 or
+    #: 7 px off.  So 2 px is the break between "these two are meant to line up" and "these
+    #: two are spaced".  Three is not that break: a drag of 3 px right is pulled onto
+    #: another row's `x` 11% of the time at 1 px, **12%** at t=2 and **57%** at t=3,
+    #: because rows sharing a column sit within 3 px of each other's landing - a snap
+    #: arguing with the person dragging.  Those counts read only the numbers in the files,
+    #: so the suite re-counts them on every machine and the gate holds this module's
+    #: sentence, docs/gui.md and the changelog stanza to whatever it answers.
+    #: `SNAP_PX` is also the measure of what the arrow keys do **not** do: a 1 px nudge
+    #: pulled back is a keypress that did nothing.
+    SNAP_PX = 2
+
+    @staticmethod
+    def anchor_class(row: dict) -> str:
+        """`'l'`, `'m'` or `'r'`: what this row's `x` means on the glass.
+
+        The vendor's rows keep Pillow's two-letter anchor name under `xigma.anchor`, and
+        the **first** letter is the horizontal one (`la` left-ascender, `rm` right-middle,
+        `mm` middle-middle); the second says only where the line sits vertically.  That is
+measured rather than read off the name: the suite draws the layouts this pane can
+        open and compares each row's declared `x` with its ink box, and finds `la` and `lm`
+        rows with `x` exactly at the box's left edge, `rm` rows exactly at its right edge,
+        and `ma`/`mm`/`ms` rows strictly between the two - their `x` *is* the centre.  Those
+        are pixels, so they follow the face they were drawn in: the assertion belongs to the
+        run that makes it, not to this sentence.  A row with no `xigma.anchor` is
+        `layout.py`'s default, `la`.
+        """
+        pr = (row.get("property") or [{}])[0]
+        a = str((pr.get("xigma") or {}).get("anchor") or "la").strip().lower()
+        return a[0] if a[:1] in ("l", "m", "r") else "l"
+
+    def _centre(self) -> tuple:
+        """The middle of the canvas **this file declares**, as `(x, y)`.
+
+        Not a constant: the same door the field bounds use reads `width`/`height` off the
+        layout and falls back to `render.W`/`render.H`, so this layout centres where its own
+        file says.  Every layout this program can select declares 480x480 today
+        (docs/themes.md keeps the four 4:3 files out of the picker), so the honest form is:
+        240 here, because this file says 480.
+        """
+        return (int(self.obj.get("width") or render.W) // 2,
+                int(self.obj.get("height") or render.H) // 2)
+
+    def _x_number(self, index: int, coord: float, box) -> tuple:
+        """The `x` that puts *this* row's edge at a glass coordinate, and what it cost.
+
+        A line on the glass is a coordinate, and the number a row has to write to reach it
+        depends on its own anchor class.  A centre-anchored row writes the coordinate itself;
+        a left- or right-anchored row adds or takes away half its ink, and the only door that
+        knows a row's ink width is the painter.  `box` is that row's drawn box, out of the
+        single frame `snap_lines` draws; `(None, reason)` when it has none, which is the
+        answer D's edges give too for a row with no box to grab.
+        """
+        cls = self.anchor_class(self.widgets()[index])
+        coord = int(round(coord))
+        if cls == "m":
+            return coord, ""
+        if not box:
+            return None, ("this row paints no box at this fixture, so its ink has no width "
+                          "to centre with")
+        half = (box[2] - box[0]) / 2.0
+        said = f"half this row's {box[2] - box[0]} px of ink at this fixture"
+        if cls == "l":
+            return int(round(coord - half)), said
+        return int(round(coord + half)), said
+
+    def snap_lines(self, index: int | None = None, box=None) -> dict:
+        """The lines this layout offers one row: `{axis: [(number, what it is)]}`.
+
+        Three families, and each one is a habit measured in these files rather than a
+        convention invented here:
+
+        * another row's declared `x`, **only within one anchor class**.  **317** pairs of
+          rows in this library hold the same number; snapped across classes, the two rows'
+          ink would sit most of a canvas apart rather than lined up (the suite measures how
+          far, on the machine it runs on, and refuses the pair if the answer ever comes back
+          small), so a number aligns only when both rows agree what it means.  A row with a
+          declared width offers its other edge too: `x + width` for a `bar`, `x + sizeWidth`
+          for an `arc`, `x + width` for a `line` (the rect `layout.line_rect` draws, which
+          D's resize door already reads), and the two figures' centres - `x - width/2` and
+          `x + width/2`, the pitch D's size door names - for a `special` pair row.
+        * another row's declared `y`, with no class rule: the anchor's second letter runs
+          along the line, it does not move ink left or right, and **44** rows already hold a
+          `y` another row of the same file holds.
+        * the canvas centre and the mirror of another row's centre, **on x only** - and the
+          files chose that, not this module: **13** rows declare `x` exactly 240 and **220**
+          pairs declare two `x` values that sum to the 480 the same file declares, while on
+          the other axis **3** rows sit at the middle and **8** pairs mirror.  A habit on one
+          axis is not a habit on the other, so y gets no centre line and no mirror line
+          (`_centre` reads the middle off this file rather than assuming 240).
+        * the canvas edges are **not** lines, on either axis: not one row in those 28 layouts
+          declares `x` or `y` at 0 or at 479.  The edges are what `move_to` refuses to cross,
+          not a number rows line themselves up on.
+        """
+        i = self.index if index is None else int(index)
+        rows = self.widgets()
+        cls = self.anchor_class(rows[i])
+        # one draw for the whole question: `_row_box` draws per call, which a model gate can
+        # afford and a live drag cannot, because a drag asks on every motion event.  The pane
+        # already holds this row's box in its own marks and hands it in.
+        _img, _notes = themes.draw(self.obj, dict(FIXTURE), FIXTURE_WHEN)
+        boxes = {r[3]: tuple(r[2]) for r in (_notes.get("boxes") or []) if r[2]}
+        my_box = box if box is not None else boxes.get(i)
+        out: dict = {"x": [], "y": []}
+
+        def add(axis, value, said):
+            v = int(round(value))
+            if not any(v == got for got, _s in out[axis]):
+                out[axis].append((v, said))
+
+        for j, w in enumerate(rows):
+            if j == i:
+                continue
+            pr = (w.get("property") or [{}])[0]
+            kind = str(w.get("type") or "")
+            if pr.get("x") is not None and self.anchor_class(w) == cls:
+                xj = int(pr["x"])
+                add("x", xj, f"row {j} (`{kind}`, {cls}-anchored like this row) "
+                              f"declares `x`")
+                for key in {"bar": ("width",), "arc": ("sizeWidth",),
+                            "line": ("width",)}.get(kind) or ():
+                    if pr.get(key):
+                        add("x", xj + int(pr[key]),
+                            f"row {j} (`{kind}`)'s far edge, its `x` plus its `{key}`")
+                if kind == "special" and themes.special_is_pair(str(pr.get("name") or "")):
+                    pitch = int(pr.get("width") or 0)
+                    for sign in (-1, 1):
+                        if pitch:
+                            add("x", xj + sign * pitch // 2,
+                                f"row {j}'s {'left' if sign < 0 else 'right'} figure, "
+                                f"at its `x` {'-' if sign < 0 else '+'} half the pitch "
+                                f"{pitch}")
+            if pr.get("y") is not None:
+                add("y", int(pr["y"]), f"row {j} declares `y`")
+
+        c0, _cy = self._centre()
+        centre, cost = self._x_number(i, c0, my_box)
+        if centre is not None:
+            add("x", centre, f"the canvas centre, {c0}" + (f", plus {cost}" if cost else
+                             ", which is what this row's own `x` means"))
+        for j, w in enumerate(rows):
+            if j == i or (w.get("property") or [{}])[0].get("x") is None:
+                continue
+            pr = (w.get("property") or [{}])[0]
+            other = boxes.get(j)
+            # a row that paints ink is placed by where that ink sits; a row that paints none
+            # at this fixture falls back on the anchor point, which is the number the file
+            # wrote and so is the only honest centre it can offer
+            mid = ((other[0] + other[2]) / 2.0 if other else int(pr["x"]))
+            mir, cost = self._x_number(i, 2 * c0 - mid, my_box)
+            if mir is not None:
+                add("x", mir, f"mirrored about the centre with row {j}, whose centre is at "
+                              f"{int(round(mid))}" + (f", plus {cost}" if cost else ""))
+        for axis in out:
+            out[axis].sort()
+            # a line off this file's canvas is not a line anyone can land on: the mirror
+            # arithmetic can ask for a negative `x`, and `move_to` would refuse that landing
+            # anyway, but the pane would then spend a guide line drawing nothing on the glass
+            cx, cy = self._centre()
+            lim = (2 * cx, 2 * cy)[0 if axis == "x" else 1]
+            out[axis] = [(v, s) for v, s in out[axis] if 0 <= v < lim]
+        return out
+
+    def snap_move(self, nx: int, ny: int, index: int | None = None, was=None,
+                  box=None, lines=None) -> tuple:
+        """Pull a drag's landing onto the nearest line the layout offers, `SNAP_PX` at most.
+
+        `(x, y, notes)`, and nothing is written: `move_to` stays the door that writes, with
+        its own refusal of an anchor off the canvas.  `was` is the anchor the drag
+        **started** from, and a line the row was already sitting on is not offered - that is
+        how a row leaves a line it is on, with no modifier and no checkbox, which is what
+        these files ask for.  89 of the 185 rows here hold an `x` another row of the same
+        file holds, so without break-away a 2 px drag from a shared column would be undone
+        by the snap before the pointer had moved.
+
+        The notes say which line took hold and what the pull was, in the words `snap_lines`
+        built; the pane shows them while the mouse is down and again after the release, the
+        same ask-and-result rule feature D painted the resize box by.
+        """
+        i = self.index if index is None else int(index)
+        nx, ny = int(nx), int(ny)
+        # `lines` is here because a drag asks on every motion event and the lines cost one
+        # frame to find: the pane computes them once, at the press, and hands the same answer
+        # to every event until the rows change.  A caller with no such state (a gate, the
+        # field-row door) lets the model work it out.
+        lines = lines if lines is not None else self.snap_lines(i, box=box)
+        notes = []
+        for axis, want, from_ in (("x", nx, (was or (nx, ny))[0]),
+                                  ("y", ny, (was or (nx, ny))[1])):
+            best = None
+            for value, said in lines[axis]:
+                if abs(value - from_) <= self.SNAP_PX:      # the line you left is not a line
+                    continue
+                pull = abs(value - want)
+                if pull <= self.SNAP_PX and (best is None or pull < best[0]):
+                    best = (pull, value, said)
+            if best:
+                notes.append(f"snapped {axis} {want} -> {best[1]} ({best[0]} px away): "
+                             f"{best[2]}")
+                if axis == "x":
+                    nx = best[1]
+                else:
+                    ny = best[1]
+        return nx, ny, notes
+
     # ------------------------------------------------ add / delete / reorder rows --
     def rows_of(self, kind: str) -> list:
         """Indexes of the rows of one kind, in draw order."""

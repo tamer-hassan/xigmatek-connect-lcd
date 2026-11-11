@@ -230,6 +230,62 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     caches, so an unsaved keystroke reached what `scan()`, `pair()` and
     `describe()` read.
 
+  * A drag can be pulled onto a number that same layout already uses. Press
+    a row's ink, move it, and if the landing comes within 2 px of a line
+    this file offers, the row goes onto it and the note line says whose
+    number it is: another row's declared `x`, another row's `y`, and on x
+    the middle of the canvas and the mirror of another row's centre. The
+    reach is counted rather than chosen: of the 185 rows that carry an `x`
+    or a `y` in the 28 layouts this pane opens, 89 hold an `x` another row
+    of the same file holds exactly and 44 do the same with `y` - 317 pairs
+    of rows holding one number between them - while the rest are apart on
+    purpose: the nearest other row's `x` is 1 px away for 0 of those rows, 2
+    px away for 12, and 3 px away for 4, and nothing sits 6 or 7 px off. So
+    2 px is the break between "meant to line up" and "spaced". Three is not:
+    a 3 px drag is pulled 11% of the time at 1 px, 12% at 2 px and 57% at 3
+    px, because rows sharing a column sit within 3 px of each other's
+    landing - a snap arguing with the person dragging.
+
+  * What a line is allowed to mean: the same anchor class. A row's class is
+    the first letter of `xigma.anchor` (`l`, `m` or `r`; the vendor's
+    default is `la`), and that letter is what says where `x` sits on the
+    glass - measured against the painter on every run: a left-anchored row's
+    `x` is exactly its ink's left edge, a right-anchored row's is exactly
+    its right edge, a centre-anchored row's lies between the two. Across
+    classes the two rows' ink would sit most of a canvas apart, so the model
+    refuses the line rather than writing a number that only looks aligned. A
+    row with a declared width offers its far edge too (`x + width` for a
+    `bar`, `x + sizeWidth` for an `arc`, the rect `layout.line_rect` draws
+    for a `line`), and a `special` pair row offers its two figures at `x -
+    width/2` and `x + width/2`. The files chose the rest: 13 rows declare
+    `x` exactly 240 and 220 pairs declare two `x` values summing to the 480
+    the same file declares, while on y 3 rows sit at the middle and 8 pairs
+    mirror - so the centre and the mirror are offered on x only. And no row
+    anywhere declares `x` or `y` at 0 or at 479, which is why the canvas
+    edges stay the bounds `move_to` refuses to cross rather than becoming
+    lines to line up on. For a row that is not centre-anchored, the number
+    that centres it comes from the box the painter draws, and the sentence
+    says `at this fixture`, because a `data` row's digits change and its ink
+    moves with them while its `x` stays where the file wrote it.
+
+  * A row leaves a line the way it arrived: by dragging off it. A line the
+    row was already sitting on is not offered back, so a 2 px drag away from
+    a shared column sticks - which is what the corpus asks for, and why
+    there is no Shift to hold and no checkbox to remember. While a pull is
+    on, the pane draws that line across the glass and the model's own
+    sentence goes under the rows during the drag and again at the release;
+    the line is chrome and nothing else, so the picture the pane saves is
+    byte for byte what it is with the guide off, and the drag is still
+    exactly one undo step because the snap happens inside `move_to` rather
+    than around it. Three things are not snapped, and the pages say so: the
+    arrow keys (a 1 px nudge pulled back is a keypress that did nothing the
+    cursor asked for), the typed field rows (a number typed is a number
+    wanted), and a resize drag (feature D's edges write a size, and a
+    neighbour's edge is not this row's size). And there is no grid to snap
+    to, nor was one invented: the gcd of every declared `x` and of every
+    declared `y` is 1, and only 27 of the 185 declared `x` values are
+    multiples of 16.
+
   * Gates for all of it, in the same twenty-two offline sections, no port
     opened by any of them.  The new checks take their shape from the files
     on this run - the envelope, the mandatory key sets, the id reuse, the
@@ -254,14 +310,27 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     numbers recounting from `themes.scan()`, the name box keeping what was
     typed, nine refusals leaving every byte of the one copy on disk where it
     was, and the passage ending with the user root as empty as it found it.
+The snapping gates count the corpus from its declared numbers - 185 rows, 89
+    and 44 of them sharing one, 317 pairs, the 1 px bucket holding nothing
+    at all, the blast radius at 1 / 2 / 3 px - and hold `edit.py`'s
+    comments, this stanza and docs/gui.md to the same digits, which is what
+    makes them figures about the files rather than one machine's readings.
+    Then they drive the drag itself: the anchor class measured against the
+    painter, a pull onto a neighbour's exact number, one pixel outside the
+    reach moving nothing, the line you left not pulling you back, cross-
+    class lines not offered at all, the mirror proved by drawing the row
+    there and seeing the two box centres sum to the width the file declares,
+    a guide line that leaves the picture the pane saves unchanged byte for
+    byte, an arrow key answering 1 px and no more, and two presses of undo
+    going back over the nudge and then over the drag.
 
   * Still not built, and said in the pages rather than left to be found: an
     editor drawing live readings (the pane draws the pinned fixture, which
-    is the picture the documents describe), snapping a row to a grid or to a
-    neighbour, and the half only glass can
-    answer - `--no-clock` on the panel, the quiet-box re-measure `bars`
-    owes, the pairing note seen on the panel, and the transcript stage 6
-    asks for.
+    is the picture the documents describe), and a snap to a grid - the files
+    carry none, so a snap answers a neighbour's own number instead. And the
+    half only glass can answer: `--no-clock` on the panel, the quiet-box re-
+    measure `bars` owes, the pairing note seen on the panel, and the
+    transcript stage 6 asks for.
 
  -- Tamer Hassan <thameruddin@gmail.com>  Tue, 10 Nov 2026 16:30:41 +0200
 xigmatek-connect-lcd (0.5) resolute; urgency=medium

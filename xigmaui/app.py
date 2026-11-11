@@ -410,7 +410,8 @@ class Canvas(QLabel):
         third item: the box the release would ask for, painted in a solid line next to the
         dashed one that is.  The fourth item is always there when the window is editing: the
         live handles, as `(edge, x, y)` triples, which are the only places a press means a
-        resize.
+        resize.  The fifth is a move drag's guide lines, as `(axis, panel px)` pairs - the
+        ones `edit.Editor.snap_move` is pulling the row onto right now.
         """
         if marks != self.marks:
             self.marks = marks
@@ -475,6 +476,23 @@ class Canvas(QLabel):
             p.drawRect(int(round(ox + target[0] * k)), int(round(oy + target[1] * k)),
                        max(1, int(round((target[2] - target[0]) * k))),
                        max(1, int(round((target[3] - target[1]) * k))))
+        guides = self.marks[4] if len(self.marks) > 4 else ()
+        if guides:
+            # the line a snap is pulling the row onto, drawn end to end across the glass.
+            # Without it a row that stops 2 px short of the cursor looks like a pane that
+            # lost the drag; with it the reader sees which of the file's numbers took hold.
+            # Chrome, and only chrome: the marks never touch the frame, the same rule the
+            # handles and the amber ask box are held to.
+            p.setPen(QPen(QColor("#8affc1")))
+            span = int(round(self.side))      # the pane drew a square of this many widget px
+            for axis, value in guides:
+                if axis == "x":
+                    at = int(round(ox + value * k))
+                    p.drawLine(at, int(round(oy)), at, int(round(oy)) + span)
+                else:
+                    at = int(round(oy + value * k))
+                    p.drawLine(int(round(ox)), at, int(round(ox)) + span, at)
+            p.setBrush(Qt.BrushStyle.NoBrush)
         p.setPen(QColor("#000000"))
         p.drawText(int(round(x0)), max(11, int(round(y0)) - 3), text)
         p.setPen(QColor("#7fd0ff"))
@@ -1250,6 +1268,14 @@ class Window(QMainWindow):
         self._resize_note = ""                # and the last refusal said during that drag
         self._resize_over = ""                # plus what lay under the handle being dragged
         self._resize_target = None            # the ask it is painting, box or nothing
+        # What a move drag may be pulled onto.  The model finds these lines by drawing one
+        # frame - a row's own ink width comes from the painter - so they are asked once per
+        # press and held for the length of the drag, because a motion event cannot afford a
+        # frame of its own.  The guide is what the pane paints of them, and `_snap_said` is
+        # the model's own sentence about the pull, shown rather than paraphrased.
+        self._snap_lines = None               # {axis: [(number, what the line is)]}
+        self._snap_guide = ()                 # ((axis, panel px), ...) taking hold right now
+        self._snap_said = ""                  # the model's words for that pull
         self._off_glass = ""                    # what the last marks said about ink
         # nothing to edit until a layout is open: a row that offers fields before there
         # is a file behind it is a row that will write to nothing
@@ -3221,7 +3247,7 @@ class Window(QMainWindow):
         # The ask the reader is aiming at has to survive that, so the target comes from the
         # drag's own state instead of being dropped on every repaint.
         self.preview.set_marks((box, text, self._resize_target if self._resize else None,
-                                handles))
+                                handles, self._snap_guide if self._drag else ()))
         # the tooltip is where the pane says, before a press, what its edge is for - and
         # the answer is the model's, not a sentence written here about kinds
         keys, why = self.ed.size_door(self.ed.index)
@@ -3269,6 +3295,10 @@ class Window(QMainWindow):
         pr = self.ed.prop()
         self._drag = [px, py, int(pr.get("x") or 0), int(pr.get("y") or 0)]
         self._drag_refused, self._drag_note = False, ""
+        # asked once, at the press, for the row this press selected: `was` is this drag's
+        # own starting anchor, which is what lets a row leave a line it is sitting on
+        self._snap_lines = self.ed.snap_lines(idx, box=self._mark_box(idx))
+        self._snap_guide, self._snap_said = (), ""
         self._canvas_marks()
 
     def _canvas_move(self, px: int, py: int) -> None:
@@ -3285,11 +3315,24 @@ class Window(QMainWindow):
         if self.ed is None or not self._drag:
             return
         x0, y0, ax, ay = self._drag
-        ok, note = self.ed.move_to(ax + px - x0, ay + py - y0, commit=False)
+        gx, gy = ax + px - x0, ay + py - y0
+        # the pull is the model's: the lines it offered at the press, this drag's starting
+        # anchor, and nothing else.  The pane never decides how far a snap reaches, which
+        # number it picks when two lines are near, or what the line is called.
+        gx, gy, said = self.ed.snap_move(gx, gy, index=self.ed.index, was=(ax, ay),
+                                         lines=self._snap_lines)
+        self._snap_guide = tuple(dict.fromkeys(
+            (("x", gx) if n.startswith("snapped x") else ("y", gy)) for n in said))
+        self._snap_said = "  ".join(said)
+        ok, note = self.ed.move_to(gx, gy, commit=False)
         if not ok and not self._drag_refused:
             self.ed_note.setText(note)
             self._drag_note = note
             self._drag_refused = True
+        elif self._snap_said:
+            # a row that stops 2 px short of the cursor needs a reason on the glass rather
+            # than a mystery, and the reason is the file's: this is the number it is on
+            self.ed_note.setText(self._snap_said)
         self._repaint()
         self._canvas_marks()
 
@@ -3359,6 +3402,12 @@ class Window(QMainWindow):
                 f"nothing moved: {self._drag_note}")
         if self._off_glass:
             self.ed_note.setText(f"{self.ed_note.text()}. {self._off_glass}")
+        if self._snap_said:
+            # the last word is the model's: which of this file's numbers the row ended on,
+            # and how far the pull was.  Cleared with the drag, so the next press starts
+            # clean and a stale line is never painted for a drag that has ended.
+            self.ed_note.setText(f"{self.ed_note.text()}. {self._snap_said}")
+            self._snap_said, self._snap_guide, self._snap_lines = "", (), None
         if dx or dy:
             self._log(f"canvas drag: {self.ed.name} row {self.ed.index} by "
                       f"({dx:+d}, {dy:+d})")

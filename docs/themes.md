@@ -105,9 +105,14 @@ them here instead, and both are gated in `tools/selftest.sh` rather than asserte
   choice rather than measured off the vendor's picture (`Time`, `CPU Frequency`,
   `Pump Speed`) are named in the same note.
 
-What is **not** built is an editor drawn from live readings, and a resize that ignores
-what a kind owns: there is no scale-everything handle, and no snapping to a grid or to a
-neighbour.  Stretching a row by dragging one of the squares on its box went in on
+What is **not** built is an editor drawn from live readings, a resize that ignores
+what a kind owns, and a snap to a grid: there is no scale-everything handle, and there is no
+grid, because these files carry none - the gcd of every declared `x` and every declared `y` in
+the **185** placements of the **28** layouts the pane opens is 1.  What did go in, on
+2026-11-11, is a drag that can be pulled onto a number the *same file* already uses, 2 px at
+most: another row's `x` within one anchor class, another row's `y`, and on x the centre and the
+mirror of another row's centre - the lines those 185 rows actually hold, since 89 of them share
+an `x` exactly.  Stretching a row by dragging one of the squares on its box went in on
 2026-11-10, through the size keys the painter reads for that kind - `width`/`height`
 for a `bar`, the pair `line_rect` declares (swapped for a row turned 90°) for a `line`,
 the ring of an `arc` scaled with its box, the `fontSize` of a `text` row, the pitch or

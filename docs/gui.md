@@ -495,6 +495,59 @@ editor commonly gets wrong:
   **35 / 109 / 15** on this bench - clear where their source sits, moved to the nearest free
   spot, still meeting another box and saying so in the sentence - and **35 / 109 / 15** on
   CI's runner, and the gate holds whichever machine is running it to its half of that pair.
+* **A drag can be pulled onto a number this same file already uses, 2 px at most.** The lines are
+  the layout's own, and the reach comes out of counting them rather than out of taste: of the
+  **185** rows that carry an `x` or a `y` in the **28** layouts this pane can open, **89** hold an
+  `x` that another row of the same file holds exactly and **44** do the same with `y`, which is
+  **317** pairs of rows holding one number between them.  The rest are apart on purpose: the
+  nearest other row's `x` is 1 px away for **0** of those rows, 2 px away for **12**, and 3 px
+  away for **4**, and nothing at all sits 6 or 7 px off.  So 2 px is the break between "this file
+  means these two to line up" and "these two are spaced", and that is `edit.Editor.SNAP_PX`.  Three
+  is not the break: a drag of 3 px is pulled onto another row's number 11% of the time at 1 px,
+  **12%** at 2 px and 57% at 3 px, because rows sharing a column sit within 3 px of each other's
+  landing - a snap arguing with the person dragging.  All of that is counted from the files, so the
+  suite re-counts it wherever it runs and this bench and CI's runner are held to the same 185 / 89
+  / 44 / 317 and the same 11 / 12 / 57.  What a row *presents* on the glass is a different kind of
+  figure - it follows the face the layout is drawn in - so the drawn census the same pass reports
+  (how many pairs of drawn boxes already share an alignment number, how many box centres sit on the
+  middle) is printed by the gate on the machine it ran on, and no page quotes it as one number.
+* **Which lines a row is offered, and what they are allowed to mean.** A row offers its declared
+  `x`, and only a row of the **same anchor class** may be pulled onto it.  The class is the first
+  letter of `xigma.anchor` - `l`, `m` or `r`, the vendor's default being `la` - and that letter is
+  what says where `x` sits on the glass, which the suite measures against the painter on every run:
+  a left-anchored row's `x` is exactly its ink's left edge, a right-anchored row's is exactly its
+  right edge, and a centre-anchored row's lies between the two, because for those `x` *is* the
+  centre.  Pulled across classes the two rows' ink would sit most of a canvas apart rather than
+  lined up, so the model does not offer that line at all.  A row with a declared width offers its
+  far edge too - `x + width` for a `bar`, `x + sizeWidth` for an `arc`, the rect `layout.line_rect`
+  draws for a `line` - and a `special` pair row offers its two figures at `x - width/2` and
+  `x + width/2`, the pitch feature D's size door names.  On `y` there is no class rule, because the
+  anchor's second letter runs *along* the line rather than across it.  The centre line and the
+  mirror are offered **on x only**, and the files are what decided that: **13** rows declare `x`
+  exactly **240** and **220** pairs of rows declare two `x` values that sum to the **480** that
+  same file declares, while on the other axis **3** rows sit at the middle and **8** pairs mirror
+  - a habit on one axis and not the other.  For a row that is not centre-anchored, the number that
+  puts its centre on the middle is derived from the box the painter draws (the same door feature D
+  searches faces through), which is why the note says `at this fixture`: a `data` row's digits
+  change with a reading and its ink moves with them while its declared `x` stays exactly where the
+  file wrote it.  And the canvas *edges* are not lines: not one row in those 28 layouts declares
+  `x` at **0** or at **479**, on either axis - the edges are the bounds `move_to` refuses to cross,
+  not a number rows line up on.
+* **How a row gets off a line, and what a snap never touches.** A line the row was already sitting
+  on is not offered back to it: `snap_move` is given the anchor the drag *started* from, and the
+  rule in the door is "the line you left is not a line".  With 89 of 185 rows parked on a column
+  their own file already uses, that is what makes a 2 px drag away from a shared column stick - and
+  it is why there is no Shift to hold and no checkbox to remember.  While a pull is on, the pane
+  draws that line end to end across the glass in a colour the marks layer owns, and the note line
+  under the rows carries the model's own sentence - during the drag and again at the release: whose
+  number it is, how far the pull was, and for the centre and the mirror what it cost in ink.  The
+  guide is chrome and nothing else: the picture the pane saves is byte for byte what it is with the
+  guide off.  And the drag is still exactly one undo step, because the snap happens inside the door
+  a drag already goes through (`move_to`) rather than around it.  Three things are never snapped,
+  said here rather than left to be found: the arrow keys (a 1 px nudge that got pulled back would
+  be a keypress that did nothing the cursor asked for), the typed field rows (a number typed is a
+  number wanted), and a resize drag (feature D's edges write a *size*, and a neighbour's edge is
+  not this row's size).
 * **A reorder is the draw order, and it is proved with pixels.** The rule, asserted in both
   directions over every adjacent pair of drawn rows in all 28 layouts: a swap moves ink
   **exactly** where the two rows both cover some pixel opaquely and in different colours.
@@ -663,8 +716,12 @@ panel is never handed a layout file), so what a save changes is what *this machi
 daemon draws next time it names that theme; a row can be added only as a copy of a row
 that already draws, removed down to but never including the last one, and reordered only
 through the list that *is* the draw order; a row's size changes only through the keys its
-kind owns - there is no scale-everything handle, and no grid or snap to drag against -
-and nothing about a row's *position* is guessed at; the editor draws from the pinned
+kind owns - there is no scale-everything handle - and a drag may be pulled onto a
+number this same file already uses, never onto a grid: the gcd of every declared `x` and of every
+declared `y` in the corpus is **1**, and only **27** of its **185** declared `x` values are
+multiples of 16, so these files have no grid to snap to and this program does not invent one and
+call it the vendor's.  Nothing about a row's *position* is guessed at either; the editor draws
+from the pinned
 fixture and not live readings; and the theme combo above still lists only the five,
 because that combo picks what the loop draws from this machine's sensors.
 

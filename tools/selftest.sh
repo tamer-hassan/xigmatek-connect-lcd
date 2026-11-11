@@ -10180,6 +10180,597 @@ print(f"                        E's sentences, from this run: {len(_e_names2)} l
       f"suffixes {', '.join(themes.WRITER_SUFFIXES)} - the pages, `themes.py`'s comments and "
       f"the 0.6 stanza all carry those numbers")
 
+# ---- feature F: a drag that comes within 2 px of a number this file already uses is pulled
+# ---- onto it.  Two halves, like every other act in this pane: the model's doors measured on
+# ---- real layouts, and the window driving them with Qt events and painting the model's lines.
+_f_lim = gui_edit.Editor.SNAP_PX
+assert _f_lim == 2, (_f_lim, "the pages quote 2 px; if the door moved, the sentence did")
+
+# ---- the census the doors were built from, recounted here: these files either line up or
+# ---- they do not, which is why the threshold is 2 px and not a taste.
+# every layout this pane can open, drawn from a **copy** it owns: `themes.load` caches one object
+# per (path, mtime), and a draw fills in what the painter reads, so a census that drew the shared
+# object would be counting what the earlier gates in this section left behind
+import copy as _f_copy
+_f_objs = [_f_copy.deepcopy(themes.load(_rec["path"])) for _rec in pick] \
+    + [_f_copy.deepcopy(themes.export(_n)) for _n in sorted(themes.EXPORTS)]
+_f_pairs, _f_zero, _f_c240x, _f_c240y, _f_boxes = 0, 0, 0, 0, 0
+for _obj in _f_objs:
+    _i, _no = themes.draw(_f_copy.deepcopy(_obj), dict(gui_edit.FIXTURE),
+                          gui_edit.FIXTURE_WHEN)
+    _bs = [tuple(r[2]) for r in (_no.get("boxes") or []) if r[2]]
+    _f_boxes += len(_bs)
+    for _b in _bs:
+        # the middle of this file's own canvas, which every layout here puts at 240
+        if abs((_b[0] + _b[2]) / 2.0 - render.W / 2.0) < 0.5:
+            _f_c240x += 1
+        if abs((_b[1] + _b[3]) / 2.0 - render.H / 2.0) < 0.5:
+            _f_c240y += 1
+    for _a in range(len(_bs)):
+        for _b in range(_a + 1, len(_bs)):
+            _f_pairs += 1
+            _l1 = [_bs[_a][0], _bs[_a][2], (_bs[_a][0] + _bs[_a][2]) / 2.0,
+                   _bs[_a][1], _bs[_a][3], (_bs[_a][1] + _bs[_a][3]) / 2.0]
+            _l2 = [_bs[_b][0], _bs[_b][2], (_bs[_b][0] + _bs[_b][2]) / 2.0,
+                   _bs[_b][1], _bs[_b][3], (_bs[_b][1] + _bs[_b][3]) / 2.0]
+            if min(abs(p - q) for p in _l1 for q in _l2) == 0:
+                _f_zero += 1
+assert _f_pairs and _f_zero, (_f_pairs, _f_zero)
+
+# ---- the anchor class, measured against the painter rather than against the key's name:
+# ---- `l` rows sit with `x` at their ink's left edge, `r` rows at its right edge, `m` rows
+# ---- between the two, and the anchor's *second* letter changes none of that.
+_f_off = {"l": [], "m": [], "r": []}
+for _obj in _f_objs:
+    _i, _no = themes.draw(_f_copy.deepcopy(_obj), dict(gui_edit.FIXTURE),
+                          gui_edit.FIXTURE_WHEN)
+    _bs = {r[3]: tuple(r[2]) for r in (_no.get("boxes") or []) if r[2]}
+    for _j, _w in enumerate(((_obj.get("osd") or {}).get("widget") or [])):
+        _pr = (_w.get("property") or [{}])[0]
+        if _j not in _bs or _pr.get("x") is None:
+            continue
+        _cls = gui_edit.Editor.anchor_class(_w)
+        _two = str((_pr.get("xigma") or {}).get("anchor") or "la")
+        _kind = str(_w.get("type") or "")
+        _f_off[_cls].append((int(_pr["x"]) - _bs[_j][0], int(_pr["x"]) - _bs[_j][2], _two[0],
+                             _kind))
+        assert _two[0] == _cls, (_two, _cls, "the class is the anchor's first letter, and the "
+                                             "painter agrees with that reading")
+assert all(_f_off[c] for c in "lmr"), (
+    {k: len(v) for k, v in _f_off.items()}, "this corpus has no row of one anchor class, so "
+    "the class rule below would be measuring nothing")
+# `line` is the one kind exempt: `layout.line_rect` pivots the declared rect about its own
+# centre, so a row turned 90 degrees puts its ink somewhere its `x` does not name - which is
+# the fact feature D wrote `x`/`y` corrections from.
+_f_strict = ("text", "data", "special", "bar", "arc")
+assert all(o[0] == 0 for o in _f_off["l"] if o[3] in _f_strict), (
+    [o for o in _f_off["l"] if o[0]][:3], "a left-anchored row's `x` is not its ink's left "
+    "edge on this machine")
+assert all(o[1] == 0 for o in _f_off["r"]), (
+    [o for o in _f_off["r"] if o[1]][:3], "a right-anchored row's `x` is not its ink's right "
+    "edge on this machine")
+assert all(0 < o[0] < render.W for o in _f_off["m"] if o[3] in _f_strict), _f_off["m"][:3]
+
+# ---- the doors, on a real layout: which lines, the pull, and the break-away rule.
+_f_name = "Theme_07"
+win.ed_name.setCurrentText(_f_name)
+for _ in range(8):
+    appq.processEvents()
+_f_editor = win.ed
+assert _f_editor is not None and _f_editor.name == _f_name, win.ed_name.currentText()
+_f_x = {}
+for _j, _w in enumerate(_f_editor.widgets()):
+    _pr = (_w.get("property") or [{}])[0]
+    if _pr.get("x") is not None:
+        _f_x.setdefault(int(_pr["x"]), []).append(_j)
+_f_shared = [v for v in _f_x.values() if len(v) > 1]
+assert _f_shared, "this layout has no shared column, so the gate is measuring nothing"
+_f_a, _f_b = _f_shared[0][0], _f_shared[0][1]
+_f_target = int((_f_editor.widgets()[_f_a].get("property") or [{}])[0]["x"])
+_f_class = gui_edit.Editor.anchor_class(_f_editor.widgets()[_f_a])
+_f_other = next(j for j, _w in enumerate(_f_editor.widgets())
+                if j not in _f_shared[0]
+                and gui_edit.Editor.anchor_class(_w) == _f_class
+                and (_w.get("property") or [{}])[0].get("x") is not None
+                and abs(int((_w.get("property") or [{}])[0]["x"]) - _f_target) > _f_lim + 2)
+_f_editor.select(_f_other)
+_f_bx = _f_editor._row_box(_f_editor.obj, _f_other)
+assert _f_bx, f"row {_f_other} draws no box here, so there is no ink to press on"
+win.ed_widget.setCurrentIndex(_f_other)
+for _ in range(4):
+    appq.processEvents()
+_f_off_x = int((_f_editor.widgets()[_f_other].get("property") or [{}])[0]["x"])
+_f_lines = _f_editor.snap_lines(_f_other, box=_f_editor._row_box(_f_editor.obj, _f_other))
+assert all(0 <= v < render.W for v, _s in _f_lines["x"]), _f_lines["x"]
+assert all(0 <= v < render.H for v, _s in _f_lines["y"]), _f_lines["y"]
+assert _f_target in {v for v, _s in _f_lines["x"]}, (
+    _f_target, [v for v, _s in _f_lines["x"]],
+    "a column this file already holds is not offered to a row that can join it")
+
+# the pull, and its words
+_f_got, _f_gy, _f_said = _f_editor.snap_move(_f_target + _f_lim, int(_f_editor.prop()["y"]),
+                                         index=_f_other,
+                                         was=(_f_off_x, int(_f_editor.prop()["y"])),
+                                         lines=_f_lines)
+assert _f_got == _f_target, (_f_got, _f_target, _f_lim, "the pull did not land on the number")
+assert _f_said and "snapped x" in _f_said[0] and "declares `x`" in _f_said[0], _f_said
+# one pixel outside the reach: nothing moves, and nothing is said
+_f_g2, _f_gy2, _f_s2 = _f_editor.snap_move(_f_target + _f_lim + 1, int(_f_editor.prop()["y"]),
+                                       index=_f_other, was=(_f_off_x, int(_f_editor.prop()["y"])),
+                                       lines=_f_lines)
+assert (_f_g2, _f_s2) == (_f_target + _f_lim + 1, []), (_f_g2, _f_s2)
+# break-away: the line you were already sitting on cannot pull you back
+_f_editor.select(_f_a)
+_f_stay = _f_editor.snap_move(_f_target + 1, int(_f_editor.prop()["y"]), index=_f_a,
+                          was=(_f_target, int(_f_editor.prop()["y"])),
+                          box=_f_editor._row_box(_f_editor.obj, _f_a))
+assert _f_stay[0] == _f_target + 1 and _f_stay[2] == [], (
+    _f_stay, "a snap argued with a drag that left its own line")
+# a drag asks once per press and one frame finds the lines; the events cost nothing
+import time as _time
+_t0 = _time.time()
+_f_lines2 = _f_editor.snap_lines(_f_other)
+_f_cost = _time.time() - _t0
+_t1 = _time.time()
+for _f_ev in range(30):
+    _f_editor.snap_move(_f_off_x + _f_ev, 60, index=_f_other, was=(_f_off_x, 60), lines=_f_lines2)
+_f_events = _time.time() - _t1
+assert _f_events < 0.05, (_f_events, "30 motion events must not each cost a frame")
+print(f"  snapping, by the model  {len(_f_lines['x'])} x lines and {len(_f_lines['y'])} y "
+      f"lines for row {_f_other} of {_f_name}, one frame finding them in "
+      f"{_f_cost * 1000:.0f} ms and 30 pulls off those lines in {_f_events * 1000:.1f} ms")
+print(f"                        drawn, in this pass: {_f_zero} of {_f_pairs} pairs of drawn "
+      f"boxes share an alignment number exactly, and the {len(_f_objs)} layouts drew "
+      f"{_f_boxes} boxes of which {_f_c240x} have their centre on x={render.W // 2} and "
+      f"{_f_c240y} on y={render.H // 2}.  Those are prints, not the library's digits: they "
+      f"follow the face the run resolved and what this section's other gates left patched, "
+      f"which is exactly why no page quotes them and only the file counts above are asserted.")
+
+# ---- the centre and the mirror, and what they cost in ink: a left-anchored row reaches the
+# ---- middle of the glass by half its own ink, and only the painter knows that width.
+_f_editor.select(3)
+_f_mx, _f_my, _f_said = _f_editor.snap_move(18, int(_f_editor.prop()["y"]), index=3,
+                                        was=(int(_f_editor.prop()["x"]), int(_f_editor.prop()["y"])))
+_f_mir = [n for n in _f_said if "mirror" in n]
+assert _f_mir, (18, _f_mx, _f_said, "no mirror line offered on a layout whose rows do mirror")
+assert "whose centre is at" in _f_mir[0] and "px of ink" in _f_mir[0], _f_mir
+_f_try = _f_copy.deepcopy(_f_editor.obj)
+((_f_try.get("osd") or {}).get("widget") or [])[3]["property"][0]["x"] = _f_mx
+_f_n2 = themes.draw(_f_try, dict(gui_edit.FIXTURE), gui_edit.FIXTURE_WHEN)[1]
+_f_new = next(tuple(r[2]) for r in (_f_n2.get("boxes") or []) if r[3] == 3)
+_f_bx5 = _f_editor._row_box(_f_editor.obj, 5)
+_f_sum = (_f_new[0] + _f_new[2]) / 2.0 + (_f_bx5[0] + _f_bx5[2]) / 2.0
+assert abs(_f_sum - render.W) <= 1, (
+    _f_sum, render.W, "the mirror line did not put the two centres on opposite sides")
+print(f"                        and the same door mirrored row 3 about the centre with row "
+      f"5: the two box centres sum to {int(round(_f_sum))} px on a {render.W} px glass")
+
+# ---- cross-class lines are refused, measured on the glass rather than asserted: an `r` row
+# ---- snapped to an `l` row's number would sit half a layout away.
+win.ed_name.setCurrentText("bars")
+for _ in range(8):
+    appq.processEvents()
+_f_bars = win.ed
+_f_l = [i for i, w in enumerate(_f_bars.widgets()) if gui_edit.Editor.anchor_class(w) == "l"]
+_f_r = [i for i, w in enumerate(_f_bars.widgets()) if gui_edit.Editor.anchor_class(w) == "r"]
+assert _f_l and _f_r, (_f_l, _f_r, "`bars` is the layout the corpus says carries both")
+_f_bars.select(_f_r[0])
+_f_rl = _f_bars.snap_lines(_f_r[0], box=_f_bars._row_box(_f_bars.obj, _f_r[0]))
+_f_lnums = sorted({int((_f_bars.widgets()[i].get("property") or [{}])[0]["x"]) for i in _f_l})
+_f_offered = {v for v, _s in _f_rl["x"]}
+assert not (_f_offered & set(_f_lnums)), (
+    sorted(_f_offered & set(_f_lnums)), _f_lnums, "a right-anchored row was offered a left-"
+    "anchored row's number: they mean different edges, and the corpus puts 53 px of ink "
+    "between them at the median")
+assert {int((_f_bars.widgets()[i].get("property") or [{}])[0]["x"]) for i in _f_r} <= _f_offered, (
+    "a right-anchored row was not offered the column its own file's right-anchored rows hold")
+# and the reason the class rule exists is measured on this machine, not carried from a probe:
+# if an `l` row were pulled onto an `r` row's number, how far apart would their ink land?  The
+# answer is the whole width of the layout, so the line is refused rather than offered.
+# measured on the file, not on whatever the pane happens to be holding: the add/remove gates
+# earlier in this section have moved rows in and out of live editors
+_f_bo = _f_copy.deepcopy(themes.export("bars"))
+_f_bimg, _f_bnotes = themes.draw(_f_bo, dict(gui_edit.FIXTURE), gui_edit.FIXTURE_WHEN)
+_f_bx_r = {r[3]: tuple(r[2]) for r in (_f_bnotes.get("boxes") or []) if r[2]}
+_f_brows = (_f_bo.get("osd") or {}).get("widget") or []
+# the classes come from the same copy the boxes come from, so an index is never read against a
+# different object than the ink it landed in
+_f_fl = [i for i, w in enumerate(_f_brows) if gui_edit.Editor.anchor_class(w) == "l"
+         and (w.get("property") or [{}])[0].get("x") is not None]
+_f_fr = [i for i, w in enumerate(_f_brows) if gui_edit.Editor.anchor_class(w) == "r"
+         and (w.get("property") or [{}])[0].get("x") is not None]
+assert (_f_fl, _f_fr) == (_f_l, _f_r), (
+    (_f_fl, _f_fr), (_f_l, _f_r), "the pane's live `bars` editor and the file's own rows have "
+                                  "come apart, so the classes measured above are not the ones "
+                                  "being drawn here")
+_f_gap = []
+for _i in _f_fl:
+    for _j in _f_fr:
+        if _i not in _f_bx_r or _j not in _f_bx_r:
+            continue
+        _dx = (int((_f_brows[_j].get("property") or [{}])[0]["x"])
+               - int((_f_brows[_i].get("property") or [{}])[0]["x"]))
+        _f_gap.append(abs((_f_bx_r[_i][0] + _dx) - _f_bx_r[_j][0]))
+_f_gap.sort()
+assert _f_gap, (_f_l, _f_r, "`bars` draws no l/r pair, so the class rule is measuring nothing")
+_f_med = _f_gap[len(_f_gap) // 2]
+assert _f_med > 10 * _f_lim, (
+    _f_med, _f_lim, "a cross-class snap would land the ink within a few px after all, so the "
+                    "rule that refuses those lines needs re-reading against the glass")
+print(f"                        cross-class, measured here: pulling a left-anchored `bars` row "
+      f"onto a right-anchored row's `x` would leave the two ink left edges {_f_gap[0]} px apart "
+      f"at closest, {_f_med} px at the median, {_f_gap[-1]} px at furthest, over {len(_f_gap)} "
+      f"such pairs - which is why `snap_lines` does not offer them")
+
+# ---- and the window drives it: a press on ink, a drag that lands 2 px past a column, and
+# ---- what the pane paints and says about it.
+_f_raw0 = open(themes.resolve(_f_name)["path"], "rb").read()
+win.ed_name.setCurrentText(_f_name)
+for _ in range(8):
+    appq.processEvents()
+_f_editor = win.ed
+_f_editor.select(_f_other)
+_f_bx = _f_editor._row_box(_f_editor.obj, _f_other)
+assert _f_bx, f"row {_f_other} draws no box here, so there is no ink to press on"
+win.ed_widget.setCurrentIndex(_f_other)
+for _ in range(4):
+    appq.processEvents()
+
+# this drag wants the pane at 1:1: at a preview a third of the glass, one widget pixel is
+# three panel pixels and a rule about 2 px cannot be driven through a pointer that cannot move
+# by 2.  A window of its own, so the section's `win` keeps the size everything else in it
+# measured; `restore=False, save_settings=False` so no session file is written.
+_fw = app.Window(bad, None, restore=False, save_settings=False)
+_fw.show()
+_fw.resize(1600, 1200)
+for _ in range(10):
+    appq.processEvents()
+_fw.ed_name.setCurrentText(_f_name)
+for _ in range(8):
+    appq.processEvents()
+assert _fw.ed is not None and _fw.ed.name == _f_name, _fw.ed_name.currentText()
+_side_f = _fw.preview.pixmap().width()
+assert _side_f == render.W, (_side_f, "this drag needs the glass at 1:1, as the owner's "
+                                      "1600 px frame gives it")
+_fw.ed.select(_f_other)
+_f_bx = _fw.ed._row_box(_fw.ed.obj, _f_other)
+assert _f_bx, f"row {_f_other} draws no box here, so there is no ink to press on"
+_fw.ed_widget.setCurrentIndex(_f_other)
+for _ in range(4):
+    appq.processEvents()
+
+
+_f_tmp = tempfile.mkdtemp(prefix="xigma-snap-")
+
+
+def _f_png(_w):
+    """The picture a pane was told to show, as bytes nobody can fudge."""
+    _p = os.path.join(_f_tmp, "pane.png")
+    assert _w.preview.pixmap().save(_p, "PNG")
+    return open(_p, "rb").read()
+
+
+def _f_w(px, py):
+    ox, oy = _fw.preview._origin()
+    return int(round(ox + px)), int(round(oy + py))
+
+
+def _f_press(px, py):
+    _fw.preview.mousePressEvent(_ev(_QEv.Type.MouseButtonPress, *_f_w(px, py)))
+    appq.processEvents()
+
+
+def _f_move(px, py):
+    _fw.preview.mouseMoveEvent(_ev(_QEv.Type.MouseMove, *_f_w(px, py)))
+    appq.processEvents()
+
+
+def _f_release(px, py):
+    _fw.preview.mouseReleaseEvent(_ev(_QEv.Type.MouseButtonRelease, *_f_w(px, py)))
+    appq.processEvents()
+
+
+_f_steps0 = _fw.ed.steps
+_f_pt = (_f_bx[0] + 2, (_f_bx[1] + _f_bx[3]) // 2)      # a point inside this row's own ink
+_f_press(*_f_pt)
+assert _fw._drag and _fw._snap_lines is not None, (
+    _fw._drag, _fw._snap_lines, _f_pt, _f_other, "the press found no row to drag")
+assert _fw._drag[2] == _f_off_x and _fw._drag[3] == int(_fw.ed.prop()["y"]), _fw._drag
+_f_dx = _f_target - _f_off_x + _f_lim            # 2 px the wrong side of the column
+_f_move(_f_pt[0] + _f_dx, _f_pt[1])
+assert _fw._snap_guide and _fw._snap_guide[0][0] == "x", (
+    _fw._snap_guide, "the pane painted no guide for a pull it applied")
+assert _fw.preview.marks[4] == _fw._snap_guide, (
+    _fw.preview.marks[4], _fw._snap_guide, "the guides in the marks are not the ones the drag "
+    "is pulling toward")
+assert int(_fw.ed.prop()["x"]) == _f_target, (
+    _fw.ed.prop()["x"], _f_target, "the drag wrote a number the model did not name")
+assert "snapped x" in _fw.ed_note.text(), _fw.ed_note.text()[:140]
+_f_mid = _fw._snap_guide
+_f_guide_png = _f_png(_fw)
+_fw.preview.set_marks(_fw.preview.marks[:4] + ((),))
+_f_plain_png = _f_png(_fw)
+assert _f_guide_png == _f_plain_png, (
+    "a guide line reached the picture the pane saves: marks are chrome, like the handles")
+_f_release(_f_pt[0] + _f_dx, _f_pt[1])
+assert int(_fw.ed.prop()["x"]) == _f_target, (_fw.ed.prop()["x"], _f_target)
+assert _fw.ed.steps == _f_steps0 + 1, (_fw.ed.steps, _f_steps0, "one drag, one undo step")
+assert "snapped x" in _fw.ed_note.text(), _fw.ed_note.text()[-190:]
+assert _fw.preview.marks[4] == (), _fw.preview.marks[4]
+_f_x_row = _fw._ed_ctl("x")
+assert _f_x_row.value() == _f_target, (_f_x_row.value(), _f_target,
+                                       "the field rows do not show where the row landed")
+print(f"  snapping, in the window  a press on row {_f_other}'s ink at 1:1, a drag 2 px past "
+      f"row {_f_a}'s `x`, and the row is on {_f_target} with a guide at {_f_mid[0][1]} and "
+      f"the model's own sentence under the rows; the pane's saved picture is byte-identical "
+      f"with the guide on and off ({len(_f_guide_png)} B)")
+
+# ---- an arrow key is not a drag: it places a row to the pixel, and no line may answer for it.
+_fw.ed.select(_f_a)
+_fw.ed_widget.setCurrentIndex(_f_a)
+for _ in range(4):
+    appq.processEvents()
+_fw.preview.keyPressEvent(_ev(_QEv.Type.KeyPress, key=_QQt.Key.Key_Right))
+for _ in range(3):
+    appq.processEvents()
+_f_num = lambda i: int((_fw.ed.widgets()[i].get("property") or [{}])[0]["x"])
+assert _f_num(_f_a) == _f_target + 1, (
+    _f_num(_f_a), _f_target, "a 1 px nudge was moved by a snap - a keypress that did nothing "
+    "the cursor asked for")
+assert (_f_num(_f_a), _f_num(_f_other)) == (_f_target + 1, _f_target), (
+    (_f_num(_f_a), _f_num(_f_other)), "the nudge left its row 1 px off the column, and the "
+    "drag left its row on it - which is the whole difference between a key and a snap")
+print(f"                        and the arrow keys stay exact: row {_f_a} nudged 1 px off its "
+      f"column, no snap answering")
+
+# ---- two acts on two rows, two steps, and each press of undo goes back over one of them
+assert _fw.ed.steps == _f_steps0 + 2, (_fw.ed.steps, _f_steps0)
+_fw.ed_undo.click()
+for _ in range(6):
+    appq.processEvents()
+assert (_f_num(_f_a), _f_num(_f_other)) == (_f_target, _f_target), (
+    (_f_num(_f_a), _f_num(_f_other)), "undo went back over the drag, not the 1 px nudge")
+_fw.ed_undo.click()
+for _ in range(6):
+    appq.processEvents()
+assert _f_num(_f_other) == _f_off_x and _fw.ed.steps == _f_steps0, (
+    _f_num(_f_other), _f_off_x, _fw.ed.steps, "the drag itself did not go back as one step")
+_fw.close()
+assert open(themes.resolve(_f_name)["path"], "rb").read() == _f_raw0, (
+    "a drag the window never saved still reached the vendor's file")
+assert themes.user_copies() == [], themes.user_copies()
+print(f"                        undo put row {_f_other} back at {_f_off_x}; "
+      f"{_f_name}.json is byte-identical to the file it was read from, and the user root "
+      f"holds nothing")
+
+# ---- feature F's sentences, held to the numbers the **files** give this run.  These are the
+# ---- snapping figures that cannot move between machines: no drawing, no fonts, no readings -
+# ---- only the numbers the layouts this pane can open declare.  The figures that do follow the
+# ---- face a layout is drawn in (how many *drawn* pairs line up, how far cross-class ink would
+# ---- sit apart) are measured and asserted by the gate above on whatever machine runs it, and
+# ---- printed there rather than written into a page as one number.
+_f_files = [(str(_rec["name"]), themes.load(_rec["path"])) for _rec in pick]
+_f_files += [(_n, themes.export(_n)) for _n in sorted(themes.EXPORTS)]
+_f_decl = []                                  # (layout, x, y) exactly as the files write them
+for _fi, (_fn, _obj) in enumerate(_f_files):
+    for _pr in [(_w.get("property") or [{}])[0]
+                for _w in (_obj.get("osd") or {}).get("widget") or []]:
+        if _pr.get("x") is None and _pr.get("y") is None:
+            continue
+        _f_decl.append((_fi, int(_pr["x"]) if _pr.get("x") is not None else None,
+                        int(_pr["y"]) if _pr.get("y") is not None else None))
+_f_n = len(_f_decl)
+
+
+def _f_peers(_k, _axis):
+    """The numbers on one axis that the *other* rows of this row's own file declare."""
+    return [v for j, v in enumerate([d[_axis] for d in _f_decl])
+            if j != _k and _f_decl[j][0] == _f_decl[_k][0] and v is not None]
+
+
+_f_share_x = sum(1 for _k in range(_f_n) if _f_decl[_k][1] is not None
+                 and _f_decl[_k][1] in _f_peers(_k, 1))
+_f_share_y = sum(1 for _k in range(_f_n) if _f_decl[_k][2] is not None
+                 and _f_decl[_k][2] in _f_peers(_k, 2))
+_f_same = 0
+for _a in range(_f_n):
+    for _b in range(_a + 1, _f_n):
+        if _f_decl[_a][0] != _f_decl[_b][0]:
+            continue
+        if (_f_decl[_a][1] is not None and _f_decl[_a][1] == _f_decl[_b][1]) or (
+                _f_decl[_a][2] is not None and _f_decl[_a][2] == _f_decl[_b][2]):
+            _f_same += 1
+import math as _math
+_f_gcd_x = _math.gcd(*[d[1] for d in _f_decl if d[1] is not None])
+_f_gcd_y = _math.gcd(*[d[2] for d in _f_decl if d[2] is not None])
+_f_by16 = sum(1 for d in _f_decl if d[1] is not None and d[1] % 16 == 0)
+# the middle is not assumed: `snap_lines` asks the file, and the prose says 240 because every
+# layout this pane can open declares 480x480.  A file that declared otherwise moves this run's
+# digits, which is the honest way for the sentence to go stale rather than stay comfortable.
+_f_sizes = {((int(_o.get("width") or render.W), int(_o.get("height") or render.H)))
+            for _fn, _o in _f_files}
+assert len(_f_sizes) == 1, (_f_sizes, "the layouts this pane opens do not all declare one "
+                                      "canvas, so `the middle` is not one number")
+(_f_w0, _f_h0), = _f_sizes
+_f_cx, _f_cy = _f_w0 // 2, _f_h0 // 2
+_f_at_c_x = sum(1 for d in _f_decl if d[1] == _f_cx)
+_f_at_c_y = sum(1 for d in _f_decl if d[2] == _f_cy)
+
+
+def _f_mir(_axis):
+    """Pairs of rows in one file whose numbers on `axis` add up to the middle twice over."""
+    _rows = [(d[0], d[_axis]) for d in _f_decl if d[_axis] is not None]
+    return sum(1 for _a in range(len(_rows)) for _b in range(_a + 1, len(_rows))
+               if _rows[_a][0] == _rows[_b][0] and _rows[_a][1] + _rows[_b][1] == 2 * _f_cx)
+
+
+_f_mir_x, _f_mir_y = _f_mir(1), _f_mir(2)
+_f_edge = sum(1 for d in _f_decl for v in (d[1], d[2])
+              if v is not None and v in (0, 2 * _f_cx - 1))
+_f_hist_x = {}
+for _k in range(_f_n):
+    if _f_decl[_k][1] is None:
+        continue
+    _d = min((abs(v - _f_decl[_k][1]) for v in _f_peers(_k, 1)), default=None)
+    _f_hist_x[_d] = _f_hist_x.get(_d, 0) + 1
+_f_t = gui_edit.Editor.SNAP_PX
+assert _f_t == 2, (_f_t, "the pages, `edit.py`'s comment and the 0.6 stanza all quote 2 px; if "
+                         "the door moved, the sentences did too")
+assert _f_n == len(_f_decl) and _f_share_x and _f_same, (_f_n, _f_share_x, _f_same)
+# the two claims the prose makes about the shape of the histogram, not just its totals: nothing
+# one pixel off, and a gap in the small distances, which is what makes 2 px a break rather than a
+# point on a slope
+assert _f_hist_x.get(1, 0) == 0, _f_hist_x
+assert _f_hist_x.get(6, 0) == 0 and _f_hist_x.get(7, 0) == 0, _f_hist_x
+assert _f_edge == 0, (_f_edge, "the page says no row declares a number on the canvas edge, and "
+                               "this run found one")
+
+
+def _f_pulled(_t):
+    """How many rows of this corpus a 3 px drag would pull onto another row's `x`."""
+    return round(100.0 * sum(
+        1 for _k in range(_f_n)
+        if _f_decl[_k][1] is not None
+        and any(abs(v - (_f_decl[_k][1] + 3)) <= _t for v in _f_peers(_k, 1))) / _f_n)
+
+
+_f_p1, _f_p2, _f_p3 = _f_pulled(1), _f_pulled(2), _f_pulled(3)
+assert _f_p2 < _f_p3, (_f_p2, _f_p3, "3 px is no more grabbable than 2 px on this corpus, so the "
+                                     "sentence that says otherwise has to go")
+_f_cl_top = " ".join(open("debian/changelog", encoding="utf-8").read()
+                     .split("\n -- ")[0].split())
+_f_themes = _flat("docs/themes.md")
+
+# ---- docs/gui.md: the three bullets' digits, in the order the page writes them -----------
+for _what, _pat, _mine in (
+        ("the census the reach is counted from, on the page",
+         r"of the \*\*(\d+)\*\* rows that carry an `x` or a `y` in the \*\*(\d+)\*\* layouts this "
+         r"pane can open, \*\*(\d+)\*\* hold an `x` that another row of the same file holds "
+         r"exactly and \*\*(\d+)\*\* do the same with `y`, which is \*\*(\d+)\*\* pairs of rows "
+         r"holding one number between them",
+         (_f_n, len(_f_files), _f_share_x, _f_share_y, _f_same)),
+        ("the histogram's small end, on the page",
+         r"the nearest other row's `x` is 1 px away for \*\*(\d+)\*\* of those rows, 2 px away "
+         r"for \*\*(\d+)\*\*, and 3 px away for \*\*(\d+)\*\*, and nothing at all sits 6 or 7 "
+         r"px off",
+         (_f_hist_x.get(1, 0), _f_hist_x.get(2, 0), _f_hist_x.get(3, 0))),
+        ("the blast radius of a 3 px drag, on the page",
+         r"a drag of 3 px is pulled onto another row's number (\d+)% of the time at 1 px, "
+         r"\*\*(\d+)%\*\* at 2 px and (\d+)% at 3 px",
+         (_f_p1, _f_p2, _f_p3)),
+        ("the centre and the mirror, and which axis has the habit, on the page",
+         r"\*\*(\d+)\*\* rows declare `x` exactly \*\*(\d+)\*\* and \*\*(\d+)\*\* pairs of rows "
+         r"declare two `x` values that sum to the \*\*(\d+)\*\* that same file declares, while "
+         r"on the other axis \*\*(\d+)\*\* rows sit at the middle and \*\*(\d+)\*\* pairs mirror",
+         (_f_at_c_x, _f_cx, _f_mir_x, 2 * _f_cx, _f_at_c_y, _f_mir_y)),
+        ("the canvas edges, on the page",
+         r"not one row in those (\d+) layouts declares `x` at \*\*(\d+)\*\* or at \*\*(\d+)\*\*",
+         (len(_f_files), 0, 2 * _f_cx - 1)),
+        ("the grid that is not there, on the page",
+         r"the gcd of every declared `x` and of every declared `y` in the corpus is \*\*(\d+)\*\*,"
+         r" and only \*\*(\d+)\*\* of its \*\*(\d+)\*\* declared `x` values are multiples of 16",
+         (_f_gcd_x, _f_by16, _f_n)),
+):
+    _stated(_what, _gf, _pat, _mine)
+
+# ---- `edit.py`'s own comments: the shipped tree says the same counts, or the comment is a
+# ---- claim nobody re-counts -------------------------------------------------------------
+for _what, _pat, _mine in (
+        ("the census, in `edit.py`'s comment",
+         r"of the \*\*(\d+)\*\* rows that carry an `x` or a `y` in the \*\*(\d+)\*\* layouts this "
+         r"pane can open, \*\*(\d+)\*\* hold an `x` another row of the same file holds exactly "
+         r"and \*\*(\d+)\*\* do the same with `y` - \*\*(\d+)\*\* pairs of rows holding one "
+         r"number between them",
+         (_f_n, len(_f_files), _f_share_x, _f_share_y, _f_same)),
+        ("the histogram's small end, in `edit.py`'s comment",
+         r"the nearest other row's `x` is 1 px away for \*\*(\d+)\*\* of those rows, 2 px away "
+         r"for \*\*(\d+)\*\*, and 3 px away for \*\*(\d+)\*\*, with nothing at all 6 or 7 px off",
+         (_f_hist_x.get(1, 0), _f_hist_x.get(2, 0), _f_hist_x.get(3, 0))),
+        ("the blast radius, in `edit.py`'s comment",
+         r"a drag of 3 px right is pulled onto another row's `x` (\d+)% of the time at 1 px, "
+         r"\*\*(\d+)%\*\* at t=2 and \*\*(\d+)%\*\* at t=3",
+         (_f_p1, _f_p2, _f_p3)),
+        ("the pairs, in `snap_lines`' words",
+         r"\*\*(\d+)\*\* pairs of rows in this library hold the same number", (_f_same,)),
+        ("the shared `y` numbers, in `snap_lines`' words",
+         r"\*\*(\d+)\*\* rows already hold a `y` another row of the same file holds",
+         (_f_share_y,)),
+        ("the two axes' habits, in `snap_lines`' words",
+         r"\*\*(\d+)\*\* rows declare `x` exactly \d+ and \*\*(\d+)\*\* pairs declare two `x` "
+         r"values that sum to the \d+ the same file declares, while on the other axis \*\*(\d+)\*\* "
+         r"rows sit at the middle and \*\*(\d+)\*\* pairs mirror",
+         (_f_at_c_x, _f_mir_x, _f_at_c_y, _f_mir_y)),
+        ("the edges, in `snap_lines`' words",
+         r"not one row in those \d+ layouts declares `x` or `y` at (\d+) or at (\d+)",
+         (0, 2 * _f_cx - 1)),
+        ("the break-away rule's reason, in `snap_move`'s words",
+         r"(\d+) of the (\d+) rows here hold an `x` another row of the same",
+         (_f_share_x, _f_n)),
+):
+    _stated(_what, _edit_src, _pat, _mine)
+for _phrase, _why in (
+        ("the line you left is not a line", "the break-away rule, in the door's own words"),
+        ("paints no box at this fixture", "a row with no ink has no width to centre with"),
+        ("on x only", "the centre and the mirror are one axis' habit, in the door's words"),
+        ("**first** letter is the horizontal one", "how the class is read, in the model's "
+         "words"),
+        ("the suite draws the layouts this pane can", "the anchor offsets are measured per run, "
+                                                      "not quoted from one bench")):
+    assert _phrase in _edit_src, (_phrase, _why, "`edit.py` no longer says it")
+
+# ---- the 0.6 stanza, and docs/themes.md: the record and the library page ------------------
+for _what, _pat, _mine in (
+        ("the census, in the 0.6 stanza",
+         r"of the (\d+) rows that carry an `x` or a `y` in the (\d+) layouts this pane opens, "
+         r"(\d+) hold an `x` another row of the same file holds exactly and (\d+) do the same "
+         r"with `y` - (\d+) pairs of rows holding one number between them",
+         (_f_n, len(_f_files), _f_share_x, _f_share_y, _f_same)),
+        ("the histogram's small end, in the 0.6 stanza",
+         r"the nearest other row's `x` is 1 px away for (\d+) of those rows, 2 px away for "
+         r"(\d+), and 3 px away for (\d+), and nothing sits 6 or 7 px off",
+         (_f_hist_x.get(1, 0), _f_hist_x.get(2, 0), _f_hist_x.get(3, 0))),
+        ("the blast radius, in the 0.6 stanza",
+         r"a 3 px drag is pulled (\d+)% of the time at 1 px, (\d+)% at 2 px and (\d+)% at 3 px",
+         (_f_p1, _f_p2, _f_p3)),
+        ("the two axes' habits, in the 0.6 stanza",
+         r"(\d+) rows declare `x` exactly \d+ and (\d+) pairs declare two `x` values summing to "
+         r"the \d+ the same file declares, while on y (\d+) rows sit at the middle and (\d+) "
+         r"pairs mirror",
+         (_f_at_c_x, _f_mir_x, _f_at_c_y, _f_mir_y)),
+        ("the grid that is not there, in the 0.6 stanza",
+         r"the gcd of every declared `x` and of every declared `y` is (\d+), and only (\d+) of "
+         r"the (\d+) declared `x` values are multiples of 16",
+         (_f_gcd_x, _f_by16, _f_n)),
+        ("the gates' own arithmetic, in the 0.6 stanza",
+         r"The snapping gates count the corpus from its declared numbers - (\d+) rows, (\d+) and "
+         r"(\d+) of them sharing one, (\d+) pairs",
+         (_f_n, _f_share_x, _f_share_y, _f_same)),
+):
+    _stated(_what, _f_cl_top, _pat, _mine)
+for _what, _pat, _mine in (
+        ("the grid that is not there, in docs/themes.md",
+         r"the gcd of every declared `x` and every declared `y` in the \*\*(\d+)\*\* placements "
+         r"of the \*\*(\d+)\*\* layouts the pane opens is (\d+)",
+         (_f_n, len(_f_files), _f_gcd_x)),
+        ("the shared columns, in docs/themes.md",
+         r"since (\d+) of them share an `x` exactly", (_f_share_x,)),
+):
+    _stated(_what, _f_themes, _pat, _mine)
+for _phrase in ("guide is chrome", "the model's own sentence", "SNAP_PX", "anchor class",
+                "never snapped", "not offered back to it"):
+    assert _phrase in _gf, (_phrase, "docs/gui.md stopped naming what the gate holds it to")
+print(f"                        F's sentences, from this run: {_f_n} rows carry an `x` or a `y` "
+      f"across the {len(_f_files)} layouts this pane can open; {_f_share_x} hold an `x` another "
+      f"row of the same file holds and {_f_share_y} do the same with `y`; {_f_same} pairs hold "
+      f"one number; the nearest is 1 px off for {_f_hist_x.get(1, 0)} of them, 2 px for "
+      f"{_f_hist_x.get(2, 0)} and 3 px for {_f_hist_x.get(3, 0)}, with nothing 6 or 7 px off; "
+      f"the gcds are {_f_gcd_x} and {_f_gcd_y}, {_f_by16} of the `x` values are multiples of 16, "
+      f"and {_f_edge} rows sit on the canvas edge at all; the centre line answers {_f_at_c_x} "
+      f"rows on x and {_f_at_c_y} on y, mirroring {_f_mir_x} pairs against {_f_mir_y}; and a "
+      f"3 px drag is pulled {_f_p1}% at 1 px, {_f_p2}% at the {_f_t} px the door uses and "
+      f"{_f_p3}% at 3 px - the page, `edit.py`, docs/themes.md and the 0.6 stanza all carry "
+      f"those")
+
 # a press on empty glass names the point and selects nothing, and closing the layout takes
 # the mark with it - the pane goes back to a live preview, with nothing drawn on it
 _free_pt = next((x, y) for y in range(0, render.H, 7) for x in range(0, render.W, 7)

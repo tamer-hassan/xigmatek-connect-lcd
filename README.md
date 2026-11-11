@@ -101,9 +101,11 @@ always a copy of a row this program already draws, never a table of defaults —
 reordered through the list that decides which one paints on top, and stretched by
 dragging one of the squares on its box, through the size keys that kind owns. A copy is
 yours to rename, and one layout can be saved as a second copy under a new name — a name
-nothing in the library answers, by name, by spelling, or by the id inside the file. The
-panel is never handed a layout file, so what that editor changes is what a loop on
-*this* machine draws the next time it names that theme
+nothing in the library answers, by name, by spelling, or by the id inside the file. And a
+drag can stick, within two pixels, to a number that same layout already uses: another row's
+edge, its centre on the glass, its mirror. There is no grid, because the vendor's files
+carry none. The panel is never handed a layout file, so what that editor changes is what a
+loop on *this* machine draws the next time it names that theme
 ([docs/gui.md](docs/gui.md) has the row and its limits).
 
 ![xigmaui, the window in three columns: the playing preview and the log on the left -
