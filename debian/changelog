@@ -286,6 +286,70 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     declared `y` is 1, and only 27 of the 185 declared `x` values are
     multiples of 16.
 
+  * The editor's pane can now look at another body's readings without
+    editing in them: a folded box called **Pane readings**, under the
+    advanced switch, offers `the fixture`, `this machine's readings`, and `a
+    metrics file`. A fresh window opens at the pinned fixture and the peek
+    is never remembered - no key for it goes near the session file - so a
+    window you did not choose cannot come up showing readings it grabbed by
+    itself. The file entry takes the same `STATE all 1` JSON shape as
+    `--metrics-file` and reads it through the same door,
+    `main.read_metrics_file`, because one file shape has to mean one thing
+    in one program: its sections replace whole sections of what this machine
+    answers, a `_`-prefixed key is a comment in the file rather than a
+    section, and a file that is missing or broken is refused in words. A
+    peek sends nothing: it paints, it does not upload.
+    The fold census moves with the new box: 12 secondary controls in 5 rows and
+    3 boxes - named by the switch's note, its tooltip, docs/gui.md's table, and
+    the gate that lists every folded widget one by one.
+
+  * The peek is held and its instant stays pinned, which is what makes it
+    one picture instead of a slideshow. The readings are read once, when the
+    entry is chosen, and again only when the reader chooses the entry they are
+    already on - that press *is* the re-read; a pane that followed the sensors
+    at 2 fps would move as far as this box's readings happen to move - nothing
+    at all on a box whose sensors sit still - so the gate times one read, one
+    draw and one second of following, and prints the milliseconds and the
+    moved pixels it measured instead of this file quoting a number that
+    belongs to one machine. The instant is pinned because that half is a fact
+    about the files: the painter takes `Date`, `Time` and `Week` from the
+    instant rather than from any reading, the library's rows ask for 2 of
+    those 3 names and 17 rows read them, so a live clock rewrites those rows
+    every second. What the pane is looking at is said in three places: the
+    model's own sentence under the rows, the badge under the picture (`pane:
+    PEEK - …`), and the caption.
+
+  * A peek cannot be edited in, and it says so rather than failing quietly.
+    The dashed box, the eight resize squares and any snap guide are hidden
+    while a peek is up, because they are drawn from the pinned row's edges
+    while the ink on screen sits elsewhere - the suite counts, on the
+    machine it runs on, how many row boxes move at another body's readings
+    and how many of the points it probes on the glass answer a different row
+    in one frame than the other, and refuses to print either count unless
+    the difference is actually there. A press on the peek, and an arrow key,
+    are refused with `edit.Editor.peek_refusal`'s own words - the window
+    does not paraphrase the model - naming the knob that puts the editable
+    frame back; the undo count, the `dirty` flag, the selected row's `x` and
+    the file's bytes do not move. The note lines under the fields do follow
+    the peek, because the measured difference is in values only (`57°C`
+    becomes `104°C` at a file body pinning `cpu.temperature` to 104.0) with
+    the reason strings left alone. Feature D's squares are asked of a box, and
+    `size_edges` never consults a reading - one box, one answer, which is what
+    the gate asserts per row - but the box is what the painter drew, so a
+    second body can change which squares exist to grab at all; the rows whose
+    offer moved are printed with the boxes that moved them, rather than
+    counted on a page.
+
+  * One loader rather than two. `--metrics-file`'s rule - what a section is,
+    what a comment key is, what a broken file means - lived in
+    `main._pinned`; the peek needed the same rule, so it is now
+    `main.read_metrics_file(path) -> (sections, reason)` and `_pinned` is
+    its caching wrapper. The loop keeps its last good read and logs once per
+    change of a broken file; the window puts the sentence on the note line,
+    keeps the pinned frame painted, and leaves the mode the reader chose on
+    the combo instead of snapping the control back under their fingers. A
+    file that names no path says so, and the chosen mode waits for the path.
+
   * Gates for all of it, in the same twenty-two offline sections, no port
     opened by any of them.  The new checks take their shape from the files
     on this run - the envelope, the mandatory key sets, the id reuse, the
@@ -323,6 +387,19 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     a guide line that leaves the picture the pane saves unchanged byte for
     byte, an arrow key answering 1 px and no more, and two presses of undo
     going back over the nudge and then over the drag.
+    The peek's gates drive the window's own knob: a named file body drawn
+    byte for byte the way a direct draw of that body draws it, a held sample
+    repainted with no difference at all, marks gone and the pane's tooltip
+    saying why, a press and an arrow key refused in the model's exact words
+    with the undo count and the file's bytes unmoved, the refusal that
+    leaves the chosen mode alone and the pinned frame up, leaving the peek
+    restoring the frame exactly, the note line answering `104°C` where the
+    fixture answers `57°C`, and the census of what moves between the pinned
+    and a live frame - boxes, probed points, note sentences, pixels a second
+    of following moves - printed with the machine that measured them. The
+    loader door is checked in both shapes: the four ways a metrics file can
+    fail to be readable, and that `_pinned` keeps its last good read through
+    one of them.
 
   * One packaging defect this cycle wrote into the changelog itself: a
     paragraph appended with its first line at column 0, which is how dpkg
@@ -336,13 +413,33 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     CI's own lintian flags before this was pushed: 0 errors, 0 warnings, 0
     info.
 
-  * Still not built, and said in the pages rather than left to be found: an
-    editor drawing live readings (the pane draws the pinned fixture, which
-    is the picture the documents describe), and a snap to a grid - the files
-    carry none, so a snap answers a neighbour's own number instead. And the
-    half only glass can answer: `--no-clock` on the panel, the quiet-box re-
-    measure `bars` owes, the pairing note seen on the panel, and the
-    transcript stage 6 asks for.
+  * Two findings about this cycle's own harness, recorded rather than fixed
+    in passing. The first: `Editor.fixture()` returns `dict(FIXTURE)`, a
+    shallow copy whose inner dicts are the module's, and the suite's hole-
+    in-the-readings gate pops `memory.total` out of the body it is handed -
+    so every draw after that one, in that process, answers one derived rate
+    fewer: the live fixture answers 20 of the 21 `source` names the library
+    asks rather than 21, and the only visible trace was a box census two
+    boxes short. Feature G's gates parse `edit.py`'s own literal and count
+    from that, and the section prints the difference; the door's repair is a
+    separate change, because closing the hole moves the drawn box counts
+    docs/gui.md labels per machine, which needs a pass on both machines
+    rather than a ride inside a feature commit. The second: a repaint re-
+    applies the selected row's marks, so the passage that asserted 'a press
+    on empty glass leaves no mark' was sometimes reading a queued timer tick
+    instead of its own act. It now stops the preview timer, asserts the
+    clearing, and then asserts the honest consequence - a repaint brings the
+    mark back, because the mark belongs to the selection, not to the last
+    press.
+
+  * Still not built, and said in the pages rather than left to be found: a
+    snap to a grid - the files carry none, so a snap answers a neighbour's
+    own number instead - and the half only glass can answer: `--no-clock` on
+    the panel, the quiet-box measurement `bars` still owes, the pairing note
+    seen on the panel, and the transcript stage 6 asks for. An editor
+    drawing this machine's readings landed on 2026-11-11, as the peek above:
+    a look, held, at the pinned instant, with the acts that write a number
+    left at the fixture.
 
  -- Tamer Hassan <thameruddin@gmail.com>  Tue, 10 Nov 2026 16:30:41 +0200
 xigmatek-connect-lcd (0.5) resolute; urgency=medium

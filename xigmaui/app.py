@@ -21,12 +21,14 @@ the glass does not have would be a lie), so a preview column wider than 480 px i
 dead space; and a clip row follows its icon, so the thumbnails are 64 px, not the
 112 px that made every row 114 px tall.
 
-The `advanced controls` switch folds away nine secondary controls, in five
-rows and two boxes: canvas, scrim, fan figures, the display's last six port
+The `advanced controls` switch folds away twelve secondary controls, in **5**
+rows and **3** boxes: canvas, scrim, fan figures, the display's last six port
 actions, the 30 second frame run, the panel-status box (its `conn 1` report
-and its Refresh button go with the box) and the guarded factory reset.  It is
-pixels only, never values: what is hidden keeps its setting and `Apply` sends
-it.  The reset and status boxes sit at the foot of the *preview* column, where
+and its Refresh button go with the box), the guarded factory reset, and the
+pane's readings box (what body the editor's picture is drawn from, and the
+file path when that body is a file).  It is pixels only, never values: what is
+hidden keeps its setting and `Apply` sends it.  The reset and status boxes sit at
+the foot of the *preview* column, where
 a 480 px picture leaves slack nothing else can fill; the layout editor does not
 fold - it is how the window shows the 23 library layouts it can draw, and
 folding it away hid the point of the themes package.  The reset keeps its
@@ -82,7 +84,7 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QColorDialog, QComboBox,
 from xigmalcd import control as wire                              # noqa: E402
 from xigmalcd import protocol, render, sensors, themes       # noqa: E402
 from xigmalcd.main import (BRIGHT_LUMA, CLIP_LUMA, DEFAULT_MP4,   # noqa: E402
-                           SCRIM_ON_BRIGHT)
+                           SCRIM_ON_BRIGHT, read_metrics_file)
 from . import clips as clipdb
 from . import edit
 from . import settings
@@ -803,8 +805,9 @@ class Window(QMainWindow):
             "show the canvas and scrim pickers, the fan figures switch, the "
             "display's last six port actions, the 30 second frame run, and - at "
             "the foot of the preview column, under the log - the panel-status box "
-            "(the `conn 1` report and its Refresh button) and the guarded factory "
-            "reset. Hiding them does not change them: what is not shown is still "
+            "(the `conn 1` report and its Refresh button), the guarded factory "
+            "reset and the pane-readings box - what body the editor's picture is "
+            "drawn from. Hiding them does not change them: what is not shown is still "
             "what is set, and Apply sends it either way. The layout editor is not "
             "one of these: it stays open, because it is how this window shows the "
             "layouts it can draw")
@@ -817,7 +820,7 @@ class Window(QMainWindow):
         # with a place missing off it
         self._adv_folded_note = ("canvas, scrim, fans, the display's last six port "
                                  "actions, the 30 s run, the panel-status box, the "
-                                 "factory reset")
+                                 "factory reset, the pane-readings box")
         self.adv_note = QLabel(self._adv_folded_note)
         self.adv_note.setStyleSheet("color:#888;font-style:italic;")
         self.adv_note.setWordWrap(True)
@@ -1059,6 +1062,38 @@ class Window(QMainWindow):
         self.fanline.setChecked(self.cfg["fans"])
         self.fanline.stateChanged.connect(self._changed)
         adv_row("fans", self.fanline)
+
+        # Feature G: what body the editor's picture is drawn from.  In this fold, not in
+        # the editor column, because it decides nothing about the file - it is the same
+        # kind of choice as `canvas` and `scrim` - and because a fresh window opens at the
+        # fixture and never remembers anything else: the peek is not written to the
+        # session file, so a window you did not choose cannot come up showing readings it
+        # grabbed by itself.  `activated` rather than `currentIndexChanged`: choosing the
+        # entry you are already on is how the reader says "read them again", and the
+        # sample is held until then: a frame that follows the sensors moves with every
+        # reading, and the gate measures - and prints - how far that is on the machine
+        # that runs it, because the answer belongs to those sensors.
+        self.peek_box = QGroupBox("Pane readings")
+        pk = QGridLayout(self.peek_box)
+        self.ed_peek = QComboBox()
+        self.ed_peek.addItem("the fixture", "fixture")
+        self.ed_peek.addItem("this machine's readings", "sensors")
+        self.ed_peek.addItem("a metrics file", "file")
+        self.ed_peek.activated.connect(self._editor_peek)
+        self.ed_peek.setToolTip(self._ed_peek_tip())
+        self.ed_peek_file = QLineEdit()
+        self.ed_peek_file.setPlaceholderText("PATH to a JSON `STATE all 1` body")
+        self.ed_peek_file.setEnabled(False)
+        self.ed_peek_file.editingFinished.connect(self._editor_peek)
+        self.ed_peek_file.setToolTip(
+            "The same file shape `--metrics-file` takes: its sections replace this "
+            "machine's for the picture only. Nothing is sent anywhere: a peek paints, "
+            "it does not upload.")
+        pk.addWidget(self.ed_peek, 0, 0)
+        pk.addWidget(self.ed_peek_file, 0, 1)
+        self._adv_hide.append(self.peek_box)
+        self._adv_hide.append(self.ed_peek)
+        self._adv_hide.append(self.ed_peek_file)
         col.addWidget(theme)
         # ---- the layout editor (docs/theme-editor.md, stage 4) ----------------
         # The model behind this group is `xigmaui/edit.py`, which holds no Qt: that is
@@ -1273,6 +1308,12 @@ class Window(QMainWindow):
         # press and held for the length of the drag, because a motion event cannot afford a
         # frame of its own.  The guide is what the pane paints of them, and `_snap_said` is
         # the model's own sentence about the pull, shown rather than paraphrased.
+        # What the pane is *looking at* while a layout is open (feature G): None means
+        # the pinned fixture, which is what every geometry door uses and what every
+        # byte-for-byte claim in the suite is made against.  A dict here holds a body of
+        # readings, the instant they are drawn at (always the pinned one) and when they
+        # were read; it is never written to the session file.
+        self._peek = None
         self._snap_lines = None               # {axis: [(number, what the line is)]}
         self._snap_guide = ()                 # ((axis, panel px), ...) taking hold right now
         self._snap_said = ""                  # the model's words for that pull
@@ -1742,12 +1783,22 @@ class Window(QMainWindow):
             # the five both ways at every ink choice this combo offers and asks for zero
             # differing pixels (docs/theme-editor.md).
             img, self._ed_notes = self.ed.paint(*self.ed.fixture(), ink=self._ink())
+            if self._peek is not None:
+                # The picture the reader asked for, and *only* the picture.  `_ed_notes`
+                # above stays the pinned frame's, because it is what `hit`, `_mark_box`,
+                # the snap lines and the size edges all read. At another body's readings
+                # the boxes move, so painting marks from this frame would point a handle
+                # at ink that is not the row it owns - and the gate counts how many boxes
+                # move, on the machine it runs on, before it prints the number.
+                img, _pk_notes = self.ed.paint(metrics=self._peek["metrics"],
+                                               when=self._peek["when"], ink=self._ink())
         else:
             img = render.draw(m, theme, **self._render_kw())
         self._osd = img
         self._seq += 1
         self.metrics.setText(
-            ("pane: pinned fixture  |  this machine: " if self.ed is not None else "")
+            (f"pane: {'PEEK - ' + self._peek['source'] if self._peek else 'pinned fixture'}"
+             "  |  this machine: " if self.ed is not None else "")
             + f"cpu {(m.get('cpu') or {}).get('temperature')}°C  "
             f"load {(m.get('cpu') or {}).get('load')}%  "
             f"gpu {(m.get('gpu') or {}).get('temperature')}°C  "
@@ -1822,9 +1873,15 @@ class Window(QMainWindow):
             self.caption.setText(
                 f"Layout `{self.ed.name}` ({self.ed.origin}), drawn through "
                 "`themes.draw` - the door `--check-theme` uses, and the frame loop uses "
-                "for a layout theme. The readings are the editor's pinned fixture, not "
-                "this machine's, so an edit is the only thing that can move a pixel "
-                "here."
+                "for a layout theme. "
+                + ("This frame is a **peek**: its readings are "
+                   f"{self._peek['source']}, held since {self._peek['held']}, drawn at the "
+                   "pinned instant so two peeks of one sample agree pixel for pixel. The "
+                   "frame your edits move is the pinned one, and nothing on this frame can "
+                   "be grabbed until you choose `the fixture` under *pane readings*."
+                   if self._peek else
+                   "The readings are the editor's pinned fixture, not this machine's, so "
+                   "an edit is the only thing that can move a pixel here.")
                 + (f" No reading for: {miss}." if miss else "")
                 + (f" {self.ed.ink_note} - a preview of a theme this repo draws from "
                    "code, not a change to the file: Save writes the colours the file "
@@ -2514,6 +2571,102 @@ class Window(QMainWindow):
         self._apply_pair(self.ed.name)
         self._editor_state()
 
+    def _ed_peek_tip(self) -> str:
+        """What the pane-readings box offers, in the words the refusal also uses."""
+        return ("the picture in the pane, while you edit, can be drawn from a body of "
+                "readings other than the pinned fixture: this machine's sensors, held "
+                "until you choose the entry again, or `a metrics file` - a JSON "
+                "`STATE all 1` body you name, the same file shape `--metrics-file` "
+                "takes, with the same rule "
+                "that its sections replace whole sections of what this machine answers. "
+                "A peek is a look: press, drag, arrow keys and handles are refused on it, "
+                "because a number written from a frame that changes in a second would "
+                "belong to a reading that is gone. Nothing here is remembered: a fresh "
+                "window opens at the fixture. And a peek is a look at numbers, not a "
+                "delivery of them: like `--metrics-file`, it never hands the panel a "
+                "reading this machine did not measure.")
+
+    def _peek_body(self, mode: str) -> tuple:
+        """`(sections, source, reason)`: the body a peek would paint with.
+
+        The only place a read happens, which is what *held* means: `sensors.collect()`
+        once per press, never per repaint - the cost belongs to the machine and the
+        moment, so the suite measures it and prints it rather than quoting it here.  A
+        named file goes through `main.read_metrics_file` - the door `--metrics-file`
+        uses - and
+        its sections replace this machine's whole sections, exactly as `main.sample` does
+        for the loop, because one file shape has to mean one thing in one program.
+        """
+        m = sensors.collect()
+        if mode == "sensors":
+            return m, "this machine's own sensors, held", ""
+        path = self.ed_peek_file.text().strip()
+        if not path:
+            return {}, "", ("a metrics file has to be named: the same `STATE all 1` body "
+                            "`--metrics-file` takes")
+        data, why = read_metrics_file(path)
+        if why:
+            return {}, "", why
+        m.update(data)
+        return (m, f"{path} ({', '.join(sorted(data)) or 'no sections'}) over this "
+                   f"machine's reading", "")
+
+    def _editor_peek(self, *_args) -> None:
+        """Choose what body the pane paints while a layout is open (feature G)."""
+        if self.ed is None:
+            # Nothing to peek at: without an open layout the pane is already showing this
+            # machine's readings, through the loop's own door rather than this one.
+            self.ed_peek.setCurrentIndex(0)
+            self.ed_note.setText("there is no layout open to peek at: the pane already "
+                                 "shows the theme above, drawn from this machine's "
+                                 "readings")
+            return
+        mode = self.ed_peek.currentData()
+        if mode == "fixture":
+            was, self._peek = self._peek, None
+            self.ed_peek_file.setEnabled(False)
+            if was is not None:
+                self.ed_note.setText("the pane is back at the pinned fixture: the "
+                                     "readings behind it are the ones every edit is "
+                                     "judged at, and the marks are the rows' again")
+                self._repaint()
+                self._canvas_marks()
+            return
+        body, source, why = self._peek_body(mode)
+        if why:
+            # A half-read body is not a picture, so the pinned frame stays up. The chosen
+            # mode stays on the combo: a reader who picked `a metrics file` and has not
+            # typed the path yet is mid-action, and snapping the control back under their
+            # fingers would lose what they were about to name. The note says what is
+            # missing, and the frame says where it stands.
+            self._peek = None
+            self.ed_peek_file.setEnabled(True)
+            self.ed_note.setText(f"no peek: {why}")
+            self._repaint()
+            self._canvas_marks()
+            return
+        self._peek = {"metrics": body, "source": source, "when": edit.FIXTURE_WHEN,
+                      "held": time.strftime("%H:%M:%S")}
+        self.ed_peek_file.setEnabled(mode == "file")
+        self.ed_note.setText(self.ed.peek_sentence(source, body, self._peek["when"],
+                                                   self._peek["held"]))
+        self._repaint()
+        self._canvas_marks()
+
+    def _note_pair(self) -> tuple:
+        """The readings the note lines describe: the peek's, while peeking.
+
+        Measured before choosing it, and re-measured by the gate wherever it runs: some of
+        the rows' sentences change between the fixture and this machine's readings, and
+        every change the suite found was a *value* (`57°C` to `65°C`) with the reason
+        strings left alone - so recomputing them makes the lines say what the frame on
+        screen shows, which is the whole rule of the note line. The pinned sentences are
+        still one press away, and the geometry doors keep answering from the fixture
+        whatever these lines say: the note describes the picture, the doors write the file.
+        """
+        return ((self._peek["metrics"], self._peek["when"]) if self._peek
+                else self.ed.fixture())
+
     def _editor_open(self, name: str) -> None:
         """Open one layout in the editor.  Reads a file; writes nothing.
 
@@ -2532,6 +2685,8 @@ class Window(QMainWindow):
         """
         if not name or name == NO_EDITOR:
             self.ed = None
+            self._peek = None             # the pane is showing this machine already
+            self.ed_peek.setCurrentIndex(0)
             self._ed_set_enabled(False)
             self.ed_state.setText("not editing: the pane below shows the theme above, "
                                   "drawn from this machine's readings")
@@ -2668,8 +2823,12 @@ class Window(QMainWindow):
         """
         for wid in (self.ed_widget, self._ed_host, self.ed_undo, self.ed_save,
                     self.ed_revert, self.ed_add, self.ed_del, self.ed_up, self.ed_down,
-                    self.ed_newname, self.ed_rename, self.ed_copy):
+                    self.ed_newname, self.ed_rename, self.ed_copy, self.ed_peek):
             wid.setEnabled(on)
+        # the peek belongs to an open layout, but its file field rides the *mode*: a
+        # path box that is live while the mode is `the fixture` invites a typed path
+        # nothing will read
+        self.ed_peek_file.setEnabled(on and self.ed_peek.currentData() == "file")
 
     def _ed_build_rows(self, kind: str) -> None:
         """One control per field this kind carries, wired to the model.
@@ -2976,7 +3135,7 @@ class Window(QMainWindow):
                                  + (" bold" if bold else " regular")
                                  + (f", the same face as {', '.join(same)}" if same
                                     else ""))
-            line, note = self.ed.drawn_text()
+            line, note = self.ed.drawn_text(*self._note_pair())
             if line is None:
                 parts.append(f"paints no line: {note}")
             else:
@@ -3217,6 +3376,20 @@ class Window(QMainWindow):
         would ask for, and this method drops that mark again when the drag ends.
         """
         self._off_glass = ""
+        if self._peek is not None:
+            # A peek carries no marks. The box, the eight squares and any guide line are
+            # drawn from the pinned row's edges, and at the readings on screen that ink
+            # sits elsewhere: the gate probes the glass on a grid and counts how many
+            # points answer a different row in the live frame than in the pinned one, on
+            # the machine it runs on. Hiding the marks is the honest half of the rule that
+            # a peek cannot be edited in - a handle drawn over nothing is a lie - and the
+            # tooltip says so before a press is wasted.
+            self.preview.set_marks(None)
+            self.preview.setToolTip("the pane is peeking at readings rather than at the "
+                                    "pinned frame: press, drag and arrow keys do nothing "
+                                    "here.  Choose `the fixture` under *pane readings* to "
+                                    "edit the file.")
+            return
         if self.ed is None:
             self.preview.set_marks(None)
             self.preview.setToolTip("")
@@ -3262,6 +3435,11 @@ class Window(QMainWindow):
     def _canvas_press(self, px: int, py: int, edge: str = "") -> None:
         if self.ed is None:
             return                        # the pane is a live preview: nothing to move
+        if self._peek is not None:
+            # The model's sentence, not one written here: what a peek is, why a grab is
+            # refused, and which knob opens the editable frame again.
+            self.ed_note.setText(self.ed.peek_refusal("A press on the glass"))
+            return
         idx = self.ed.hit(self._ed_notes, px, py)
         box = self._mark_box(self.ed.index)
         if edge and box:
@@ -3445,7 +3623,16 @@ class Window(QMainWindow):
                       f"({dx:+d}, {dy:+d})")
 
     def _canvas_nudge(self, dx: int, dy: int) -> None:
-        """Arrow keys move the selected row: 1 px, 10 with Shift, one step per press."""
+        """Arrow keys move the selected row: 1 px, 10 with Shift, one step per press.
+
+        A peek refuses the key before any of that, in the model's words: a nudge is a
+        precise act - one pixel asked for, one pixel given - and a frame that will change
+        in a second has no pixel to nudge against.  Feature F never snaps a key either;
+        this is the other half of the same rule.
+        """
+        if self._peek is not None:
+            self.ed_note.setText(self.ed.peek_refusal("An arrow key"))
+            return
         if self.ed is None:
             return
         ok, note = self.ed.move(dx, dy)

@@ -85,8 +85,9 @@ the machine can find, watch the preview, put one frame or the whole loop on the 
 And because this panel cannot be asked what it is showing, the window says what it
 *knows*: the background the running display reported putting there, and the last six
 things it did on the port. Three columns — preview, controls, clip library — with an
-`advanced controls` switch that folds nine secondary controls - two boxes of them, at the
-foot of the preview column - away without changing their values, a `playing` box that
+`advanced controls` switch that folds twelve secondary controls - two boxes of them at the
+foot of the preview column, and one, the pane-readings box, in the controls column - away
+without changing their values, a `playing` box that
 decodes the background in sequence so the preview moves under our layer instead of showing
 one still frame of it, and one row that is always in sight, for the colour of the text it
 draws. This is a capture of the real program (`tools/screenshot.py`, no panel attached),
@@ -104,7 +105,10 @@ yours to rename, and one layout can be saved as a second copy under a new name �
 nothing in the library answers, by name, by spelling, or by the id inside the file. And a
 drag can stick, within two pixels, to a number that same layout already uses: another row's
 edge, its centre on the glass, its mirror. There is no grid, because the vendor's files
-carry none. The panel is never handed a layout file, so what that editor changes is what a
+carry none. And the picture it edits can be peeked at through this machine's own readings, or a
+metrics file you name — held, at the pinned instant, and looked at only: press, drag and arrow
+keys stay with the pinned frame, so an edit is never judged against a number that changes. The
+panel is never handed a layout file, so what that editor changes is what a
 loop on *this* machine draws the next time it names that theme
 ([docs/gui.md](docs/gui.md) has the row and its limits).
 

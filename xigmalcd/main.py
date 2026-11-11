@@ -33,6 +33,34 @@ PINNED: dict = {}        # last good `--metrics-file` read: a bad edit must not 
 PINNED_MTIME = None      # so the change is logged once, not every frame
 
 
+def read_metrics_file(path: str) -> tuple:
+    """The `STATE all 1` sections a metrics file names, as `(sections, reason)`.
+
+    One loader for two doors: `--metrics-file` for the loop (through `_pinned`, which
+    caches it) and the editor pane's peek for the window (`xigmaui/app.py:_editor_peek`).
+    They take the same file shape because a second copy of this rule - what a section
+    is, what a comment key is, what a broken file means - is a second thing to keep
+    honest.  `(sections, "")` when the file was read, `(dict(), the sentence)` when it
+    was not, and the caller decides what to do with that: the loop keeps its last good
+    read and logs once, the window puts the sentence on the note line rather than
+    painting a half-read body.
+
+    A key starting with `_` is a comment in the file, not a section, so it never
+    reaches the renderer as part of the STATE body - measured both ways in
+    `tools/selftest.sh`, which pins a hot `cpu.temperature` and then a file whose
+    `cpu` has a `load` and no temperature, and asks for the arc to vanish.
+    """
+    try:
+        with open(path) as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as exc:      # unreadable, or not JSON at all
+        return {}, f"{path}: {type(exc).__name__}: {exc}"
+    if not isinstance(data, dict):
+        return {}, (f"{path}: a `STATE all 1` body is a JSON object, not a "
+                    f"{type(data).__name__}")
+    return {k: v for k, v in data.items() if not k.startswith("_")}, ""
+
+
 def _pinned(args) -> dict:
     """Sections from `--metrics-file`, re-read whenever that file changes.
 
@@ -44,7 +72,8 @@ def _pinned(args) -> dict:
     sensors will not produce on their own - the red end of the gauge ramp, a
     three-digit temperature, a column with no reading - and the log of a window
     like that has to say the numbers were pinned, because nothing on this panel
-    reads back.
+    reads back.  The file itself is read by `read_metrics_file`, the one door this
+    and the editor pane's peek share.
     """
     global PINNED, PINNED_MTIME
     try:
@@ -54,16 +83,10 @@ def _pinned(args) -> dict:
         return PINNED
     if mtime == PINNED_MTIME:
         return PINNED
-    try:
-        with open(args.metrics_file) as fh:
-            data = json.load(fh)
-        assert isinstance(data, dict), "the file has to be a JSON object"
-        # a key starting with `_` is a comment in the file, not a section, so it
-        # never reaches the renderer as part of the STATE body
-        data = {k: v for k, v in data.items() if not k.startswith("_")}
-    except Exception as exc:
-        print(f"  ! --metrics-file: {type(exc).__name__}: {exc}; "
-              f"keeping the last good read", file=sys.stderr)
+    data, why = read_metrics_file(args.metrics_file)
+    if why:
+        print(f"  ! --metrics-file: {why}; keeping the last good read",
+              file=sys.stderr)
         PINNED_MTIME = mtime          # so one broken file logs once, not per frame
         return PINNED
     if data != PINNED:

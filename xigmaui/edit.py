@@ -1811,12 +1811,18 @@ measured rather than read off the name: the suite draws the layouts this pane ca
     def fixture(self) -> tuple:
         """The metrics and the instant this editor draws with - always the same pair.
 
-        There is deliberately no live-readings door here yet: an edit shown against
-        sensors that move underneath it cannot be judged, and every byte-for-byte
-        comparison in the gates (the frame before an edit, the frame after, the frame
-        read back off disk) only means anything because the instant is fixed.  Showing
-        this machine's readings is stage 4's own next step, listed as unbuilt in
-        docs/theme-editor.md rather than half-offered by a flag nothing exercises.
+        Nothing that *writes* a number goes through any other pair, on purpose: an edit
+        shown against sensors that move underneath it cannot be judged, and every
+        byte-for-byte comparison in the gates (the frame before an edit, the frame
+        after, the frame read back off disk) means something only because the readings
+        and the instant are fixed.  Showing this machine's readings exists now as the
+        pane's **peek** - `xigmaui/app.py` holds the sample and paints it through
+        `paint`, never through this door, and while a peek is up the acts that write a
+        number are refused with `peek_refusal`'s sentence.  That is the split the
+        measurements asked for: at another body of readings some of the row boxes this
+        library draws move elsewhere - the suite counts how many, on the machine it runs
+        on, and prints it - and feature F's centring number moves with the ink width, so
+        the peek is a look and not an editing surface.
         """
         return dict(FIXTURE), FIXTURE_WHEN
 
@@ -1824,6 +1830,72 @@ measured rather than read off the name: the suite draws the layouts this pane ca
         vals, absent = themes.values(*self.fixture())
         return (f"fixture: {', '.join(f'{k} {v}' for k, v in sorted(vals.items()))}"
                 + (f"  (no reading for {', '.join(sorted(absent))})" if absent else ""))
+
+    # ------------------------------------------------------------- peeking at readings --
+    def values_line(self, metrics: dict, when: datetime.datetime) -> str:
+        """The numbers behind a frame, as one line - the shape `fixture_line` gives.
+
+        `fixture_line` is this editor's own pair; this is any pair's, because a peek
+        frame is drawn from a body the reader named or this machine answered, and the
+        pane has to say which.  Unanswered names are listed rather than dropped: a row
+        that paints nothing because its source has no reading is the difference between
+        a thin picture and a broken one.  Counted from the files, so it holds on every
+        machine: the 106 rows carrying a `source` in the 28 layouts this pane opens ask
+        for **21** distinct names, the pinned fixture answers **16** of them and leaves
+        **5** with no value - the pump and `Fan 3`/`Fan 4`'s name and speed, the rows a
+        Windows fan array filled and no Linux box will.  Those five come out of the
+        files and are the same wherever they are counted.  `themes.values`'s own
+        absent list is wider than that - it names every source the painter could be
+        asked for, including ones no layout here reads, and how much wider depends on
+        what a given machine answers (the network pair is absent on a box with no
+        readable interface and present on one with it), so the size of *that* list
+        belongs to a run's print rather than to this sentence.
+        """
+        vals, absent = themes.values(metrics, when)
+        return (", ".join(f"{k} {v}" for k, v in sorted(vals.items()))
+                + (f"  (no reading for {', '.join(sorted(absent))})" if absent else ""))
+
+    def peek_sentence(self, source: str, metrics: dict, when: datetime.datetime,
+                      held: str = "") -> str:
+        """What the pane says about a frame it is only looking at.
+
+        Four things in one sentence, because a reader could get each of them wrong
+        without it: which body the picture came from, that the instant is still the
+        pinned one, that nothing on this frame can be grabbed or sent anywhere, and
+        which knob puts the editable frame back.  The instant is
+        pinned on purpose, and that part is a file fact: the painter takes `Date`, `Time`
+        and `Week` from the instant rather than from any reading, the layouts ask for two
+        of those three names, and **17** rows read them - so a live clock rewrites those
+        rows every second and the same peek twice would not be the same picture.  Held
+        means the numbers are re-read only when the reader asks again: a frame that
+        followed this machine's sensors moved a lot of pixels with no edit involved, and
+        the suite measures how much on the machine it runs on.
+        """
+        return (f"peeking: the picture is {source}, at the pinned instant "
+                f"{when:%Y-%m-%d %H:%M:%S}" + (f", held since {held}" if held else "")
+                + ".  Nothing here is written or sent; the frame your edits move is the "
+                "pinned one, and `the fixture` under *pane readings* puts it back.  "
+                + self.values_line(metrics, when))
+
+    def peek_refusal(self, action: str = "A press") -> str:
+        """Why an act that writes a number is refused while the pane is peeking.
+
+        The measurements are the reason, and the suite makes them on the machine it runs
+        on: drawing these layouts at the fixture and at this box's own readings moves some
+        of the row boxes, and probing the glass on a grid answers a **different row** at
+        some points in one frame than in the other.  A handle drawn at a pinned edge would
+        then sit over another row's ink, and a drag would grab a row nobody pointed at.
+        And any number such a drag wrote would belong to a sample that is gone a second
+        later: feature F derives a centred row's `x` from the width of its ink, and ink
+        width follows the reading.  So the geometry doors stay shut in a peek, marks are
+        hidden, and this sentence says which knob opens them again.  The gate asserts both
+        counts are non-zero before it prints them, because a claim that rests on "these
+        differ" needs the difference to still be there.
+        """
+        return (f"{action} moves nothing while the pane is peeking at readings: every "
+                "act that writes a number - press, drag, arrow key, handle - is drawn "
+                "and judged at the pinned frame.  Choose `the fixture` under *pane "
+                "readings* to put that frame back, and it works there.")
 
     # ----------------------------------------------------- what a row paints --
     def drawn_text(self, metrics: dict | None = None,

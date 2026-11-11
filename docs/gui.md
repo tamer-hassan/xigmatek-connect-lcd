@@ -79,7 +79,8 @@ one of them (see "How the three columns get their sizes", after the table):
 | `Send frames for 30 s` | library, advanced | the picture loop, so you can watch the real glass | `STATE all 1` twice, then 60 uploads at 2 fps |
 | status | preview, under the log, advanced | the panel's `conn 1` reply: sn, versions, `space`, `brightness`, `mode`, `logo`, `osdState`, `timeout`, each annotated only where PROTOCOL.md records what it means | `conn 1`, `power resume`, `timeout 60` - and no metrics blob, because it puts no picture on the glass. With a display running there is no fresh `conn 1` to ask for, so the box shows the one that display read at its own session start, labelled as such |
 | log | preview, under the picture | the window's own last 200 lines (`LOG_KEEP`): what it sent, what the panel answered, what failed and why. Scrollable, selectable, newest at the bottom; the display's full record is its journal, `journalctl --user -u xigmalcd -f` (docs/usage.md) | nothing: it is a readout |
-| `advanced controls` | controls, top row | folds away the nine secondary controls named further down, in two boxes at the foot of the preview column; it hides pixels and never values | nothing |
+| `advanced controls` | controls, top row | folds away the twelve secondary controls named further down - two boxes at the foot of the preview column, and the pane-readings box in the controls column; it hides pixels and never values | nothing |
+| pane readings | controls, advanced, folded | what body the editor's picture is painted from: the pinned fixture, this machine's held readings, or a JSON `STATE all 1` file you name (the same shape `--metrics-file` takes) | nothing - a peek is not a setting, and no key for it goes near the session file |
 | reset | preview, under the log, advanced | the vendor's `recovery` | needs the word `reset` typed in, then a confirm dialog. With a display running it goes over the socket, which refuses it unless that display was started `--allow-reset`, and the refusal is quoted in the daemon's words |
 
 ### How the three columns get their sizes, and why the preview is never bigger than the glass
@@ -297,12 +298,14 @@ A preview is only ever blamed for what it adds, and the suite holds each file to
 
 ### The advanced switch
 
-A checkbox at the top of the controls column, default **off**, folds away nine
+A checkbox at the top of the controls column, default **off**, folds away twelve
 secondary controls: the `canvas` and `scrim` pickers, the fan-figures switch, the
 display's last six port actions, the "send frames for 30 s" run, the panel-status
-box - the `conn 1` report and its `Refresh` button go with their box - and the
-factory reset's whole box, its word field and its button with it, three controls in
-one.  They fold as two boxes at the foot
+box - the `conn 1` report and its `Refresh` button go with their box - the factory
+reset's whole box, its word field and its button with it, three controls in one, and
+the **pane-readings box** feature G added: the combo that chooses what body the
+editor's picture is painted from, and the file field that comes with it.  Two of the
+three boxes fold at the foot
 of the preview column, under the log, rather than as loose rows in the controls
 column: `conn 1` answers with fourteen fields that wrapped to about ten lines in a
 300 px column, and the picture's column is the one with height spare below a 480 px
@@ -312,7 +315,7 @@ invisible, restarting the window and reading the same 200 back.  The choice is
 remembered (`advanced` in the settings file), and the note beside the switch names
 what is folded so a reader is never hunting for a control that exists.  The suite
 holds that note, the switch's tooltip and this document to the same list, and checks
-the set by parent as well as by length: nine controls, in the two boxes it says.
+the set by parent as well as by length: **12** controls, in **5** rows and **3** boxes.
 
 The **guarded factory reset moved in behind the switch**, which reverses what 0.4
 documented - there the box stayed on screen whatever the switch said, on the grounds
@@ -654,16 +657,78 @@ editor commonly gets wrong:
 * **The pane shows the file, at pinned readings.** `themes.draw` - the door
   `--check-theme` uses and the frame loop uses for a layout theme - with the fixture every
   documented figure in this repo was read at (CPU 57.0 °C, GPU 47.0 °C, 2026-02-17
-  09:30:12), and that fixture is shaped like a machine: it answers 15 of the 19 sources the
-  five generated layouts ask, the four it leaves being the `Fan 3`/`Fan 4` slots past its two
-  reported tachometers. The line under the picture says so (`pane: pinned fixture | this
-  machine: …`) because a preview that moved with the sensors would make it impossible to tell
-  an edit from a temperature. Because both doors read that one dict, a generated layout and
+  09:30:12), and that fixture is shaped like a machine: it answers **15** of the **19** sources the
+  five generated layouts ask, the **4** it leaves being the `Fan 3`/`Fan 4` slots past its two
+  reported tachometers. Widening that census to all **28** layouts the pane can open: **106**
+  rows carry a `source` - the `data` rows and the `bar` and `arc` rows that read a percentage -
+  between them asking **21** distinct names, of which that dict answers **16** and leaves **5**
+  with no value: the pump and `Fan 3`/`Fan 4`'s name and speed, the slots a Windows fan array
+  filled and no Linux machine will. The line under the picture says what it drew (`pane: pinned
+  fixture | this machine: …`) because a preview that moved with the sensors would make it
+  impossible to tell an edit from a temperature. Because both doors read that one dict, a generated layout and
   the theme it was generated from put down the same picture here: zero differing pixels for
   all five, at seven ink choices, worst channel 0, gated. The text-colour row therefore
   reaches a generated layout - by `themes.with_ink`, into a copy, so what Save writes keeps
   the file's own colours - and does not reach anybody else's: open `Theme_28` and an ink moves
   it 0 px (docs/theme-editor.md).
+* **The pane can also look at another body's readings, without editing in them.** Under the
+  advanced switch, a folded box called **Pane readings** offers three entries: `the fixture`
+  (what a fresh window opens at, and what every act that writes a number is drawn and judged
+  at), `this machine's readings`, and `a metrics file` taking the path of a JSON `STATE all 1`
+  body - **the same shape and the same loader `--metrics-file` uses**, `main.read_metrics_file`,
+  because one file shape has to mean one thing in one program: its sections replace whole
+  sections of what this machine answers, `_`-prefixed keys are comments in the file rather than
+  sections, and a file that cannot be read or is not a JSON object is refused in words instead
+  of painting half a body. Nothing about a peek is remembered, and nothing in it is sent:
+  the peek paints, it never uploads.
+* **The instant stays pinned, and the readings stay held - both are what make a peek one
+  picture rather than a slideshow.** The instant is the file-fact half of that: the painter takes
+  `Date`, `Time` and `Week` from the instant it is handed rather than from any reading, the
+  library's rows ask for **2** of those **3** names, and **17** rows read them - so a peek drawn
+  at the wall clock rewrites those rows every second and the same look twice would not be the
+  same picture. Held means the numbers are read once, when the reader chooses the entry, and
+  again only when they choose the entry they are already on: choosing it a second time *is* the
+  re-read. What following the sensors instead would cost belongs to the machine and the moment,
+  so the gate times one read, one draw and one second of following, and prints the milliseconds
+  and the moved pixels it measured rather than this page quoting any of them. What moves between
+  the pinned frame and a live one is measured the same way, never assumed: the suite draws the
+  layouts it can open twice, at the fixture and at this box's own readings, and counts how many
+  row boxes land elsewhere and how many of the points it probes on the glass answer a
+  **different row** in one frame than the other - asserting both counts are non-zero before
+  printing them, because the whole rule below rests on those frames disagreeing.
+* **A press on a peek is refused, in the model's words, and the marks go away.**
+  `edit.Editor.peek_refusal` owns that sentence, and the window quotes it instead of
+  paraphrasing: *"A press on the glass
+  moves nothing while the pane is peeking at readings"* - then the one knob that puts the
+  editable frame back. An arrow key gets the same answer in its own words. The dashed box, the
+  eight resize squares and any snap guide are all hidden while a peek is up, because every one
+  of them is drawn from the pinned row's edges while the ink you are looking at sits elsewhere,
+  and a handle drawn over nothing is a lie; the pane's tooltip says so before a press is wasted.
+  The reason the geometry doors stay shut, rather than working off the live boxes, is that any
+  number a drag wrote there would belong to a sample that is gone a second later - and feature
+  F derives a centre-anchored row's `x` from the width of its ink, which follows the reading.
+  Feature D's squares are the same hazard from the other end, and the distinction matters:
+  `size_edges` **never consults a reading** - it pushes each of the eight through
+  `_resize_plan` with the box it is handed and nothing else, so the rule is **one box, one
+  answer** - but that box is what the painter drew, so a different body can change which
+  squares exist to be grabbed at all. The census asserts the rule and prints the consequence:
+  no row is ever offered two answers at one box, every row whose offer moved had its box move
+  with it, and the suite names that row, its two boxes and both offers on the log rather than
+  putting the count on this page, because which box a face draws belongs to the machine
+  drawing it.
+  Only the picture changes: the model is untouched, and the gate proves it by comparing the
+  file's bytes, the undo count and the `dirty` flag after a refused press and a refused key.
+* **What a peek shows, the note lines say.** The lines under the field rows are re-computed
+  against the frame on screen - at a file body that pins `cpu.temperature` to **104.0** a
+  temperature row reads `104°C`, where the same row reads `57°C` at the fixture - because the
+  rule of the note line is that it says what the row paints. That is honest here for a reason
+  the suite re-checks wherever it runs: of the rows' sentences that differ between the two
+  frames, **every** difference is a *value*, with the reason strings (`no reading for …`, an
+  unanswered `source`, a `format` the value cannot be dressed in) left alone. The two halves
+  keep their own rules - the note describes the picture, the doors write the file - and the
+  badge under the picture names the body the picture came from: `pane: PEEK - this machine's
+  own sensors, held | this machine: …`, with the pane's caption saying the same in a sentence
+  and the model's `peek_sentence` carrying the numbers behind the frame.
 * **The picture can be pointed at, and what a point means is the paint's answer.** The
   ink box `themes.draw` records for the selected row is marked on the pane. Press inside a
   box and that row is selected; where two boxes overlap the **later** row wins, because
@@ -677,7 +742,12 @@ editor commonly gets wrong:
 * **The mark is chrome, and the pane admits one thing the model cannot.** The dashed
   rectangle and its label are painted over the picture in the pane's own paint event, and
   never drawn into the frame the caption counts; the gate re-shows the pane with a mark up
-  and without one and compares the bytes it was handed. And a row's *anchor* is bounded by
+  and without one and compares the bytes it was handed. What the chrome belongs to is the
+  **selection**, not the last press: a press on empty glass clears the mark and says the point
+  is nobody's row, and the next repaint paints it back for the row that is still selected. The
+  suite pins both halves - the press's clearing, then a repaint and the mark's return - with the
+  preview timer stopped, because whether a frame boundary lands inside a press's own event pump
+  is timing, not behaviour. And a row's *anchor* is bounded by
   the canvas while its ink is not, which is how the vendor's own files are checked - `x` at
   the last legal column is legal and the row still draws pixels the glass will never show.
   `validate` says nothing about that, so the sentence sits beside the mark ("its ink runs
@@ -721,9 +791,9 @@ number this same file already uses, never onto a grid: the gcd of every declared
 declared `y` in the corpus is **1**, and only **27** of its **185** declared `x` values are
 multiples of 16, so these files have no grid to snap to and this program does not invent one and
 call it the vendor's.  Nothing about a row's *position* is guessed at either; the editor draws
-from the pinned
-fixture and not live readings; and the theme combo above still lists only the five,
-because that combo picks what the loop draws from this machine's sensors.
+from the pinned fixture, never from a live sample - what a peek offers is a look, not an editing
+surface (the bullet above) - and the theme combo above still lists only the five, because that
+combo picks what the loop draws from this machine's sensors.
 
 ### The colour of the text
 

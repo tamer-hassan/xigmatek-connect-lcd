@@ -6125,44 +6125,61 @@ print("  clip detail             the readout under the list, not a second copy o
 
 # ---- the advanced switch: what folds away, and what hiding never changes ----
 # Default: folded.  Everything hidden keeps its value and still goes out on Apply -
-# the switch is about pixels, not about defaults.  Nine controls fold, and they are
-# one box more than 0.4 folded: the factory reset moved in here from the controls
-# column, which is a decision deliberately reversed from the one 0.4 documented, so
-# the box keeps its typed-word gate checked here whatever is around it.  The layout
-# editor does NOT fold: it is the only place the window shows the library's layouts.
+# the switch is about pixels, not about defaults.  Twelve controls fold, in three
+# boxes: the panel-status box and the guarded factory reset (one box more than 0.4
+# folded, a decision deliberately reversed from the one 0.4 documented, so the box
+# keeps its typed-word gate checked here whatever is around it), and since feature G
+# the pane-readings box - the mode combo and its file field, which decide what body
+# the editor's picture is painted from and say nothing about the file, so it belongs
+# with `canvas` and `scrim` rather than in the editor column.  It also keeps a fresh
+# window at the fixture: the peek is not a setting, and no key for it goes near the
+# session file.  The layout editor does NOT fold: it is the only place the window
+# shows the library's layouts.
 folded = [win.canvas, win.scrim, win.fanline, win.d_events, win.btn_live,
-          win.status_box, win.reset_box, win.confirm, win.btn_reset]
-assert len(folded) == 9, folded
+          win.status_box, win.reset_box, win.confirm, win.btn_reset,
+          win.peek_box, win.ed_peek, win.ed_peek_file]
+assert len(folded) == 12, folded
 assert win.ed_group not in win._adv_hide, \
     "the layout editor folded away again, and it is the window's only layout browser"
 # the note beside the switch, the tooltip on the switch, and the two docs that walk
-# the window all have to name the same nine things.  The note counts by commas; the
-# tooltip and the docs are checked by their own wording, so the lists are written out
-# here rather than scraped from the prose.
+# the window all have to name the same eight rows and boxes.  The note counts by
+# commas; the tooltip and the docs are checked by their own wording, so the lists are
+# written out here rather than scraped from the prose.
 note_folded = win.adv_note.text()
 # The note used to be checked by counting commas, which worked while everything that
 # folded was a row of its own.  It now folds two whole boxes, and one of those boxes
 # holds three controls, so the note is checked by naming each thing it has to cover:
 # a map with the right number of commas and a box missing from it is the worse failure.
 for _what in ("canvas", "scrim", "fan", "port actions", "30 s run", "status",
-              "reset"):
+              "reset", "readings"):
     assert _what in note_folded.lower(), (_what, note_folded,
                                           "the note beside the switch does not name it")
-# Seven named things, nine controls: five rows of their own and two whole boxes, the
-# reset's box bringing its word field and its button with it.  Checked both ways,
+# Eight named things, twelve controls: five rows of their own and three whole boxes -
+# the panel-status box, the reset's box (bringing its word field and its button) and
+# the pane-readings box (bringing its combo and its file field).  Checked both ways,
 # because a note that names the panel-status box twice (an earlier draft of this one
 # called the same reply "panel hello" *and* "the panel-status box") is a map with a
 # place on it that the window does not have.
-assert len([p for p in note_folded.split(",") if p.strip()]) == 7, note_folded
+assert len([p for p in note_folded.split(",") if p.strip()]) == 8, note_folded
 assert len(folded) - len([w for w in folded if w in (win.status_box, win.reset_box,
-                                                    win.confirm, win.btn_reset)]) == 5, \
+                                                    win.confirm, win.btn_reset,
+                                                    win.peek_box, win.ed_peek,
+                                                    win.ed_peek_file)]) == 5, \
     [w.objectName() or type(w).__name__ for w in folded]
+# ...and the third box folds with the switch rather than merely being listed here:
+# `_set_advanced` drives `win._adv_hide`, and the boxes are counted out of the window
+assert all(w in win._adv_hide for w in (win.peek_box, win.ed_peek, win.ed_peek_file)), \
+    "the pane-readings box does not fold with the switch"
+assert sum(1 for w in folded if w in (win.status_box, win.reset_box, win.peek_box)) == 3, \
+    [type(w).__name__ for w in folded]
 gui_txt = open("docs/gui.md", encoding="utf-8").read()
 assert "layout editor" in gui_txt, "the window grew an editor and gui.md did not"
-assert "nine secondary controls" in gui_txt, "gui.md counts the folded controls differently"
+assert "twelve secondary controls" in gui_txt, \
+    "gui.md counts the folded controls differently"
 _tip = win.adv_toggle.toolTip()
 assert "factory reset" in _tip and "panel-status box" in _tip and "layout editor" in _tip, (
     _tip, "the switch's tooltip does not say what it covers and what it leaves alone")
+assert "pane-readings box" in _tip, (_tip, "the tooltip has not heard of the third box")
 assert "does not change them" in _tip, (
     _tip, "the tooltip does not say that hiding is about pixels, never values")
 # where the two boxes that folded over live: both at the foot of the *preview*
@@ -10793,13 +10810,863 @@ print(f"                        F's sentences, from this run: {_f_n} rows carry 
       f"{_f_p3}% at 3 px - the page, `edit.py`, docs/themes.md and the 0.6 stanza all carry "
       f"those")
 
+# ---- feature G: the pane can look at another body's readings, and refuses to be edited in
+# ---- them.  Two halves, like every other act in this pane: the census of what actually moves
+# ---- between the pinned frame and a live one (measured here and printed, with only the *file*
+# ---- figures asserted), and the window driven through real Qt events by its own knob.
+import ast as _gg_ast
+import builtins as _gg_builtins
+import copy as _gg_deep
+import json as _gg_json
+import tempfile as _gg_tf
+
+_gk_WHEN = gui_edit.FIXTURE_WHEN
+# The pinned pair, taken from `edit.py`'s own text rather than from the live module dict.  Not
+# fussiness: `Editor.fixture()` hands out `dict(FIXTURE)`, a shallow copy whose inner dicts are
+# the module's, and a gate earlier in this section pops `memory.total` out of what it is handed -
+# so every draw after that one answers one derived rate fewer than the program ever does.  G's
+# figures are claims about the fixture **as written**, so they are counted here from a parse of
+# the literal, and the live dict's difference is printed below, not hidden.  The door's own
+# repair is a separate change: it moves the drawn box counts docs/gui.md labels per machine.
+_gk_FIX = {}
+for _gg_node in _gg_ast.parse(open("xigmaui/edit.py", encoding="utf-8").read()).body:
+    if (isinstance(_gg_node, _gg_ast.Assign)
+            and getattr(_gg_node.targets[0], "id", "") == "FIXTURE"):
+        _gk_FIX = _gg_ast.literal_eval(_gg_node.value)
+assert _gk_FIX.get("memory", {}).get("total"), _gk_FIX.get("memory")
+assert _gk_FIX["cpu"]["temperature"] == 57.0, _gk_FIX["cpu"]
+
+_gk_TMP = _gg_tf.mkdtemp(prefix="xigma-peek-")
+
+
+def _gk_px(_a, _b):
+    """Pixels of one layer that differ from another's, on the machine drawing both."""
+    return sum(1 for _q in ImageChops.difference(_a.convert("RGBA"), _b.convert("RGBA"))
+               .get_flattened_data() if _q != (0, 0, 0, 0))
+
+
+def _gk_draw(_obj, _met, _when=None):
+    """A draw this gate owns.  `themes.draw` fills in what the painter reads and `themes.load`
+    caches one object per (path, mtime), so a census never touches the shared copy - and the
+    metrics body is copied just as deeply, because this gate draws at one pinned body again and
+    again, and its byte-for-byte claims are only worth making if nothing can write into it."""
+    return themes.draw(_gg_deep.deepcopy(_obj), _gg_deep.deepcopy(_met), _when or _gk_WHEN)
+
+
+def _gk_ed(_name):
+    """An editor of this gate's own, over a fresh read of the file (or the export)."""
+    if _name in themes.EXPORTS:
+        return gui_edit.Editor(_gg_deep.deepcopy(themes.export(_name)),
+                               origin="generated from render.py", path="", name=_name,
+                               theme=_name)
+    _rec = themes.resolve(_name)
+    return gui_edit.Editor(_gg_deep.deepcopy(themes.load(_rec["path"])),
+                           origin=themes.origin(_rec), path=_rec["path"], name=_rec["name"])
+
+
+# ---- feature G grew the advanced fold by one box: the census of what folds is taken from the
+# ---- section's own `folded` list (a gate above names all twelve controls and asserts its
+# ---- length), and the prose half below holds docs/gui.md and `app.py`'s module docstring to
+# ---- those three numbers - controls, loose rows, boxes.  Not `win._adv_hide`: that list holds
+# ---- a field's label as well as the field, eighteen widgets for twelve controls.
+_gk_fold_all = list(folded)
+_gk_fold_boxed = (win.status_box, win.reset_box, win.confirm, win.btn_reset,
+                  win.peek_box, win.ed_peek, win.ed_peek_file)
+_gk_fold_boxes = sum(1 for _w4 in _gk_fold_all if _w4 in (win.status_box, win.reset_box,
+                                                          win.peek_box))
+_gk_fold_loose = len([_w4 for _w4 in _gk_fold_all if _w4 not in _gk_fold_boxed])
+assert _gk_fold_boxes == 3 and _gk_fold_loose == 5, (
+    _gk_fold_boxes, _gk_fold_loose, [type(_w4).__name__ for _w4 in _gk_fold_all])
+
+# ------------------------------------------------------------------ the loader door --
+# One door, two callers: `--metrics-file` for the loop (through `_pinned`, which caches) and the
+# pane's peek for the window.  The shapes it has to answer belong to the file, not to this run.
+import xigmalcd.main as _gk_main                # the section's own `_m` alias is reused by
+                                                # three later blocks for a regex match and for
+                                                # a QFontMetrics, so this gate names its own
+_gk_ok = os.path.join(_gk_TMP, "body.json")
+_gk_missing = os.path.join(_gk_TMP, "not-here.json")
+_gk_bad = os.path.join(_gk_TMP, "broken.json")
+_gk_list = os.path.join(_gk_TMP, "list.json")
+# A body chosen to answer exactly the names the pinned fixture answers, and no others: that is
+# what lets the note lines of the two frames be compared sentence by sentence.
+with open(_gk_ok, "w") as _fh:
+    _gg_json.dump({"_comment": "a note in the file, not a section",
+                   "cpu": {"temperature": 104.0, "load": 96.0, "usage": 96.0,
+                           "speedAverage": 3400, "power": 18.0, "voltage": 1.36},
+                   "gpu": {"temperature": 47.0, "load": 22.0, "speed": 1200, "fan": 45.0,
+                           "power": 90.0, "memoryUsage": 2458, "dedicatedTotal": 8192},
+                   "memory": {"load": 41.0, "used": 53740, "total": 131072},
+                   "motherboard": {"temperature": 44.0},
+                   "fans": [{"onBoard": True, "type": "Fan", "name": "Fan CPU", "value": 1180},
+                            {"onBoard": True, "type": "Chassis", "name": "Fan System 5",
+                             "value": 890}]}, _fh)
+open(_gk_bad, "w").write("{ this is not json at all")
+_gg_json.dump([1, 2, 3], open(_gk_list, "w"))
+
+_gk_secs, _gk_why = _gk_main.read_metrics_file(_gk_ok)
+assert _gk_why == "" and "_comment" not in _gk_secs, (sorted(_gk_secs), _gk_why)
+assert _gk_secs["cpu"]["temperature"] == 104.0, _gk_secs["cpu"]
+_gk_r_miss = _gk_main.read_metrics_file(_gk_missing)
+assert _gk_r_miss[0] == {} and "FileNotFoundError" in _gk_r_miss[1], _gk_r_miss
+_gk_r_bad = _gk_main.read_metrics_file(_gk_bad)
+assert _gk_r_bad[0] == {} and "JSONDecodeError" in _gk_r_bad[1], _gk_r_bad
+_gk_r_list = _gk_main.read_metrics_file(_gk_list)
+assert _gk_r_list[0] == {} and "not a list" in _gk_r_list[1], _gk_r_list
+# and the loop's half of the same door: a broken file must not stop a display.  The section's
+# state is put back afterwards, because other gates in this section read what the loop keeps.
+_gk_saved = (_gk_main.PINNED, _gk_main.PINNED_MTIME)
+try:
+    _gk_pa = lambda pth: _gk_main.build_parser().parse_args(
+        ["--theme", "alpha", "--metrics-file", pth])
+    assert _gk_main._pinned(_gk_pa(_gk_ok))["cpu"]["temperature"] == 104.0
+    assert _gk_main._pinned(_gk_pa(_gk_bad))["cpu"]["temperature"] == 104.0, (
+        "a broken metrics file stopped the loop keeping its last good read")
+finally:
+    _gk_main.PINNED, _gk_main.PINNED_MTIME = _gk_saved
+_gk_body = _gk_secs
+_gk_absent = set(themes.values(_gg_deep.deepcopy(_gk_body), _gk_WHEN)[1])
+_gk_fabsent = set(themes.values(_gg_deep.deepcopy(_gk_FIX), _gk_WHEN)[1])
+# The body is *self-contained*: it is not the fixture with a few keys patched, so a name the
+# fixture cannot answer may well be answered here (this file names `gpu.dedicatedTotal`, which
+# the pinned fixture has never carried: docs/theme-editor.md keeps the story of the stale
+# fixture keys).  That is deliberate - a deterministic frame needs a deterministic body - and
+# it is what lets the gate assert two exact note-line values, `104°C` from this file against
+# the fixture's `57°C`.  What must **not** happen is the body dropping a name the fixture
+# answers: that would take a row out of the picture and make the two frames incomparable.
+assert not (_gk_fabsent - _gk_absent), (sorted(_gk_fabsent - _gk_absent), sorted(_gk_absent),
+                                        "the file body answers less than the fixture does, so "
+                                        "a row that paints at the fixture would paint nothing "
+                                        "in the peek, and the note lines could not be compared")
+# the five names the library asks and nothing here can answer: a **file** fact, the same set
+# the prose counts.  `_gk_absent` is wider by whatever this machine cannot read - a CI runner
+# with no interface section answers fewer names than the bench does - so the gate holds this
+# intersection and prints the width instead of asserting one number for it.
+_gk_fanpump = {"Fan 3 Name", "Fan 3 Speed", "Fan 4 Name", "Fan 4 Speed", "Pump Speed"}
+assert _gk_fanpump <= _gk_absent and _gk_fanpump <= _gk_fabsent, (sorted(_gk_absent),
+                                                                  sorted(_gk_fabsent))
+print(f"  the loader door      `main.read_metrics_file` answers four shapes: a body with its "
+      f"`_` comment key dropped ({sorted(_gk_secs)}), a path that is not there, a file that "
+      f"is not JSON, and a JSON list where a `STATE all 1` body belongs - each failure a "
+      f"sentence rather than a half-read picture; and `_pinned` keeps its last good read "
+      f"through the broken one, which is what a display loop needs")
+
+# ------------------------------------------------- a fresh window sits at the fixture --
+_gk = app.Window(bad, None, restore=False, save_settings=False)
+_gk.show()
+_gk.resize(1600, 1200)
+for _ in range(10):
+    appq.processEvents()
+assert gui_edit.FIXTURE["cpu"]["temperature"] == 57.0
+assert _gk._peek is None and _gk.ed_peek.currentData() == "fixture", (_gk._peek,)
+assert _gk.ed_peek.currentIndex() == 0, _gk.ed_peek.currentIndex()
+assert not _gk.ed_peek_file.isEnabled(), "the path box is live in a mode that will not read it"
+assert not _gk.ed_peek.isEnabled(), "the combo is offered with no layout open"
+assert not [k for k in _gk._state() if "peek" in k.lower()], sorted(_gk._state())
+for _need in ("metrics file", "held", "refused", "fixture", "`--metrics-file`",
+              "is remembered", "never hands the panel"):
+    assert _need in _gk.ed_peek.toolTip(), (_need, _gk.ed_peek.toolTip()[:220],
+                                            "the combo's tooltip stopped saying what a peek "
+                                            "is, and what it never does")
+_gk.ed_name.setCurrentText("bars")
+for _ in range(8):
+    appq.processEvents()
+assert _gk.ed is not None and _gk.ed.name == "bars", _gk.ed_name.currentText()
+assert _gk.ed_peek.isEnabled(), "the combo stayed shut after a layout opened"
+assert _gk.preview.pixmap().width() == render.W, (
+    _gk.preview.pixmap().width(), "this window was sized so the glass is at 1:1")
+_gk.ed.select(2)
+_gk.ed_widget.setCurrentIndex(2)
+for _ in range(4):
+    appq.processEvents()
+_gk_hit = _gk.ed.hit(_gk._ed_notes, 240, 24)          # a point that answers a row
+assert _gk_hit is not None, _gk_hit
+_gk_raw = {str(_r["name"]): open(_r["path"], "rb").read() for _r in pick}
+_gk_pin_layer = _gk._osd.tobytes()
+assert _gk_pin_layer == _gk.ed.paint(*_gk.ed.fixture(), ink=_gk._ink())[0].tobytes()
+assert _gk.preview.marks and _gk.preview.marks[0], _gk.preview.marks
+
+
+def _gk_note():
+    return _gk.ed_note.text()
+
+
+def _gk_at(_px, _py):
+    ox, oy = _gk.preview._origin()
+    return int(round(ox + _px)), int(round(oy + _py))
+
+
+def _gk_press(_px, _py):
+    _gk.preview.mousePressEvent(_ev(_QEv.Type.MouseButtonPress, *_gk_at(_px, _py)))
+    appq.processEvents()
+
+
+def _gk_key(_key):
+    _gk.preview.keyPressEvent(_ev(_QEv.Type.KeyPress, key=_key))
+    appq.processEvents()
+
+
+# ---------------------------------------------------------------------- the peek, by file --
+_gk.ed_peek_file.setText(_gk_ok)
+_gk.ed_peek.setCurrentIndex(2)
+_gk._editor_peek()                                      # as `activated` would deliver it
+for _ in range(6):
+    appq.processEvents()
+assert _gk._peek is not None and _gk.ed_peek.currentIndex() == 2
+assert _gk._peek["when"] == _gk_WHEN, (
+    "a peek moved the instant: two peeks of one file would not be the same picture, and the "
+    "Date/Time/Week rows would rewrite themselves every second")
+assert _gk._peek["metrics"]["cpu"]["temperature"] == 104.0, _gk._peek["metrics"]["cpu"]
+assert _gk_ok in _gk._peek["source"], _gk._peek["source"]
+_gk_pk_layer = _gk._osd.tobytes()
+assert _gk_pk_layer == _gk_draw(_gk.ed.obj, _gk_body)[0].tobytes(), (
+    "the pane's peek layer is not what a direct draw of that body gives")
+assert _gk_pk_layer != _gk_pin_layer, (
+    "a body pinning the temperature at 104.0 drew the fixture's picture: nothing was peeked "
+    "at, so every claim below would be about a frame nobody saw")
+assert _gk.preview.marks is None, _gk.preview.marks
+assert "peeking" in (_gk.preview.toolTip() or ""), _gk.preview.toolTip()[:140]
+assert _gk_note() == _gk.ed.peek_sentence(_gk._peek["source"], _gk._peek["metrics"],
+                                          _gk._peek["when"], _gk._peek["held"]), _gk_note()[:180]
+assert "PEEK" in _gk.metrics.text() and _gk._peek["source"] in _gk.metrics.text(), \
+    _gk.metrics.text()[:150]
+assert "peek" in _gk.caption.text().lower(), _gk.caption.text()[:150]
+assert _gk.ed_peek_file.isEnabled(), "the path box went shut while the file mode is chosen"
+# the doors still answer the pinned frame, exactly as before the peek
+assert _gk.ed.hit(_gk._ed_notes, 240, 24) == _gk_hit, (
+    "`_ed_notes` changed under a peek: those boxes are what `hit`, the marks, the snap lines "
+    "and the size edges all read, and they must stay the pinned frame's")
+_gk_mx = _gk._mark_box(_gk.ed.index)
+assert _gk_mx and _gk_mx == _gk.ed._row_box(_gk.ed.obj, _gk.ed.index), (_gk_mx,)
+# the note lines describe the frame on the screen
+_gk_pair = _gk._note_pair()
+assert _gk_pair[0]["cpu"]["temperature"] == 104.0 and _gk_pair[1] == _gk_WHEN, _gk_pair
+_gk_temp = next(i for i, _w in enumerate(_gk.ed.widgets())
+                if str(_w.get("type")) == "data"
+                and "Temperature" in str((_w.get("property") or [{}])[0].get("source") or ""))
+_gk.ed.select(_gk_temp)
+_gk.ed_widget.setCurrentIndex(_gk_temp)
+for _ in range(4):
+    appq.processEvents()
+_gk_pk_line = _gk.ed.drawn_text(*_gk._note_pair())[0]
+_gk_fx_line = _gk.ed.drawn_text(*_gk.ed.fixture())[0]
+assert _gk_pk_line == "104°C" and _gk_fx_line == "57°C", (
+    _gk_pk_line, _gk_fx_line, "the note line is supposed to say what the row paints in the "
+    "frame you are looking at")
+assert _gk_note() == _gk.ed.peek_sentence(_gk._peek["source"], _gk._peek["metrics"],
+                                          _gk._peek["when"], _gk._peek["held"]), (
+    "selecting a row while peeking overwrote the peek's own sentence, and that sentence is "
+    "the only place the pane says which body it drew")
+_gk_pk_px = _gk_px(_gk_draw(_gk.ed.obj, _gk_body)[0], _gk.ed.paint(*_gk.ed.fixture(),
+                                                                   ink=_gk._ink())[0])
+print(f"  peeking, by file     the pane painted `{_gk.ed.name}` from `{_gk_ok.split('/')[-1]}` "
+      f"byte for byte as a direct draw of that body does ({len(_gk_pk_layer)} B of layer, "
+      f"{_gk_pk_px} px of it moved by that body), the marks went away with a tooltip saying "
+      f"why, and the row's own note line reads {_gk_pk_line!r} where the fixture reads "
+      f"{_gk_fx_line!r}")
+
+# A held body redraws with nothing moving, and holding is proved at the door: the file is
+# opened **once** per press - the peek's only read - and not once while the pane repaints.
+_gk_opens = []
+_gk_real_open = open
+
+
+def _gk_counted_open(_pth, *_a, **_kw):
+    if str(_pth) == _gk_ok:
+        _gk_opens.append(str(_pth))
+    return _gk_real_open(_pth, *_a, **_kw)
+
+
+_gg_builtins.open = _gk_counted_open       # `builtins.open`, what `open()` finds
+try:
+    _gk._editor_peek()                                   # the reader chose the entry again
+    for _ in range(4):
+        appq.processEvents()
+    _gk_after_press = len(_gk_opens)
+    _gk._repaint()
+    _gk._repaint()
+    for _ in range(4):
+        appq.processEvents()
+    _gk_after_repaints = len(_gk_opens)
+finally:
+    _gg_builtins.open = _gk_real_open
+assert _gk_after_press == 1, (_gk_after_press, "one press on the knob read the file more than "
+                                               "once, or not at all")
+assert _gk_after_repaints == 1, (_gk_after_repaints, "a repaint re-read the peek's file: that "
+                                                "is a following pane, not a held one")
+assert _gk._osd.tobytes() == _gk_pk_layer, "a held body repainted differently: it is not held"
+
+# ------------------------------------------------------------------ what a peek refuses --
+_gk_steps, _gk_dirty = _gk.ed.steps, _gk.ed.dirty
+_gk_xy = (int(_gk.ed.prop().get("x", -1)), int(_gk.ed.prop().get("y", -1)))
+_gk_pt = (_gk_mx[0] + 2, (_gk_mx[1] + _gk_mx[3]) // 2)      # ink the pinned frame put there
+_gk_press(*_gk_pt)
+assert _gk._drag is None, "a press began a drag on a peek whose marks said there was nothing"
+assert _gk_note() == _gk.ed.peek_refusal("A press on the glass"), _gk_note()[:220]
+_gk_key(_QQt.Key.Key_Right)
+assert (_gk.ed.steps, _gk.ed.dirty) == (_gk_steps, _gk_dirty), (_gk.ed.steps, _gk_steps)
+assert (int(_gk.ed.prop().get("x", -1)), int(_gk.ed.prop().get("y", -1))) == _gk_xy, (
+    _gk_xy, _gk.ed.prop(), "an arrow key moved a row while the pane was peeking")
+assert _gk_note() == _gk.ed.peek_refusal("An arrow key"), _gk_note()[:220]
+for _sentence in (_gk.ed.peek_refusal("A press on the glass"), _gk.ed.peek_refusal("An arrow "
+                                                                                  "key"),
+                  _gk.ed.peek_sentence(_gk._peek["source"], _gk._peek["metrics"], _gk_WHEN,
+                                       _gk._peek["held"])):
+    assert "peek" in _sentence and "fixture" in _sentence, _sentence
+assert _gk.ed.peek_refusal("A press on the glass") == _gk.ed.peek_refusal(
+    "A press on the glass"), "the refusal is not the model's fixed words"
+print(f"  refused on the peek  a press on the row's own ink and an arrow key each answered "
+      f"with the model's sentence rather than the window's: no drag started, no undo step "
+      f"taken, the selected row's `x` and `y` unmoved ({_gk_xy[0]},{_gk_xy[1]}), and the "
+      f"`dirty` flag still {_gk_dirty}")
+
+# ------------------------------------------------------ a peek whose file cannot be read --
+for _txt, _need in (("", "has to be named"), (_gk_missing, "FileNotFoundError"),
+                    (_gk_bad, "JSONDecodeError"), (_gk_list, "not a list")):
+    _gk.ed_peek_file.setText(_txt)
+    _gk._editor_peek()
+    for _ in range(4):
+        appq.processEvents()
+    assert _gk._peek is None, (_txt, _gk._peek)
+    assert _gk.ed_peek.currentIndex() == 2, (
+        _txt, _gk.ed_peek.currentIndex(), "a failed peek snapped the mode away from under the "
+        "reader, losing the path they were about to name")
+    assert _gk_note().startswith("no peek:") and _need in _gk_note(), _gk_note()[:170]
+    assert _gk._osd.tobytes() == _gk_pin_layer, (
+        _txt, "a refused peek changed the picture: the pinned frame stays up until a body is "
+        "actually read")
+    assert _gk.ed_peek_file.isEnabled(), "the path box was shut while the reader names it"
+print("  a peek that cannot be read   four refusals - no path named, a path that is not "
+      "there, a file that is not JSON, and a JSON list where a `STATE all 1` body belongs - "
+      "each one the loader's own sentence on the note line, the pinned frame still painted, "
+      "and the chosen mode left on the combo")
+
+# --------------------------------------------------------------------- the sensors peek --
+_gk.ed_peek_file.setText(_gk_ok)
+_gk.ed_peek.setCurrentIndex(1)                           # this machine's readings
+_gk_reads = []
+_gk_real_collect = sensors.collect
+sensors.collect = lambda *a, **k: (_gk_reads.append(1), _gk_real_collect(*a, **k))[1]
+_gk._editor_peek()
+_gk_collects = len(_gk_reads)
+sensors.collect = _gk_real_collect
+for _ in range(6):
+    appq.processEvents()
+assert _gk._peek is not None and _gk.ed_peek.currentIndex() == 1
+assert "sensors" in _gk._peek["source"], _gk._peek["source"]
+_gk_live_secs = sorted(k for k in _gk._peek["metrics"] if k != "timestamp")
+_gk_live = dict(_gk._peek["metrics"])
+# A runner answers fewer sections than this bench does - one early CI run came back with only
+# `cpu`, `disk`, `memory` and `timestamp`, no `gpu` and no fans at all - so what is asserted here
+# is that the peek took a body, held it, and painted exactly that body; which sections this
+# machine contributed is printed further down, as this machine's fact.
+assert _gk._osd.tobytes() == _gk_draw(_gk.ed.obj, _gk_live)[0].tobytes(), (
+    "the sensors peek is not a draw of the body that was read - a second read crept in")
+assert _gk.preview.marks is None and _gk.ed.hit(_gk._ed_notes, 240, 24) == _gk_hit
+_gk_live_px = _gk_px(_gk_draw(_gk.ed.obj, _gk_live)[0],
+                     _gk.ed.paint(*_gk.ed.fixture(), ink=_gk._ink())[0])
+# re-choosing the entry you are already on *is* the re-read, and one re-read costs one collect
+_gk_metrics0 = dict(_gk._peek["metrics"])
+_gk_held0 = _gk._peek["held"]
+time.sleep(1.05)
+_gk_reads.clear()
+_gk_real_collect = sensors.collect
+sensors.collect = lambda *a, **k: (_gk_reads.append(1), _gk_real_collect(*a, **k))[1]
+_gk.ed_peek.setCurrentIndex(1)
+_gk._editor_peek()
+_gk_press_cost = time.time()
+_gk_live2 = dict(_gk._peek["metrics"])
+_gk_press_cost = time.time() - _gk_press_cost
+sensors.collect = _gk_real_collect
+assert _gk_live2 is not _gk_metrics0 and len(_gk_reads) == _gk_collects, (
+    len(_gk_reads), _gk_collects, "a re-read cost a different number of reads than the press "
+    "that first opened the peek - the knob would mean two different things")
+# Whether a second of following moves any pixels belongs to the machine and the moment: an idle
+# runner answers the same temperature, the same load and the same fan speed twice, and moves
+# nothing.  The half that is *this program's* promise is the one asserted just below: one held
+# body, drawn twice, is the same picture exactly.
+_gk_follow_px = _gk_px(_gk_draw(_gk.ed.obj, _gk_metrics0)[0], _gk_draw(_gk.ed.obj, _gk_live2)[0])
+_gk_held_twice = _gk_px(_gk_draw(_gk.ed.obj, _gk_live2)[0], _gk_draw(_gk.ed.obj, _gk_live2)[0])
+assert _gk_held_twice == 0, (
+    _gk_held_twice, "a held body drew two different layers in the same window, so the peek is "
+    "not held and every byte-for-byte claim about it is false")
+_gk_t0 = time.time()
+_gk_live1 = _gk_real_collect()
+_gk_collect_ms = 1000 * (time.time() - _gk_t0)
+_gk_t0 = time.time()
+_gk_draw(_gk.ed.obj, _gk_live1)
+_gk_draw_ms = 1000 * (time.time() - _gk_t0)
+print(f"  peeking, by sensor   this machine's own readings ({', '.join(_gk_live_secs)}), drawn "
+      f"as one held body: {_gk_live_px} px of `{_gk.ed.name}` moved against the fixture, and a "
+      f"second read about a second later moved {_gk_follow_px} px more with no edit at this end "
+      f"- which is why the peek is held rather than followed. One press costs one "
+      f"`sensors.collect()` ({_gk_collect_ms:.0f} ms here) plus a layer draw "
+      f"({_gk_draw_ms:.0f} ms); a repaint costs no read of the peek's body")
+
+# ------------------------------------------------------------------ back to the fixture --
+_gk.ed_peek.setCurrentIndex(0)
+_gk._editor_peek()
+for _ in range(8):
+    appq.processEvents()
+assert _gk._peek is None and not _gk.ed_peek_file.isEnabled()
+assert _gk._osd.tobytes() == _gk_pin_layer, (
+    "leaving a peek did not put the pinned frame back byte for byte")
+assert _gk.preview.marks and _gk.preview.marks[0], _gk.preview.marks
+assert "fixture" in _gk_note(), _gk_note()[:130]
+_gk_key(_QQt.Key.Key_Right)
+assert _gk.ed.steps == _gk_steps + 1 and int(_gk.ed.prop()["x"]) == _gk_xy[0] + 1, (
+    _gk.ed.steps, _gk_xy, "the editable frame did not come back when the peek left")
+_gk.ed_undo.click()
+for _ in range(6):
+    appq.processEvents()
+assert (int(_gk.ed.prop().get("x", -1)), int(_gk.ed.prop().get("y", -1))) == _gk_xy
+_gk.ed_name.setCurrentText(app.NO_EDITOR)
+for _ in range(8):
+    appq.processEvents()
+assert _gk.ed is None and _gk._peek is None and _gk.ed_peek.currentIndex() == 0
+_gk._editor_peek()
+assert "no layout open" in _gk_note(), _gk_note()[:130]
+assert not _gk.ed_peek.isEnabled(), "the combo is live again with no layout open"
+_gk.close()
+# and leave the section's own window quiet.  The sleeps above (one second, to watch a held
+# sample against a following one) queue `win`'s preview timer, and the next `processEvents()`
+# - which belongs to a gate **after** this one - would drain them; a repaint re-applies the
+# still-selected row's marks, so a gate that asserts what a press left on the pane would be
+# reading a frame boundary rather than its own act.  Eight pumps of the loop cost a quarter of
+# a second and buy the section back its determinism.
+for _ in range(8):
+    appq.processEvents()
+    time.sleep(0.03)
+appq.processEvents()
+assert {str(_r["name"]): open(_r["path"], "rb").read() for _r in pick} == _gk_raw, (
+    "a peek wrote to a vendor layout file")
+assert themes.user_copies() == [], themes.user_copies()
+print("  back at the fixture  one press of the same knob put the pinned frame back exactly "
+      "(layer byte for byte), the marks returned with it, and the arrow key moved the row "
+      "again - then undo put the row back; closing the layout cleared the peek by itself, and "
+      "no file anywhere changed")
+
+# ---- and the census behind G's rules: what another body of readings moves, and how much of
+# ---- that belongs to the machine.  Two columns, on purpose: the **file body** the peek is
+# ---- driven with is the same JSON on this bench and on CI's runner, so every count taken
+# ---- against it is asserted; this machine's own sensors are a fact about this machine, so the
+# ---- same counts taken against them are printed and labelled, never quoted by a page and never
+# ---- asserted - a runner with no `gpu` section, or an idle second in which nothing moves, would
+# ---- otherwise fail a claim that is really about a deterministic body.  The same split feature
+# ---- F shipped with, applied one level finer.
+_gk_files = [(str(_r["name"]), themes.load(_r["path"])) for _r in pick]
+_gk_files += [(_n, themes.export(_n)) for _n in sorted(themes.EXPORTS)]
+_gk_sensors = _gk_real_collect()
+
+_gk_c = dict(rows=0, boxes=0, box_moved=0, box_only=0, probe=0, probe_diff=0,
+             sent=0, sent_diff=0, sent_value_only=0, sent_both_none=0, sent_reason_diff=0,
+             x_num_changed=0, x_num_max=0, edges_changed=0, edges_same_box=0,
+             showif_changed=0)
+_gk_edge_case = None                              # the first row whose offer moved, and why
+_gk_l = dict(box_moved=0, box_only=0, probe_diff=0, sent=0, sent_diff=0, sent_value_only=0,
+             sent_both_none=0, sent_reason_diff=0, showif_changed=0, edges_changed=0)
+for _nm, _ob in _gk_files:
+    _i, _nf = _gk_draw(_ob, _gk_FIX)
+    _i, _nb = _gk_draw(_ob, _gk_body)              # the named file body: machine-independent
+    _i, _nl = _gk_draw(_ob, _gk_sensors)           # this box's own readings: its own, printed
+    _bf = {r[3]: tuple(r[2]) for r in (_nf.get("boxes") or []) if r[2]}
+    _bb = {r[3]: tuple(r[2]) for r in (_nb.get("boxes") or []) if r[2]}
+    _bl = {r[3]: tuple(r[2]) for r in (_nl.get("boxes") or []) if r[2]}
+    _ed = _gk_ed(_nm)
+    _rows = _ed.widgets()
+    _gk_c["rows"] += len(_rows)
+    _gk_c["boxes"] += len(_bf)
+    _gk_c["box_moved"] += sum(1 for _i2 in set(_bf) & set(_bb) if _bf[_i2] != _bb[_i2])
+    _gk_c["box_only"] += len(set(_bf) ^ set(_bb))
+    _gk_l["box_moved"] += sum(1 for _i2 in set(_bf) & set(_bl) if _bf[_i2] != _bl[_i2])
+    _gk_l["box_only"] += len(set(_bf) ^ set(_bl))
+    # the pane's own question, at three frames: press this point, which row answers?
+    for _px in range(0, render.W, 16):
+        for _py in range(0, render.H, 16):
+            _gk_c["probe"] += 1
+            _gk_c["probe_diff"] += _ed.hit(_nf, _px, _py) != _ed.hit(_nb, _px, _py)
+            _gk_l["probe_diff"] += _ed.hit(_nf, _px, _py) != _ed.hit(_nl, _px, _py)
+    # every row's note sentence, at the fixture and at each other body: different, and how?
+    for _i2 in range(len(_rows)):
+        _ed.select(_i2)
+        _a, _sa = _ed.drawn_text(_gg_deep.deepcopy(_gk_FIX), _gk_WHEN)
+        _gk_c["sent"] += 1
+        _gk_l["sent"] += 1
+        for _met, _key in ((_gk_body, _gk_c), (_gk_sensors, _gk_l)):
+            _b, _sb = _ed.drawn_text(_gg_deep.deepcopy(_met), _gk_WHEN)
+            if (_a, _sa) == (_b, _sb):
+                continue
+            _key["sent_diff"] += 1
+            if _a is None and _b is None:
+                _key["sent_both_none"] += 1
+                _key["sent_reason_diff"] += _sa != _sb
+            elif _a is None or _b is None:
+                # a row that paints in one frame and not the other: a *different* kind of
+                # difference, and the one a runner's missing section can cause by itself
+                _key["showif_changed"] += 1
+            else:
+                _key["sent_value_only"] += 1
+                _key["sent_reason_diff"] += _sa != _sb
+    # feature F's centring number, and feature D's edges, asked of each frame's own ink: the
+    # file body here, because a centring number that moved is a reason to refuse a drag and the
+    # claim has to hold wherever the suite runs
+    for _i2, _w in enumerate(_rows):
+        _pr = (_w.get("property") or [{}])[0]
+        if _pr.get("x") is None:
+            continue
+        _fa = _ed._x_number(_i2, render.W // 2, _bf.get(_i2))[0]
+        _fb = _ed._x_number(_i2, render.W // 2, _bb.get(_i2))[0]
+        if (_fa is None) != (_fb is None) or (_fa is not None and _fa != _fb):
+            _gk_c["x_num_changed"] += 1
+            if _fa is not None and _fb is not None:
+                _gk_c["x_num_max"] = max(_gk_c["x_num_max"], abs(_fa - _fb))
+
+    # feature D's grab squares, asked of every row at both frames.  The squares are a
+    # function of the **box** a frame drew - `size_edges` pushes each of the eight through
+    # `_resize_plan` with that box and never looks at a reading - so the invariant that
+    # holds wherever the suite runs is: one box, one answer.  What a body *does* change is
+    # which boxes exist, and that is a drawn figure like any other: printed, with the one
+    # example the run found, never asserted as one number for both machines.
+    for _i2 in range(len(_rows)):
+        _ea = _ed.size_edges(_i2, _bf[_i2]) if _i2 in _bf else ()
+        _eb = _ed.size_edges(_i2, _bb[_i2]) if _i2 in _bb else ()
+        _el = _ed.size_edges(_i2, _bl[_i2]) if _i2 in _bl else ()
+        _gk_l["edges_changed"] += _ea != _el
+        if _bf.get(_i2) == _bb.get(_i2):
+            _gk_c["edges_same_box"] += 1
+            assert _ea == _eb, (_nm, _i2, str(_rows[_i2].get("type")), _bf.get(_i2), _ea,
+                                _eb, "one drawn box, two different offers: `size_edges` is "
+                                     "not the pure function of the box its door says it is")
+        if _ea != _eb:
+            _gk_c["edges_changed"] += 1
+            assert _bf.get(_i2) != _bb.get(_i2), (
+                _nm, _i2, _bf.get(_i2), _ea, _eb, "the offer moved at an unchanged box")
+            if _gk_edge_case is None:
+                _gk_edge_case = (_nm, _i2, str(_rows[_i2].get("type")),
+                                 _bf.get(_i2), _bb.get(_i2), _ea, _eb)
+
+assert _gk_c["rows"] and _gk_c["boxes"], _gk_c
+# the claims G's prose rests on, proved on the body both machines read: a page that says "the
+# marks are hidden because the boxes move" needs the boxes to move, and the sentence that calls
+# a note line's difference a *value* needs no reason strings to change
+assert _gk_c["box_moved"] > 0, _gk_c
+assert _gk_c["probe_diff"] > 0, _gk_c
+assert _gk_c["sent_diff"] > 0, _gk_c
+assert not _gk_c["showif_changed"] and not _gk_c["sent_reason_diff"], (
+    _gk_c, "the file body changed a row's *reason* (or took a row in and out of the picture), "
+    "so the note lines can no longer be re-computed against it as docs/gui.md says they are")
+assert _gk_c["sent_value_only"] + _gk_c["sent_both_none"] == _gk_c["sent_diff"], _gk_c
+# feature D's squares never consult a reading - they are asked of a box, and the loop above
+# asserts `size_edges` answers the same at the same box.  What *can* move is which squares the
+# pane can offer at all, because a box whose ink runs off the 480 px glass has no on-screen
+# square on that side to grab: that follows drawn geometry, so the count is printed, never
+# asserted as one number for both machines, and it can only move for a row whose box moved.
+assert _gk_c["edges_changed"] <= _gk_c["box_moved"], (
+    _gk_c, "a row's offered edges moved while its box sat still: `size_edges` is reading "
+           "something other than the box it was handed")
+assert _gk_l["edges_changed"] <= _gk_l["box_moved"], (
+    _gk_l, "the same rule at this machine's own readings: an offer moved at an unchanged box")
+print(f"  what another body moves   counted against the file body the peek is driven with, the "
+      f"same JSON on either machine, which is why these are asserted: {_gk_c['box_moved']} of "
+      f"the {_gk_c['boxes']} row boxes the {len(_gk_files)} layouts draw at the fixture land "
+      f"elsewhere ({_gk_c['box_only']} boxes appear or vanish outright), {_gk_c['probe_diff']} "
+      f"of the {_gk_c['probe']} points probed on the glass answer a different row in one frame "
+      f"than the other, and {_gk_c['sent_diff']} of {_gk_c['sent']} note sentences differ - "
+      f"{_gk_c['sent_value_only']} of them a value, 0 a reason, 0 a row coming in or out of the "
+      f"picture.  Feature F's centring number moved for {_gk_c['x_num_changed']} rows, by up to "
+      f"{_gk_c['x_num_max']} px.  That is why a peek carries no marks and refuses a press.")
+# the one example this run found, spelled out, because "the offer follows the box" is a
+# sentence a reader can only check against a case.  Whether the ink leaves the glass is
+# computed from the two boxes rather than assumed, so the sentence is true wherever it runs.
+if _gk_edge_case:
+    _gk_nm, _gk_i2, _gk_kind, _gk_b0, _gk_b1, _gk_e0, _gk_e1 = _gk_edge_case
+    _gk_off = bool(_gk_b1) and (_gk_b1[0] < 0 or _gk_b1[1] < 0 or _gk_b1[2] > render.W
+                                or _gk_b1[3] > render.H)
+    _dg = (f"the case this run found: `{_gk_nm}` row {_gk_i2} ({_gk_kind}) drew "
+           f"{_gk_b0} at the fixture and {_gk_b1} at the body"
+           + (f", which puts ink past the {render.W}x{render.H} canvas" if _gk_off else "")
+           + f" - the pane offered {len(_gk_e0)} squares there ({_gk_e0}) and "
+             f"{len(_gk_e1)} here ({_gk_e1})")
+else:
+    _dg = "this run found no row whose offer moved at all"
+print(f"                        feature D's grab squares: no reading is ever asked "
+      f"({_gk_c['edges_same_box']} rows offered the same squares at the same box, and no row "
+      f"ever offered two different answers for one box), yet which squares are offered moved "
+      f"for {_gk_c['edges_changed']} row{'' if _gk_c['edges_changed'] == 1 else 's'} - because "
+      f"a handle is painted on the row's **drawn** box, and a different body draws a different "
+      f"box.  {_dg}")
+print(f"                        this machine's own readings, printed and not asserted because "
+      f"they belong to it: {_gk_l['box_moved']} boxes moved, {_gk_l['box_only']} appeared or "
+      f"vanished, {_gk_l['probe_diff']} of {_gk_c['probe']} probed points answered another row, "
+      f"{_gk_l['sent_diff']} sentences differed ({_gk_l['sent_value_only']} values, "
+      f"{_gk_l['sent_both_none']} unpainted-reason, {_gk_l['showif_changed']} a row in or out"
+      f" of the picture, {_gk_l['sent_reason_diff']} reasons changed).  The shapes agree; the"
+      f" counts are this box's.")
+
+# a second of following, measured as the seconds pass, on the layout the peek is driven with.
+# The asserted half is the held one, and it is machine-independent: one body, drawn twice, is
+# one picture.  The following half belongs to the moment, so it is printed - an idle runner can
+# answer the same temperature and the same load twice in a second and move nothing.
+_gk_obj = dict(_gk_files)["bars"]
+_gk_t0 = time.time()
+_gk_a_layer = _gk_draw(_gk_obj, _gk_sensors)[0]
+time.sleep(max(0.0, 1.05 - (time.time() - _gk_t0)))
+_gk_b_layer = _gk_draw(_gk_obj, _gk_real_collect())[0]
+_gk_hold = _gk_draw(_gk_obj, _gk_sensors)[0]
+_gk_follow = _gk_px(_gk_a_layer, _gk_b_layer)
+_gk_span = time.time() - _gk_t0
+assert _gk_px(_gk_a_layer, _gk_hold) == 0, (
+    "the same held body drew two different layers: every byte-for-byte claim about a peek "
+    "would be false")
+_gk_costs = []
+for _ in range(3):
+    _t = time.time()
+    _gk_real_collect()
+    _gk_costs.append(1000 * (time.time() - _t))
+print(f"  held, not followed  one held body draws the same layer twice with 0 px different - "
+      f"that is what a byte-for-byte comparison of a peek can mean - while following this "
+      f"machine's sensors for {_gk_span:.1f} s moved {_gk_follow} px of `bars`' layer with no "
+      f"edit involved ({sum(_gk_costs) / 3:.0f} ms a read here, {render.W * render.H:,} px of "
+      f"glass to redraw).  Whether a following pane moves is the machine's business; whether a "
+      f"held "
+      f"one is stable is this program's, and only the second is asserted.")
+
+# ---- feature G's sentences, held to the numbers the **files** give this run.  Everything
+# ---- asserted here is a file fact: which `source` names the layouts ask for, which of them
+# ---- come from the instant rather than a reading, how many rows read them, what the pinned
+# ---- fixture answers.  Nothing here draws, so this bench and CI's runner must answer
+# ---- identically - and the drawn figures (boxes moved, pixels following costs) are printed by
+# ---- the census above on the machine it ran on, never quoted by a page.
+_gk_names = set()                                   # `source` names the library asks for
+_gk_rows_with_source = 0
+_gk_instant_rows = 0
+for _nm2, _ob2 in _gk_files:
+    for _w2 in (_ob2.get("osd") or {}).get("widget") or []:
+        # one row, one `source`: the first `property` entry, which is the one the painter
+        # reads for the row's own value (a `special` row's extra entries are named by the
+        # drawing's own rule, not by this census)
+        _pr2 = (_w2.get("property") or [{}])[0]
+        _src = str(_pr2.get("source") or "")
+        if not _src:
+            continue
+        _gk_names.add(_src)
+        _gk_rows_with_source += 1
+        if _src in themes.CLOCKED:
+            _gk_instant_rows += 1
+_gk_all = len(_gk_names)
+_gk_ans = sorted(_s for _s in _gk_names if _s in themes.values(_gg_deep.deepcopy(_gk_FIX),
+                                                               gui_edit.FIXTURE_WHEN)[0])
+_gk_noans = sorted(_s for _s in _gk_names if _s not in _gk_ans)
+_gk_asked_clock = sorted(_s for _s in _gk_names if _s in themes.CLOCKED)
+assert _gk_rows_with_source and _gk_all, (_gk_rows_with_source, _gk_all)
+assert len(themes.CLOCKED) == 3, themes.CLOCKED            # Date, Time, Week
+# the five generated layouts' half of the census, which docs/gui.md and docs/theme-editor.md
+# have quoted since 0.5, and which is a **different** count: five files, not twenty-eight.  The
+# same row rule as above, restricted to the five layouts this repository draws from `render.py`.
+_gk_five = sorted({_str for _n3 in sorted(themes.EXPORTS)
+                   for _w3 in (themes.export(_n3).get("osd") or {}).get("widget") or []
+                   for _str in [str((_w3.get("property") or [{}])[0].get("source") or "")]
+                   if _str})
+_gk_five_ans = [s for s in _gk_five if s in _gk_ans]
+_gk_five_noans = [s for s in _gk_five if s not in _gk_ans]
+assert len(_gk_five) == len(_gk_five_ans) + len(_gk_five_noans), (_gk_five, _gk_ans)
+# G's figures are about the pinned pair **as `edit.py` writes it**, so they are counted from the
+# pristine parse the window half built (`_gk_FIX`) - and the live module dict's state is printed,
+# because the difference is a defect this cycle found in its own harness.
+_gk_vals, _gk_abs = themes.values(_gg_deep.deepcopy(_gk_FIX), gui_edit.FIXTURE_WHEN)
+_gk_live_vals, _gk_live_abs = themes.values(_gg_deep.deepcopy(gui_edit.FIXTURE),
+                                            gui_edit.FIXTURE_WHEN)
+_gk_fanpump = {"Fan 3 Name", "Fan 3 Speed", "Fan 4 Name", "Fan 4 Speed", "Pump Speed"}
+assert _gk_FIX["cpu"]["temperature"] == 57.0, _gk_FIX["cpu"]
+# the file body the window gate drives its peek with, and the figures the pages quote from it
+_gk_body_file = _gk_body["cpu"]["temperature"]
+assert _gk_body_file == 104.0 and _gk_body["cpu"]["load"] == 96.0, _gk_body["cpu"]
+
+_gk_cl_top = " ".join(open("debian/changelog", encoding="utf-8").read()
+                      .split("\n -- ")[0].split())
+_gk_readme = " ".join(open("README.md", encoding="utf-8").read().split())
+_gk_tedit = _flat("docs/theme-editor.md")
+_gk_edit_src2 = _flat("xigmaui/edit.py")
+_gk_main_src = _flat("xigmalcd/main.py")
+
+# ---- docs/gui.md: the four bullets' file figures, in the order the page writes them --------
+for _what, _pat, _mine in (
+        ("what the fixture answers, across the whole library, on the page",
+         r"Widening that census to all \*\*(\d+)\*\* layouts the pane can open: \*\*(\d+)\*\* "
+         r"rows carry a `source`[^.]*?asking \*\*(\d+)\*\* distinct names, of which that dict "
+         r"answers \*\*(\d+)\*\* and leaves \*\*(\d+)\*\* with no value",
+         (len(_gk_files), _gk_rows_with_source, _gk_all, len(_gk_ans), len(_gk_noans))),
+        ("the names that come from the instant, and how many rows read them, on the page",
+         r"the painter takes `Date`, `Time` and `Week` from the instant it is handed rather "
+         r"than from any reading, the library's rows ask for \*\*(\d+)\*\* of those "
+         r"\*\*(\d+)\*\* names, and \*\*(\d+)\*\* rows read them",
+         (len(_gk_asked_clock), len(themes.CLOCKED), _gk_instant_rows)),
+        ("the numbers behind the note-line claim, on the page",
+         r"pins `cpu\.temperature` to \*\*(\d+)\.\d+\*\* a\s+temperature row reads "
+         r"`(\d+)°C`, where the same row reads `(\d+)°C` at the fixture",
+         (int(_gk_body_file), int(_gk_body_file),
+          int(_gk_FIX["cpu"]["temperature"]))),
+        ("the five generated layouts' census, which the page has quoted since 0.5",
+         r"it answers \*\*(\d+)\*\* of the \*\*(\d+)\*\* sources the five generated layouts "
+         r"ask, the \*\*(\d+)\*\* it leaves being the `Fan 3`/`Fan 4` slots",
+         (len(_gk_five_ans), len(_gk_five), len(_gk_five_noans))),
+        # the window's own `_adv_hide` list, counted in the window half above: what folds,
+        # how much of it is a loose row, and how much belongs to one of the three boxes
+        ("the fold, which feature G's box grew to twelve controls in three boxes",
+         r"the set by parent as well as by length: \*\*(\d+)\*\* controls, in \*\*(\d+)\*\* "
+         r"rows and \*\*(\d+)\*\* boxes",
+         (len(_gk_fold_all), _gk_fold_loose, _gk_fold_boxes)),
+):
+    _stated(_what, _gf, _pat, _mine)
+for _phrase in ("Pane readings", "main.read_metrics_file", "never remembered",
+                "peek_refusal", "the model's own sentence", "PEEK - this machine's",
+                "| pane readings | controls, advanced, folded"):
+    assert _phrase in _gf, (_phrase, "docs/gui.md stopped naming what this gate holds it to")
+assert "fixture and not live readings" not in _gf, (
+    "docs/gui.md still calls live readings unbuilt, and they are built - as a peek")
+# the four bullets are four, and each says what the gate proves about it
+# counted by their leads rather than by `* **`, because the flattened page has no line ends
+_gk_bullets = _re.findall(r"(?:The pane can also look at another body's readings"
+                          r"|The instant stays pinned, and the readings stay held"
+                          r"|A press on a peek is refused"
+                          r"|What a peek shows, the note lines say)", _gf)
+assert len(_gk_bullets) == 4, _gk_bullets
+print(f"  G's page figures     the library asks {_gk_all} `source` names across the "
+      f"{len(_gk_files)} layouts, the fixture answers {len(_gk_ans)} and leaves "
+      f"{len(_gk_noans)} ({', '.join(_gk_noans)}); the painter's {len(themes.CLOCKED)} "
+      f"instant names are asked by {len(_gk_asked_clock)} of them, read by "
+      f"{_gk_instant_rows} rows; `themes.values` answers {len(_gk_vals)} here and calls "
+      f"{len(_gk_abs)} absent on this machine ({', '.join(sorted(_gk_abs))}) - a set holding "
+      f"the five names above plus whatever else this box cannot read; and the five generated "
+      f"layouts "
+      f"alone ask {len(_gk_five)} names, answered {len(_gk_five_ans)} - the older sentence in "
+      f"docs/gui.md and docs/theme-editor.md quotes that pair, not the library-wide one")
+if _gk_live_vals != _gk_vals:
+    print(f"                        and one defect this cycle found in its own harness: the "
+          f"live `edit.FIXTURE` in this process answers {len(_gk_live_vals)} names, not "
+          f"{len(_gk_vals)} - it cannot answer {sorted(set(_gk_live_abs) - set(_gk_abs))} "
+          f"any more, because "
+          f"`Editor.fixture()` hands out `dict(FIXTURE)`, a shallow copy whose inner dicts are "
+          f"the module's, and a gate earlier in this section pops a reading out of what it is "
+          f"handed.  G's figures above are counted from a parse of `edit.py`'s own literal, so "
+          f"they describe the fixture the program draws at; the door's repair is a separate "
+          f"change, because repairing it moves the drawn box counts the page labels per machine")
+
+# ---- `edit.py`'s and `app.py`'s own comments: the shipped tree states the same counts ------
+_stated("the library census, in `edit.py`'s docstring", _gk_edit_src2,
+        r"the (\d+) rows carrying a `source` in the 28 layouts this pane opens ask for "
+        r"\*\*(\d+)\*\* distinct names, the pinned fixture answers \*\*(\d+)\*\* of them and "
+        r"leaves \*\*(\d+)\*\* with no value",
+        (_gk_rows_with_source, _gk_all, len(_gk_ans), len(_gk_noans)))
+assert "how much wider depends on what a given machine answers" in _gk_edit_src2, (
+    "`edit.py` states a machine-dependent size for `themes.values`' absent list again")
+assert _gk_fanpump <= set(_gk_abs), (sorted(_gk_abs),
+                                     "the fixture no longer leaves the fan and pump names "
+                                     "unanswered, and the pages say it does")
+_stated("the fold arithmetic, in `app.py`'s module docstring", _app_src,
+        r"folds away twelve secondary controls, in \*\*(\d+)\*\* rows and \*\*(\d+)\*\* boxes",
+        (_gk_fold_loose, _gk_fold_boxes))
+for _phrase, _why in (
+        ("which knob puts the editable frame back",
+         "`peek_sentence` names the fix, and says it in four things rather than three"),
+        ("The gate asserts both", "`peek_refusal` rests on the two frames disagreeing, and "
+                                  "says the gate will not print a count that is not there"),
+        ("the acts that write a number are refused with `peek_refusal`'s sentence",
+         "`fixture()` says the peek never goes through that door")):
+    assert _phrase in _gk_edit_src2, (_phrase, _why, "`edit.py` no longer says it")
+for _phrase, _why in (
+        ("Pane readings", "the folded box's name, which the docs and the gate both use"),
+        ("A peek is a look", "the combo's tooltip, in the window's own words"),
+        ("its file field rides the *mode*", "the enablement rule in `_ed_set_enabled`"),
+        ("the peek is not written to the session file",
+         "the peek is not remembered, said in the code that builds the box"),
+        ("the pinned frame stays up", "a refusal paints nothing new"),
+        ("it never hands the panel a", "a peek is a look at numbers, not a delivery")):
+    assert _phrase in _app_src, (_phrase, _why, "`app.py` no longer says it")
+
+for _phrase, _why in (
+        ("def read_metrics_file", "the one loader for `--metrics-file` and the pane's peek"),
+        ("a `STATE all 1` body is a JSON object, not a", "the non-object refusal, in words"),
+        ("A key starting with `_` is a comment in the file, not a section",
+         "the comment-key rule, spelled in exactly one place now"),
+        ("keeping the last good read", "the loop's half of the same door")):
+    assert _phrase in _gk_main_src, (_phrase, _why)
+
+# ---- the 0.6 stanza, themes.md, theme-editor.md and README: the record and the pages ------
+for _what, _pat, _mine in (
+        ("the instant names, in the 0.6 stanza",
+         r"the painter takes `Date`, `Time` and `Week` from the instant rather than from any "
+         r"reading, the library's rows ask for (\d+) of those (\d+) names and (\d+) rows read "
+         r"them",
+         (len(_gk_asked_clock), len(themes.CLOCKED), _gk_instant_rows)),
+        ("the numbers behind the note-line claim, in the 0.6 stanza",
+         r"\(`(\d+)°C` becomes `(\d+)°C` at a file body pinning `cpu\.temperature` to "
+         r"(\d+)\.\d+\)",
+         (int(_gk_FIX["cpu"]["temperature"]), int(_gk_body_file),
+          int(_gk_body_file))),
+):
+    _stated(_what, _gk_cl_top, _pat, _mine)
+_stated("the fold census, in the 0.6 stanza", _gk_cl_top,
+        r"The fold census moves with the new box: (\d+) secondary controls in (\d+) "
+        r"rows and (\d+) boxes",
+        (_gk_fold_all and len(_gk_fold_all), _gk_fold_loose, _gk_fold_boxes))
+for _phrase in ("**Pane readings**", "`main.read_metrics_file`", "PEEK", "never remembered",
+                "peek_refusal", "the four ways a metrics file can fail",
+                "the census of what moves", "loader door is checked in both"):
+    assert _phrase in _gk_cl_top, (_phrase, "the 0.6 stanza no longer says what was built")
+assert "an editor drawing live readings" not in _gk_cl_top.split("Still not built")[1], (
+    "the still-not-built bullet still lists live readings, and they shipped this cycle")
+assert "folds away the twelve secondary controls named further down" in _gf \
+    and "the pane-readings box in the controls column" in _gf, (
+    "docs/gui.md's own table no longer counts the fold the way the window does")
+assert "folds twelve secondary controls" in _gk_readme, "README counts the fold differently"
+assert "peeked" in _gk_readme, "README's editor paragraph has not heard of the peek"
+assert "in place of the first of those, is the **peek**" in _gk_tedit \
+    and "Live readings came in on" in _gk_tedit, (
+    "docs/theme-editor.md does not say where live readings came in")
+assert "not built, and not claimed: live readings" not in _gk_tedit.lower(), (
+    "docs/theme-editor.md still opens a canvas passage by calling live readings unbuilt")
+for _doc in ("docs/themes.md",):
+    _txt = " ".join(open(_doc, encoding="utf-8").read().split())
+    assert "**not** built is a resize" in _txt and "is a **peek**" in _txt, (
+        _doc, "the library page's not-built list no longer matches what shipped")
+# the page's D sentence: the invariant may be stated, the machine-dependent count may not.
+# `gate_g_census.py` asserts the invariant per row (one box, one answer) and prints the rows
+# whose offer moved with their boxes; a page quoting one machine's count would be a stale claim
+# the moment the other machine answered, so the digits stay off the pages by gate, not habit.
+for _src, _where in ((_gf, "docs/gui.md"), (_gk_cl_top, "the 0.6 stanza")):
+    assert "never consults a reading" in _src and "one box, one answer" in _src, (
+        _where, "the sentence separating D's rule from its drawn consequence is gone, and the "
+                "census no longer has a page to correct")
+    assert not _re.search(r"D's (?:grab )?squares? (?:moved|change) for \d+", _src), (
+        _where, "a page states one machine's count of rows whose offered squares moved")
+print(f"                        the pages, `edit.py`, `app.py`, `main.py` and the 0.6 stanza "
+      f"all carry those counts; the fold stands at 12 controls in 5 rows and 3 boxes; and no "
+      f"page calls live readings unbuilt any more")
+
 # a press on empty glass names the point and selects nothing, and closing the layout takes
 # the mark with it - the pane goes back to a live preview, with nothing drawn on it
+# The timer is stopped for this passage, and it is said rather than slipped: `_repaint` ends by
+# re-applying the selected row's marks, so a press that clears them clears them **until the next
+# frame** - and whether a frame lands inside the press's own event pumping is timing, not the
+# behaviour under test.  The fact that follows is the honest one: the mark comes back, because
+# the press said only that the *point* was nobody's row, and the row that was selected still is.
+win.preview_timer.stop()
 _free_pt = next((x, y) for y in range(0, render.H, 7) for x in range(0, render.W, 7)
                 if win.ed.hit(win._ed_notes, x, y) is None)
 _press(*_free_pt)
 assert "selects no row" in win.ed_note.text(), win.ed_note.text()
 assert win.preview.marks is None, win.preview.marks
+_gg_before = win.ed.index
+win._repaint()
+for _ in range(4):
+    appq.processEvents()
+assert win.ed.index == _gg_before and win.preview.marks, (
+    win.ed.index, _gg_before, win.preview.marks,
+    "a repaint did not bring the selected row's mark back: either the press changed the "
+    "selection, which the sentence above denies, or the mark is not chrome that follows the "
+    "selection - and docs/gui.md calls it chrome painted over the picture")
+win.preview_timer.start()
 win.ed_name.setCurrentText(app.NO_EDITOR)
 for _ in range(8):
     appq.processEvents()

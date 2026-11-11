@@ -105,8 +105,12 @@ them here instead, and both are gated in `tools/selftest.sh` rather than asserte
   choice rather than measured off the vendor's picture (`Time`, `CPU Frequency`,
   `Pump Speed`) are named in the same note.
 
-What is **not** built is an editor drawn from live readings, a resize that ignores
-what a kind owns, and a snap to a grid: there is no scale-everything handle, and there is no
+What is **not** built is a resize that ignores what a kind owns, and a snap to a grid:
+what *is* built, on 2026-11-11, is a **peek** - the editor's pane can be pointed at this
+machine's own readings, or at a JSON `STATE all 1` file the reader names through the same door
+`--metrics-file` uses, held rather than followed, drawn at the pinned instant, with every act
+that writes a number refused on it.  An edit is still judged only against the pinned fixture,
+and no peek is remembered or sent anywhere: there is no scale-everything handle, and there is no
 grid, because these files carry none - the gcd of every declared `x` and every declared `y` in
 the **185** placements of the **28** layouts the pane opens is 1.  What did go in, on
 2026-11-11, is a drag that can be pulled onto a number the *same file* already uses, 2 px at
