@@ -22,7 +22,7 @@ opening a layout puts that clip under the preview unless the reader has ticked *
 background* (docs/gui.md). The five themes this repository draws from `render.py` are not
 vendor pages, so there is no vendor record to read for them: they pair with the backdrop
 their own published picture is composited over, kept in `themes.CODE_CLIPS` and derived
-back out of the README's `<theme>-<clip>.mp4` names by `tools/selftest.sh` on every run.
+back out of the README's `<theme>-<clip>.mp4` names by `tests/test_theme_library.py`.
 Three of the four canvas-refused files name clips as
 well, and one names a `.png` rather than a clip - one more reason the refusal is keyed on
 a file's own `ratio` field rather than on what sits beside it.
@@ -45,8 +45,8 @@ a file's own `ratio` field rather than on what sits beside it.
 
 The same files also say what colour their lettering is, and the honest answer
 is **mostly white, not all**.  Counted across the 23 `480X480` layout files -
-the ones the panel's size, byte-identical to what the themes package installs, and
-re-derived by the suite's vendor-library section so the sentence cannot rot:
+the ones the panel's size, byte-identical to what the themes package installs, and counted
+from those files by `xigmalcd.themes.field_census` rather than kept by hand:
 
 | what | measured |
 |---|---|
@@ -87,7 +87,7 @@ only (docs/limits.md keeps that as an open item).
 
 All of that is about *this* program not sending those files, and it stays true: the panel
 is never handed a theme, and no plan here changes that. Two things follow from drawing
-them here instead, and both are gated in `tools/selftest.sh` rather than asserted here:
+them here instead, and both are gated in `tests/test_theme_library.py` rather than asserted here:
 
 * **23 of the 27, on the canvas.** The gate reads each file's own `ratio` field: 23 say
   `1:1` (480×480, the panel's size) and 4 say `4:3` (320×240). The four are refused, with
@@ -132,7 +132,7 @@ docs/gui.md).  What **is**
 built, since
 2026-11-08, is the window's `Layout` box - one layout, one widget, **every field that
 widget carries as a row of its own** (10 rows for a `text` widget through 18 for an
-`arc`), over the same model the suite drives headless: a layout file under
+`arc`), over the same model `tests/test_editor.py` drives headless: a layout file under
 `~/.config/xigmalcd/themes` is read before the vendor's copy of the same name, a copy
 made for editing is byte-identical to the file it came from (23/23), a save is atomic
 and keeps a `.bak`, and deleting your copy puts the vendor's back in front. All of it
@@ -175,8 +175,8 @@ process, with `/dev/xigma-no-such-port` never opened and no byte sent anywhere:
     `/usr/share/xigmalcd/themes/alpha/layouts/480X480/1757491588804.json`, and the name list
     comes out identical to the checkout's.  So the remedy for an installed service is the newer
     package.  (Labelled as this bench's measurement, because GitHub's runner has no such
-    directory: the suite counts the page's **23** against `themes.scan()`'s own selectable list,
-    and only looks inside that root on a machine that has one.)
+    directory: the **23** is `themes.scan()`'s own selectable count, and a reader only finds
+    files inside that root on a machine that has the package installed.)
 * and that remedy has now been read off a newer install on the same machine, the same day: the
     bench's `xigmatek-connect-lcd` and `-themes` packages went to **0.6**, built from this tree,
     and driven the same way - in process, `/dev/xigma-no-such-port` never opened - that build's
@@ -232,7 +232,7 @@ three-digit temperature appears.  A missing reading draws no arc and reads `--°
 fan with no reading reads `CPU FAN -- RPM` rather than going quiet.  See
 `xigmalcd/render.py` for the measured geometry (the ring's open-bottomed shape is the vendor
 skin's own - 269° of solid ink from 136° to 45° on its captured frame - drawn here at 260°
-from 140°), `tools/selftest.sh` for the check that keeps text off
+from 140°), `tests/test_gauges.py` for the check that keeps text off
 the stroke, and [Notes and known limits](limits.md) for what the fan figures can honestly show on a
 given board. Its background default is `media/Theme_25.mp4` - the clip
 the vendor app itself pairs with that theme - so the default picture is the Windows pairing,

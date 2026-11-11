@@ -1,3 +1,83 @@
+xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
+
+  * The offline checks move out of one shell file and into ordinary test files.
+    `tools/selftest.sh` - 13,869 lines in 22 sections, grown over six cycles -
+    is deleted, and what it checked is now 278 checks across 33 files in
+    `tests/`, run by the standard library: `python3 -m unittest discover -s
+    tests`.
+    Measured on this bench: about two minutes, against the 497 s the
+    runner timed the suite's own step at for the `v0.6` tag.  Nothing that
+    examined code was dropped on the way - the
+    wire, the encoder's loss budget, the copied library's painting, the export
+    parity, the substitutions a layout names, `alpha`'s special rows, the
+    window, the editor's model, the control socket, the panel worker's gates,
+    the background pairing - and everything that existed to re-quote a sentence
+    from a document went with it.
+
+  * `tests/fixtures.py` holds the isolation and the pinning once, which the
+    suite rebuilt inside each of its 22 sections: the repo root taken from this
+    file, `QT_QPA_PLATFORM=offscreen` before anything imports Qt, a temporary
+    `XDG_CONFIG_HOME` for the process and again per test, `XIGMA_SOCKET` pointed
+    at a path that does not exist so the window asks a socket before it would
+    ask a port, one pinned instant and four pinned bodies of readings, a
+    recording stub panel with deliberately no `send`, and the pixel helpers so a
+    "same picture" claim always answers with pixels and worst channel.  The
+    guard the old suite closed with - the sha256 of the real
+    `~/.config/xigmaui/config.json` unchanged - is `tests/test_zz_isolation.py`,
+    and its failure message names the two possible causes instead of just the
+    one.
+
+  * `tools/verify_manifest.py` replaces the suite's largest non-GUI section, the
+    2,910 lines titled "the vendor theme library: every copied byte against its
+    own manifest".  It re-hashes all 125 `files[]` entries - 27 backgrounds, 27
+    foregrounds, 27 layouts, 44 clips, 128,106,463 B - cross-checks `counts`
+    against `files` and against the tree, reports anything sitting in a scanned
+    directory that the manifest does not name, matches each layout's declared
+    background against the copied clip's hash, and asserts that the 27 encrypted
+    `.thm` containers XIGMATEK owns are recorded and absent: 66,300,082 B of
+    bytes this repository documents and does not ship.  0.12 s over the real
+    tree, and shown non-vacuous against a fake root with one deleted file, one
+    changed file, one extra file and one present container.
+
+  * A page stops carrying a figure that needs a gate per machine.  Where the
+    suite checked that a number in `docs/` equalled what this box measured, the
+    figure comes out of the page and the page names the command that prints it -
+    `xigmalcd --list-themes`, `tools/hotpath.py`, `tools/theme_check.py`,
+    `xigmalcd --version`.  That is what makes the document cuts in this release
+    safe rather than quietly stale, and it is also why the gates that counted
+    sections and re-read changelog sentences are gone rather than rewritten.
+
+  * Four fixes in the shipped code, each one surfaced by running a check
+    rather than by reading for style, and all four the same habit: reading a
+    file and leaving the handle to the garbage collector.
+    `xigmalcd/protocol.py`: `usb_label` read three sysfs attributes that
+    way, on every port scan and every session renewal - measured over one
+    `find_ports()` pass, 3 unclosed-file warnings before and 0 after, with
+    the answer unchanged (`/dev/ttyACM0  Xigmatek USB Device [1d6b:0109]`).
+    `xigmalcd/main.py`: the background upload read the whole file the same
+    way, in the loop that renews its session every 60 s.
+    `xigmalcd/themes.py`: `shape_of` and `copy_for_edit` read a layout file
+    the same way, on every editor open and every copy for editing - 27
+    unclosed handles over one pass of the copied library, 0 after.  And
+    `xigmalcd/main.py` defined `_run_action` **twice**, byte-identical,
+    since the baseline commit: one definition left, 33 lines of dead code
+    gone.
+
+  * CI gains `tests/` and `tools/verify_manifest.py` as steps, and a
+    `shellcheck` step over the shell that ships: measured here,
+    `install/install.sh` has no findings.  The job's `timeout-minutes` and apt
+    retries came from the 0.6 cycle; what changed since the tag is that a job
+    now fails fast rather than sitting six hours on a runner that cannot resolve
+    `*.ubuntu.com`.
+
+  * Version parity is one assertion over three places a reader meets the number
+    - `xigmalcd.__version__`, `pyproject.toml`, and the top `debian/changelog`
+    stanza - rather than a line inside the deleted suite.  The deb job still
+    compares the changelog with the tag, which only exists during a build.
+
+
+ -- Tamer Hassan <thameruddin@gmail.com>  Wed, 11 Nov 2026 22:05:00 +0200
+
 xigmatek-connect-lcd (0.6) resolute; urgency=medium
 
   * Released as `v0.6`, the first tag of a tree whose layout editor writes

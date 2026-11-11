@@ -3,8 +3,11 @@
 # without the author's hardware, and nothing pretends to re-derive the rest.
 #
 # What runs:
-#   selftest  tools/selftest.sh, the offline suite.  No port is opened, so a runner
-#             with no panel in it is exactly the right machine for it.
+#   checks    `tests/`, under the standard library's unittest, and
+#             `tools/verify_manifest.py` over the copied vendor library.  No port is opened, so
+#             a runner with no panel in it is exactly the right machine for it.  Through 0.6 this
+#             job ran `tools/selftest.sh` instead: one 13,869-line shell file making the same
+#             claims, now ordinary files and a fraction of the minutes.
 #   deb       dpkg-buildpackage -us -uc -b, then lintian on the result.
 #   install   apt install the .deb that job just produced, on a runner that had
 #             nothing of ours on it, then debian/tests/smoke - the checks that only
@@ -22,17 +25,17 @@
 # What no job here does: touch /dev/ttyACM0, send a frame, or claim anything about
 # real glass.  The measurements about the panel live in README.md and the docs/ set it
 # links, and in PROTOCOL.md, each with the bench log they came from; a runner cannot
-# re-derive those, so it does not cite them.  The two places where the suite could
-# reach for hardware are guarded and stay
-# guarded: the reset command runs here without --yes (xigmalcd/reset.py, and the
-# suite's own pyproject section asserts "dry run: nothing sent"), and the packaged
-# smoke test renders to a PNG in a temporary directory.
+# re-derive those, so it does not cite them.  The two places where a check could
+# reach for hardware are guarded and stay guarded: `xigmalcd-reset` runs here with no
+# arguments and `tests/test_packaging.py` asserts it prints "dry run: nothing sent"
+# (xigmalcd/reset.py), and the packaged smoke test renders to a PNG in a temporary
+# directory.
 #
 # The 146 MB themes package is not uploaded on a pull request - a reviewer of a code
 # change does not need somebody else's 146 MB, and the artifact storage is not free.
 # It is built on every run (so `dh_missing --fail-missing` and lintian still see it),
-# uploaded and installed on a tag, and the suite re-hashes those same files from the
-# checkout on every run anyway ("the vendor theme library" section).
+# uploaded and installed on a tag, and `tools/verify_manifest.py` re-hashes those same
+# files out of the checkout on every push anyway.
 
 name: package
 
@@ -49,40 +52,34 @@ concurrency:
 
 env:
   DEBIAN_FRONTEND: noninteractive
-  # apt's own knobs for a fetch that fails.  Added on 2026-11-11 after three pushes in a row
-  # (runs 137, 138, 139) sat in `sudo apt-get update` on `Temporary failure resolving
-  # ...ubuntu.com` - a resolver fault on GitHub's runner, in a job whose whole design point is
-  # that the suite itself needs no network.  The options are measured to parse here
-  # (`apt-get -s -o Acquire::Retries=2 -o Acquire::http::Timeout=20 install -y coreutils`, exit
-  # 0, no unknown-option warning).  What they did not do is fix a broken resolver: run 140, the
-  # first under this change, still could not get its lists and failed the step - in 25 minutes
-  # (16:31:53 to 16:57:03), three archives retried five times each over three attempts, which is
-  # why `Retries` is 2 and not 5.  The bound is the part that worked: nothing sat for GitHub's
-  # six-hour default, and the log says which side broke.  Run 141, forty minutes later, resolved
-  # everything and ran the suite - the fault was the runner's, and it moved on.
+  # apt's own knobs for a fetch that fails, added when three pushes in a row sat in
+  # `sudo apt-get update` on `Temporary failure resolving *.ubuntu.com` - a resolver fault on
+  # GitHub's runner, in jobs whose whole design point is that they need no network.  The
+  # options are measured to parse (`apt-get -s -o Acquire::Retries=2 -o Acquire::http::Timeout=20
+  # install -y coreutils`: exit 0, no unknown-option warning).  They do not fix a broken
+  # resolver; what they fix is the wait.  Retries=5 across three attempts once burned 25
+  # minutes of a job before it failed, so the bound is the point: a network fault should show
+  # up in minutes, with the log saying which side broke.
   APT: "-o Acquire::Retries=2 -o Acquire::http::Timeout=20"
 
 jobs:
-  selftest:
-    name: offline suite, no panel
+  checks:
+    name: the checks, no panel
     runs-on: ubuntu-26.04
-# How long this job has actually taken, read out of GitHub's own API rather than
-# guessed at: the v0.5 tag run (sha 5bf130e) measured selftest 3 min 28 s, deb
-# 1 min 5 s, install 1 min 34 s, release 20 s; today's run 136 measured selftest
-# 6 min 30 s, deb 1 min 11 s, install 38 s.  Every number below is at least four
-# times the larger of the two, so a slow suite still passes - and a job that cannot
-# reach the network fails in minutes instead of holding a runner for GitHub's
-# six-hour default, which is what three stalled `apt-get update` steps did today.
+# The timeouts are four times what the jobs take on a runner, read out of GitHub's own
+# durations rather than guessed at, so a slow machine still passes and a job that cannot
+# reach the network fails in minutes instead of holding a runner for GitHub's six-hour
+# default.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
-      - name: what the suite imports
-        # Not a guessed list: PIL, pyserial and PyQt6 are what tools/selftest.sh
-        # imports (its own header says so), desktop-file-utils is the one external
-        # command it looks for with `command -v`, and the two font packages are what
-        # xigmalcd/render.py resolves - the gauge-geometry section measures ink
-        # against the ring's stroke, so it is measuring *these* glyphs.
+      - name: what the checks import
+        # Not a guessed list: PIL, pyserial and PyQt6 are what `tests/` imports,
+        # desktop-file-utils, ffmpeg, tesseract and shellcheck are the external
+        # commands the checks ask for by name, and the two font packages are what
+        # xigmalcd/render.py resolves - the gauge checks measure ink against the
+        # ring's stroke, so they are measuring *these* glyphs.
         # requirements.txt and pyproject.toml name the same runtime deps for a pip
         # install; apt is the shorter way to the same three on this distro.
         #
@@ -93,28 +90,25 @@ jobs:
         # 2026-11-07.  The .deb has the same thing in `Suggests: ffmpeg`, and the
         # figures the assertion compares against are the ones README and docs/ quote.
         #
-        # tesseract-ocr is here for the other reason: the suite searches every published
-        # PNG for this panel's serial number, and a byte grep cannot see a picture - that
-        # is how the serial got into the README's advanced-mode capture and stayed there
-        # from 2026-11-08 to 2026-11-10.  The gate says out loud when the tool is missing,
-        # so on 2026-11-10 the first CI run of it printed "the pixel half of this check
-        # did NOT run"; installing it is what makes that half run where the tree is
-        # published from.  It stays out of the package: this is a check, not a feature.
+        # tesseract-ocr is here for the privacy check: `tests/test_no_serial.py` reads every
+        # published PNG for this panel's serial number, because a byte grep cannot see a
+        # picture - that is how a serial sat in the README's advanced-mode capture for two
+        # days.  The check says out loud when the tool is missing, so having it installed is
+        # what makes that half run where the tree is published from.  It stays out of the
+        # package: this is a check, not a feature.
         #
         # shellcheck is here for the shell that ships.  Measured on this bench: `install/install.sh`
-        # has no findings at all, so this step exists to keep it that way and costs a second.  The
-        # exclusion of `tools/selftest.sh` is explained by the step "the shell this repository
-        # ships", below.
+        # has no findings at all, so the step exists to keep it that way and costs a second.
         run: |
           ok=""
           for i in 1 2 3; do
             if sudo apt-get $APT update; then ok=1; break; fi
-            echo "  apt-get update failed, attempt $i of 3 - runs 137, 138 and 139 today all"
-            echo "  stopped exactly here, on a runner that could not resolve *.ubuntu.com"
+            echo "  apt-get update failed, attempt $i of 3, on a runner that could not"
+            echo "  resolve *.ubuntu.com - which is the runner's fault, not this tree's"
             sleep 20
           done
           test -n "$ok" || { echo "  no package lists after three attempts: this is the runner's"
-                             echo "  network, not this tree's suite, and the suite is what the"
+                             echo "  network, not this tree's checks, and the checks are what the"
                              echo "  job exists to run"; exit 1; }
           sudo apt-get $APT install -y --no-install-recommends \
             python3 python3-pil python3-serial python3-pyqt6 python3-setuptools \
@@ -124,10 +118,10 @@ jobs:
           ffmpeg -version | head -1
           tesseract --version | head -1
 
-      - name: tests/ - the checks that are moving out of the suite
-        # 0.7 cycle: `tools/selftest.sh` (13,869 lines, 22 sections) is being replaced by ordinary
-        # test files in `tests/`, run by the standard library. Both run for now; the suite is the
-        # one that goes. Nothing here needs a dependency the step above does not already install.
+      - name: tests/
+        # Ordinary test files, run by the standard library: no runner, no plugin, nothing a fresh
+        # clone cannot do.  This replaced `tools/selftest.sh`, 13,869 lines of shell and heredoc,
+        # in the 0.7 cycle.
         run: python3 -m unittest discover -s tests -v
 
       - name: the copied vendor library against its own manifest
@@ -136,18 +130,13 @@ jobs:
         # what replaces the suite's 2,910-line version of the same claim.
         run: tools/verify_manifest.py
 
-      - name: tools/selftest.sh
-        run: tools/selftest.sh
-
       - name: the shell this repository ships
-        # Two tracked `.sh` files: `install/install.sh`, the installer a person runs, and
-        # `tools/selftest.sh`, the offline suite being replaced in this cycle.  Measured here,
-        # install.sh has 0 findings and selftest.sh has 2 style notes - one `cd` without `|| exit`
-        # at line 7, one `ps | grep` where `pgrep` exists at 13,851 - both in lines that will not
-        # exist at 0.7.  So the suite is excluded by name rather than dressed up on the way out:
-        # the check that would have to keep passing after its deletion is the one over install.sh.
+        # `install/install.sh` is the only shell left: the offline suite used to be the other one,
+        # and it is deleted in this cycle.  Measured here before that deletion, install.sh had no
+        # findings and the suite had 2 style notes, both on lines that no longer exist.  The step
+        # costs about a second and exists to keep install.sh that way.
         run: |
-          files=$(git ls-files '*.sh' | grep -v '^tools/selftest\.sh$')
+          files=$(git ls-files '*.sh')
           echo "  linting: $files"
           test -n "$files" || { echo "  no shell files found: this step would be checking nothing"
                                 exit 1; }
@@ -155,68 +144,9 @@ jobs:
           # shellcheck disable=SC2086
           shellcheck $files
 
-      - name: README's section count is the suite's section count
-        # README's "Where the detail lives" page says how many offline sections the
-        # suite has, docs/packaging.md repeats it, and debian/changelog says it in the
-        # packaged form.  All are digits someone has to remember, so here is the
-        # arithmetic: a section added without updating the prose fails CI, which is
-        # cheaper than a document that quietly becomes folklore.
-        run: |
-          python3 - <<'PY'
-          import re
-          # Spelled out rather than remembered: a suite section is added more often than
-          # this file is read, and hand-listing the words means the count runs out at some
-          # number and the failure stops being about the documents.  `\b[\w-]+` matters just
-          # as much - `\w+` would read "twenty-one" as "one", which is a real number and
-          # quietly under the limit, so the gate would report "none of them is today's 21"
-          # for a sentence that says exactly 21.
-          _LOW = ("zero one two three four five six seven eight nine ten eleven twelve "
-                  "thirteen fourteen fifteen sixteen seventeen eighteen nineteen").split()
-          words = {w: i for i, w in enumerate(_LOW)}
-          for _t, _v in (("twenty", 20), ("thirty", 30), ("forty", 40), ("fifty", 50)):
-              words[_t] = _v
-              for _i, _u in enumerate(_LOW[1:10], start=1):
-                  words[f"{_t}-{_u}"] = _v + _i
-          n = sum(1 for ln in open("tools/selftest.sh", encoding="utf-8")
-                  if ln.startswith('echo "== '))
-          where = ["README.md", "docs/tools.md", "docs/packaging.md"]
-          # A released changelog stanza is a record of the suite *that release*
-          # shipped with: the 0.2 stanza saying "seventeen" is true about 0.2 and
-          # rewriting it to the tree's count would be falsifying it.  So the rule
-          # has two halves.  Nothing may claim more than the tree has - that is
-          # the stale-high case a reader would be misled by - and every file that
-          # speaks about working here today has to state the current number.  The
-          # changelog's top stanza is the tree's own entry, checked against it.
-          bad = []
-          for path in where:
-              claims = [words.get(c.lower()) for c in
-                        re.findall(r"\b([\w-]+) offline sections",
-                                   open(path, encoding="utf-8").read())]
-              if any(c is None for c in claims):
-                  bad.append((path, "an unrecognised number word"))
-              elif any(c > n for c in claims):
-                  bad.append((path, [c for c in claims if c > n], f"> {n}"))
-              elif n not in claims:
-                  bad.append((path, claims, f"none of them is today's {n}"))
-          top = re.search(r"^(\S+) \(([^)]+)\)[^\n]*\n(.*?)(?=\n\S.*\n|\Z)",
-                          open("debian/changelog", encoding="utf-8").read(),
-                          re.S)
-          top_claims = [words.get(c.lower()) for c in
-                        re.findall(r"\b([\w-]+) offline sections", top.group(3))] if top else []
-          if top_claims != [n]:
-              bad.append(("debian/changelog (top stanza)", top_claims,
-                          f"must state {n} and only {n}"))
-          if bad:
-              print(f"the suite has {n} sections, but these files disagree: {bad}")
-              raise SystemExit(1)
-          print(f"  {n} offline sections, and README, docs/tools.md, "
-                f"docs/packaging.md and the tree's own changelog entry all say so; "
-                f"older stanzas may keep the counts they were written against")
-          PY
-
   deb:
     name: build the .deb files
-    needs: selftest
+    needs: checks
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
@@ -527,11 +457,11 @@ jobs:
             echo "tree says what was done to obtain those files; nothing here licenses"
             echo "them."
             echo
-            echo "Nothing in this run touches a panel. The offline suite"
-            echo "(\`tools/selftest.sh\`), the build, \`lintian\`, and the post-install"
-            echo "checks (\`debian/tests/smoke\`) all pass with no serial port present,"
-            echo "and the suite's own reset gate check asserts that \`xigmalcd-reset\`"
-            echo "without \`--yes\` prints the frame and sends nothing."
+            echo "Nothing in this run touches a panel. The offline checks (\`tests/\`),"
+            echo "the build, \`lintian\`, and the post-install checks"
+            echo "(\`debian/tests/smoke\`) all pass with no serial port present, and"
+            echo "\`tests/test_packaging.py\` asserts that \`xigmalcd-reset\` with no"
+            echo "\`--yes\` prints the frame and sends nothing."
             echo
             echo "The same install-and-check pair has also been run on real hardware"
             echo "that happens to be a desktop rather than a runner: the author's bench,"

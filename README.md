@@ -123,7 +123,7 @@ And these are real captures from live system (simple vs advanced mode), taken be
 with this bench's panel serial painted out of the status box: the `conn 1` reply names
 it, a screenshot keeps that as pixels rather than bytes, and the serial is the one fact
 that stays on the bench (docs/limits.md and docs/packaging.md keep the account, and the
-suite OCRs every published PNG to keep it that way):
+`tests/test_no_serial.py` OCRs every published PNG to keep it that way):
 
 ![xigmaui, simple mode](docs/xigmaui1.png)
 
@@ -201,9 +201,9 @@ names, so the default glass is what `ALPHA` showed you on Windows.
 | [PROTOCOL.md](PROTOCOL.md) | the wire: the handshake, the frame format, the media upload, the session limit — every claim from a capture |
 
 Everything in those files is measured on the author's bench or read out of a kept log,
-and the gaps are named as gaps. `tools/selftest.sh` runs the twenty-two offline sections
-that hold the claims which do not need hardware — it is what CI runs first, on a machine
-that has never seen a panel.
+and the gaps are named as gaps. The claims that do not need hardware live as ordinary
+tests in [`tests/`](tests/), run by the standard library — `python3 -m unittest discover
+-s tests` — and that is what CI runs first, on a machine that has never seen a panel.
 
 ## How the protocol works
 
@@ -211,8 +211,8 @@ See **[PROTOCOL.md](PROTOCOL.md)** — frame format, the checksum rule, the vend
 escaping (`0x5A` → `5B 01`, `0x5B` → `5B 02`, counted nowhere), how replies are matched
 to requests (`AckNumber = SeqNumber + 1`), the command set, the upload sequence, the
 session limits, and how to read the vendor app yourself. It is written out of captures of
-the Windows app talking to this panel, and the offline suite re-checks that code against
-those same captures: **181** host→panel frames re-encoded with **0** disagreeing with
+the Windows app talking to this panel, and `tools/verify_protocol.py` re-checks that code
+against those same captures: **181** host→panel frames re-encoded with **0** disagreeing with
 `xigmalcd/protocol.py`, and **267** replies read against the checksum rule with all of
 them passing.
 
@@ -234,5 +234,5 @@ down.
 
 The protocol was recovered by watching the Windows app talk to a panel that this
 project then drove from Linux; the notes on how, and the captures themselves, are in
-[PROTOCOL.md](PROTOCOL.md). [docs/handoff-2026-11-05.md](docs/handoff-2026-11-05.md) is
-the record of how that discovery went, kept as history rather than as current state.
+[PROTOCOL.md](PROTOCOL.md), which is the record of how that discovery went - what was
+watched, what was measured, and what was inferred and later corrected.

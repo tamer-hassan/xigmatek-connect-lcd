@@ -13,8 +13,17 @@ worst channel delta 0. `alpha` was the one that had to earn its keys; `bars` was
 that had to earn a change to its own drawing, and what that took is written out under
 "The last theme, and the shape it turned out to need" below.
 
-Stage 3, the file model, is in - what it measured is written out under "What building the file model measured" below. **Stage 4 is in, in the two changes the plan named**: `xigmaui/edit.py` is the editor's model, and the window's layout-editor row is a shell over it - what that half measured is under "What the editor's first half measured". Then the canvas in that same pane: press a row's ink box to select it, drag it, nudge it with the arrow keys - under "What the canvas half measured". What is still missing there is the pane drawing live readings instead of the pinned fixture, and any way to snap a row to a grid or to a neighbour. Stage 5 (docs and census) and stage 6 (the glass pass) are not built. Every census figure below is re-derived by `tools/selftest.sh`'s vendor-library
-section, so it cannot rot in place. The decisions are
+Stage 3, the file model, is in - what it measured is written out under "What building the file
+model measured" below. **Stage 4 is in, in the two changes the plan named**: `xigmaui/edit.py` is
+the editor's model, and the window's layout-editor row is a shell over it - what that half
+measured is under "What the editor's first half measured". Then the canvas in that same pane:
+press a row's ink box to select it, drag it, nudge it with the arrow keys - under "What the canvas
+half measured". What is still missing there is the pane drawing live readings instead of the
+pinned fixture, and any way to snap a row to a grid or to a neighbour. Stage 5 (docs and census)
+and stage 6 (the glass pass) are not built. Every census figure below is computed from the files
+in this tree -
+`themes.scan()`, `themes.field_census()` and the layout files themselves - so it cannot rot in
+place. The decisions are
 settled with the owner; the census is measured out of the files in this tree on the same
 date, and each figure says where it came from, so that a reader can re-run it rather than
 take it on trust. Where a number is a computation under a stated assumption, it says so -
@@ -87,8 +96,9 @@ docs/limits.md: 43 clips and 28 images per install, 40 of 43 clips 480×480 and 
 
 ## What runs today, and what does not
 
-(The figures in this section are the ones `tools/selftest.sh` re-derives on every run, in
-the vendor-library section, from the shipped files - not a snapshot of a one-off pass.)
+(Every figure in this section is a computation over the shipped files, not an observation of
+one machine, and `tests/test_theme_library.py` recomputes the source census on every run and
+pins the counts it finds.)
 
 - **14 of the 23 480×480 themes use only sources `sensors.collect()` already produces.**
   That figure is a computation, not an observation: it pairs the 12 named sources above
@@ -151,8 +161,8 @@ the vendor-library section, from the shipped files - not a snapshot of a one-off
 
 ### What building the file model measured (stage 3, 2026-11-08)
 
-All of this is printed by `tools/selftest.sh` in the vendor-library section, on a temp
-`XDG_CONFIG_HOME`, and nothing in it is written outside that directory.
+All of this is re-run by `tests/test_theme_files.py`, on a temporary `XDG_CONFIG_HOME`, and
+nothing in it is written outside that directory.
 
 * **Every shipped layout is reproducible from its own parsed content: 27/27.** One
   indentation (1 space), sorted keys, newline-terminated, and the only thing the vendor's
@@ -918,7 +928,8 @@ pane over that, and since 2026-11-10 the rows themselves - added as a copy of a 
 already draws, removed down to but never including the last one, reordered through the
 list that *is* the draw order, and stretched at its edges through the size keys its kind
 owns; `--export-theme`, `--list-specials`, `--check-theme` and
-`--print-theme-fields`, each gated in `tools/selftest.sh`; and since 2026-11-11 the pane's
+`--print-theme-fields`, each gated in `tests/test_theme_files.py` and `tests/test_editor.py`;
+and since 2026-11-11 the pane's
 **peek** - `main.read_metrics_file` and `sensors.collect()` feeding `Editor.paint` while
 `Editor.fixture()` stays the only pair any writing door goes through, `peek_sentence` and
 `peek_refusal` owning the words the window shows, and the fold census at twelve controls in

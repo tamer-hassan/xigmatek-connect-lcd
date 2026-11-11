@@ -36,7 +36,7 @@ headless box. Three console scripts are declared: `xigmalcd`, `xigmaui`, and
 `xigmalcd-reset` - the vendor's panel reset, `xigmalcd/reset.py`, which exists as a command
 because a system that came from a `.deb` has no `tools/` directory to run and no other way
 back once the panel's `logo`/`mode` read `2147483647` ([If the panel goes white](troubleshooting.md)).
-`tools/selftest.sh` reads `pyproject.toml` to keep all of that true: both packages listed,
+`tests/test_packaging.py` reads `pyproject.toml` to keep all of that true: both packages listed,
 PyQt6 in the extra and not in the base dependencies, all three console-script targets
 resolving to something callable, and that third one sending nothing when it is called
 without `--yes`. Run from a checkout, the first two are `python3 -m xigmalcd` and
@@ -78,7 +78,7 @@ its own icon, which is why the `.desktop` entry names it by path instead of an i
 name). The installer regenerates that PNG only if it is
 missing or empty, and then validates the entry with `desktop-file-validate` when that
 command exists, so a broken `.desktop` is caught at install time rather than by a menu
-that silently shows nothing. `tools/selftest.sh` checks the shipped `.png` and validates
+that silently shows nothing. `tests/test_launcher.py` checks the shipped `.png` and validates
 the template the same way, with no install step involved. The entry has one extra
 action, **Start in the tray only** (`python3 -m xigmaui --hidden`), for when the window
 is a control panel you keep out of the way; it needs a desktop with a tray, and the

@@ -844,8 +844,9 @@ re-helloes without pushing it again.
   0.2 and measures 4.50).
 * **Brightness first, because the glyphs are white where it matters** - ours, and the theme
   ALPHA has actually selected: 6 of its 6 `textColor` values are `rgba(255, 255, 255, 1)`.
-  Counted across the library rather than assumed, and re-derived by `tools/selftest.sh` from
-  the 23 `480X480` layout files the themes package installs: **106** `textColor` values,
+  Counted across the library rather than assumed, and countable again from the 23
+  `480X480` layout files the themes package installs
+  (`xigmalcd.themes.field_census`): **106** `textColor` values,
   **88** of them that white, **9** distinct spellings, **18** of the 23 files uniform and
   **5** carrying other colours for at least some of their lettering (`rgba(62, 62, 62, 1)`
   six times, `rgba(34, 31, 31, 1)` four, one `rgba(0, 0, 0, 1)`, one `rgba(3, 0, 34, 1)`).
@@ -1256,7 +1257,7 @@ topic registry above is current. What that package adds is *content*:
     throughout the watched sitting, so both gauges were filled a little under half: the
     mid-range case, not the red end of the ramp and not a three-digit value.
   * **What the accepted file does give up, so the trade cannot go quietly stale.** Measured
-    offline on one ringed frame, printed by `tools/selftest.sh` on every run: the RGBA file is
+    offline on one ringed frame, measured by `tests/test_encoder.py` on every run: the RGBA file is
     **40 777 B and bit-exact**, the indexed file is **12 176 B** and keeps a graded alpha but
     moves it at **36 145 of 230 400 pixels by up to 28/255** and shifts the colour at **12 660
     pixels by up to 26**. Of **11 149 pixels drawn fully opaque, only 74 keep alpha 255**,

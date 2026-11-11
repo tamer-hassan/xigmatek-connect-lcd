@@ -61,7 +61,7 @@ echo "== the clips the package installed are the ones the code finds"
 # $XIGMA_MEDIA unset and no checkout in the picture: /usr/share/xigmalcd/media has to
 # answer on its own, which is exactly the case that was broken before the roots were
 # made installation-aware (xigmalcd/main.py:media_roots).  md5 is the vendor's own
-# clip, the same value tools/selftest.sh pins from a checkout.
+# clip, the same value `tests/test_pinned_metrics.py` pins from a checkout.
 test -z "${XIGMA_MEDIA:-}" || { echo "  XIGMA_MEDIA is set; unset it for this test"; exit 1; }
 python3 - <<'PY'
 import hashlib, os
@@ -110,7 +110,7 @@ if _lib:
           f"from {_want_roots[-1]}, and the three vendored clips still answer from media/")
 print(f"  roots         {m.media_roots()}")
 PY
-say "vendored clips" "3 clips, sizes and md5 as pinned in tools/selftest.sh"
+say "vendored clips" "3 clips, sizes and md5 as pinned in tests/test_pinned_metrics.py"
 
 echo
 echo "== one frame, drawn with no panel in the loop"
@@ -312,7 +312,7 @@ if ! dpkg -s xigmatek-connect-lcd-themes >/dev/null 2>&1; then
 else
     test -f "$lib/manifest.json" || { echo "  missing $lib/manifest.json: FAILED"; exit 1; }
     # Every file the manifest recorded, hashed in the layout the package installed it
-    # into: the same check tools/selftest.sh runs in a checkout, run here against the
+    # into: the same check `tools/verify_manifest.py` runs in a checkout, run here against the
     # bytes that actually got packaged.
     python3 - "$lib" <<'PY'
 import hashlib, json, os, sys

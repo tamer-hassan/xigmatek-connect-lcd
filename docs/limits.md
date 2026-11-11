@@ -227,8 +227,8 @@ What has been measured on glass, by whom, with how many frames - and what has no
    package vendors were roots: `--theme Theme_07` drew the layout while `--mp4
    Theme_07.mp4` could not name the file sitting beside it in the package installed next
    door.  The media roots still come first, so the session default is `media/Theme_25.mp4`
-   on every box; the installed test pins the 23 and the clip-roots section of
-   `tools/selftest.sh` pins the order, with a planted name that both kinds of root
+   on every box; the installed test pins the 23 and
+   `tests/test_media_roots.py` pins the order, with a planted name that both kinds of root
    hold.  The vendor's encrypted `.thm` containers are not in the package: they were in
    the 0.1 and 0.2 packages, and
    since 0.3 the manifest records them by vendor path, byte count and sha256 only.  The
@@ -287,7 +287,7 @@ What has been measured on glass, by whom, with how many frames - and what has no
   whichever is wider, never pushed below 16. Measured with our font at the anchors the theme
   draws at: `CPU FAN 2400 RPM` inks 192 px (x 28-220) at font 20 with ink y 250-265 - 29 px
   clear of `CPU USED`'s ink, which starts at y 294, and clear of its gauge ring's stroke, which
-  is what `tools/selftest.sh` asserts rather than trusts. The other tachometers this board
+  is what `tests/test_gauges.py` asserts rather than trusts. The other tachometers this board
   reports (`Fan System 5`, a pump on a box that has one) no longer get glass space - two
   figures, one per temperature - but they are still sent: everything `sensors.fans()` reads
   rides into the metrics blob, whose `fans` section
@@ -309,7 +309,7 @@ What has been measured on glass, by whom, with how many frames - and what has no
   the 260°
   *and* its colour, green at 30 °C through amber at 62 to red at 100, clamped at both ends,
   with the unfilled part left as a translucent track (`A26_ARC_TRACK`) so the ring reads as a
-  gauge even at 30 °C. A column with no reading draws **no arc at all**: `tools/selftest.sh`
+  gauge even at 30 °C. A column with no reading draws **no arc at all**: `tests/test_gauges.py`
   samples 161 points along the middle of the stroke and asserts 0 of them are painted.
   What it costs, offline: painted pixels go from 8.7 % (the vendor's own skin frame, 19 969 of
   230 400) to 17.7 % (40 806), the rings themselves being 12 786 of them; one `render.draw`
@@ -354,11 +354,12 @@ What has been measured on glass, by whom, with how many frames - and what has no
   a comment in the file, not a section; a file that stops parsing logs one line and keeps the
   last good read rather than stopping the loop, and a fresh process with a broken file falls
   back to the real sensors rather than resurrecting the old fake. Three fixtures are kept in
-  `tools/metrics/` (`pin-104.json`, `pin-96.json`, `pin-no-cpu-temp.json`); `tools/selftest.sh`
-  checks the offline half of the promise - pinned, the same upload call sends **0** metrics
+  `tools/metrics/` (`pin-104.json`, `pin-96.json`, `pin-no-cpu-temp.json`);
+  `tests/test_pinned_metrics.py` checks the offline half of the promise - pinned, the same upload
+  call sends **0** metrics
   blobs where unpinned it sends **1**; the pinned 104 frame fills the whole 260° of arc
-  (**1 298** samples along the stroke's middle) and its outer colour `(255, 66, 64)` matches the
-  ramp's own hot tip `(255, 64, 64)`; a section with no temperature paints **0** samples.
+  over 1 200 samples along the stroke's middle) and its outer colour matches the ramp's own
+  hot tip within 12; a section with no temperature paints no samples at all.
   What it costs on the wire, all of it with nothing refused: the filled red arc is
   **14 253-14 439 B** a frame at 104 °C (`data/glass/2026-11-07-005051-pin-104-3digit.txt`,
   **46 of 46**) and **14 528-14 557 B** at 96 °C
@@ -392,7 +393,10 @@ What has been measured on glass, by whom, with how many frames - and what has no
   watching), and 2026-11-07 at 00:24:34 / 00:25:40 / 00:26:46 was watched, with the encoder in
   each window's on-screen heading, and the owner's verdict was **"no difference I could see"**
   (**61 of 61**, **61 of 61**, **31 of 31**; 42 560-46 415 B against 12 169-12 401 B). What the
-  indexed file does give up, printed by `tools/selftest.sh` on every run so it cannot go stale:
+  indexed file gives up is re-measured offline, one frame at a time, by
+  `tests/test_encoder.py` - which asserts bounds, not these counts. The figures below are what
+  one alpha-overlay frame gave when they were first counted, and they are a record of that
+  measurement:
   it keeps a graded alpha, and the half-transparent gauge track - 4 029 pixels at alpha 150 -
   comes back within 11/255, but PIL's octree quantiser treats RGBA as one four-channel colour,
   so of 11 149 pixels drawn fully opaque only **74** still carry alpha 255, and the gauge ramp,
@@ -451,9 +455,11 @@ What has been measured on glass, by whom, with how many frames - and what has no
   down: nothing inside `docs/` can honestly say "the picture above", and the encoding
   settings are x264's (`crf 20`, `preset medium`) rather than a palette's.
 
-  Every figure in this table is printed by `tools/selftest.sh` from the written files on
-  every run, and it came out identical across four runs on 2026-11-08 - two of them with the
-  machine's own zone set to UTC, which is how the clock-zone bullet below was found:
+  Every figure in this table was read out of the written files by the 0.6 offline suite, and
+  came out identical across four runs on 2026-11-08 - two of them with the machine's own zone
+  set to UTC, which is how the clock-zone bullet below was found. At 0.7 nothing re-derives
+  this table: `ffprobe` over `docs/videos/*.mp4` recomputes any row of it, and the six rows are
+  a record of that run rather than a claim a check holds up.
 
   | the file | frames | length | rate | bytes | clip → field luma | glyph − halo | moved over 3 s: drawn / untouched |
   |---|---|---|---|---|---|---|---|
@@ -746,19 +752,21 @@ What has been measured on glass, by whom, with how many frames - and what has no
   `conn 1` reply the window shows happens to name it.  What had been holding the rule was
   grepping the staged diff, and a staged diff is bytes: it cannot see a picture.  The field
   is painted out now (`docs/packaging.md` keeps the account and the byte cost), and
-  `tools/selftest.sh` searches both halves of the serial through every published text file
-  and every published PNG, by OCR where `tesseract` is installed and saying so where it
+  `tests/test_no_serial.py` searches both halves of the serial through every published text
+  file and every published PNG, by OCR where `tesseract` is installed and saying so where it
   is not.  The published history still holds the file as it was, and the owner decided on
   2026-11-10 to **leave it**: a device serial number on a panel nobody else can address is
   not a credential, and rewriting history would move the tagged releases and the assets
   published from them for no gain.  What is enforced from here forward is the picture, not
   the past.
-  **What that costs, said plainly:** a clone cannot re-run `tools/verify_protocol.py`,
-  `tools/theme_check.py --arc`, or the two `tools/selftest.sh` sections that call them.
-  Every wall-clock, byte-count and pixel figure in this README and in `PROTOCOL.md` names the
-  bench file it was read out of, so that the run can be **repeated** rather than trusted — not
-  so that it can be read here.  Those tools, and both selftest sections, print that they
-  skipped instead of reporting a pass.
+  **What that costs, said plainly:** a clone cannot re-run `tools/verify_protocol.py` or
+  `tools/theme_check.py --arc`, because the captures and the vendor install they read are not
+  in the repository. Every wall-clock, byte-count and pixel figure in this file and in
+  `PROTOCOL.md` names the bench file it was read out of, so that the run can be **repeated**
+  rather than trusted — not so that it can be read here.  `tools/verify_protocol.py` is the
+  one place the wire claims are re-encoded against the captures, and
+  `tests/test_protocol.py` prints its command line and says out loud that a clone has no
+  captures, rather than reporting a pass it did not make.
 
 **Drawing one of ALPHA's own layouts, and what that cannot show.** 23 of the 27 copied
 layouts are pickable (`--theme Theme_07`, and `--list-themes` prints the set); 4 are

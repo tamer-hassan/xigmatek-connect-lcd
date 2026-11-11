@@ -31,7 +31,7 @@ the systemd unit - `debian/xigmalcd.service`'s `ExecStart` is `/usr/bin/xigmalcd
 alpha --fps 2` and `debian/tests/smoke` fails an install whose unit ever grows
 `--allow-reset`. The control socket refuses `reset` unless the display loop was started
 with `--allow-reset`, and the window quotes that refusal rather than working around it.
-And without `--yes` the command is a printout: `tools/selftest.sh` asserts "dry run:
+And without `--yes` the command is a printout: `tests/test_packaging.py` asserts "dry run:
 nothing sent" plus the 109-byte frame length, from the entry point itself, and
 `debian/tests/smoke` asserts the same two things against `/usr/bin/xigmalcd-reset` after
 an install.

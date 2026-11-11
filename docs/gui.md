@@ -24,7 +24,7 @@ the author's model - every measurement in this repo was taken on a Connect 360, 
 Connect has been tested, and the entry just declines to tell the owner of another Connect
 that this is not for their port. `connect 360` stays in the entry's `Keywords`, and the
 window's own title bar and tray tooltip say the same thing as the menu (`xigmaui/app.py`,
-checked against both files by `tools/selftest.sh`).
+checked against both files by `tests/test_packaging_parity.py`).
 
 **It has two roles and picks one at startup by looking.** Only one process can hold
 the port (PROTOCOL.md §1), so:
@@ -1076,8 +1076,8 @@ the suite asserts both halves. Two cases are said out loud rather than left to b
   `themes.CODE_CLIPS`. That is not a guess and not a vendor record either: the vendor
   library has no page for a theme it did not draw, so the honest source is this project's
   own pictures - the README's MP4s are named `<theme>-<clip>.mp4` for it, and
-  `tools/selftest.sh` derives the set back out of those file names on every run and fails
-  if the table disagrees. The amber-ink figure (`alpha-Theme_25-amber.mp4`) drops out of
+  `tests/test_theme_library.py` derives the set back out of those file names on every run and
+  fails if the table disagrees. The amber-ink figure (`alpha-Theme_25-amber.mp4`) drops out of
   that derivation by itself, because its clip part is not a file any media root holds.
   `clock` is the one backdrop that is bright, so pairing it brings the scrim plate with it
   - the same luma rule as everywhere else, not a per-theme setting. A layout *you* authored
@@ -1316,12 +1316,13 @@ having failed. Both are fixed in `tools/display_glass.py`, which now waits for t
 own `background <name> accepted` / `did not land` event and writes a refusal down as what
 the panel answered. The last two runs are the ones that ran with those fixes in place.
 
-And one claim above that the first three logs do **not** support, found by
-`tools/selftest.sh` rather than by reading: the phase named "the command-line client" was
+And one claim above that the first three logs do **not** support, found by a check rather
+than by reading: the phase named "the command-line client" was
 wired to the same body as the plain status reads, so the subprocess that runs
 `python3 -m xigmalcd --status` was never started, and those three logs contain no line from
-it. The driver has a phase kind of its own now, and the selftest compares the driver's phase
-table against its table of bodies so a phase cannot silently point at the wrong thing again.
+it. The driver has a phase kind of its own now, and `tests/test_glass_ledger.py` compares the
+driver's phase table against its table of bodies so a phase cannot silently point at the wrong
+thing again.
 The fourth run is the one that shows the separate client: three lines from the subprocess,
 counters included, and the display never noticed the difference.
 
@@ -1359,8 +1360,10 @@ still running when it was read: `/usr/bin/xigmalcd --theme alpha --fps 2`, one p
 `NRestarts=0`. The evidence is the unit's own journal plus reads
 over the control socket, kept as `data/glass/2026-11-07-072155-service-2fps-journal.log`,
 and it is thinner by design than a `tools/display_glass.py` log: no phases, no per-frame
-byte sizes. `tools/selftest.sh` re-derives every number in the table below out of that
-file rather than trusting this prose. What it says, at two instants of the same process:
+byte sizes. The table below was read out of that file when the run was fresh; at 0.7 nothing
+re-derives it, and `python3 tools/log_timeline.py <that log>` prints the same session's
+sequence for anyone who wants to re-count it. What it says, at two instants of the same
+process:
 
 | | at 13.9 min (07:36) | at 47.7 min (08:09) |
 |---|---|---|
@@ -1414,9 +1417,8 @@ That log claims otherwise, and the claim is the bug. `^C` landed inside the rene
 the phase loop fell out to the summary, and the summary printed `== every phase checked
 out` and exited 0 about a renewal that had never happened. Fixed in `tools/display_glass.py`
 (an interrupt now names the phase it stopped in and adds it to the run's own list of what it
-did not show, so a stopped window exits 1); `tools/selftest.sh` reads the handler to check
-it does that, and reads the kept logs as two kinds - windows that ran to their own end, and
-this one, cited only for what it reached.
+did not show, so a stopped window exits 1); `tests/test_glass_ledger.py` reads that handler to
+check it still does it.
 
 **The sixth window exists for one number: what the rings cost on the wire.** It ran the same
 full window at 18:01:09-18:09:51, after `theme_alpha` had put a gauge arc around each
@@ -1455,15 +1457,14 @@ exception rather than as a notice code, so they went into `frames` but not into
 is in `xigmalcd/main.py` (the `except ProtocolError` branch), and it is honest to say
 what proves it: **not** the two clean runs that followed, which had no refusals at all
 (496 of 496 and 498 of 498, 0 refused, so the two counters agree there but nothing was
-exercised). What pins it is a test in `tools/selftest.sh` that runs the real loop against a
-stub panel which throws away every fourth file - it refuses them the way the panel did, as
+exercised). What pins it is `tests/test_loop_counters.py`, which runs the real loop against a
+stub panel that throws away every fourth file - it refuses them the way the panel did, as
 `device refused the file: 400 b''` out of `send_media` - and then reads the counters the way
-a client does, from inside the loop. The section prints its own arithmetic, so the figures
-are measured rather than asserted: 23 files asked for, 5 thrown away, the run printed
-`18/23` and said `! frame` five times, and in all 18 client polls `refused` equalled
-`frames - ok` while `errors` stayed a streak (max 1). The exact counts move with timing;
-what the test insists on is that `frames - ok == refused`, that the `! frame` lines and the
-counter agree, and that spread-out refusals never end the run. Finding the case on real
+a client does, from inside the loop. That run printed `18/23`, said `! frame` five times, and
+in all 18 client polls `refused` equalled `frames - ok` while `errors` stayed a streak (max 1)
+- figures from that run, since the exact counts move with timing. What the check insists on is
+that `frames - ok == refused`, that the `! frame` lines and the counter agree, and that
+spread-out refusals never end the run. Finding the case on real
 glass was luck, and two runs not reproducing it is the same panel being uncooperative in the
 other direction; both are written here rather than papered over.
 
@@ -1545,8 +1546,8 @@ default end to end: `ENCODE DEFAULT` at 00:32:17, no encoder flag given, **31 of
 (`data/glass/2026-11-07-003217-encode-DEFAULT-indexed.txt`). The offline cost of that choice is
 written down rather than hidden - the gauge ramp is drawn in 80 colours and comes back in 13,
 one flat colour every ~12 px of arc, and 11 149 fully opaque pixels come back with only 74 of
-them still at alpha 255 - and `tools/selftest.sh` prints those numbers on every run, so the
-trade cannot quietly go stale. To repeat the comparison:
+them still at alpha 255 - and `tests/test_encoder.py` re-measures the same trade, as bounds,
+on every run, so it cannot quietly go stale. To repeat the comparison:
 
 ```bash
 python3 -m xigmalcd --theme alpha --fps 1 --duration 60 --no-mp4 \
@@ -1562,8 +1563,8 @@ is, is the `LIVE alpha` phase made longer: add `--baseline 300` to the command a
 the first five minutes of the window are the ringed theme at 1 fps, still driven over the
 socket, still logged.
 
-Cost, measured on this box and re-measured by `tools/selftest.sh` (it prints the
-numbers it just got, so these cannot quietly go stale). The picker lists every clip the
+Cost, measured on this box; the window's own clip column prints these numbers, so they are
+this bench's and not a promise about yours. The picker lists every clip the
 roots hold, and lists each **distinct file** once: **40 rows out of the 46 mp4 files this
 repository tracks
 files** - 3 vendored in `media/` and 37 from the vendor's library. The other 121 files are
@@ -1686,8 +1687,8 @@ what it remembers (§11): the file describes the window, not the glass.
 
 Still not wired: a tray icon, and a live-to-glass toggle that keeps running after you
 let go - the frame loop only runs for the window it announced, and it always says how
-long that is. `tools/selftest.sh` covers
-the GUI offline: clip sizes and lumas, all five themes previewed, the scrim rule
+long that is. `tests/` covers the GUI offline: clip sizes and lumas, all five themes previewed,
+the scrim rule
 tripping on the bright clip and not the dark one, a missing port reported in the
 log instead of raising, the settings round-trip plus the junk it refuses, the
 `.desktop` entry (through `desktop-file-validate` when it is installed) and its icon,
@@ -1695,8 +1696,8 @@ and the four panel actions run against a stubbed `Link` -
 which is where the wire rules get re-checked rather than re-stated: the background
 upload hands over the whole file (all 214 917 B of `Theme_25.mp4`) with the 0.02 s
 pre-byte pause and the clip's own filename, a frame goes up as one `.osd` PNG bounded
-between 8 and 40 KB (12 120 B in the run that last checked this), 1 s at 5 fps is between 4 and 6
-uploads (5 on this box), `STATE all 1` lands exactly twice and only before the first
+between 10 and 20 KB (about 12.1 kB on this bench), 1 s at 5 fps is between 4 and 6 uploads,
+`STATE all 1` lands exactly twice and only before the first
 file of a drawing session, `fans=False` leaves the tach array out of it, `status`
 pushes no blob at all, a shortened session clock (0.2 s) makes the loop reopen repeatedly
 in one second without re-pushing metrics, a port that disappears at a renewal ends the

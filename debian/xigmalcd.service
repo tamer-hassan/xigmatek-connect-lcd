@@ -1,6 +1,6 @@
 # The systemd user unit, as installed by the .deb: /usr/lib/systemd/user/xigmalcd.service.
 # install/xigmalcd.service.in is the same unit for a git checkout, with @DIR@ and
-# @PYTHON@ filled in by install/install.sh.  tools/selftest.sh compares the two so
+# @PYTHON@ filled in by install/install.sh.  `tests/test_packaging_parity.py` compares the two so
 # they cannot drift apart on the things that matter (ExecStart's flags, the
 # PartOf/After pairing, WantedBy, Restart, Nice).
 #

@@ -1,6 +1,6 @@
 # The menu entry, as installed by the .deb: /usr/share/applications/xigmaui.desktop.
 # install/xigmaui.desktop.in is the same entry for a git checkout, with @DIR@ and
-# @PYTHON@ filled in by install/install.sh.  tools/selftest.sh compares the two so
+# @PYTHON@ filled in by install/install.sh.  `tests/test_packaging_parity.py` compares the two so
 # they cannot drift apart on the things that matter (Name, Exec's program and flags,
 # StartupWMClass, Categories, the tray action).
 #
@@ -21,7 +21,7 @@
 #
 # The name is the family, not the author's model - see install/xigmaui.desktop.in for
 # the paragraph, which says what has and has not been measured on which Connect.  The
-# two files must agree on Name, Comment and Keywords: tools/selftest.sh checks that.
+# two files must agree on Name, Comment and Keywords: that same test checks it.
 [Desktop Entry]
 Type=Application
 Version=1.0

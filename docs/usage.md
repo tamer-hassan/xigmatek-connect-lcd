@@ -66,17 +66,17 @@ Put the module in `/etc/modules-load.d/` if you want it at every boot.
 | `--duration N` | stop after N seconds |
 | `--once` | push one frame and exit |
 | `--dry-run DIR` | render to PNGs in DIR, never touch the port (test a theme) |
-| `--bg clear\|black` | `clear` (default) draws on a transparent canvas, so the panel's own background layer keeps playing behind our glyphs - the way ALPHA's `.osd` files do, which paint 4.6 percent of their pixels. `black` fills the canvas opaquely, and that is **not** the same as an opaque frame: 3 of the five drawn themes (`alpha`, `dual`, `gauge`) paint their own translucent fills - a ring's track, the grey plate behind two figures - and PIL's `ImageDraw` replaces those pixels instead of blending them with the canvas, so they keep letting the stored background through even with `--bg black`. Two of them (`bars`, `clock`) declare nothing translucent and go opaque across the whole frame, and so does a layout theme, because there the plate is composited *under* the finished layer. The suite derives the split from the exports' own colour keys and prints the leaking counts beside the machine rather than quoting them here |
+| `--bg clear\|black` | `clear` (default) draws on a transparent canvas, so the panel's own background layer keeps playing behind our glyphs - the way ALPHA's `.osd` files do, which paint 4.6 percent of their pixels. `black` fills the canvas opaquely, and that is **not** the same as an opaque frame: 3 of the five drawn themes (`alpha`, `dual`, `gauge`) paint their own translucent fills - a ring's track, the grey plate behind two figures - and PIL's `ImageDraw` replaces those pixels instead of blending them with the canvas, so they keep letting the stored background through even with `--bg black`. Two of them (`bars`, `clock`) declare nothing translucent and go opaque across the whole frame, and so does a layout theme, because there the plate is composited *under* the finished layer. `tests/test_conventions.py` derives the split from the exports' own colour keys and prints the leaking counts beside the machine rather than quoting them here |
 | `--mp4 [PATH]` | upload a 480×480 H.264 MP4 as the panel's background layer at session start, as ALPHA does with its theme background. **On by default**, with `media/Theme_25.mp4` from this repo (214 917 B, 23 frames at 24 fps, a 0.96 s loop, byte-identical to the copy `currentThemeBg` names in `%APPDATA%/alpha`, mean luma 18.7 of 255 so it is dark under white glyphs, 0 black frames). Its measured weakness is the loop join: 2.50 against 1.51 typical frame-to-frame motion, i.e. a small jump once per second. It is the default because it is the vendor's own pairing, not because it measures best; the two measured-quieter vendored clips are one flag away - `--mp4 media/Theme_11.mp4` (3 402 098 B, 363 frames at 24 fps, a 15.1 s loop, luma 13.3-24.1, 0 black frames, join 0.11 against 2.54 - the smoothest loop in the vendor's library, taken in **2.4 s**) and `--mp4 media/theme_48.mp4` (1 333 649 B, 10.85 s, luma 227.3, a near-white field for white text and a join of 4.50 against 0.60, hence the automatic `--scrim`). All figures come from decoding all 40 vendor clips, not from sampling ("Where the defaults come from"). `Theme_24.mp4` in the vendor tree is the smallest upload that still reads seamless (0.94 MB, 4.04 s, join 1.55 vs 2.93). A bare name is looked up in every root that exists, in one order: `$XIGMA_MEDIA`, this checkout's `media/`, `/usr/share/xigmalcd/media`, then the vendor's theme library - this checkout's `themes/alpha/clips`, or `/usr/share/xigmalcd/themes/alpha/clips` where the themes package installs it - so `--mp4 Theme_07.mp4` names the background a layout declares even in a bare checkout. The media roots come first, which is why the default is still `media/Theme_25.mp4` on every box: the roots decide which file a name this box holds means, and nothing is uploaded that this flag did not ask for |
 | `--no-mp4` | skip the upload and leave the panel's stored background playing. The panel plays the last media file it took, so what is stored now is whatever the last run uploaded (`Theme_25.mp4` after the 11:04 run); only a reset clears it — `xigmalcd-reset --yes` on an installed system, `tools/reset_panel.py --yes` in a checkout — which puts the still logo back |
-| `--text-color COLOUR` | the ink of the text this program draws: a name from this program's own palette (`amber`, `mint`, `cyan`, `white`, `dim`…), `#rgb`/`#rrggbb`, or anything PIL's colour table names. Unset keeps each theme's own skin - and for `alpha` that skin is the white measured in its layout file (6 of 6 text colours, PROTOCOL.md §10), which is why unset is the default and not a guess. It changes **our layer only**: the vendor's themes keep their text colour inside their own files - 106 `textColor` values across the 23 480×480 layouts, 88 of them `rgba(255, 255, 255, 1)`, 5 of those themes using other colours at all - and nothing here sends one, so a vendor theme's lettering is whatever that theme's file says, whatever this says (docs/themes.md has the table). The colour is baked into the frame before it is uploaded, so the panel is never told a colour and is never asked one (§11). Measured off-glass by the suite: a chosen ink comes back within **1/255 per channel** after the default 256-colour palette encoding, and choosing one leaves the frame's painted area unchanged (gauge 6 087 px before and after) - the ink moves the ink, not the composition |
+| `--text-color COLOUR` | the ink of the text this program draws: a name from this program's own palette (`amber`, `mint`, `cyan`, `white`, `dim`…), `#rgb`/`#rrggbb`, or anything PIL's colour table names. Unset keeps each theme's own skin - and for `alpha` that skin is the white measured in its layout file (6 of 6 text colours, PROTOCOL.md §10), which is why unset is the default and not a guess. It changes **our layer only**: the vendor's themes keep their text colour inside their own files - 106 `textColor` values across the 23 480×480 layouts, 88 of them `rgba(255, 255, 255, 1)`, 5 of those themes using other colours at all - and nothing here sends one, so a vendor theme's lettering is whatever that theme's file says, whatever this says (docs/themes.md has the table). The colour is baked into the frame before it is uploaded, so the panel is never told a colour and is never asked one (§11). Measured off-glass, and offline in `tests/test_knobmap.py`, where the file door and the code door are held to the same bytes: a chosen ink comes back within **1/255 per channel** after the default 256-colour palette encoding, and choosing one leaves the frame's painted area unchanged (gauge 6 087 px before and after) - the ink moves the ink, not the composition |
 | `--clock-size N` | how tall the clock's digits are, in pixels, for themes that draw one. Default 26 of the panel's 480 |
 | `--gauge-source temperature\|load` | what the arc follows. `temperature` is what ALPHA uses, and on an idle desktop CPU it barely moves (across ALPHA's own 65 captured frames the tip travelled 14 degrees in 43 s); `load` follows CPU busy percent, which moves every second |
 | `--cold N`, `--hot N` | the gauge's scale. Default 30/75, measured off ALPHA: its digits read 57 °C at 55-61 percent of the sweep |
 | `--title TEXT`, `--label TEXT`, `--no-clock` | what the picture says. Themes without a heading ignore `--title`; `--label` defaults to `CPU TEMP`, or `CPU LOAD` with `--gauge-source load`; `--no-clock` drops the clock line from every theme that draws one and leaves the rest of the frame in place - on `clock` it drops the big time line and keeps the date and the readings line in their own bands.  That is a frame change since 0.4, because until then `theme_clock` took a `clock` argument and never read it, so the flag did nothing on the one theme that is mostly a clock (docs/limits.md's knob map holds the pair at 0 px in both doors, and stage 6 of docs/theme-editor.md owes the new frame a look on glass) |
-| `--scrim A` | alpha 0-255 of the dark plate drawn behind the glyphs. Unset is automatic: no plate over the shipped dark default (luma 18.7), a plate at `SCRIM_ON_BRIGHT` 150 over a vendored clip measured brighter than mid-grey (`theme_48.mp4` is 227, white on white without it), no plate for `--bg black` or an unmeasured clip. White glyphs by default - ours, and 6 of 6 `textColor` values in the layout of the theme ALPHA has selected (across the library's 23 480×480 layouts, 88 of 106 text colours are that white; the suite re-derives both counts) |
+| `--scrim A` | alpha 0-255 of the dark plate drawn behind the glyphs. Unset is automatic: no plate over the shipped dark default (luma 18.7), a plate at `SCRIM_ON_BRIGHT` 150 over a vendored clip measured brighter than mid-grey (`theme_48.mp4` is 227, white on white without it), no plate for `--bg black` or an unmeasured clip. White glyphs by default - ours, and 6 of 6 `textColor` values in the layout of the theme ALPHA has selected (across the library's 23 480×480 layouts, 88 of 106 text colours are that white; `xigmalcd.themes.field_census` re-derives both counts) |
 | `--order notice\|fast` | when `transported` goes out. `notice` (default) holds it until the panel's own file notice lands, which is the order ALPHA's traffic has and the only order that makes the glass redraw every frame; `fast` sends it right after the last file byte, and the panel answers that 1 time in 6 and the picture jumps (`tools/order_probe.py`, PROTOCOL.md §6) |
-| `--truecolor` | put the exact 8-bit RGBA PNG on the wire instead of the 256-colour file that is the default on **every** canvas. Costs 3.4× the bytes — on glass one ringed `alpha` frame measured **42 560-46 415 B against 12 169-12 401 B** (means 43 782 B against 12 289 B) — and it is the only shape that keeps the half-transparent gauge track's alpha to the unit. What the default gives up is in `tools/selftest.sh`'s prints: the gauge ramp drawn in 80 colours coming back in 13, and 74 of 11 149 fully opaque pixels keeping alpha 255. Both shapes went up **61 of 61** frames at 1 fps and the owner could see no difference from the chair, which is why RGBA is the opt-in (PROTOCOL.md §11) |
+| `--truecolor` | put the exact 8-bit RGBA PNG on the wire instead of the 256-colour file that is the default on **every** canvas. Costs 3.4× the bytes — on glass one ringed `alpha` frame measured **42 560-46 415 B against 12 169-12 401 B** (means 43 782 B against 12 289 B) — and it is the only shape that keeps the half-transparent gauge track's alpha to the unit. What the default gives up is measured offline by `tests/test_encoder.py`: the gauge ramp drawn in 80 colours coming back in 13, and 74 of 11 149 fully opaque pixels keeping alpha 255. Both shapes went up **61 of 61** frames at 1 fps and the owner could see no difference from the chair, which is why RGBA is the opt-in (PROTOCOL.md §11) |
 | `--palette` | spell the default out: the 256-colour PNG, over a transparent canvas as over an opaque one, which is what `xigmaui/panel.py` has always uploaded. Kept so older command lines and README's encode A/B/A windows mean what they say; `--truecolor` wins if both are given |
 | `--colors N` | palette size for the indexed file (default 256) |
 | `--chunk N`, `--gap S` | raw upload chunk size, and the one pause between the `transport` announcement and the first file byte (the vendor app: 1000 bytes; the pause is 0.02 s and see §6 before setting it to 0) |
@@ -110,7 +110,7 @@ never handed a layout file (PROTOCOL.md §11 reads the vendor app's traffic and 
 such upload; docs/themes.md).
 
 `--list-themes` prints the set with the numbers behind it. All of these are re-derived by
-`tools/selftest.sh` in the vendor-library section, so the paragraph is a record, not a
+`tests/test_theme_library.py`, so the paragraph is a record, not a
 claim:
 
 * **23 pickable, 4 refused, and the refusal is on the file's own `ratio` field** - the
@@ -128,9 +128,10 @@ claim:
   something - 114 widget boxes between them on this bench, whose font files resolve every
   family the library's rows name (the **3** of them: `arial` `simsun` `verdana`, answered
   here by Liberation Sans, DejaVu Sans and Noto Sans CJK, because a Linux box has the
-  shapes and not the vendor's font files); the suite prints the face situation per
-  machine, because a box with no CJK face installed drops those widgets and lands under
-  that count.  A row with **no `fontFamily` at all** drops the same way - the report says
+  shapes and not the vendor's font files); `tests/test_library_draw.py` reports the faces
+  a machine cannot resolve, because a box with no CJK face installed drops those widgets and
+  lands under that count.  A row with **no `fontFamily` at all** drops the same way - the report
+  says
   `font:` with nothing after the colon, because there is no default face to fall back to -
   and 9 print
   `skipped Pump Speed: no pump tachometer has been measured on this box`. The same notes
@@ -148,7 +149,8 @@ claim:
   per-theme geometry (docs/limits.md), and `--bg black`, which for a layout is composited
   *under* the finished layer, so the frame really is opaque and covers the panel's stored
   background - the drawn five are not the same case, because their canvas goes in before
-  the drawing (`--bg` in the table above). Gated both ways in the suite, opaque alpha
+  the drawing (`--bg` in the table above). Held both ways by `tests/test_conventions.py`: opaque
+  alpha
   (255, 255) against the same layout's transparent (0, ...), and the alpha tally of every
   drawn theme on a black canvas
 * Over the control socket the same names work - `{"cmd":"theme","value":"Theme_07"}` -
@@ -179,19 +181,20 @@ claim:
   ```
 
   Which lines of that are stable and which are not: the first is read out of the file and
-  is the same on every machine (the suite pins 23 pickable / 4 refused and every widget
-  count), `skipped: Pump Speed` for those 9 themes is gated on every machine, and the box
+  is the same on every machine (`tests/test_theme_library.py` pins 23 pickable / 4 refused
+  and every widget count), `skipped: Pump Speed` for those 9 themes is gated on every machine
+  by `tests/test_library_draw.py`, and the box
   and pixel counts are this bench's - 19 253 lit px is from 2026-11-08, printed next to the
   machine name for exactly that reason. For one of the five it says where the drawing comes
   from: `clock: generated from render.py, 3 widgets`. And the two halves of that report answer
-  for different things, which the suite holds in that direction rather than as one count:
+  for different things, held in that direction rather than as one count:
   `skipped:` is **per widget** - one note each, repeats and all, where a row silenced by its
   dependency is named by what it depends on (`showIf:GPU Memory Rate`) instead of by its own
   reading, and a row silenced by a `xigma.format` its value cannot be dressed in is named by
   that key (`format:GPU Temperature (ValueError)`) - while `and cannot:` is **per source**,
   from what `sensors.collect()` left unanswered. On a box with no GPU the two differ by
-  exactly those silenced rows, and the suite asserts that difference instead of pretending
-  it is not there. A drawn theme with no
+  exactly those silenced rows, and that difference is asserted instead of papered over. A drawn
+  theme with no
   export - none today, and the wording is driven in a gate by taking one away - is still
   answered in words rather than an error.
 * **One theme directory is read, and one is writable, and they are the same one:**
@@ -206,7 +209,7 @@ claim:
   `gauge` that disagrees with `render.theme_gauge`. A file you write by hand in that
   directory may carry this program's own extension keys - `--print-theme-fields`
   lists them all, each with the reason it had to be added, and that list is read out
-  of `layout.py` rather than kept by hand - and the suite holds one such
+  of `layout.py` rather than kept by hand - and `tests/test_conventions.py` holds one such
   hand-authored file to the same standard as our own exports: its ring paints
   `render.temp_arc`'s ring with **zero differing pixels** at six readings. The
   window's `Layout` box opens, edits, saves and reverts exactly that file
@@ -239,8 +242,9 @@ claim:
   changing it would re-render three themes whose figures were read off the current
   drawing). A fifth key came from `alpha`'s temperature pair rather than from an export:
   `xigma.fitArc`, the ring a `special` row's text is sized against, spelled in an `arc`
-  row's own vocabulary. It exists because no width can do that job: the suite searches the
-  441 whole-pixel budgets this canvas can hold and finds none that reproduces the six sizes
+  row's own vocabulary. It exists because no width can do that job: `tests/test_specials.py`
+  searches every whole-pixel budget this canvas can hold (441 of them) and finds none that
+  reproduces the six sizes
   the ring picks (docs/limits.md). `dual`'s middle line is a `special`, not a widget:
   `CPU 62%    4101 / 15625 GB` is a composite of three readings in one string, and
   `alpha`'s three pairs of lettering - its fan figures, its temperature figures, and the two
@@ -318,8 +322,9 @@ asking that 0.2 display `{"cmd": "text_color", "value": "amber"}` answers
 `text_color` key at all. So the new client prints `text theme default` for a 0.2 display -
 the *reading* is true, since that display has no ink but its theme's own, but the client
 got it from a missing key rather than from an answer, and it cannot tell the two apart.
-Both sides of that are the suite's to keep honest: the socket section asserts the hex
-round trip against a display that does know the command.
+Both sides of that are checked: `tests/test_control_socket.py` asserts the hex round trip,
+and `tests/test_display_remote.py` runs the window against a display that does not report the
+field at all.
 
 The reply also carries the daemon's **event ring** - the last twenty things it chose to
 record about the port, six of them in every status answer - and `--status` prints them
@@ -373,7 +378,7 @@ client:
   distinguish "the display answered `no`" from "nothing is listening", because
   those mean opposite things and are cured by opposite things.
 
-`--status` is the same client from the command line, and `tools/selftest.sh`
+`--status` is the same client from the command line, and `tests/test_control_socket.py`
 exercises the socket end to end: bounds, the one-slot queue, the `.zip` refusal,
 the `reset` refusal, junk from a client, a second daemon refused on a live socket,
 a failed run leaving no socket behind, and the window driving a display over a

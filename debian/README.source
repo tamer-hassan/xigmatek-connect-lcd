@@ -22,7 +22,7 @@ Version: one number, written in four places - debian/changelog, pyproject.toml,
 `xigmalcd/__init__.py`'s __version__, and the wheel's METADATA that pyproject
 generates - plus the tag, which is the same number with a `v` in front.  The build
 job's "the version, where it is written" step compares changelog with pyproject and,
-on a tag, with the tag; tools/selftest.sh compares pyproject with
+on a tag, with the tag; `tests/test_packaging.py` compares pyproject with
 `xigmalcd.__version__`.  Keep them equal and say so in the changelog when one moves.
 
 Which bytes go in which package
@@ -113,7 +113,8 @@ clock and two machines cannot agree on the bytes.  That is exactly how the publi
 v0.1 asset and a build of the same tree on this bench came out 18 B apart with all 37
 file md5s and every control field identical - the 0.1 entry was stamped 04:40:00 +0000
 while the runner built at 04:12Z.  The entry now carries the time it was actually
-written, and tools/selftest.sh fails if the top entry is ever dated in the future again.
+written, and `tests/test_debian_changelog.py` fails if the top entry is ever dated in the
+future again.
 zstd's threading is not a variable here: -19 with -T1 and with -T24 on the same 5.6 MB
 tar gave byte-identical output.  See docs/packaging.md for the whole write-up.
 
@@ -141,7 +142,8 @@ installed; docs/packaging.md quotes that transcript and points there.  The same 
 also run green in CI, on a runner that installed both packages and re-hashed 152/152
 manifest entries there.
 
-The offline suite, tools/selftest.sh, runs before packaging in CI and is the thing
+The offline checks, `tests/` under `python3 -m unittest discover -s tests`, run before
+packaging in CI and are the thing
 to run after editing protocol.py, render.py or xigmaui/.  It is not run from
 debian/rules' override_dh_auto_test: two of its sections read the author's bench
 files under data/ (the Windows captures, the glass logs) and several measure wall
@@ -157,5 +159,5 @@ python3-serial and python3-pil are runtime Depends, not Build-Depends.  That is 
 the first CI build did - `unittest.loader._FailedTest`, `ModuleNotFoundError: No
 module named 'PIL'`, `dh_auto_test ... exit code 13` - and the reason it never showed
 up on this bench is that this bench has Pillow installed.  debian/rules therefore
-exports PYBUILD_DISABLE=test; the suite that actually tests something is the CI job
+exports PYBUILD_DISABLE=test; the checks that actually test something (`tests/`) are the CI job
 named above, and debian/tests/smoke is what tests the install.

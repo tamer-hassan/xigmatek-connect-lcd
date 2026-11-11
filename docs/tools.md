@@ -13,7 +13,7 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
 | If the question is | run | what it answers |
 |---|---|---|
 | is the panel healthy after a boot or a reset? | `tools/state.py`, then `tools/bootcheck.py` | the `conn` snapshot, read-only; then two small and two full uploads. `logo`/`mode` at `2147483647` means it is not healthy |
-| did my edit break the wire format? | `tools/selftest.sh`, then `tools/verify_protocol.py data/captures/*.txt` | twenty-two offline sections with no hardware, then every captured Windows frame re-encoded and diffed: **181 frames, 0 mismatches** (130 in one session, 51 in the other). The captures are bench files, so in a fresh clone the first section prints those figures and says it did not re-derive them |
+| did my edit break the wire format? | `python3 -m unittest discover -s tests`, then `tools/verify_protocol.py data/captures/*.txt` | twenty-two offline sections with no hardware, then every captured Windows frame re-encoded and diffed: **181 frames, 0 mismatches** (130 in one session, 51 in the other). The captures are bench files, so in a fresh clone the first section prints those figures and says it did not re-derive them |
 | does this firmware know that topic at all? | `tools/fuzz.py`, `tools/probe.py` | no answer = no topic, `400` = topic exists and the body was wrong, `200` = the JSON parsed — which is not the same as the write landing |
 | will the panel take *my* file? | `tools/send_image.py FILE`; `tools/fileshape.py` if the file's shape is the question | one upload, judged by the panel's own file notice; the second rotates RGBA, indexed, flat and the vendor's own `.osd` files through one session |
 | how fast does the glass tick, and why does the clock only move every 20-40 s? | `tools/frame_lag.py`, `tools/indexprobe.py`, `tools/watchtest.py` | a big frame number and the wall clock painted on the glass, so the answer is a glance rather than a stopwatch. Needs eyes on the unit |
@@ -26,7 +26,7 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
 | what did the vendor app itself actually send? | `tools/log_timeline.py LOG`, `tools/capdump.py`, `tools/vendor_capture.py` | ALPHA's 6-17 MB logs folded into a request sequence, the Windows IRP captures parsed without a Windows box, and the `.osd` payloads taken back out of them |
 | the panel is white from the first second | `xigmalcd-reset --yes` (installed) / `tools/reset_panel.py --yes` (checkout) | the vendor's `recovery`, byte-identical to the frame in its own log; the only repair for fields stuck at `2147483647` |
 | what would a frame look like, with no panel in the loop? | `python3 -m xigmalcd --dry-run DIR`, `tools/previews.py`, `tools/preview_gif.py` | PNGs on disk from the same render path; a preview composites over the shipped clip the way the panel composites |
-| could a generated layout draw one of our five themes instead? | `tools/knobmap.py` | per option, per theme: the best edit of that theme's own export, and the pixels between the two doors. 28 of the 37 pairs land at 0 px; the other 9 are far from 0, and the suite holds that line, the counts, the 900 px floor and the flag the map once caught being ignored |
+| could a generated layout draw one of our five themes instead? | `tools/knobmap.py` | per option, per theme: the best edit of that theme's own export, and the pixels between the two doors. 28 of the 37 pairs land at 0 px; the other 9 are far from 0, and `tests/test_knobmap.py` holds that split, the counts and the floor being ignored |
 | the README's previews move, and how would I make another? | `tools/preview_gif.py --clip CLIP --theme T --series FILE --no-gif` (README's set: `--scale 480 --frames 240 --gif-fps 20-or-24 --crf 20 --no-gif`) | the preview pane's composite as a 10-12 s H.264 MP4 — the shape the README links, uploaded through GitHub's editor because an `.mp4` written into markdown becomes an `<img>` nothing plays; with `--series FILE` or `--live-seconds N` every reading in it comes from a recorded `sensors.collect()` series, so the digits, meters and clock move; it prints the bytes, the frame count and length as the written file reports them, how many passes of the clip that is, and the min→max of what it drew |
 | what does the window look like, and does the README's picture match the code? | `tools/screenshot.py` | `docs/screenshot-xigmaui.png`: the real Qt window, offscreen, with a port path that does not exist so nothing on the glass is touched |
 | what are ALPHA's theme files, and what do its themes actually contain? | `tools/thm_unlock.py`, `tools/theme_previews.py` | the `.thm` container opened with the app's own constants: 27 layouts, 44 clips, 27 baked overlays in `themes/alpha/`, every byte hashed; and a sheet showing each theme over its own clip |
@@ -60,42 +60,33 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   `conn 1` — and **267 panel replies read, 267 checksum-clean**. Against the long
   session alone: **130 and 0**, 65 pairs, `ContentLength` matching in 130 of 130. If
   you change `protocol.py`, run this.
-* `tools/selftest.sh` — the offline checks: capture round-trip, a render of every
-  theme, encode/decode round-trips including the panel's malformed-reply case, the encoder
-  switches read out of the PNG each dry run writes, what the indexed file gives up next to
-  RGBA, the pinned-metrics promise (a pinned frame draws the far end of the ramp and sends no
-  metrics blob at all), the vendor theme library re-hashed against its own manifest (125
-  entries over 98 distinct files, plus the 27 `.thm` containers it records by hash and
-  deliberately does not carry - and with the vendor's install mounted, exactly those 27 get
-  re-hashed where they live, which is 152/152), the clip-list dedup rule, the root-vendored
-  clips, the contact sheets, and the `store.json`/`.thm` pairing), where the shipped clips
-  are looked up (checkout, `$XIGMA_MEDIA`, `/usr/share/xigmalcd/media`, and the Windows
-  partition's copies, in that order, checked against fake roots), the packaged copies of
-  the login unit and the menu entry compared key for key against the checkout's
-  (`debian/xigmalcd.service` and `debian/xigmaui.desktop` against
-  `install/*.in`, including that neither `ExecStart` arms `--allow-reset` and that the
-  program's name is one string in both files and in `xigmaui/app.py`),
-  `pyproject.toml` read as an installed person would meet it (including `xigmalcd-reset`
-  called with no `--yes`, which must print its frame and send nothing), the
-  window's saved-state round-trip, the `.desktop` entry and its icon, the GUI built
-  offscreen against a port that does not exist (clip sizes and lumas, five themes
-  previewed, the scrim rule, the reset gate, the four panel actions against a stubbed
-  `Link`), the two picture-level rules added at 0.3 - the `dual` ring's filled part against
-  its own unfilled part over a decoded clip of the vendor's (100.4 luma where the pale
-  default managed 7.4, re-counted every run) and every line of the `clock` theme cropped to
-  its own y band with ink required to stay inside the 480 px panel - the six README videos
-  checked as documents (length and rate as the written file reports them, the untouched
-  field against the clip each marker names, glyph against its own halo over a floor of
-  30, the motion claim from both directions so a layer that never changes cannot pass off
-  the background's movement as its own, and the preview slots themselves - README's five
-  and docs/gui.md's one have to be filled, by a marker naming the right file or by an
-  uploaded link to GitHub's CDN, with the counts adding up and a relative `.mp4` image
-  link rejected outright) - the wall-clock cost of
-  the window re-measured rather than remembered, and the
-  the window re-measured rather than remembered, and the
-  GUI ledger's own numbers re-read out of `data/glass/` so the table in [the GUI doc](gui.md) cannot
-  quietly become folklore. Needs no hardware, so it is what to run after editing
-  `protocol.py`, `render.py` or `xigmaui/`.
+* `tests/` — the offline checks, run by the standard library:
+  `python3 -m unittest discover -s tests`.  One file per subject, and the name says what
+  it holds: `test_protocol.py` (encode → decode → re-encode, the `0x5A`/`0x5B` quoting, a
+  device reply with a bad checksum still parsed on structure), `test_encoder.py` (what the
+  indexed file gives up next to RGBA, and the switches read back out of the PNG each dry run
+  writes), `test_pinned_metrics.py` (a pinned frame draws the far end of the ramp and sends
+  no metrics blob at all), `test_gauges.py`, `test_ink.py`, `test_conventions.py` and
+  `test_specials.py` (what a layout file is allowed to name, held to the pixels it claims),
+  `test_theme_library.py` and `test_library_draw.py` (which layouts this canvas selects and
+  what they paint), `test_export_parity.py`, `test_knobmap.py`, `test_theme_files.py` and
+  `test_editor.py` (the five generated themes, and the layout editor's model),
+  `test_media_roots.py` and `test_clip_db.py` (where a clip name resolves, and the dedup
+  rule), `test_settings.py`, `test_packaging.py`, `test_packaging_parity.py`,
+  `test_debian_changelog.py`, `test_launcher.py`, `test_launch_unit.py`, `test_no_serial.py`,
+  `test_docs_links.py`, `test_glass_ledger.py`, and the window's own files:
+  `test_window.py`, `test_window_sizing.py` (the owner's sizing rule, as relations: no
+  column under what it holds, no sideways scroll at the floor, one/two/three columns of
+  rows as the width allows), `test_canvas.py`, `test_pairing.py`, `test_display_remote.py`,
+  `test_control_socket.py`, `test_panel_safety.py`, `test_loop_counters.py` and
+  `test_zz_isolation.py` (nothing here wrote your session file).
+* `tools/verify_manifest.py` — the copied vendor library against its own manifest: all 125
+  `files[]` entries re-hashed (27 backgrounds, 27 foregrounds, 27 layouts, 44 clips,
+  128,106,463 B), `counts` cross-checked against `files` and against the tree, anything extra
+  sitting in a scanned directory named, each layout's declared background matched to the hash
+  of the clip it names, and the 27 encrypted `.thm` containers confirmed **absent** - recorded
+  by hash, never carried.  `--quick` skips the hashing, `--json` is for a build log.
+
 * `tools/gui_glass.py` — the GUI's drawing paths against the real glass, in one
   continuous labelled run: status, background upload, one frame, `--live-seconds`
   at `--fps`, with the phase name as the theme title so whatever you saw has a name
@@ -108,7 +99,7 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   ([limits.md](limits.md) keeps that as an open item). Tee its output into `data/glass/` under a name that
   carries the window's date and time: that file is what the ledgers in [gui.md](gui.md) and
   [limits.md](limits.md) quote, and
-  `tools/selftest.sh` re-reads it.
+  `tests/test_glass_ledger.py` checks that every kept transcript is named by a page.
 * `tools/display_glass.py` — the same idea for the other model: it **starts a separate
   `xigmalcd` display process** (given `--duration`, so it cannot outlive the script) and
   then behaves only like a client of its control socket, on a socket of its own
@@ -296,28 +287,33 @@ these knobs interact in ways nobody guesses right:
   trusting its own arithmetic: all six README files report 240 frames at 24 or 20 fps =
   10.00 s or 12.00 s as written.
   * **what the file did to the ink, measured off the file.** The GIF path reports the
-  nearest drawn colour to the ink asked for - the suite writes a 160 px, 6-frame,
-  128-colour GIF every run and reads `#ffc400` back as **(252, 197, 2)**, 3/255 off. The
+  nearest drawn colour to the ink asked for - the 0.6 suite wrote a 160 px, 6-frame,
+  128-colour GIF and read `#ffc400` back as **(252, 197, 2)**, 3/255 off, on this bench. The
   MP4 path asks the harder question, and answers it per pixel: of the **2 268** pixels the
   layer paints at exactly that colour, the written file holds 1 144 within 3/255, 2 187
   within 8/255, 81 unchanged. Two questions, printed side by side, because neither is the
   256-colour PNG the upload path sends (§10 measures that drift at 1/255 per channel).
 
-README's set, as the suite prints it: `alpha` 908 420 B / 10.00 s at 24 fps, `gauge`
-1 930 104 B / 12.00 s at 20 fps, `dual` 214 113 B, `clock` 278 884 B, `bars` 779 905 B,
-the amber ink figure 927 752 B — **5 039 178 B** for six, plus 13 916 B of readings JSON.
-Those six sizes and the total are the launcher section's business now: it stats the files
-and fails this page if a figure moves, which is the gate that should have caught the
-22 405 B the `bars` clip shed when its fan slots were re-rendered on 2026-11-08.
-The suite checks these files as documents - frame count against the length and rate the
-written file reports, a length in the 10-12 s README promises, a size ceiling, the
+README's set, as `du -b docs/videos/*` and `ffprobe` read them on this bench: `alpha`
+908 420 B / 10.00 s at 24 fps, `gauge` 1 930 104 B / 12.00 s at 20 fps, `dual` 214 113 B,
+`clock` 278 884 B, `bars` 779 905 B, the amber ink figure 927 752 B — **5 039 178 B** for
+six, plus 13 916 B of readings JSON. Those are this bench's figures, re-read rather than
+promised: the gate that used to fail this page when one moved is gone, and the reason it
+existed is the reason it is not worth re-writing - the 22 405 B the `bars` clip shed when
+its fan slots were re-rendered on 2026-11-08 was a fact about a re-render, and a page that
+carries the command to re-read it stays true through the next one.
+Nothing gates these six files as documents any more, and that is a choice rather than an
+oversight: the claims are frame count against the length and rate the written file reports, a
+length in the 10-12 s README promises, a size ceiling, the
 untouched field matching the clip each marker names (gaps 0.1-13.6), glyph against
 its own halo over a floor of 30, the plate's effect measured both ways on the bright clip
 (53.5 without, 93.0 with), and the motion claim in two directions: the file has to change
 where the layer paints (at least 3/255, and 1.2x the untouched field) *and* the two layers
 it was built from have to differ over 622-6 226 pixels once each sample's own clock is put
-back. Pointedly no byte hash: x264 output is its version's business, and a different
-runner could write different bytes of the same animation.
+back. Re-read the first three with `ffprobe` and the ceiling with `du -b`; the rest belongs to
+the encoder pass that wrote the files, on one bench, and is quoted as that.  Pointedly no byte
+hash: x264 output is its version's business, and a different runner could write different bytes
+of the same animation.
 
 * `tools/knobmap.py` — the question the theme-editor plan keeps meeting, measured: every
   drawn theme also exists as a generated layout file, so could the file door draw it instead?
@@ -327,7 +323,7 @@ runner could write different bytes of the same animation.
   branch), or by flipping a bool, or a size the socket itself documents (40 of 8..120) — then
   the best edit of that theme's **export** is found and the two doors are compared at one
   pinned reading dict and one pinned clock instant.  No port, nothing uploaded.
-  `--json` writes the rows; a section of `tools/selftest.sh` runs the tool and holds its
+  `--json` writes the rows; `tests/test_knobmap.py` runs the tool and holds its
   structure: every signature option is a row or an unread note (the unread list re-derived
   here with `ast`, so the tool cannot quietly drop an option and make the map look clean),
   exactness is binary with a 900 px floor taken from the run, and the reader's ink and the
@@ -340,7 +336,8 @@ runner could write different bytes of the same animation.
   docs/limits.md and re-derived on every run; the non-zero pixel figures walk glyph edges and
   installed faces, so they are printed beside the machine and never quoted as fixed.
 * `tools/screenshot.py` — regenerates `docs/screenshot-xigmaui.png`, the README's picture of
-  the **window** rather than of the glass: a real `xigmaui` built the way the suite builds it
+  the **window** rather than of the glass: a real `xigmaui` built the way `tests/test_window.py`
+  builds it
   (`QT_QPA_PLATFORM=offscreen`, `XDG_CONFIG_HOME` in a temporary directory so no remembered
   settings shape the shot, `XIGMA_SOCKET` pointed at nothing so the window is its own boss),
   pumped until the clip rows have their ffmpeg thumbnails, then `grab()`ed. It refuses to run
@@ -351,12 +348,16 @@ runner could write different bytes of the same animation.
 the README's picture shows: the three columns side by side, nine rows of the clip list on
 this bench and ten rows of the clip list with CI's fonts).  The window is resizable down to
 its own floor of 1280x1024, so that framing is a choice and not a claim about the layout:
-  the suite checks the size against `settings.DEFAULTS["size"]`, checks the row count that
-page states against what it measures on the machine running it, and checks the column
-rules themselves, so none of those sentences can go stale.  Nothing about the layout is fixed
-  by the picture: the preview column caps itself at the 480 px frame, the clip library is a
-  column of its own, and the splitter is the user's, which is what the suite asserts instead
-  - along with the floors under those columns, which is what a 1180 px window could not hold.
+  `tests/test_window_sizing.py` checks the column rules themselves: every column gets at
+least what it holds, no column scrolls sideways at the window's own floor, a drop-down's list
+carries the widest entry any layout can put in it, and the field grid takes one, two or three
+columns according to the width the controls column has.  Nothing about the layout is fixed by
+the picture: the preview column caps itself at the 480 px frame, the clip library is a column
+of its own, and the splitter is the user's - which is what that file asserts instead, along
+with the floors under those columns, which is what a 1180 px window could not hold.  The size
+and row-count sentences above are labelled as bench figures and re-read by whoever looks; no
+gate keeps this page's copy of them honest, and that is said here rather than discovered by a
+reader.
 * `tools/asar_extract.py ASAR` — read an Electron `.asar` without node: list, unpack,
   `--cat` one file, or `--find TEXT` to grep file *contents*, which is how the string
   constants in the app's compiled main process (`out/main/index.jsc`) get mined.

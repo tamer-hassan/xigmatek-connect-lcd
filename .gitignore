@@ -24,8 +24,9 @@ docs/preview-*.png
 # byte-count and pixel figure in README.md and PROTOCOL.md traces to a file in this
 # directory on the author's machine, and the file names are quoted so a run can be
 # repeated, not so it can be read here.  The checks that would read them -
-# `tools/verify_protocol.py`, `tools/theme_check.py --arc`, and the two selftest
-# sections that call them - say out loud that they are skipping instead of passing.
+# `tools/verify_protocol.py` and `tools/theme_check.py --arc`, and the one test in
+# `tests/` that wants the captures (`test_protocol.py`) - say out loud that they are
+# skipping instead of passing.
 data/
 
 # python packaging and editors

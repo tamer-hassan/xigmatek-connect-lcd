@@ -3,7 +3,7 @@ Depends: @, python3, python3-pil, python3-serial, desktop-file-utils
 Restrictions: superficial
 
 # What this test is for: the things that can only be measured after an install, in
-# the layout an install produces.  The offline suite (tools/selftest.sh) covers the
+# the layout an install produces.  The offline checks (`tests/`) cover the
 # protocol, the renders and the window from a checkout; none of it can see whether
 # pybuild put the modules where the interpreter looks, whether the clips the
 # packaging installs are the ones the code then finds by its own root rules, or

@@ -4,7 +4,7 @@
 #
 # Why pybuild rather than copying the modules by hand: this tree's metadata lives
 # in pyproject.toml - it is what `pip wheel .` reads, what the licence hash check in
-# tools/selftest.sh reads back, and what declares the three console scripts
+# `tests/test_packaging.py` reads back, and what declares the three console scripts
 # (`xigmalcd = xigmalcd.main:main`, `xigmaui = xigmaui.__main__:run`,
 # `xigmalcd-reset = xigmalcd.reset:main`).  dh-python 7 has a PEP 517 build plugin
 # (`plugin_pyproject.py`), so the deb is built from that one declaration instead of
@@ -69,8 +69,8 @@ export PYBUILD_INSTALL_DIR = /usr/lib/python3/dist-packages
 # on this bench the step proved nothing and on a clean runner it failed the build for
 # a reason that had nothing to do with the package's correctness.
 #
-# The suite that does test something is tools/selftest.sh, and it runs as its own CI
-# job before this build does - see debian/README.source, "Testing", for why it is not
+# The checks that do test something are `tests/`, and they run as their own CI job
+# before this build does - see debian/README.source, "Testing", for why they are not
 # wired into dh_auto_test instead.  `PYBUILD_DISABLE=test` is how dh-python spells it
 # (pybuild's is_disabled() compares the item against the step name); a builder who
 # wants the default back can still ask for it with DEB_BUILD_OPTIONS, and

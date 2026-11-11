@@ -1,6 +1,6 @@
 [project]
 name = "xigmalcd"
-version = "0.6"
+version = "0.7"
 description = "Show Linux system stats on the LCD built into Xigmatek Connect AIO coolers"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -9,7 +9,7 @@ dependencies = ["pyserial>=3.5", "pillow>=9.0"]
 # The SPDX form (a string, plus `license-files`) is PEP 639, which setuptools
 # understood from 77.  Earlier setuptools silently ignored `license-files` and
 # would build a wheel whose METADATA claimed no licence file at all, so the build
-# requirement is raised rather than left at 61 - and tools/selftest.sh reads this
+# requirement is raised rather than left at 61 - and `tests/test_packaging.py` reads this
 # file back and compares the declaration with the LICENSE on disk.
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
