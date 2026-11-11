@@ -5,8 +5,11 @@ The five themes this project draws, what `alpha` is a redraw *of*, and the geome
 ## The 27 vendor themes are not in the picker, and that is not an oversight
 
 `xigmaui`'s theme list takes `sorted(render.THEMES)`: `alpha`, `bars`, `clock`, `dual`,
-`gauge`. Those are the pictures **this program** draws from live readings, and the window
-lists only what it can preview. `xigmalcd --theme` takes those five **and** 23 of the vendor's 27
+`gauge`. Those are the pictures **this program** draws from live readings, and they are the
+five whose own options - a title, a label, a `cold`/`hot` band, a gauge source, an ink colour -
+the window edits with that picker. It is not that the window cannot show the others: the layout
+editor previews every selectable file in the box beside the picture, and since 2026-11-11 it
+puts one on the glass from there, by `apply to the panel`. `xigmalcd --theme` takes those five **and** 23 of the vendor's 27
 layout files, by the name of the background each one declares - `Theme_07`,
 or the numeric id `1757491588804` - painted by `xigmalcd/layout.py` at the canvas the
 file itself declares and uploaded as an ordinary `.osd` frame. What has never happened,

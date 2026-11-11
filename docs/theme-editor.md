@@ -297,8 +297,10 @@ naming: a copy renamed, a second copy written under a new name, both taking a fr
 so one `--theme <id>` never answers two files, and a name rule shared by every door that
 invents one (`themes.new_name`) - it refuses a name any layout answers today, by name,
 by case-fold, or by id, which is what `resolve()` actually matches. The bullets and
-every digit they hold are in docs/gui.md. The window's theme combo still lists the five,
-because that combo picks what the loop draws from this machine's sensors.
+every digit they hold are in docs/gui.md. The window's theme combo still lists the five, because
+those are the five whose per-theme options and ink the row under that picker edits; a
+layout reaches the glass from the editor's box, by `apply to the panel`, and the display
+answers with the name it is drawing so the window can show that rather than remember it.
 
 ### What the canvas half measured (stage 4, 2026-11-08)
 

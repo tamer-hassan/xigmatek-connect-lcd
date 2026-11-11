@@ -207,7 +207,7 @@ A pane
 that cannot be dragged under what it holds cannot grow a horizontal scrollbar inside
 itself, so the 0.4 failure mode is unreachable rather than merely avoided. The controls
 floor is the editor's own footprint, so it moves twice over: one column of editor rows asks for **376 px** of controls on this bench, two columns for **400**, three for **568** - and **394 / 417 / 589** on CI's runner - a closed drop-down that has to show the longest entry it holds is part of what those columns carry, and the window's own minimum rises with them. Every one of those digits is read out of this page and held to whichever of the two labelled machines is running the suite, because a floor that follows the fonts is not a constant to compare.
-The 18 rows of an `arc` widget stand **858 px** tall in one column and **465 px** in three there, the grid's own ask going **171 / 344 / 512 px** - **779** and **434 px**, asking **180 / 361 / 533**, on CI's runner - which is the reflow buying height without buying a scrollbar, and all twelve figures come off the sizing pass the suite runs on every machine. Those four heights are what the two rows of controls under the fields cost, in height and never in a column's width: 0.5 read 796 / 403 here and 723 / 378 there, the row of row-level controls made it 827 / 434 and 751 / 406, and the name box with its two buttons made it 858 / 465 and 779 / 434 - so a row of controls is 31 px on this bench and 28 px on that runner, twice over, while the grid's own ask does not move at all because the grid of rows did not change. Every one of those digits is read out of this page and held to whichever of the two labelled machines is running the suite, because a floor that follows the fonts is not a constant to compare.
+The 18 rows of an `arc` widget stand **889 px** tall in one column and **496 px** in three here, the grid's own ask going **171 / 344 / 512 px** - **779** and **434 px**, asking **180 / 361 / 533**, on CI's runner, where the two heights are what it answered before the `apply to the panel` row landed and the run that carries it prints its own pair - which is the reflow buying height without buying a scrollbar, and all twelve figures come off the sizing pass the suite runs on every machine. Those four heights are what the two rows of controls under the fields cost, in height and never in a column's width: 0.5 read 796 / 403 here and 723 / 378 there, the row of row-level controls made it 827 / 434 and 751 / 406, and the name box with its two buttons made it 858 / 465 and 779 / 434, as did the editor's structural row (add / remove / up / down) and the row that tells a running display to draw the open layout - 889 / 496 here, and the runner's own pair printed by the run that carries that row - so a row of controls is 31 px on this bench and 28 px on that runner, three times over, while the grid's own ask does not move at all because the grid of rows did not change. Every one of those digits is read out of this page and held to whichever of the two labelled machines is running the suite, because a floor that follows the fonts is not a constant to compare.
 
 ### The preview plays, or shows one frame
 
@@ -745,6 +745,30 @@ editor commonly gets wrong:
   badge under the picture names the body the picture came from: `pane: PEEK - this machine's
   own sensors, held | this machine: …`, with the pane's caption saying the same in a sentence
   and the model's `peek_sentence` carrying the numbers behind the frame.
+* The layout this box has open can be put on the glass, from this box.** `apply to the
+  panel` sends one socket command - `("theme", <the name this box holds>)` - and
+  nothing else. The theme box's `Apply these settings` is where clock size, canvas,
+  scrim, fans and fps live, and a button under the layout rows has no business moving
+  them while you are looking at one row's `x`. The display's own door has taken a
+  layout name since 0.4 (`control.Control._set_theme` refuses only a name that
+  `render.THEMES` lacks *and* `themes.resolve` answers None for); what was missing was
+  a control in this window that spoke it. The theme combo lists the **5** names this
+  program draws from code while the editor opens **28** - the 5 generated ones and
+  **23** of the vendor's files - so until this change a layout could be previewed,
+  edited, saved, renamed and copied here and still never reach the panel. What the log
+  says after the press is read rather than remembered: the display's own
+  `status()["theme"]`, because §11 gives no readback of pixels but settings come back,
+  and a count of the boxes that file paints at this machine's readings against the
+  pinned fixture the pane is showing - the suite prints that pair on whichever box ran
+  it, since it is a drawing and not a rule. Two things the command deliberately does
+  not reach: the panel's stored background, which is a separate upload and the clips
+  box's act, and the colours written in the layout's own file, because the theme box's
+  colour row paints only what *this program* draws. And it is one display's business
+  while that display runs: what a fresh one starts with is its own `--theme`. The
+  tray's theme submenu keeps the same five names as the combo - the suite's tray check
+  prints that count every run, and asserts it - so the route to a layout is in the
+  window, not in a menu of twenty-eight.
+
 * **The picture can be pointed at, and what a point means is the paint's answer.** The
   ink box `themes.draw` records for the selected row is marked on the pane. Press inside a
   box and that row is selected; where two boxes overlap the **later** row wins, because
@@ -838,8 +862,11 @@ declared `y` in the corpus is **1**, and only **27** of its **185** declared `x`
 multiples of 16, so these files have no grid to snap to and this program does not invent one and
 call it the vendor's.  Nothing about a row's *position* is guessed at either; the editor draws
 from the pinned fixture, never from a live sample - what a peek offers is a look, not an editing
-surface (the bullet above) - and the theme combo above still lists only the five, because that
-combo picks what the loop draws from this machine's sensors.
+surface (the bullet above). The theme combo lists the five names this program draws from
+code, because those are the five whose options the row under it edits - a title, a label,
+a `cold`/`hot` band, a gauge source; a file layout brings its own geometry and its own
+colours. A layout reaches the glass from the editor's box instead, by `apply to the
+panel`, and the panel then paints that file from its own live readings.
 
 ### The colour of the text
 
@@ -1095,8 +1122,10 @@ Five things it deliberately does not pretend to be:
   result as frames - which is what this does, and it is what makes a row's
   position draggable on screen at all. What it is *not* is the vendor's app: a new row
   is always a copy of a row this program already draws rather than a table of defaults,
-  nothing about a layout is ever sent to the panel, and the theme pane offers the five
-  themes this repo draws, with the daemon's own options.
+  nothing reaches the panel that this window has not saved first (`apply to the panel`
+  sends a name, and the display resolves it to a file on disk), no background goes with
+  it, and the theme pane offers the five themes this repo draws, with the daemon's own
+  options.
 * **No storage gauge.** The status pane prints `space` as a number with a note
   that it is not a size ledger: across four accepted uploads it moved a few KB
   in either direction and never resembled the file's size (§9).

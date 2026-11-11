@@ -92,21 +92,24 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     four bullets about structural editing into that list, which is what
     reading a page cover to cover does that reading a diff does not.
 
-  * The window's sizing figures move, in height only.  An `arc`'s 18 field
+  * The window's sizing figures move, in height only. An `arc`'s 18 field
     rows stood 796 px tall in one column and 403 in three on the author's
-    bench at 0.5, 827 and 434 after the row of row-level controls, and 858 and
-    465 after the name box; GitHub's runner read 723 and 378, then 751 and
-    406, then 779 and 434.  So each of those two rows costs 31 px of height
-    here and 28 px there, and no column's width - and the grid's own ask does
-    not move at all (171 / 344 / 512 px here, 180 / 361 / 533 there), because
-    the grid of rows is the grid that was already there.  The pair gate is what
-    found this: the first run of this tree failed on the bench at the gate the
-    suite calls `the arc box heights`, a later one failed on the runner at the
-    same gate, and each failure printed that machine's own pair.  The three
-    columns' floors, the controls floor by columns of rows, the fresh split,
-    the narrowest column and the window's own minimum are unchanged on both
-    machines, and the suite still fails any pane that has to scroll sideways to
-    be read.
+    bench at 0.5, 827 and 434 after the row of row-level controls, and 858
+    and 465 after the name box; GitHub's runner read 723 and 378, then 751
+    and 406, then 779 and 434. The row that tells a running display to draw
+    the open layout is the third such row: 889 and 496 on this bench, and
+    the runner's own pair printed by the run that carries it, replacing the
+    779 and 434 the page labels as its figures before the row. So each of
+    those three rows costs 31 px of height here and 28 px there, and no
+    column's width - and the grid's own ask does not move at all (171 / 344
+    / 512 px here, 180 / 361 / 533 there), because the grid of rows is the
+    grid that was already there. The pair gate is what found this: the first
+    run of this tree failed on the bench at the gate the suite calls `the
+    arc box heights`, a later one failed on the runner at the same gate, and
+    each failure printed that machine's own pair. The three columns' floors,
+    the controls floor by columns of rows, the fresh split, the narrowest
+    column and the window's own minimum are unchanged on both machines, and
+    the suite still fails any pane that has to scroll sideways to be read.
 
   * lintian has been printing one warning that no CI run has ever seen,
     because the CI job builds binary-only (`-us -uc -b`) while a source
@@ -511,6 +514,35 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     uses, and 0 bytes differ; the file door takes its instant as an
     argument, which is why every other compare in that section was safe and
     this one was not.
+
+  * A layout the editor has open can be put on the glass from the window
+    now, by one button and one command. Reported on 2026-11-11: a layout
+    could be opened, previewed, edited, saved, renamed and copied in the
+    window, and none of it reached the panel - the theme combo lists
+    `sorted(render.THEMES)`, five names, and `Apply these settings` sends
+    that combo's text, so with the editor on `Theme_01` it sent
+    `theme='alpha'`. The display's door had taken a layout name the whole
+    time (`control.Control._set_theme` refuses only a name `render.THEMES`
+    lacks *and* `themes.resolve` answers None for; measured answering
+    `ok=True` for `Theme_01`, `Theme_07`, the numeric id, and one of my
+    copies, and refusing `no-such-layout` with `themes.why_not`'s sentence),
+    and it reports the theme it draws in `status()["theme"]`, so the window
+    can show the display's answer instead of remembering its own. `apply to
+    the panel` sends that one command and nothing else - clock size, canvas,
+    scrim, fans and fps are the theme box's, and the gate asserts they did
+    not move - and the log says the three things a reader cannot see from
+    the picture: that the pane is the pinned fixture while the panel paints
+    the file at this machine's readings, that the panel's stored background
+    is untouched, and that the file's own glyph colours are not what the
+    theme box's colour row paints. For one of the five names the button also
+    moves the picker, because two controls that disagree about what the
+    glass shows are worse than either; the tray's theme submenu keeps those
+    five too, and the suite's tray check asserts that list by name. A fresh
+    display still starts on its own `--theme`: the suite's socket section
+    drives the button against an in-process display, asserts one command and
+    one setting changed, reads the refusal path, and prints the box counts
+    for the machine that ran it.
+
 
   * Still not built, and said in the pages rather than left to be found: a
     snap to a grid - the files carry none, so a snap answers a neighbour's

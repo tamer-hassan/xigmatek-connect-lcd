@@ -991,7 +991,6 @@ class Window(QMainWindow):
         self.d_events.setStyleSheet("font-family:monospace;color:#888;")
         llay.addWidget(self.d_events)
         self._adv_hide.append(self.d_events)
-        self._set_display_widgets(False)
         col.addWidget(live)
 
         theme = QGroupBox("Theme on the glass")
@@ -1247,9 +1246,11 @@ class Window(QMainWindow):
         #
         # The rows live in a grid that reflows between one, two and three columns
         # depending on the width this splitter happens to give the box (see
-        # `EditorBox`), so the 18 rows of an `arc` widget make this box 858 px tall in
-        # one column at a 1280x1024 window and 465 px in three at 1919x1055 - this
-        # bench's reading, CI's runner reading 779 and 434 - each row of controls under
+        # `EditorBox`), so the 18 rows of an `arc` widget make this box 889 px tall in
+        # one column at a 1280x1024 window and 496 px in three at 1919x1055 - this
+        # bench's reading, CI's runner reading 779 and 434 (what it answered before the
+        # `apply to the panel` row landed, replaced by that row's own run) - each row of
+        # controls under
         # the fields is 31 px of height here and 28 px there, against the 796/403 and
         # 723/378 that 0.5 measured in the same pass - measured in
         # the window, printed by the suite's sizing gate, and held to whichever half of
@@ -1291,10 +1292,20 @@ class Window(QMainWindow):
         brow.addWidget(self.ed_undo)
         brow.addWidget(self.ed_save)
         brow.addWidget(self.ed_revert)
+        # The one act here that reaches the glass rather than the file, on its own row for
+        # the same measured reason as the rows above: this column's floor is read back off
+        # the widest thing it holds, and a longer label is a wider floor for the column.
+        prow = QHBoxLayout()
+        self.ed_apply_panel = QPushButton("apply to the panel")
+        self.ed_apply_panel.setToolTip(self._ed_apply_panel_tip())
+        self.ed_apply_panel.clicked.connect(self._apply_layout_to_display)
+        prow.addWidget(self.ed_apply_panel)
+        prow.addStretch(1)
         # a row of its own across the whole width: three buttons squeezed into a
         # field column is what put a 357 px floor under the whole controls column
         # (measured) while the labels and fields needed barely more
         eform.addLayout(brow)
+        eform.addLayout(prow)
 
         # The two acts that invent a name.  The box holds the name to give, not the name
         # that is: a reader who has just typed a new one should not have it replaced under
@@ -1648,6 +1659,15 @@ class Window(QMainWindow):
         # the switch's initial position: setChecked() above ran before the
         # `toggled` connect, so the folding has to be applied here as well
         self._set_advanced(self.adv_toggle.isChecked())
+        # ...and the same for the display's widgets, at the end rather than where the
+        # display's own box is built: that list names a control in the editor's box, and
+        # the editor is built after this point in one pass through `_build`.  With the call
+        # where it used to sit, the list named a widget that did not exist yet - which the
+        # suite caught as `AttributeError: 'Window' object has no attribute
+        # 'ed_apply_panel'` printed from inside `_build`, in every window, on the first run
+        # of this change.  Nothing is enabled by this: no display has been polled yet, so
+        # the answer is still "off", and the poll that finds one turns it on.
+        self._set_display_widgets(False)
 
     #: The three columns' own floors, in pixels: the preview is the one the picture
     #: can shrink inside (the cap in `_build` is its other half), and the two text
@@ -3029,9 +3049,10 @@ class Window(QMainWindow):
         """One, two or three columns of rows, by the width the *pane* has.
 
         This is the responsive half, and it is here because the alternative is a
-        scrollbar: the 18 rows of an `arc` widget make this box **858 px** tall in one
-        column at a 1280x1024 window and **465 px** in three at 1919x1055 - this bench's
-        digits, where CI's runner reads 779 and 434 (a row of controls under the fields is
+        scrollbar: the 18 rows of an `arc` widget make this box **889 px** tall in one
+        column at a 1280x1024 window and **496 px** in three at 1919x1055 - this bench's
+        digits, where CI's runner reads 779 and 434, the figures from before the apply row
+        (a row of controls under the fields is
         31 px of height here and 28 px there) - measured in the window and printed
         by the suite's sizing gate with the grid's own ask of 171 / 344 / 512 px, and a
         controls column that cannot hold what it is shown is
@@ -3457,6 +3478,104 @@ class Window(QMainWindow):
             + ". What you typed is still here, unsaved.")
         self._ed_refresh_layouts()
         self._editor_state()
+
+    def _ed_apply_panel_tip(self) -> str:
+        """The button's sentence, before the press.
+
+        Three things a reader cannot see from the picture, in the order they bite: that the
+        pane is the pinned fixture and the panel is live readings, that this sends one
+        setting where the theme box's Apply sends seven, and that two things this program
+        changes elsewhere - the panel's stored background, and the theme's ink - are not in
+        this command at all.
+        """
+        return ("tell a running display to draw the layout this box has open: the one "
+                "command `--theme <name>` already means when the loop starts. The pane is "
+                "showing the pinned fixture; the panel paints this file at this machine's "
+                "live readings, so the digits differ. One setting goes, not seven - the "
+                "theme box's `Apply these settings` is where clock size, canvas, scrim, "
+                "fans and fps live. What this does not touch: the panel's stored "
+                "background (the clips box sends that, Ctrl+Shift+U), the colours written "
+                "in the layout file, and what a fresh display starts with, which is its "
+                "own `--theme`.")
+
+    def _apply_layout_to_display(self) -> None:
+        """Tell a running display to draw the layout this editor has open.  One command.
+
+        `daemon.apply` sends the theme box's seven pickers, and a button sitting under the
+        *layout* rows has no business moving the clock size, the canvas, the scrim, the fan
+        figures or the frame rate while the reader is looking at one row's `x`.  This is the
+        narrow door: `("theme", <this layout's name>)`, and nothing else.
+
+        The door is not new; the handle was.  `control.Control._set_theme` has taken both
+        halves of the vocabulary since 0.4 - it refuses only a name that `render.THEMES`
+        lacks *and* `themes.resolve` answers None for - while the window's only route to it
+        was the theme combo, which lists `sorted(render.THEMES)`: five entries, against the
+        28 the editor can open.  Measured on 2026-11-11: with the editor open on `Theme_01`,
+        pressing `Apply these settings` sent `theme='alpha'`, and the 23 layouts this program
+        paints only from a file - plus any copy of your own - had no route to the glass in
+        this window at all.
+
+        What gets said after the press is read, not remembered.  The display's own reply
+        carries `status["theme"]` (PROTOCOL.md §11: no readback of pixels, but settings come
+        back), and the box counts come from `themes.draw` at this machine's readings against
+        the same file at the pinned fixture - the two frames this window is standing between.
+        Drawn first, before the command goes: a count that failed should not be able to leave
+        the panel changed and the window silent.
+        """
+        if self.ed is None:
+            self._log("nothing to apply: the layout box holds nobody. Pick one above, or "
+                      "use the theme box's `Apply these settings` for the five this "
+                      "program draws from code")
+            return
+        if not self.daemon.present:
+            # the button is disabled in this state; the guard is for the keyboard shortcut
+            self._log("no display running to tell: this window visits the port itself, one "
+                      "action at a time, and a layout the panel has never seen is one "
+                      "frame at a time (`Send one frame`)")
+            return
+        name = str(self.ed.name)
+        # what the two frames this window sits between actually hold, counted by the painter.
+        # One variable, not two: the body.  The instant stays `edit.FIXTURE_WHEN`, the same
+        # rule feature G set for a peek - `Date`, `Time` and `Week` come from the instant
+        # rather than from any reading, so a moving instant would rewrite those rows every
+        # second and the count would stop being about readings at all.  Drawn before the
+        # command goes: a count that failed should not be able to leave the panel changed and
+        # the window silent.
+        _live, live_notes = self.ed.paint(sensors.collect(), edit.FIXTURE_WHEN)
+        _pin, pin_notes = self.ed.paint(*self.ed.fixture())
+        n_live = len(live_notes.get("boxes") or [])
+        n_pin = len(pin_notes.get("boxes") or [])
+        rep = self.daemon.send("theme", value=name)
+        if not rep.get("ok"):
+            # `send` has logged the display's refusal in the display's own words already
+            _was = (self.daemon.status or {}).get("theme") or "what it had"
+            self._log(f"the panel kept {_was}: nothing moved for {name}")
+            return
+        shown = str((rep.get("status") or {}).get("theme") or name)
+        if themes.resolve(name) is None:
+            # one of the five this program draws from code: the theme box names the same
+            # thing, and two controls that disagree about what the panel draws are worse
+            # than either one, so make them agree instead of leaving the reader to notice
+            if self.theme.currentText() != name:
+                self.theme.setCurrentText(name)
+            self._log(f"panel draws {shown} (its own status says so). That is one of the "
+                      f"five this program draws from `render.py`, so the theme box's picker "
+                      f"names it too, and its `Apply these settings` reaches the same door")
+        else:
+            self._log(f"panel draws {shown} (its own status says so), from "
+                      f"{self.ed.where}. At this machine's readings, at the same pinned "
+                      f"instant, that file paints "
+                      f"{n_live} boxes, against {n_pin} at the pinned fixture the pane is "
+                      f"showing: a row whose reading this box cannot answer is skipped on "
+                      f"the glass. The panel's stored background is untouched by this "
+                      f"command, and so are the colours the file names for its own glyphs - "
+                      f"the theme box's colour row paints only what this program draws. And "
+                      f"the theme box's `Apply these settings` would send its own pick "
+                      f"({self.theme.currentText()}) back over this one: the two controls "
+                      f"write the same setting")
+        self._log("what a fresh display starts with is its own `--theme`, not this change: "
+                  "the service's line says it, and `--theme <name>` at a start is the way "
+                  "to make this one stick")
 
     # ------------------------------------------------------- the canvas door --
     # Pointing at the picture is the other half of the editor: a row's ink box is where
@@ -3962,7 +4081,12 @@ class Window(QMainWindow):
 
     # ---- the running display --------------------------------------------
     def _set_display_widgets(self, on: bool) -> None:
-        for w in (self.btn_pause, self.btn_dframe, self.btn_apply, self.d_fps):
+        # `ed_apply_panel` belongs to this list, not to the editor's own enablement: the
+        # editor's fields are useful with no display running (a file can be edited and saved
+        # with nothing on the other end of the port), while a command that tells a display
+        # what to draw has no recipient at all in that state.
+        for w in (self.btn_pause, self.btn_dframe, self.btn_apply, self.d_fps,
+                  self.ed_apply_panel):
             w.setEnabled(on)
 
     def _show_display(self, st: dict) -> None:
@@ -4161,11 +4285,13 @@ class Window(QMainWindow):
         self.tray_pause = QAction("Pause the display", self)
         self.tray_pause.triggered.connect(self._tray_pause)
         menu.addAction(self.tray_pause)
-        themes = menu.addMenu("Theme on the glass")
+        # `theme_sub`, not `themes`: the module of that name is what the rest of this class
+        # reaches for, and a local QMenu called `themes` would answer instead of it from here on.
+        self.tray_theme_menu = theme_sub = menu.addMenu("Theme on the glass")
         for name in sorted(render.THEMES):
             act = QAction(name, self)
             act.triggered.connect(lambda _=False, n=name: self._tray_theme(n))
-            themes.addAction(act)
+            theme_sub.addAction(act)
         menu.addSeparator()
         show = QAction("Show window", self)
         show.triggered.connect(self._show_from_tray)

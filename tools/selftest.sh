@@ -6623,9 +6623,13 @@ assert _cl[0] >= _sized.PANE_FLOORS[1], (_cl, _sized.PANE_FLOORS,
     "the page's controls floor is under the bound the code sets for that column")
 assert _cl[0] < _cl[1] < _cl[2] and _cl[3] < _cl[4] < _cl[5], (
     _cl, "a machine's controls floors do not rise with its columns of rows")
+# The `arc` editor box's height, both labelled halves.  "in three here" is how the page writes
+# the bench's own pair since feature I moved it (858/465 -> 889/496 here, one more row of
+# controls); the older wording ("in three there") is what the page said when both halves were
+# quoted in one breath, so the pattern takes either rather than forcing a rewrite of prose.
 _hh = _pair("the `arc` box heights",
             r"stand \*\*(\d+) px\*\* tall in one column and \*\*(\d+) px\*\* in three "
-            r"there.*?\*\*(\d+)\*\* and \*\*(\d+) px\*\*, asking",
+            r"(?:here|there).*?\*\*(\d+)\*\* and \*\*(\d+) px\*\*, asking",
             (_box_at[1280][1], _box_at[1919][1]))
 _ga = _pair("the grid's own ask",
             r"the grid's own ask going \*\*(\d+) / (\d+) / (\d+) px\*\* - \*\*\d+\*\* and "
@@ -12098,6 +12102,62 @@ print(f"                        the pages carry those two ratios ({_th_ppair:.2f
       f"pane, {_th_label_pair:.2f}:1 elsewhere) because this gate measured them, and no page "
       f"quotes a pixel count or a tooltip count")
 
+# ---- feature I's sentences, held to the numbers the **files** give this run.  The counts here
+# ---- are file facts - the five names in `render.THEMES`, the selectable vendor files, the
+# ---- layouts this box opens - so a page may state them and this gate may assert them, and they
+# ---- answer the same on either machine.  What a press paints (the boxes at this machine's
+# ---- readings against the pinned fixture) is a drawn figure: the socket section prints it on the
+# ---- box that ran it, and no page may quote it, which is what the last check below is for.
+_ii_cl = " ".join(open("debian/changelog", encoding="utf-8").read().split("\n -- ")[0].split())
+_ii_app = _flat("xigmaui/app.py")
+_ii_files = len(pick)                                   # selectable vendor layout files
+_ii_open = _ii_files + len(themes.EXPORTS)              # what the editor's combo offers
+for _src, _where in ((_gf, "docs/gui.md"), (_ii_cl, "the 0.6 stanza"),
+                     (_flat("docs/themes.md"), "docs/themes.md")):
+    assert "apply to the panel" in _src, (_where, "the control is not named where a reader "
+                                                  "would look for it")
+    assert not _re.search(r"paints \d+ boxes", _src), (
+        _where, "a page quotes how many boxes a press paints, which is the machine's own figure "
+                "- the socket section prints that pair beside the display's answer")
+    assert not _re.search(r"\d+ (?:of the )?\d+ (?:names|layouts) (?:are |were )?unreachable",
+                          _src), (_where, "a page counts unreachable names from one run, which "
+                                          "follows how many copies that machine holds")
+
+# docs/gui.md: the picker's five and this box's twenty-eight, counted here from the files
+_m = _re.search(r"lists the \*\*(\d+)\*\* names this program draws from code while the "
+                r"editor opens \*\*(\d+)\*\* - the \d+ generated ones and \*\*(\d+)\*\* of the "
+                r"vendor's files", _gf)
+assert _m, ("docs/gui.md", "the sentence holding the picker's five against this box's "
+                            "twenty-eight is gone, so nothing re-counts those digits")
+assert tuple(int(x) for x in _m.groups()) == (len(render.THEMES), _ii_open, _ii_files), (
+    _m.groups(), len(render.THEMES), _ii_open, _ii_files,
+    "the page's counts are not this run's: `render.THEMES`, the selectable files, and the "
+    "exports the editor adds")
+assert "the display's own" in _gf and "stored background" in _gf, (
+    "docs/gui.md stopped saying what the press reads back and what it deliberately leaves alone")
+
+# docs/themes.md: the reason the picker stays on five is the options row, not an inability to
+# preview - the pane has previewed every one of these files since the editor landed, and the old
+# sentence said otherwise.
+_themes_md = _flat("docs/themes.md")
+assert "the layout editor previews every selectable file" in _themes_md, (
+    "docs/themes.md still explains the picker by what the window cannot show")
+assert "`apply to the panel`" in _themes_md, "docs/themes.md does not name the route"
+
+# `app.py`'s own comment carries the measurement, so the claim cannot outlive the code
+for _phrase, _why in (("the window's only route to it", "the gap, in the door's own comment"),
+                      ("`sorted(render.THEMES)`: five entries, against the", "the counts, in code"),
+                      ("Drawn before the command goes", "why the counts cannot leave the panel "
+                                                        "changed and the window silent"),
+                      ("no readback of pixels, but settings come", "the readback's warrant")):
+    assert _phrase in _ii_app, (_phrase, _why, "`app.py` stopped saying it where a reader looks")
+
+print(f"  I's page figures      the picker names {len(render.THEMES)} drawn-from-code names "
+      f"while this box opens {_ii_open} ({_ii_files} files + {len(themes.EXPORTS)} exports), all "
+      f"counted from the files on this run; the pages name the control, the readback and the "
+      f"background it leaves alone, and none of them quotes a box count or an unreachable-name "
+      f"tally")
+
 # a press on empty glass names the point and selects nothing, and closing the layout takes
 # the mark with it - the pane goes back to a live preview, with nothing drawn on it
 # The timer is stopped for this passage, and it is said rather than slipped: `_repaint` ends by
@@ -12651,6 +12711,128 @@ for _ in range(6):
 assert win.daemon.knows("text_color") is True and win.ink_choice.isEnabled(), \
     "the row stayed dead after the display came back with the field"
 
+# ---- feature I: the editor's own route to the glass.  Reported on 2026-11-11: everything the
+# ---- editor could do with a layout stopped at the file.  A layout could be opened, previewed at
+# ---- the pinned fixture, edited, saved as a copy, renamed and copied here - and no control in
+# ---- this window told a running display to draw it.  Measured in this harness before a line was
+# ---- written: with the editor on a vendor layout, `Apply these settings` sent `theme=gauge`,
+# ---- the theme combo's pick, because that combo lists `sorted(render.THEMES)` - five entries
+# ---- against the 28 this box opens.  The display's own `theme` door has taken a layout name
+# ---- since 0.4 (`control.Control._set_theme` refuses only a name that `render.THEMES` lacks
+# ---- *and* `themes.resolve` answers None for), and it answers with the name it is drawing.  So
+# ---- the gate drives the narrow door: one command, one setting, the display's answer read back,
+# ---- and the two counts the log prints taken from the painter in the same press.
+import re as _i_re                                              # noqa: E402
+from xigmalcd import themes as _i_themes                        # noqa: E402
+
+_i_files = [str(_r["name"]) for _r in _i_themes.scan()[0]]
+_i_vendor = _i_files[0]
+assert render.THEMES and _i_vendor not in render.THEMES, (_i_vendor, sorted(render.THEMES))
+assert _i_vendor not in {win.theme.itemText(_i) for _i in range(win.theme.count())}, (
+    "the theme combo has grown a layout entry, which is not the shape this route took: the "
+    "picker stays on the five whose per-theme options and ink the row under it edits")
+_i_all = (args.theme, args.clock_size, args.bg, args.scrim, args.no_fans, args.fps,
+          args.text_color)
+
+# The guard first: the button is enabled by a running display, not by an open layout, so with
+# nobody open it has to refuse in words and send nothing at all.
+win.ed_name.setCurrentText(app.NO_EDITOR)
+for _ in range(6):
+    qapp.processEvents()
+assert win.ed is None and win.ed_apply_panel.isEnabled(), (
+    "the route is dead in a window that has a display and no layout open: it should be the "
+    "other way round, since saying so is the point of that branch")
+_i_mark = win.log_view.text()
+win.ed_apply_panel.click()
+for _ in range(4):
+    qapp.processEvents()
+_said = win.log_view.text()[len(_i_mark):]
+assert "the layout box holds nobody" in _said, (_said[-300:],
+                                                "a press with no layout open moved silently")
+assert (args.theme, args.clock_size, args.bg, args.scrim, args.no_fans, args.fps,
+        args.text_color) == _i_all, "the refusal still reached the display's settings"
+assert ctl.take() is None, "a refusal queued an action on the port's behalf"
+
+# The file case: the editor's own name, one command, and the other six settings untouched.
+win.ed_name.setCurrentText(_i_vendor)
+for _ in range(10):
+    qapp.processEvents()
+assert win.ed is not None and str(win.ed.name) == _i_vendor, (win.ed and win.ed.name, _i_vendor)
+_i_mark = win.log_view.text()
+win.ed_apply_panel.click()
+for _ in range(6):
+    qapp.processEvents()
+_said = win.log_view.text()[len(_i_mark):]
+assert args.theme == _i_vendor, (_i_all[0], args.theme, "the layout the editor holds did not "
+                                                       "reach the display")
+assert (args.clock_size, args.bg, args.scrim, args.no_fans, args.fps,
+        args.text_color) == _i_all[1:], (_i_all, (args.clock_size, args.bg, args.scrim,
+                                                  args.no_fans, args.fps, args.text_color),
+                                         "a button under the layout rows moved a setting that "
+                                         "belongs to the theme box")
+assert ctl.take() is None, ("applying a layout queued an upload or a frame: the button sends "
+                            "one socket command, and the background is a separate act")
+assert win.theme.currentText() == _i_all[0], (
+    win.theme.currentText(), "the picker was rewritten to name a layout it cannot preview with "
+                             "its own options row")
+
+# Read, not remembered: the display answers with the theme it is drawing, and the window shows
+# that answer rather than the one it sent (§11: no readback of pixels, settings come back).
+assert ctl.status()["theme"] == _i_vendor, (ctl.status(),
+                                            "the display does not report the layout it was told "
+                                            "to draw")
+win.daemon.poll(report=True)
+for _ in range(6):
+    qapp.processEvents()
+assert _i_vendor in win.d_line.text(), (win.d_line.text(),
+                                        "the display line does not carry the layout it reports")
+
+# What the log said, and the two counts the painter gave it in that same press.  The
+# pinned-fixture half of the pair is deterministic (that body, that instant - feature G's held
+# frame), so it is asserted; the live half belongs to this machine's sensors, so the gate only
+# checks that the sentence carries a number, and prints which one came out here.
+_i_pin_boxes = len(win.ed.paint(*win.ed.fixture())[1].get("boxes") or [])
+_m = _i_re.search(r"paints (\d+) boxes, against (\d+) at the pinned fixture", _said)
+assert _m, (_said[-500:], "the log does not say what the panel will paint, at whose readings")
+assert int(_m.group(2)) == _i_pin_boxes, (_m.group(2), _i_pin_boxes,
+                                          "the log's pinned-fixture count is not what the "
+                                          "editor's own paint of that fixture reports")
+for _phrase in ("panel draws", "its own status says so", "stored background is untouched",
+                "colours the file names", "what a fresh display starts with",
+                "would send its own pick", "this machine's readings, at the same pinned"):
+    assert _phrase in _said, (_phrase, "the press did not say one of the things a reader cannot "
+                                       "see from the picture")
+
+# The five generated names: the picker can say the same thing, so the two controls are made to
+# agree rather than left for the reader to notice apart.
+_i_gen = next(_n for _n in sorted(_i_themes.EXPORTS) if _n != win.theme.currentText())
+win.ed_name.setCurrentText(_i_gen)
+for _ in range(10):
+    qapp.processEvents()
+assert win.ed is not None and str(win.ed.name) == _i_gen
+_i_mark = win.log_view.text()
+win.ed_apply_panel.click()
+for _ in range(6):
+    qapp.processEvents()
+_said2 = win.log_view.text()[len(_i_mark):]
+assert args.theme == _i_gen, (args.theme, _i_gen, "a generated layout did not reach the display")
+assert win.theme.currentText() == _i_gen, (
+    win.theme.currentText(), "the theme box and the display disagree about what is drawn, which "
+                             "is the state the log claims to have avoided")
+assert "one of the five this program draws from `render.py`" in _said2, _said2[-400:]
+assert _i_themes.resolve(_i_gen) is None, (_i_gen,
+                                           "a generated name resolved to a file, so the two "
+                                           "branches above are being driven blind")
+print(f"  the layout, on the panel   `apply to the panel` sent one command: the display now "
+      f"reports {_i_vendor!r} while its clock ({args.clock_size}), canvas ({args.bg}), scrim "
+      f"({args.scrim}), fans ({args.no_fans}) and {args.fps} fps are as they were; that file "
+      f"paints {_m.group(1)} boxes at this machine's readings against {_i_pin_boxes} at the "
+      f"pinned fixture (a printed pair, this box's), and the picker still lists "
+      f"{win.theme.count()} names while this box opens {len(_i_files) + len(_i_themes.EXPORTS)}")
+win.ed_name.setCurrentText(app.NO_EDITOR)
+for _ in range(4):
+    qapp.processEvents()
+
 # the pause button is a user click, and a status sync must not answer itself
 win.btn_pause.click()
 assert ctl.paused is True
@@ -12685,7 +12867,8 @@ try:
 finally:
     app.QSystemTrayIcon = _real_tray_cls
 assert win.tray is not None, "the tray the desktop offers was not built"
-assert win.tray_line is not None and win.tray_pause is not None, "an icon with no menu"
+assert (win.tray_line is not None and win.tray_pause is not None
+        and win.tray_theme_menu is not None), "an icon with a part of it missing"
 # (Qt answers this with a line on stderr, `QObject::connect: No such signal
 # QPlatformNativeInterface::systemTrayWindowChanged(QScreen*)`, because the platform
 # plugin here has no tray host to talk to.  That noise is the fixture, not a failure:
@@ -12725,8 +12908,16 @@ assert tray_txt == f"{st['theme']} at {st['fps']} fps, " \
 assert win.tray_pause.text() == "Pause the display", win.tray_pause.text()
 assert win.tray_pause.isEnabled() and not win.tray_line.isEnabled(), \
     "the status line is a label, not a button"
+# the submenu's own entries, asserted rather than counted: this is where the page says the
+# tray keeps the five names this program draws from code, and a layout reaches the glass from
+# the editor's box instead (`apply to the panel`, a few hundred lines above).  If the menu ever
+# grows the vendor files, that sentence needs rewriting and this assert says so first.
+_sub = [a.text() for a in win.tray_theme_menu.actions() if a.text()]
+assert _sub == sorted(render.THEMES), (_sub, sorted(render.THEMES),
+                                       "the tray's theme submenu no longer lists exactly the "
+                                       "five names the pages say it lists")
 print(f"  tray menu            {tray_txt!r} / {win.tray_pause.text()!r}, "
-      f"the theme submenu has {len(sorted(render.THEMES))} entries")
+      f"the theme submenu has {len(_sub)} entries ({', '.join(_sub)})")
 win._quitting = True
 win.close()
 assert not win.preview_timer.isActive() and not win.daemon_timer.isActive()
