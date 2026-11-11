@@ -865,7 +865,12 @@ Two things, written down because they are facts about the tree and not about a b
   never-meet pairs and 12 / 6 / 6 -> 13 / 7 / 6 on the meet side, the bench went 120 -> 122 and
   12 / 6 / 6 -> 13 / 7 / 6, and the two machines agree on the meet triple again while staying two
   pairs apart on the never-meet side.  The adds (159 across 28 layouts) and the placement triple
-  (35 / 109 / 15) did not move on either box.
+  (35 / 109 / 15) did not move on either box.  The follow-up green run, 43027945669, is the first
+  that reached the asserts naming the *rows* rather than counting their pixels, and those held on
+  CI's runner too: the same two row ids and the same three adjacencies came back there, which is
+  what makes the paragraph above a claim about the files rather than about this bench.  What the
+  census prints next to them - a copy's median, the layer draw beside it, the counts of boxes and
+  pairs inside `bars` - belongs to whichever box ran it, and no page quotes those.
 
   Because which gate aborts depends on which figure moved, that section now prints every count it
   measured that follows a face - adds, placement, both sides of the reorder census - before any of
