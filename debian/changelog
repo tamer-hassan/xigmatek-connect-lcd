@@ -95,15 +95,18 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
   * The window's sizing figures move, in height only.  An `arc`'s 18 field
     rows stood 796 px tall in one column and 403 in three on the author's
     bench at 0.5, 827 and 434 after the row of row-level controls, and 858 and
-    465 after the name box: 31 px for each of those two rows, and never a
-    column's width.  GitHub's runner read 723 and 378 at 0.5 and 751 and 406
-    after the first of them, and what it reads after the second is a figure a
-    run there prints rather than a number carried here - the pair gate holds
-    each machine to the half labelled with its name, and this bullet is what
-    that gate said when the bench moved.  The three columns' floors, the
-    controls floor by columns of rows, the fresh split and the narrowest
-    column the window allows are unchanged, and the suite still fails any pane
-    that has to scroll sideways to be read.
+    465 after the name box; GitHub's runner read 723 and 378, then 751 and
+    406, then 779 and 434.  So each of those two rows costs 31 px of height
+    here and 28 px there, and no column's width - and the grid's own ask does
+    not move at all (171 / 344 / 512 px here, 180 / 361 / 533 there), because
+    the grid of rows is the grid that was already there.  The pair gate is what
+    found this: the first run of this tree failed on the bench at the gate the
+    suite calls `the arc box heights`, a later one failed on the runner at the
+    same gate, and each failure printed that machine's own pair.  The three
+    columns' floors, the controls floor by columns of rows, the fresh split,
+    the narrowest column and the window's own minimum are unchanged on both
+    machines, and the suite still fails any pane that has to scroll sideways to
+    be read.
 
   * lintian has been printing one warning that no CI run has ever seen,
     because the CI job builds binary-only (`-us -uc -b`) while a source

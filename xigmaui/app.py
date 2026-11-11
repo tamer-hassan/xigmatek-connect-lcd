@@ -1123,9 +1123,9 @@ class Window(QMainWindow):
         # depending on the width this splitter happens to give the box (see
         # `EditorBox`), so the 18 rows of an `arc` widget make this box 858 px tall in
         # one column at a 1280x1024 window and 465 px in three at 1919x1055 - this
-        # bench's reading, CI's runner reading 751 and 406 in its pass for the row of
-        # row-level controls, which is 31 px of height here and 28 px there against the
-        # 796/403 and 723/378 that 0.5 measured - measured in
+        # bench's reading, CI's runner reading 779 and 434 - each row of controls under
+        # the fields is 31 px of height here and 28 px there, against the 796/403 and
+        # 723/378 that 0.5 measured in the same pass - measured in
         # the window, printed by the suite's sizing gate, and held to whichever half of
         # the labelled pair the machine running it is.  It buys height rather than pushing
         # a scrollbar under the column, which is the failure mode 0.5 was written to catch.
@@ -2773,9 +2773,8 @@ class Window(QMainWindow):
         This is the responsive half, and it is here because the alternative is a
         scrollbar: the 18 rows of an `arc` widget make this box **858 px** tall in one
         column at a 1280x1024 window and **465 px** in three at 1919x1055 - this bench's
-        digits, where CI's runner reads 751 and 406 (its pass for the first of the two
-        control rows; the name box is another 31 px here) - measured in the window and
-        printed
+        digits, where CI's runner reads 779 and 434 (a row of controls under the fields is
+        31 px of height here and 28 px there) - measured in the window and printed
         by the suite's sizing gate with the grid's own ask of 171 / 344 / 512 px, and a
         controls column that cannot hold what it is shown is
         exactly the 0.4 defect the fresh-window gate now fails on.  The box asks for it
