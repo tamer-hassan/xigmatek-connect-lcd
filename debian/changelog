@@ -310,7 +310,7 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     numbers recounting from `themes.scan()`, the name box keeping what was
     typed, nine refusals leaving every byte of the one copy on disk where it
     was, and the passage ending with the user root as empty as it found it.
-The snapping gates count the corpus from its declared numbers - 185 rows, 89
+    The snapping gates count the corpus from its declared numbers - 185 rows, 89
     and 44 of them sharing one, 317 pairs, the 1 px bucket holding nothing
     at all, the blast radius at 1 / 2 / 3 px - and hold `edit.py`'s
     comments, this stanza and docs/gui.md to the same digits, which is what
@@ -323,6 +323,18 @@ The snapping gates count the corpus from its declared numbers - 185 rows, 89
     a guide line that leaves the picture the pane saves unchanged byte for
     byte, an arrow key answering 1 px and no more, and two presses of undo
     going back over the nudge and then over the drag.
+
+  * One packaging defect this cycle wrote into the changelog itself: a
+    paragraph appended with its first line at column 0, which is how dpkg
+    reads a heading. Run 42953285963 built the .deb files and failed its
+    lintian step - `syntax-error-in-debian-changelog`, once per package that
+    ships `changelog.gz`, so twice - while the offline suite was green on
+    both machines, because that suite reads the top entry's stamp and every
+    line's width and never their indentation. The packaging section now
+    counts dpkg's three shapes over the whole file: indented body, well-
+    formed heading, trailer. The fixed tree was built here and checked with
+    CI's own lintian flags before this was pushed: 0 errors, 0 warnings, 0
+    info.
 
   * Still not built, and said in the pages rather than left to be found: an
     editor drawing live readings (the pane draws the pinned fixture, which

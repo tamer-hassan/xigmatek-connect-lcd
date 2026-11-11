@@ -5481,6 +5481,28 @@ assert sum(1 for _ln in _cl if len(_ln) == 80) >= 10, (
 print(f"  changelog width       every line <= 80 columns ({max(len(x) for x in _cl)} here, "
       f"{sum(1 for x in _cl if len(x) == 80)} lines at the limit): lintian fails a longer "
       f"one, and it failed an 82-column line once already")
+
+# ...and the same file's *shape*, which a width count cannot see.  dpkg's grammar for a
+# changelog body allows three things: an indented line, a well-formed heading, and a trailer.
+# A body line that starts at column 0 is read as a heading, and lintian calls it
+# `syntax-error-in-debian-changelog` - once per package that ships `changelog.gz`, so two here,
+# in the same job.  How this one was found: feature F's stanza grew a paragraph appended by a
+# helper that wrapped continuation lines at four spaces but left the first line at none.  The
+# offline suite was green on both machines - it reads the top stanza's stamp through
+# `dpkg-parsechangelog`, which never looks at the body's indentation - and only the .deb job
+# noticed, at the step that ships.  So the gate is the same three shapes dpkg allows.
+_CL_HEAD = _re.compile(r"^[a-z0-9][a-z0-9.+~/-]* \([^()]+\) [^;]+; urgency=\S+$")
+_offshape = [(k + 1, _ln[:60]) for k, _ln in enumerate(_cl)
+             if _ln.strip() and not _ln[:1].isspace()
+             and not _CL_HEAD.match(_ln.rstrip()) and not _ln.startswith(" -- ")]
+assert not _offshape, (
+    _offshape[:4],
+    "a debian/changelog line that is neither indented body, well-formed heading nor trailer: "
+    "dpkg reads it as a heading, lintian fails the .deb job on it, and nothing else here does")
+print(f"  changelog shape       every non-blank line is indented body, one of the "
+      f"{sum(1 for x in _cl if _CL_HEAD.match(x.rstrip()))} well-formed headings, or a "
+      f"trailer - the three shapes dpkg allows, because a body line at column 0 is a heading "
+      f"to it and lintian said so in both packages")
 PY
 
 echo
