@@ -594,39 +594,6 @@ def _run_action(link, port, args, ctl, act):
     return link
 
 
-def _run_action(link, port, args, ctl, act):
-    """Carry out something a control client asked for, here on the loop thread.
-
-    That is the whole design of control.py: the socket never touches the port,
-    it leaves one request in a slot and this thread - the only one that owns
-    /dev/ttyACM0 - does it.  Returns the link, which `reset` replaces.
-
-    What a client may not ask for is decided in control.py: no firmware-shaped
-    file, and no `recovery` unless the daemon was started with --allow-reset."""
-    kind, path = act
-    if kind == "upload":
-        name = os.path.basename(path)
-        if _upload_background(link, args, path):
-            ctl.note(f"background {name} accepted")
-        else:
-            ctl.note(f"background {name} did not land: the panel keeps "
-                     f"whatever it already has stored")
-        link.drain(0.2)
-    elif kind == "reset":
-        # only reachable with --allow-reset; the vendor's reset re-enumerates
-        # the USB device, so the fd we hold dies under us (PROTOCOL.md §9)
-        print("  ! recovery requested over the control socket", file=sys.stderr)
-        try:
-            link.post("recovery", {"enable": True})
-        except (ProtocolError, OSError) as exc:
-            ctl.note(f"recovery: {exc}")
-        time.sleep(2.0)
-        link = rehandshake(link, port, args, reopen=True)
-        ctl.note("recovery sent and the session rebuilt: the panel's stored "
-                 "background is gone, re-upload a clip if you want one back")
-    return link
-
-
 def one_frame(link, metrics, args, push_state=False) -> tuple[int, str, str]:
     """Render one frame, put it on the wire, and return (bytes, name, verdict).
 
