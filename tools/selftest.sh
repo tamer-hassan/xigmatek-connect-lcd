@@ -3967,10 +3967,32 @@ assert not os.path.exists(_n_path + ".bak"), "the .bak was left behind under the
 # ---- a name nobody was shadowing: what a loop drawing that name ends up drawing
 _n_p3, _n_notes3 = themes.rename_copy("moved-again", "a-name-of-mine")
 _n_args = _main.build_parser().parse_args(["--theme", "a-name-of-mine"])
-_n_loop0 = _main.paint(_n_args, {})
-_n_p4, _n_notes4 = themes.rename_copy("a-name-of-mine", "and-now-another")
-_n_loop1 = _main.paint(_n_args, {})
-assert _n_loop1.tobytes() == render.draw({}, "gauge").tobytes(), (
+# One instant, pinned on both sides of the comparison, with the same idiom the theme-census
+# gates use (`render._now` patched, restored in a `finally`).  This assert compares a *generated*
+# theme's frame against another generated theme's frame, and the generated themes read this
+# machine's wall clock for their own time line: `theme_gauge` calls `clock_str()`, which calls
+# `render._now()`.  Unpinned, the assert is a race with the second - and CI's run 43023694060
+# lost it on a tree that drew the right picture.  Measured here, unpinned: two `gauge` frames a
+# second apart differ at 772 of 921 600 bytes, every one of them inside the bbox
+# (274, 446, 292, 468), which is the last digit of the clock line `theme_gauge` paints at
+# (236, 458); pinned, the same two frames a second apart are byte for byte one picture.  The
+# file door takes its instant as an argument (`themes.draw(_n_obj0, {}, WHEN)` above), which is
+# why every other compare in this section is safe and this one was not.
+_n_now_real = render._now
+render._now = lambda: WHEN.timetuple()
+try:
+    _n_loop0 = _main.paint(_n_args, {})          # the name still answers: the copy, not a fallback
+    _n_p4, _n_notes4 = themes.rename_copy("a-name-of-mine", "and-now-another")
+    _n_loop1 = _main.paint(_n_args, {})          # the same loop, one rename later
+    _n_gauge = render.draw({}, "gauge")
+finally:
+    render._now = _n_now_real
+assert _n_loop0.tobytes() != _n_gauge.tobytes(), (
+    "the loop was already drawing `gauge` before the rename, so the byte identity below says "
+    "nothing about a fallback at all")
+_n_diff_px = sum(1 for _x, _y in zip(_n_loop1.tobytes(), _n_gauge.tobytes()) if _x != _y)
+assert _n_diff_px == 0, (
+    _n_diff_px, ImageChops.difference(_n_loop1, _n_gauge).getbbox(),
     "a loop that loses the name it was drawing does not fall back to `gauge`, so the "
     "sentence in the note is wrong")
 assert any("falls back to `gauge`" in n for n in _n_notes4), _n_notes4

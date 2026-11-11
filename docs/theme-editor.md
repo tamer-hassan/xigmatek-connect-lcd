@@ -876,6 +876,22 @@ Two things, written down because they are facts about the tree and not about a b
   widen - and the same rule that once read `779 and 434` out of a failing gate for the `arc` box
   heights is what read 120 and 13 / 7 / 6 out of this one.
 
+* **A byte compare against a generated theme's frame was a race with this machine's clock,
+  and CI's run 43023694060 lost it.** That section asks what a loop drawing a name that has just
+  been renamed out from under it ends up painting - the stock `gauge`, in words - and the assert
+  compared the loop's frame with `render.draw({}, "gauge")` byte for byte.  The behaviour was
+  right; the comparison was not.  The generated themes take their time line from this machine:
+  `theme_gauge` calls `clock_str()`, which calls `render._now()` - the one hook docs/limits.md
+  says every generated theme reads.  So the two frames were drawn a second apart, and measured
+  here unpinned that is 772 of 921 600 bytes differing, every one of them inside the bbox
+  (274, 446, 292, 468): the last digit of the clock `theme_gauge` paints at (236, 458).  Pinned
+  the way the theme-census gates already pin it - `render._now` pointed at the section's `WHEN`,
+  restored in a `finally` - the same two frames a second apart are one picture byte for byte.
+  Why only this one: every other byte compare in that section draws through the **file** door,
+  and `themes.draw` takes its instant as an argument.  The gate now also asserts the loop drew
+  something *other* than `gauge` before the rename, so the identity after it is about a fallback
+  rather than about two names that never differed, and its failure message carries a differing-
+  byte count and a bbox - what a byte compare ought to print when a race is suspected of it.
 * **A repaint re-applies the selected row's marks.** The pane's closing passage asserted that a
   press on empty glass leaves no mark, which is true until the next frame; once another gate's
   `time.sleep()` left a timer tick queued, the assert was reading that tick rather than its own

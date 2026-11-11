@@ -482,23 +482,35 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     placement, both sides of the reorder census - before holding any of them
     to a page, so one red run answers for all of them.
 
-  * Two findings about this cycle's own harness, recorded rather than fixed
-    in passing. The first: `Editor.fixture()` returns `dict(FIXTURE)`, a
-    shallow copy whose inner dicts are the module's, and the suite's hole-
-    in-the-readings gate pops `memory.total` out of the body it is handed -
-    so every draw after that one, in that process, answers one derived rate
-    fewer: the live fixture answers 20 of the 21 `source` names the library
-    asks rather than 21, and the only visible trace was a box census two
-    boxes short. Feature G's gates parse `edit.py`'s own literal and count
-    from that, and the section prints the difference; the door itself is
-    repaired in its own change below, precisely because closing the hole
-    moves the drawn box counts docs/gui.md labels per machine. The second: a
-    repaint re- applies the selected row's marks, so the passage that
-    asserted 'a press on empty glass leaves no mark' was sometimes reading a
-    queued timer tick instead of its own act. It now stops the preview
-    timer, asserts the clearing, and then asserts the honest consequence - a
-    repaint brings the mark back, because the mark belongs to the selection,
-    not to the last press.
+  * Three findings about this cycle's own harness, recorded rather than
+    fixed in passing. The first: `Editor.fixture()` returned
+    `dict(FIXTURE)`, a shallow copy whose inner dicts are the module's, and
+    the suite's hole-in-the-readings gate pops `memory.total` out of the
+    body it is handed - so every draw after that one, in that process,
+    answered one derived rate fewer: that fixture answered 20 of the 21
+    `source` names the library asks rather than 21, and the only visible
+    trace was a box census two boxes short. Feature G's gates parse
+    `edit.py`'s own literal and count from that, and the section prints the
+    difference; the door itself is repaired in its own change below,
+    precisely because closing the hole moves the drawn box counts
+    docs/gui.md labels per machine. The second: a repaint re- applies the
+    selected row's marks, so the passage that asserted 'a press on empty
+    glass leaves no mark' was sometimes reading a queued timer tick instead
+    of its own act. It now stops the preview timer, asserts the clearing,
+    and then asserts the honest consequence - a repaint brings the mark
+    back, because the mark belongs to the selection, not to the last press.
+    The third: a byte compare against a *generated* theme's frame was a race
+    with this machine's clock, and CI's run 43023694060 lost it on a tree
+    that drew the right picture. The gate asserts that a loop which loses
+    the theme name it was drawing falls back to `gauge` - and compared the
+    loop's frame with `render.draw({}, "gauge")` byte for byte. Generated
+    themes take their time line from `render._now()`, so those two frames
+    were a second apart: measured here, 772 of 921 600 bytes differ, all of
+    them the last digit of the clock `theme_gauge` paints at (236, 458). It
+    pins one instant on both sides now, the idiom the theme census already
+    uses, and 0 bytes differ; the file door takes its instant as an
+    argument, which is why every other compare in that section was safe and
+    this one was not.
 
   * Still not built, and said in the pages rather than left to be found: a
     snap to a grid - the files carry none, so a snap answers a neighbour's
