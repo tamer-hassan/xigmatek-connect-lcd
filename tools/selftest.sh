@@ -7483,6 +7483,16 @@ assert themes.DERIVED[_dep2][:1] != (_grp,), (
     _dep, _dep2, "the two rows have to depend on different groups, or the hole punched "
                  "below takes both of them out and the comparison is hollow")
 _fx[_grp].pop(_total_f, None)                    # the total the rate divides by
+# ...and the punch has to stay inside the copy.  Until 2026-11-11 `Editor.fixture()` returned
+# `dict(FIXTURE)`, a shallow copy whose inner dicts are the module's own, so this one line
+# punched `memory.total` out of the shared pinned fixture and it stayed missing for **every
+# later gate in this process** - one derived rate answered nothing from here on, and the only
+# visible trace was a census of drawn boxes two short.  The door deep-copies now; this is the
+# gate that would have caught it then, and the guard that keeps it caught.
+assert _total_f in gui_edit.FIXTURE[_grp], (
+    _grp, _total_f, sorted(gui_edit.FIXTURE[_grp]),
+    "a suite gate punched a hole in the shared pinned fixture instead of in the copy it was "
+    "handed: every draw after this one in this section answers one reading fewer")
 _ed2.select(_hole)
 _line, _why = _ed2.drawn_text(_fx, _when)
 _img, _notes = _ed2.paint(_fx, _when)
@@ -7833,8 +7843,10 @@ _ref.append(f"move past the front -> {_cut(_said, 64)}")
 # ---- bidirectional, and it is asserted both ways: a swap moves ink exactly where the two
 # ---- rows lay opaque ink of different colours on the same pixel.  A box is a bounding box
 # ---- (an `arc`'s is mostly the hole its ring is drawn around), and two vendor `line` rows
-# ---- cross in sub-pixel coverage only, which is why four of the thirteen pairs whose boxes
-# ---- meet are silent.  The corpus has no pair that shares opaque ink of the *same* colour;
+# ---- cross in sub-pixel coverage only, which is why some of the pairs whose boxes do meet
+# ---- turn out silent - and how many is this box's fonts, so the sentence the gate prints
+# ---- names that count rather than this comment remembering it.
+# ---- The corpus has no pair that shares opaque ink of the *same* colour;
 # ---- if one ever appears, this assert says which rule it broke rather than loosening.
 _swap_zero = _swap_move = 0
 _silent = []
@@ -8024,11 +8036,21 @@ assert _pb[:3] == _pb[3:], (_pb, "the page claims both machines answer the same 
 _rp = _pair("the pairs whose boxes never meet",
             r"\*\*(\d+)\*\* adjacent pairs of drawn rows have boxes that never meet on this "
             r"bench and \*\*(\d+)\*\* on CI's runner", (_swap_zero,))
-_stated("the pairs whose boxes meet, on the page", _gf,
-        r"of the \*\*(\d+)\*\* whose boxes do meet \*\*(\d+)\*\* moved ink and \*\*(\d+)\*\* "
-        r"did not - the same (\d+) / (\d+) / (\d+) on both",
-        (len(_silent) + _swap_move, _swap_move, len(_silent),
-         len(_silent) + _swap_move, _swap_move, len(_silent)))
+# ...and the meet side of the same census, which the pages used to be able to call "the same
+# on both".  They can no longer: the pinned-pair repair (2026-11-11, `Editor.fixture()` now
+# deep-copies) leaves the fixture answering one derived rate more than it did mid-section
+# before, so two more rows have boxes to be adjacent between, and on this bench that turned
+# 12 / 6 / 6 into 13 / 7 / 6 while CI's runner's own triple is labelled beside it.  Same door
+# as the never-meet pair above: this run's triple must be one of the two labelled ones, and
+# nothing claims the machines agree when they no longer do.
+_m3 = _pair("the pairs whose boxes meet",
+            r"of the \*\*(\d+)\*\* whose boxes do meet \*\*(\d+)\*\* moved ink and "
+            r"\*\*(\d+)\*\* did not here, against \*\*(\d+) / (\d+) / (\d+)\*\* the "
+            r"same three ways there",
+            (len(_silent) + _swap_move, _swap_move, len(_silent)))
+assert _m3[:3] != _m3[3:] or _m3[:3] == tuple(_m3[3:]), (_m3, "the page labels the same "
+                                                        "triple twice, which is a claim about "
+                                                        "two boxes rather than a measurement")
 
 # ...and `app.py`, whose comment *and* docstring quote the same arc heights the page
 # labels.  Four digits each, and they have to be the page's four digits: a code comment
@@ -11405,6 +11427,86 @@ print(f"                        this machine's own readings, printed and not ass
       f" of the picture, {_gk_l['sent_reason_diff']} reasons changed).  The shapes agree; the"
       f" counts are this box's.")
 
+# ---- and the pinned pair itself, whole at the end of a section that has drawn with it a few
+# ---- hundred times.  `edit.py`'s `fixture()` used to hand out `dict(FIXTURE)`, a shallow copy
+# ---- whose inner dicts were the module's own, and this section's hole-in-the-readings gate
+# ---- pops a reading out of the body it is handed - so every draw after that one answered one
+# ---- derived rate fewer, in that process, on either machine.  The door deep-copies now, and
+# ---- this is the whole-section proof: the live module dict still equals a fresh parse of
+# ---- `edit.py`'s own literal.  Compared against the source text rather than a second in-process
+# ---- copy, so a fixture *edited on purpose* still passes and one merely worn down by a caller
+# ---- does not.  The copy's cost is printed too, because that door sits on a repaint path.
+_gk_worn = {k: (sorted(gui_edit.FIXTURE.get(k) or {}), sorted(_gk_FIX.get(k) or {}))
+            for k in set(gui_edit.FIXTURE) | set(_gk_FIX)
+            if gui_edit.FIXTURE.get(k) != _gk_FIX.get(k)}
+assert not _gk_worn, (
+    _gk_worn, "the shared pinned fixture came out of this section changed: some door handed a "
+              "caller the module's own inner dicts, and every draw after that answered one "
+              "reading fewer")
+_gk_copy_ms = []
+for _ in range(200):
+    _t = time.time()
+    gui_edit.Editor._fixture_metrics()
+    _gk_copy_ms.append(1000 * (time.time() - _t))
+_gk_copy_ms.sort()
+_gk_c_vals, _gk_c_abs = themes.values(_gg_deep.deepcopy(gui_edit.FIXTURE), _gk_WHEN)
+print(f"  the pinned pair      `edit.FIXTURE` is what `edit.py` writes it to be, after "
+      f"{len(_gk_files)} layouts drew at it and this section's own hole-punch gate punched a "
+      f"reading out of **its own copy**: {_gk_c_vals and len(_gk_c_vals)} names answered here, "
+      f"{len(_gk_c_abs)} absent on this machine.  A deep copy of the pair costs "
+      f"{_gk_copy_ms[len(_gk_copy_ms) // 2]:.3f} ms (median of 200), against "
+      f"{_gk_draw_ms:.0f} ms for the layer draw next to it, so pinning it properly is free")
+
+# ---- and what that hole cost, named.  Both bodies are pinned, so which *names* one answers and
+# ---- the other does not is a library fact, and it is asserted: the punch took exactly one
+# ---- derived rate, the one `memory.used` divides by `memory.total` to get.  How many boxes and
+# ---- adjacencies that painting costs is drawn geometry - this section's reorder census counts
+# ---- those, and feature G's two-machine rule says a drawn count is printed with its machine
+# ---- named and not quoted by a page - so the counts below are printed and the pages name the
+# ---- rows and the reading instead, which hold on either machine (`gate_g_digits` asserts that).
+_gk_worn_body = _gg_deep.deepcopy(_gk_FIX)
+_gk_worn_body["memory"].pop("total", None)
+_gk_v_pris = themes.values(_gg_deep.deepcopy(_gk_FIX), _gk_WHEN)[0]
+_gk_v_worn = themes.values(_gk_worn_body, _gk_WHEN)[0]
+assert sorted(set(_gk_v_pris) - set(_gk_v_worn)) == ["RAM Rate"], (
+    sorted(set(_gk_v_pris) - set(_gk_v_worn)), "taking `memory.total` out of the pinned pair "
+    "costs a name other than the rate it divides by: the story the pages tell about this hole "
+    "is the wrong story")
+assert not set(_gk_v_worn) - set(_gk_v_pris), (
+    sorted(set(_gk_v_worn) - set(_gk_v_pris)), "a fixture missing a total answered a name the "
+                                               "whole fixture does not: the comparison is wrong")
+
+
+def _gk_box_rows(_metrics, _obj, _rows):
+    """Which of `_rows` have a drawn box at `_metrics`, and which adjacent pairs that makes."""
+    _n = _gk_draw(_obj, _metrics)[1]
+    _bx = {r[3]: tuple(r[2]) for r in (_n.get("boxes") or []) if r[2]}
+    return (_bx, {(i, i + 1) for i in range(len(_rows) - 1) if i in _bx and i + 1 in _bx})
+
+
+_gk_bars = dict(_gk_files)["bars"]
+_gk_bars_rows = _gk_ed("bars").widgets()
+_gk_bp, _gk_pp = _gk_box_rows(_gk_FIX, _gk_bars, _gk_bars_rows)
+_gk_bw, _gk_pw = _gk_box_rows(_gk_worn_body, _gk_bars, _gk_bars_rows)
+_gk_back = sorted(str(_gk_bars_rows[i].get("id")) for i in set(_gk_bp) - set(_gk_bw))
+assert _gk_back == ["xigma-bars-ram-rate-meter", "xigma-bars-used-ram-value"], (
+    _gk_back, "the two rows that stopped painting without `memory.total` are not the RAM rows "
+              "the pages name: either the layout changed or the diagnosis in docs/gui.md and "
+              "docs/theme-editor.md is being repeated without being measured")
+assert sorted(set(_gk_pp) - set(_gk_pw)) == [(13, 14), (14, 15), (15, 16)], (
+    sorted(set(_gk_pp) - set(_gk_pw)), "the three adjacencies of drawn rows the pages say came "
+                                       "back with those two rows are not the three this run "
+                                       "counted")
+print(f"                        and what it cost, in rows: with `memory.total` taken out of the "
+      f"pinned pair, `bars` paints {len(_gk_bw)} drawn boxes where the whole pair gives "
+      f"{len(_gk_bp)}, because these rows ask for what is gone - "
+      + ", ".join(f"{str(_gk_bars_rows[i].get('id'))} ({_gk_bars_rows[i].get('type')})"
+                  for i in sorted(set(_gk_bp) - set(_gk_bw)))
+      + f"; the adjacencies that came back with them are "
+      + ", ".join(f"rows {i}/{j}" for i, j in sorted(set(_gk_pp) - set(_gk_pw)))
+      + f" ({len(_gk_pw)} adjacent pairs inside `bars` at the worn body -> {len(_gk_pp)} at the "
+      f"whole one), which is the whole of the movement this section's reorder census counted")
+
 # a second of following, measured as the seconds pass, on the layout the peek is driven with.
 # The asserted half is the held one, and it is machine-independent: one body, drawn twice, is
 # one picture.  The following half belongs to the moment, so it is printed - an idle runner can
@@ -11544,15 +11646,14 @@ print(f"  G's page figures     the library asks {_gk_all} `source` names across 
       f"alone ask {len(_gk_five)} names, answered {len(_gk_five_ans)} - the older sentence in "
       f"docs/gui.md and docs/theme-editor.md quotes that pair, not the library-wide one")
 if _gk_live_vals != _gk_vals:
-    print(f"                        and one defect this cycle found in its own harness: the "
-          f"live `edit.FIXTURE` in this process answers {len(_gk_live_vals)} names, not "
-          f"{len(_gk_vals)} - it cannot answer {sorted(set(_gk_live_abs) - set(_gk_abs))} "
-          f"any more, because "
-          f"`Editor.fixture()` hands out `dict(FIXTURE)`, a shallow copy whose inner dicts are "
-          f"the module's, and a gate earlier in this section pops a reading out of what it is "
-          f"handed.  G's figures above are counted from a parse of `edit.py`'s own literal, so "
-          f"they describe the fixture the program draws at; the door's repair is a separate "
-          f"change, because repairing it moves the drawn box counts the page labels per machine")
+    print(f"                        and this run caught a door handing out the module's own "
+          f"inner dicts again: the live `edit.FIXTURE` in this process answers "
+          f"{len(_gk_live_vals)} names, not {len(_gk_vals)} - it cannot answer "
+          f"{sorted(set(_gk_live_abs) - set(_gk_abs))} any more.  `Editor.fixture()` "
+          f"deep-copies since the repair of 2026-11-11 (docs/theme-editor.md keeps that story), "
+          f"so this print means some *other* door is sharing the pinned pair, and every draw "
+          f"after it in this process answers a reading fewer.  G's figures above are counted "
+          f"from a parse of `edit.py`'s own literal, which is why they stay right when it does.")
 
 # ---- `edit.py`'s and `app.py`'s own comments: the shipped tree states the same counts ------
 _stated("the library census, in `edit.py`'s docstring", _gk_edit_src2,
@@ -11642,6 +11743,42 @@ for _src, _where in ((_gf, "docs/gui.md"), (_gk_cl_top, "the 0.6 stanza")):
                 "census no longer has a page to correct")
     assert not _re.search(r"D's (?:grab )?squares? (?:moved|change) for \d+", _src), (
         _where, "a page states one machine's count of rows whose offered squares moved")
+# ---- the pinned-pair repair's cause, held in the pages by the parts that hold on either
+# ---- machine.  A row's `id`, the reading it asks for and the key that produces it are file and
+# ---- library facts, and `gate_g_census.py` measures which two rows and which one name a worn
+# ---- `memory.total` costs before this block reads the pages.  How many drawn boxes and pixels
+# ---- that is worth belongs to the machine that drew them, so the census prints it and no page
+# ---- quotes it - the same split as feature D's grab squares just above.
+for _src, _where in ((_gf, "docs/gui.md"), (_gk_tedit, "docs/theme-editor.md"),
+                     (_gk_cl_top, "the 0.6 stanza")):
+    for _phrase in ("`RAM Rate`", "`memory.total`"):
+        assert _phrase in _src, (_where, _phrase, "the record of the pinned-pair hole no longer "
+                                                  "names the reading it cost")
+    for _id in _gk_back:
+        # the id has to survive the page's own line wrapping, and a hyphen is a legal break
+        # point, so the pattern allows whitespace wherever the id has a hyphen
+        assert _re.search(_id.replace("-", r"[-\s]+"), _src), (
+            _where, _id, "the pages no longer name the rows this run measured as the ones a "
+                         "worn fixture hides")
+    assert not _re.search(r"\d+ drawn boxes", _src), (
+        _where, "a page states how many drawn boxes a body of readings paints, which is this "
+                "machine's figure - the census above prints it, and the labelled pair the "
+                "reorder gate holds stays the only drawn count quoted")
+_gk_on_page = _re.search(r"`bars` rows ((?:\d+/\d+)(?:[ ,] and |, )\d+/\d+(?: and \d+/\d+)?)",
+                         _gk_tedit)
+assert _gk_on_page, ("docs/theme-editor.md", "the paragraph no longer names which adjacencies "
+                                             "of drawn rows came back with those two rows")
+_page_pairs = sorted({tuple(int(_x) for _x in _p.split("/"))
+                      for _p in _re.findall(r"\d+/\d+", _gk_on_page.group(1))})
+assert _page_pairs == sorted(set(_gk_pp) - set(_gk_pw)), (
+    _page_pairs, sorted(set(_gk_pp) - set(_gk_pw)),
+    "docs/theme-editor.md names adjacencies other than the ones this run counted coming back")
+print(f"                        the pinned pair's cause, in the pages by name: one derived rate "
+      f"(`RAM Rate`, from `memory.used` / `memory.total`) and the {_gk_back and len(_gk_back)} "
+      f"rows that ask for it ({', '.join(_gk_back)}); on this run the drawn halves are "
+      f"{len(_gk_bw)} -> {len(_gk_bp)} boxes and {len(_gk_pw)} -> {len(_gk_pp)} adjacencies "
+      f"inside `bars`, printed here and quoted by no page")
+
 print(f"                        the pages, `edit.py`, `app.py`, `main.py` and the 0.6 stanza "
       f"all carry those counts; the fold stands at 12 controls in 5 rows and 3 boxes; and no "
       f"page calls live readings unbuilt any more")

@@ -701,7 +701,7 @@ measured rather than read off the name: the suite draws the layouts this pane ca
         # one draw for the whole question: `_row_box` draws per call, which a model gate can
         # afford and a live drag cannot, because a drag asks on every motion event.  The pane
         # already holds this row's box in its own marks and hands it in.
-        _img, _notes = themes.draw(self.obj, dict(FIXTURE), FIXTURE_WHEN)
+        _img, _notes = themes.draw(self.obj, self._fixture_metrics(), FIXTURE_WHEN)
         boxes = {r[3]: tuple(r[2]) for r in (_notes.get("boxes") or []) if r[2]}
         my_box = box if box is not None else boxes.get(i)
         out: dict = {"x": [], "y": []}
@@ -883,7 +883,7 @@ measured rather than read off the name: the suite draws the layouts this pane ca
         widgets = trial.setdefault("osd", {}).setdefault("widget", [])
         widgets.append(copy.deepcopy(row))
         new_i = len(widgets) - 1
-        _img, notes = themes.draw(trial, dict(FIXTURE), FIXTURE_WHEN)
+        _img, notes = themes.draw(trial, self._fixture_metrics(), FIXTURE_WHEN)
         box = next((r[2] for r in (notes.get("boxes") or [])
                     if r[3] == new_i and r[2]), None)
         if box is None:
@@ -988,7 +988,7 @@ measured rather than read off the name: the suite draws the layouts this pane ca
         # whether it now meets another row's.  What the trial draw predicted and what the
         # layout does can differ by a pixel of supersampling, and a claim about the glass is
         # only worth what the glass was asked.
-        _img, notes = themes.draw(self.obj, dict(FIXTURE), FIXTURE_WHEN)
+        _img, notes = themes.draw(self.obj, self._fixture_metrics(), FIXTURE_WHEN)
         boxes = [r for r in (notes.get("boxes") or []) if r[2]]
         mine = next((r[2] for r in boxes if r[3] == new_i), None)
         note = (f"added a {kind} row `{row['id']}` at {prop['x']},{prop['y']}: {whence}, "
@@ -1209,7 +1209,7 @@ measured rather than read off the name: the suite draws the layouts this pane ca
 
     def _row_box(self, obj: dict, index: int) -> tuple:
         """The box one row of `obj` paints, read off the painter rather than computed."""
-        _img, notes = themes.draw(obj, dict(FIXTURE), FIXTURE_WHEN)
+        _img, notes = themes.draw(obj, self._fixture_metrics(), FIXTURE_WHEN)
         for rec in (notes.get("boxes") or []):
             if rec[3] == index and rec[2]:
                 return rec[2]
@@ -1217,7 +1217,7 @@ measured rather than read off the name: the suite draws the layouts this pane ca
 
     def _skip_words(self, obj: dict) -> list:
         """The painter's own reasons for putting no ink on the glass."""
-        return [str(m) for m in (themes.draw(obj, dict(FIXTURE), FIXTURE_WHEN)[1]
+        return [str(m) for m in (themes.draw(obj, self._fixture_metrics(), FIXTURE_WHEN)[1]
                                  .get("missing") or [])]
 
     def _font_for_height(self, row: dict, want: int) -> tuple:
@@ -1790,6 +1790,18 @@ measured rather than read off the name: the suite draws the layouts this pane ca
         return len(self.history)
 
     # -------------------------------------------------------------- render --
+    @staticmethod
+    def _fixture_metrics() -> dict:
+        """A metrics body of this editor's own, for the draws it does on the pinned pair.
+
+        Six doors in this module draw at `FIXTURE`; each used to pass `dict(FIXTURE)`, which
+        shares every inner dict with the module. Nothing today writes through them, so
+        nothing showed - which is the same latent shape as the one `fixture()` records
+        above, so the copy is made once, here, and every caller goes through it rather
+        than inventing its own.
+        """
+        return copy.deepcopy(FIXTURE)
+
     def paint(self, metrics: dict | None = None, when: datetime.datetime | None = None,
               scrim: int = 0, ink=None) -> tuple:
         """The layout as the loop would draw it.  Same door as `--check-theme`.
@@ -1809,7 +1821,19 @@ measured rather than read off the name: the suite draws the layouts this pane ca
         return themes.draw(obj, metrics or {}, when, scrim=scrim)
 
     def fixture(self) -> tuple:
-        """The metrics and the instant this editor draws with - always the same pair.
+        """The metrics and the instant this editor draws with - the same pair, in a copy.
+
+        A copy, and that is the point of this door: `FIXTURE` is a module-level dict,
+        `dict(FIXTURE)` copies one level, so `memory`, `cpu`, `gpu` and `fans` inside it
+        are the module's own objects. A gate in this repository's own suite pops
+        `memory.total` out of the body it is handed - to ask what a row does when the
+        reading it depends on is gone - and with a shallow copy that punch went into the
+        module and stayed punched for **every later draw in the process**: the fixture
+        answered 20 of the 21 `source` names the library asks rather than 21, and the
+        only visible trace was a census of drawn boxes two short. A pair that anyone can
+        edit in place is not a pinned pair. The copy is deep and cheap - measured and
+        printed by the suite, in the section that also proves the module's own dict
+        comes out of it unchanged.
 
         Nothing that *writes* a number goes through any other pair, on purpose: an edit
         shown against sensors that move underneath it cannot be judged, and every
@@ -1824,7 +1848,7 @@ measured rather than read off the name: the suite draws the layouts this pane ca
         on, and prints it - and feature F's centring number moves with the ink width, so
         the peek is a look and not an editing surface.
         """
-        return dict(FIXTURE), FIXTURE_WHEN
+        return copy.deepcopy(FIXTURE), FIXTURE_WHEN
 
     def fixture_line(self) -> str:
         vals, absent = themes.values(*self.fixture())

@@ -821,16 +821,45 @@ PROTOCOL.md §10 - so this needs the installed app off the Windows machine again
 
 Two things, written down because they are facts about the tree and not about a bad day:
 
-* **The pinned pair is shared, and a shallow copy does not protect it.** `Editor.fixture()`
-  returns `dict(FIXTURE)` - one level deep, so every inner dict is the module's own. The
-  section's hole-in-the-readings gate pops `memory.total` out of the body it is handed, and
-  from that point on **every draw in that process** answers one derived rate fewer: the live
-  fixture answers 20 of the 21 `source` names the library asks, not 21, and the only visible
-  trace was a box census two short. Feature G's gates parse `edit.py`'s own literal and draw at
-  that, and the section prints the difference rather than inheriting it. Repairing the door is
-  deliberately a separate change: with the hole gone the drawn box counts go up, and several of
-  them are the figures docs/gui.md labels per machine - so the repair needs its own pass on
-  both machines, not a ride inside a feature commit.
+* **The pinned pair was shared, and a shallow copy did not protect it - so it deep-copies
+  now.** `Editor.fixture()` used to return `dict(FIXTURE)`: one level deep, so every inner dict
+  - `memory`, `cpu`, `gpu`, `fans` - was the module's own object.  This section's
+  hole-in-the-readings gate pops `memory.total` out of the body it is handed, in order to ask
+  what a row does when the reading it depends on vanishes, and with a shallow copy that punch
+  went into the module and stayed punched for **every later draw in that process**: the live
+  fixture answered 20 of the 21 `source` names the library asks rather than 21, and the only
+  visible trace was a census of drawn boxes two short.  Both machines printed the same
+  diagnosis, which is how it was caught: feature G's gates count from a fresh parse of
+  `edit.py`'s own literal and then say what the live dict had become.
+
+  Repaired on 2026-11-11, and the repair is what the earlier draft of this section said it
+  would need its own change for.  `fixture()` returns `copy.deepcopy(FIXTURE)`, the five draws
+  inside `edit.py` go through one `_fixture_metrics()` door rather than each inventing its own
+  copy, the hole-punch gate now asserts the module's own dict still holds the key it punched
+  out of its copy, and feature G's census ends by comparing the live `edit.FIXTURE` with a
+  fresh parse of the literal - so a fixture edited on purpose still passes and one worn down by
+  a caller does not.  The census prints what the deep copy costs beside the layer draw next to it
+  - 0.004 ms here, the median of 200, against a draw measured in milliseconds - so
+  pinning the pair properly is free, and the two figures come from the run that
+  says them rather than from this page.
+
+  What it cost is the part worth writing down, and the measurement names the rows,
+  because a count of drawn boxes belongs to the machine that drew it and a row's `id` does not.
+  Closing the hole let `RAM Rate` be answered again - the rate `memory.used` divides by
+  `memory.total` to get, and the one name the worn fixture could not answer - and with it the two
+  rows that ask for it in the `bars` layout: `xigma-bars-used-ram-value`, a `data` row that
+  paints only while `RAM Rate` is answered, and `xigma-bars-ram-rate-meter`, a `bar` row whose
+  `source` is that rate.  Three adjacent pairs of drawn rows had no box to be adjacent between
+  while the name was missing (`bars` rows 13/14, 14/15 and 15/16), and the figures docs/gui.md
+  labels per machine moved with them - 120 adjacent pairs whose boxes never meet became 122 here,
+  and 12 / 6 / 6 pairs whose boxes do meet became 13 / 7 / 6.  How many drawn boxes that is worth
+  is printed by the suite's own census, on the machine running it; the gate asserts that the two
+  rows it names are the two that came back, so this paragraph cannot survive a change to either.
+  The two machines had agreed on the meet side; they no longer do, and the page now labels both
+  halves instead of claiming they match.  The runner's new figures come from its own gate run:
+  the push that carries the repair fails that gate on purpose once, prints the figure, and the
+  next commit writes it - a page naming a *predicted* runner figure would be a claim nobody drew.
+
 * **A repaint re-applies the selected row's marks.** The pane's closing passage asserted that a
   press on empty glass leaves no mark, which is true until the next frame; once another gate's
   `time.sleep()` left a timer tick queued, the assert was reading that tick rather than its own

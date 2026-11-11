@@ -444,6 +444,37 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     white, black and a mid-grey, and asserts the swatch's own pixels did not
     move when the tooltip came off it.
 
+  * The pinned pair is copied, and what that moved. `Editor.fixture()`
+    returned `dict(FIXTURE)` - one level, so `memory`, `cpu`, `gpu` and
+    `fans` inside it were the module's own objects - and this suite's hole-
+    in-the-readings gate pops `memory.total` out of the body it is handed,
+    so from that line on every draw in the process answered one derived rate
+    fewer: 20 of the 21 `source` names the library asks instead of 21, with
+    a census of drawn boxes two short as the only visible trace. Feature G's
+    peek gates printed the diagnosis on either machine. It is repaired:
+    `fixture()` returns `copy.deepcopy(FIXTURE)`, the five draws inside
+    `edit.py` go through one `_fixture_metrics()` door instead of each
+    inventing a shallow copy, the punch gate asserts the module's own dict
+    still holds what it punched out of its copy, and G's census ends by
+    comparing the live `edit.FIXTURE` to a fresh parse of `edit.py`'s
+    literal - edited on purpose passes, worn down by a caller does not. The
+    census prints what the copy costs beside the layer draw next to it -
+    0.004 ms here, median of 200, against a draw in milliseconds - so
+    pinning the pair is free. And the repair moved drawn, per-machine
+    figures, which is why it is its own change: `RAM Rate` came back, and
+    with it the two `bars` rows that ask for it (`xigma-bars-used-ram-
+    value`, painted only while that rate is answered, and `xigma-bars-ram-
+    rate-meter`), and three adjacent pairs of drawn rows came back with
+    them; on this bench the swap census went from 120 adjacent pairs of
+    drawn rows whose boxes never meet to 122 and from 12 / 6 / 6 on the meet
+    side to 13 / 7 / 6, while the suite prints what that is worth in drawn
+    boxes on whichever machine ran it. The two machines used to agree on the
+    meet side and no longer do, so docs/gui.md labels both halves and the
+    gate holds every run to one of them rather than claiming a match. The
+    runner's two new figures come from its own gate run rather than from a
+    guess: this push fails that gate once and prints them, and the next
+    commit writes them down.
+
   * Two findings about this cycle's own harness, recorded rather than fixed
     in passing. The first: `Editor.fixture()` returns `dict(FIXTURE)`, a
     shallow copy whose inner dicts are the module's, and the suite's hole-
@@ -452,16 +483,15 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     fewer: the live fixture answers 20 of the 21 `source` names the library
     asks rather than 21, and the only visible trace was a box census two
     boxes short. Feature G's gates parse `edit.py`'s own literal and count
-    from that, and the section prints the difference; the door's repair is a
-    separate change, because closing the hole moves the drawn box counts
-    docs/gui.md labels per machine, which needs a pass on both machines
-    rather than a ride inside a feature commit. The second: a repaint re-
-    applies the selected row's marks, so the passage that asserted 'a press
-    on empty glass leaves no mark' was sometimes reading a queued timer tick
-    instead of its own act. It now stops the preview timer, asserts the
-    clearing, and then asserts the honest consequence - a repaint brings the
-    mark back, because the mark belongs to the selection, not to the last
-    press.
+    from that, and the section prints the difference; the door itself is
+    repaired in its own change below, precisely because closing the hole
+    moves the drawn box counts docs/gui.md labels per machine. The second: a
+    repaint re- applies the selected row's marks, so the passage that
+    asserted 'a press on empty glass leaves no mark' was sometimes reading a
+    queued timer tick instead of its own act. It now stops the preview
+    timer, asserts the clearing, and then asserts the honest consequence - a
+    repaint brings the mark back, because the mark belongs to the selection,
+    not to the last press.
 
   * Still not built, and said in the pages rather than left to be found: a
     snap to a grid - the files carry none, so a snap answers a neighbour's
