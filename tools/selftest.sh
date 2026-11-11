@@ -11646,6 +11646,288 @@ print(f"                        the pages, `edit.py`, `app.py`, `main.py` and th
       f"all carry those counts; the fold stands at 12 controls in 5 rows and 3 boxes; and no "
       f"page calls live readings unbuilt any more")
 
+# ---- the tooltips this window shows, measured as the pixels they paint.  Reported on
+# ---- 2026-11-11: every tooltip over the preview pane had a black background and text too
+# ---- faint to read.  A Qt tooltip is painted by `QTipLabel`, a top-level of the application
+# ---- that takes its colours from the palette of the widget the tooltip belongs to, so the
+# ---- pane's `background:#101014` stylesheet dragged that near-black into the popup while the
+# ---- text stayed the palette's own black: 1.11:1, and 0 glyph pixels reaching 4.5:1 (WCAG AA
+# ---- for body text) - the "faint gray" in the screenshot is the antialiasing of black on
+# ---- near-black.  What ships is `app.apply_tooltip_colours()`: those two colours forced onto
+# ---- the popup's own widget class, and nothing else.
+# ----
+# ---- Two-machine discipline: a *ratio* and a *colour name* are colour facts, so they are
+# ---- asserted and answer the same on either machine.  The *count of readable glyph pixels*
+# ---- follows the fonts this box has, so it is printed and never asserted, exactly as feature
+# ---- F's drawn figures are.
+from PyQt6.QtCore import QPoint as _th_QP                            # noqa: E402
+from PyQt6.QtGui import QColor as _th_QC, QImage as _th_QI           # noqa: E402
+from PyQt6.QtGui import QPalette as _th_QPal                         # noqa: E402
+from PyQt6.QtWidgets import QToolTip as _th_QT                       # noqa: E402
+from PyQt6.QtWidgets import QWidget as _th_QW                        # noqa: E402
+
+
+def _th_lum(_c):
+    def _f(_v):
+        _v /= 255.0
+        return _v / 12.92 if _v <= 0.03928 else ((_v + 0.055) / 1.055) ** 2.4
+    return 0.2126 * _f(_c.red()) + 0.7152 * _f(_c.green()) + 0.0722 * _f(_c.blue())
+
+
+def _th_cr(_a, _b):
+    _x, _y = sorted((_th_lum(_a), _th_lum(_b)))
+    return (_y + 0.05) / (_x + 0.05)
+
+
+def _th_popup(_w):
+    """The tooltip of `_w`, drawn, and what it is actually made of.
+
+    (painted background, palette text colour, their ratio, pixels of glyph ink at >= 4.5:1,
+    the popup's size, the palette's own base colour).  The popup is grabbed and its pixels
+    counted rather than reasoned about: the defect *was* a palette nobody had looked at, and a
+    popup that reports one pair while painting another is how it hid.
+    """
+    _th_QT.showText(_w.mapToGlobal(_th_QP(_w.width() // 2, _w.height() // 2)), _w.toolTip(), _w)
+    for _ in range(6):
+        appq.processEvents()
+    _lab = next((_t for _t in appq.topLevelWidgets()
+                 if _t.metaObject().className() == "QTipLabel"), None)
+    assert _lab is not None, "no QTipLabel after showText: there is nothing to measure"
+    _img = _lab.grab().toImage()
+    _counts = {}
+    for _y in range(_img.height()):
+        for _x in range(_img.width()):
+            _k = _img.pixelColor(_x, _y).name()
+            _counts[_k] = _counts.get(_k, 0) + 1
+    _bg = _th_QC(max(_counts, key=_counts.get))
+    _txt = _lab.palette().color(_th_QPal.ColorRole.ToolTipText)
+    _base = _lab.palette().color(_th_QPal.ColorRole.ToolTipBase)
+    _ink = sum(_n for _k, _n in _counts.items() if _th_cr(_th_QC(_k), _bg) >= 4.5)
+    _th_QT.hideText()
+    for _ in range(3):
+        appq.processEvents()
+    return _bg, _txt, _th_cr(_bg, _txt), _ink, (_img.width(), _img.height()), _base
+
+
+_th_floor = 4.5                                     # WCAG AA for body text
+_th_win = app.Window(bad, None, restore=False, save_settings=False)
+_th_win.show()
+_th_win.resize(1280, 1024)
+_th_win.ed_name.setCurrentText("bars")
+for _ in range(12):
+    appq.processEvents()
+
+# The colours are in force, and they got there through the narrow door: the popup's own widget
+# class.  An application *stylesheet* is the wrong door, and this suite proved it the hard way -
+# installing one re-polishes every widget through the stylesheet style, which moved this window's
+# own layout (the `arc` box heights the pages label per machine: 858 and 465 px became 818 and
+# 459 on this bench, caught by the gate that holds those figures).  So nothing may be installed
+# at application scope, and the class palette has to carry both colours.
+assert not (appq.styleSheet() or ""), ((appq.styleSheet() or "")[:120],
+                                       "an application stylesheet is installed: measured, it "
+                                       "costs 40 px of box height in this very window and every "
+                                       "pixel gate below it would be holding a layout nobody "
+                                       "ships")
+_th_tp = appq.palette("QTipLabel")
+assert _th_tp.color(_th_QPal.ColorRole.ToolTipBase).name() == app.TOOLTIP_BASE \
+    and _th_tp.color(_th_QPal.ColorRole.ToolTipText).name() == app.TOOLTIP_TEXT, (
+    _th_tp.color(_th_QPal.ColorRole.ToolTipBase).name(),
+    _th_tp.color(_th_QPal.ColorRole.ToolTipText).name(),
+    "the window built its tooltips without the shipped colours: a theme's palette is answering")
+
+_th_cand = [_w for _w in _th_win.findChildren(_th_QW)
+            if _w.toolTip() and _w.isVisible() and _w.isEnabled()
+            and _w.width() > 4 and _w.height() > 4]
+assert len(_th_cand) >= 20, (len(_th_cand), "the census is measuring a bare window: a tooltip "
+                                            "rule asserted over two widgets checks nothing")
+_th_pairs, _th_bad, _th_ink_min = {}, [], None
+for _w in _th_cand:
+    _bg, _txt, _pair, _ink, _sz, _base = _th_popup(_w)
+    _key = (_bg.name(), _txt.name())
+    _th_pairs[_key] = _th_pairs.get(_key, 0) + 1
+    if _pair < _th_floor:
+        _th_bad.append((type(_w).__name__, _bg.name(), _txt.name(), round(_pair, 2)))
+    # the text colour is the shipped one everywhere, and the background is either the shipped
+    # one or the plate of the widget it belongs to - the pane, by design, keeps its own glass
+    assert _txt.name() == app.TOOLTIP_TEXT, (type(_w).__name__, _txt.name(),
+                                            "a popup painted text in some colour the tree does "
+                                            "not name")
+    assert _bg.name() in (app.TOOLTIP_BASE, "#101014"), (type(_w).__name__, _bg.name(),
+                                                         "a tooltip took its background from a "
+                                                         "widget this window does not paint a "
+                                                         "plate on")
+    assert _th_cr(_base, _txt) >= _th_floor, (type(_w).__name__, _base.name(), _txt.name(),
+                                              round(_pair, 2), "the popup's own palette is "
+                                                              "below the floor")
+    _th_ink_min = _ink if _th_ink_min is None else min(_th_ink_min, _ink)
+assert not _th_bad, (_th_bad, "a tooltip this window shows is unreadable at WCAG AA")
+_th_pretty = ", ".join(f"{_b}+{_t} x{_n}" for (_b, _t), _n in sorted(_th_pairs.items()))
+print(f"  every tooltip, drawn    {len(_th_cand)} live tooltips on this window, each one shown "
+      f"and grabbed; colour pairs painted: {_th_pretty}; the least readable popup clears "
+      f"{_th_floor}:1 with {_th_ink_min} px of glyph ink at that contrast - a pixel count, so "
+      f"this machine's, and no floor is asserted on it")
+
+# ---- the reported case, named: the preview pane's own popup -------------------------------
+_th_pbg, _th_ptxt, _th_ppair, _th_pink, _th_psz, _th_pbase = _th_popup(_th_win.preview)
+assert _th_pbg.name() == "#101014", (
+    _th_pbg.name(), "the pane's popup no longer paints the pane's own plate: the colours and "
+                    "the pane's stylesheet are being read by something other than the popup")
+assert _th_ptxt.name() == "#f2f2f2" and _th_ppair >= 15, (
+    _th_pbg.name(), _th_ptxt.name(), round(_th_ppair, 2), "the tooltip over the preview pane "
+                                                          "went back to dark-on-dark")
+print(f"                        the reported case: over the pane the popup paints "
+      f"{_th_pbg.name()} behind {_th_ptxt.name()} text, {_th_ppair:.2f}:1 over a "
+      f"{_th_psz[0]}x{_th_psz[1]} px popup with {_th_pink} px of readable ink - measured on the "
+      f"tree before this change: 1.11:1 and 0 px, which is the faint gray")
+
+# ---- the second hazard the census found, already in the tree before this change -----------
+# A tooltip on a widget whose stylesheet paints a background paints *that* background, and the
+# colour row's swatch paints whatever colour the layout file names.  Measured on the tree as it
+# was, with that colour spelled `rgba(0, 0, 0, 255)`: a #000000 popup with the palette's
+# #000000 text, 1.00:1.  With the popup's colours forced and the tooltip left on the swatch,
+# the popup at `rgba(255, 255, 255, 255)` keeps #ffffff behind light text: 1.12:1.  No text
+# colour is legible on every colour a file can name - a mid-grey defeats either one - so the
+# swatch carries no tooltip at all and the row's label, which paints no background of its own,
+# carries the words.
+_th_fld = None
+for _i in range(len(_th_win.ed.widgets())):
+    _th_win.ed.select(_i)
+    _th_win.ed_widget.setCurrentIndex(_i)
+    for _ in range(4):
+        appq.processEvents()
+    for _f, _rec in _th_win.ed_rows.items():
+        if _rec[4] == "colour" and _rec[3] is not None:
+            _th_fld = _f
+            break
+    if _th_fld:
+        break
+assert _th_fld, "no colour row was offered for a `bars` row, so the swatch case cannot be measured"
+assert not _th_win.ed_rows[_th_fld][3].toolTip(), (
+    _th_win.ed_rows[_th_fld][3].toolTip()[:60], "the colour swatch carries a tooltip again: its "
+                                                "popup would be painted in the layout's own "
+                                                "colour, which is not a colour this program can "
+                                                "promise text for")
+assert "rgba" in _th_win.ed_rows[_th_fld][0].toolTip(), (
+    _th_win.ed_rows[_th_fld][0].toolTip()[:80], "the colour row's sentence is not on its label: "
+                                                "the words have to live on a widget that paints "
+                                                "the shipped popup background")
+_th_sweep = []
+for _spell in ("rgba(255, 255, 255, 255)", "rgba(0, 0, 0, 255)", "rgba(128, 128, 128, 255)"):
+    _th_win.ed.set(_th_fld, _spell)
+    _th_win._ed_bind_rows()                  # the rows are rebuilt here, tooltip and all
+    for _ in range(6):
+        appq.processEvents()
+    _th_lab2, _th_sw2 = _th_win.ed_rows[_th_fld][0], _th_win.ed_rows[_th_fld][3]
+    _was = _th_sw2.grab().toImage().pixelColor(2, 2).name()
+    _b, _t, _p, _k, _s, _ba = _th_popup(_th_lab2)
+    _th_sweep.append((_spell, _b.name(), _t.name(), round(_p, 2), _k))
+    assert _p >= _th_floor, (_spell, _b.name(), _t.name(), round(_p, 2),
+                             "a colour in the file made a tooltip unreadable")
+    assert not _th_sw2.toolTip(), "re-binding the rows put a tooltip back on the swatch"
+    assert _th_sw2.grab().toImage().pixelColor(2, 2).name() == _was, (
+        "the swatch stopped painting the colour the file names: taking its tooltip away was "
+        "supposed to change nothing about how it looks")
+print("                        the colour row measured at three spellings of its own colour - "
+      "white, black, and a mid-grey that defeats either text colour - each popup on the row's "
+      "label: " + ", ".join(f"{_s} -> {_b}+{_t} {_p}:1" for _s, _b, _t, _p, _k in _th_sweep)
+      + f"; the swatch still paints the file's colour (its own corner pixel reads "
+      f"{_was}) and carries no tooltip")
+
+# ---- and the door is scoped: a palette on one class colours no control, moves no pixel ----
+# The measurement that decided this shape is recorded on `apply_tooltip_colours`: an application
+# stylesheet re-polishes the whole window and moved the `arc` box heights this very section holds
+# (858 and 465 px to 818 and 459).  Nothing at application scope is installed here, and the
+# ordinary palette still answers what the theme handed it - which is what keeps every drawn and
+# laid-out figure in this section meaning what it meant before.
+assert not (appq.styleSheet() or ""), "an application stylesheet crept in after all"
+assert _th_tp.color(_th_QPal.ColorRole.Window).name() != appq.palette().color(
+    _th_QPal.ColorRole.Window).name(), (
+    _th_tp.color(_th_QPal.ColorRole.Window).name(), appq.palette().color(
+        _th_QPal.ColorRole.Window).name(),
+    "the popup palette and the application palette are the same: the class targeting went away, "
+    "and every control would be painted in tooltip colours")
+_th_layer = _th_win._osd.tobytes()
+app.apply_tooltip_colours()                  # idempotent: called again, nothing moves
+for _ in range(6):
+    appq.processEvents()
+assert _th_win._osd.tobytes() == _th_layer, "colouring the tooltip class moved the drawn layer"
+_th_cls_win = _th_tp.color(_th_QPal.ColorRole.Window).name()
+_th_cls_txt = _th_tp.color(_th_QPal.ColorRole.WindowText).name()
+_th_app_win = appq.palette().color(_th_QPal.ColorRole.Window).name()
+print(f"                        scoped, and idle: the popup's own class answers "
+      f"{_th_cls_win}/{_th_cls_txt} where the window's palette answers {_th_app_win}, no "
+      f"application stylesheet is installed, and calling the door again moved 0 of "
+      f"{len(_th_layer):,} bytes of the pane's drawn layer")
+_th_win.close()
+
+# ---- the pages, held to the numbers this gate just measured ------------------------------
+# A ratio is colour maths on fixed hexes, so a page may state it and this gate may assert it:
+# either machine answers the same.  The ink counts are not, and no page quotes one.  What the
+# popup measured *before* this change (1.11:1, 0 readable px) is a record of the defect, written
+# in the past tense in both pages, and nothing here asserts it: what ships is what gets measured.
+import re as _th_re
+
+_th_cl = " ".join(open("debian/changelog", encoding="utf-8").read().split("\n -- ")[0].split())
+
+
+def _th_flat(_path):
+    _out = []
+    for _ln in open(_path, encoding="utf-8"):
+        _t = _ln.strip()
+        while _t.startswith("#"):
+            _t = _t[1:]
+            if _t.startswith(":"):
+                _t = _t[1:]
+            _t = _t.lstrip()
+        _out.append(_t)
+    return " ".join(" ".join(_out).split())
+
+
+_th_app = _th_flat("xigmaui/app.py")
+_th_gui = " ".join(gui_txt.split())
+_th_sweep_pairs = sorted({_row[3] for _row in _th_sweep})
+assert len(_th_sweep_pairs) == 1 and _th_sweep_pairs[0] >= 12, _th_sweep
+_th_label_pair = _th_sweep_pairs[0]
+for _src, _where, _pats in (
+        (_th_gui, "docs/gui.md", (r"measured here at \*\*(\d+\.\d+)\*\*:1 over\s+the pane",
+                                  r"\*\*(\d+\.\d+)\*\*:1 everywhere else",
+                                  r"each popup on the label answers\s+\*\*(\d+\.\d+)\*\*:1")),
+        (_th_cl, "the 0.6 stanza", (r"(\d+\.\d+):1 over the pane and (\d+\.\d+):1 elsewhere",))):
+    for _pat in _pats:
+        _m = _th_re.search(_pat, _src)
+        assert _m, (_where, _pat, "the sentence stating a measured tooltip ratio is gone, so "
+                                  "nothing holds it to this run")
+        for _grp in _m.groups():
+            _got = float(_grp)
+            assert any(abs(_got - _v) < 0.01 for _v in (_th_ppair, _th_label_pair)), (
+                _where, _pat, _got, round(_th_ppair, 2), _th_label_pair,
+                "the ratio written down is not the ratio this window paints")
+for _phrase, _why in (("`app.apply_tooltip_colours`", "the door is named where a "
+                       "reader looks for it"),
+                      ("WCAG AA's 4.5:1", "the floor the gate asserts is the floor the page says"),
+                      ("swatch carries no tooltip", "the colour row's sentence moved, in prose"),
+                      ("palette of the widget the tooltip belongs to",
+                       "the mechanism is stated, not just the fix")):
+    assert _phrase in _th_gui, (_phrase, _why, "docs/gui.md stopped saying it")
+for _phrase in ("`app.apply_tooltip_colours`", "16.96:1", "12.65:1", "1.11:1",
+                "0 pixels of readable"):
+    assert _phrase in _th_cl, (_phrase, "the 0.6 stanza no longer records what was measured")
+for _phrase, _why in (("palette of the widget the tooltip belongs to",
+                       "`apply_tooltip_colours`' comment carries the mechanism"),
+                      ("858 px in one column, 465 px in three",
+                       "why an application stylesheet was rejected, in the code"),
+                      ("no wording can be made legible on every colour",
+                       "why the swatch carries no tooltip"),
+                      ("COLOUR_TIP", "the colour sentence lives in one named constant")):
+    assert _phrase in _th_app, (_phrase, _why, "`app.py` stopped saying it in its own comments")
+assert not _th_re.search(r"\d[\d,]* px of (readable )?glyph ink", _th_gui), (
+    "docs/gui.md quotes a readable-ink pixel count, which belongs to the fonts on one machine")
+assert not _th_re.search(r"\d+ (?:live )?tooltips", _th_cl), (
+    "the 0.6 stanza counts tooltips, and that count follows which rows are open")
+print(f"                        the pages carry those two ratios ({_th_ppair:.2f}:1 over the "
+      f"pane, {_th_label_pair:.2f}:1 elsewhere) because this gate measured them, and no page "
+      f"quotes a pixel count or a tooltip count")
+
 # a press on empty glass names the point and selects nothing, and closing the layout takes
 # the mark with it - the pane goes back to a live preview, with nothing drawn on it
 # The timer is stopped for this passage, and it is said rather than slipped: `_repaint` ends by

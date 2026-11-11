@@ -413,6 +413,37 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     CI's own lintian flags before this was pushed: 0 errors, 0 warnings, 0
     info.
 
+  * Tooltips are legible now, by a door narrow enough to leave the rest
+    alone. Reported on 2026-11-11: every tooltip over the preview pane had a
+    black background and text too faint to read. A Qt tooltip is painted by
+    one application-level label that takes its colours from the palette of
+    the widget it belongs to, so the pane's `background:#101014` lent that
+    near-black to the popup while the text stayed the palette's black -
+    measured 1.11:1 with 0 pixels of readable glyph ink, the "faint gray"
+    being antialiasing. The colours are set on the palette of the tooltip's
+    own widget class (`app.apply_tooltip_colours`, `TOOLTIP_BASE` and
+    `TOOLTIP_TEXT`), called wherever a `Window` is built - not only in
+    `main()`, because the suite and a throwaway script build windows too,
+    and a rule one door forgets cannot be held. An application *stylesheet*
+    was tried first and rejected on measurement: installing one re-polishes
+    every widget, which moved this window's own layout: the `arc` editor box
+    the pages label per machine, 858 px in one column and 465 px in three,
+    came out 818 and 459 here, caught by the gate that holds those two
+    figures. The gate now shows and grabs every live tooltip the window
+    offers and fails anything under WCAG AA's 4.5:1: 16.96:1 over the pane
+    and 12.65:1 elsewhere, both colour maths on fixed hexes, so either
+    machine answers the same; the readable-pixel counts follow fonts, so
+    they are printed rather than quoted. The census found a second hazard
+    the report did not mention, already in the tree: the colour row's swatch
+    paints whatever colour the layout file names, so its tooltip was painted
+    in that colour - 1.00:1 at `rgba(0, 0, 0, 255)`, and 1.12:1 (white
+    popup, light text) with the colours forced and the sentence left there.
+    No text colour is legible on every colour a file can name, so the
+    sentence moved to the row's label, which paints no background of its
+    own, and the swatch carries no tooltip; the gate measures the popup at
+    white, black and a mid-grey, and asserts the swatch's own pixels did not
+    move when the tooltip came off it.
+
   * Two findings about this cycle's own harness, recorded rather than fixed
     in passing. The first: `Editor.fixture()` returns `dict(FIXTURE)`, a
     shallow copy whose inner dicts are the module's, and the suite's hole-

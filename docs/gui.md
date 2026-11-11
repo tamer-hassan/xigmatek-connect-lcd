@@ -347,7 +347,9 @@ uses is the model's answer too: a menu wherever a vocabulary already exists in c
 (`edit.choices()` - 5 families, 27 readings for `source` and `showIf`, 6 anchors, 5
 special drawings, the painter conventions, the named ramps), a checkbox for `bold`, a
 spinbox for `edit.number_fields()`, a colour row with a swatch and the colour dialog for
-`edit.COLOUR_FIELDS`, and a plain text box only for what is genuinely free text - a line
+`edit.COLOUR_FIELDS` - the hover sentence on that row's label, because the swatch paints
+the layout's own colour and a tooltip takes its background from the widget it belongs
+to - and a plain text box only for what is genuinely free text - a line
 of `content`, a `format`. The grid takes one column of rows in a narrow controls column
 and two or three as the window widens, which is what 1280×1024 through 3840×2160 is for.
 And the picture itself can be pointed at: press a row to select it, drag it to move it,
@@ -753,6 +755,36 @@ editor commonly gets wrong:
   `validate` says nothing about that, so the sentence sits beside the mark ("its ink runs
   to x,y - off the 480x480 canvas") rather than leaving a clipped row as the reader's
   discovery.
+* **A tooltip paints the same two colours wherever it lands.** Qt tooltip is drawn by
+  one label that belongs to the application, and it takes its colours from the palette
+  of the widget the tooltip belongs to - so a control whose stylesheet paints a
+  background paints that background behind the tooltip's words as well. The preview
+  pane's near-black plate did exactly that: its popup measured **1.11**:1 with **0**
+  pixels of readable glyph ink, which is what "a black background and faint gray text"
+  looks like from the inside. `app.apply_tooltip_colours` sets both colours -
+  `TOOLTIP_BASE` behind `TOOLTIP_TEXT` - on the palette of the tooltip's own widget
+  class, and the suite now shows and grabs every live tooltip the window offers and
+  fails anything under WCAG AA's 4.5:1: measured here at **16.96**:1 over the pane,
+  where the popup keeps the pane's own #101014 and gains the lighter text, and
+  **12.65**:1 everywhere else. The door is deliberately narrow. An application
+  *stylesheet* was tried, and it is not free: installing one re-polishes every widget
+  through the stylesheet style, which moved this window's own layout - the `arc`
+  editor box the pages label per machine, **858 px** in one column and **465 px** in
+  three, came out 818 and 459 on this bench, caught by the gate that holds those two
+  figures - so nothing is installed at application scope, the ordinary palette is left
+  to the theme, and the gate asserts that no application stylesheet exists at all. The
+  colour row's hover sentence moved from its swatch button to that row's label for the
+  same fact read the other way round: the button paints whatever colour the layout
+  file names, and no text colour is legible on every colour a file can name. Measured
+  at three spellings on one row - white, black, and a mid-grey that defeats either
+  text colour - each popup on the label answers **12.65**:1, while that same popup on
+  the swatch was 1.00:1 before this change and 1.12:1 with the colours forced and the
+  sentence left there. So the swatch carries no tooltip, and taking it away changed
+  not one pixel of how the swatch paints. How much ink a popup draws follows the fonts
+  on the machine, so the gate prints those counts and asserts only the colour pairs
+  and the ratios.
+
+
 * **A refused value changes nothing at all.** Type 9999 into `x` and the spinbox holds it,
   the note prints the model's sentence ("must stay inside the 480x480 canvas this layout
   declares"), and the picture, the dirty flag and the undo history do not move. Six

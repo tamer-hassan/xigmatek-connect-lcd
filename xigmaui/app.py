@@ -145,6 +145,73 @@ UNSET = "(not set)"
 #: in two places, because the row's behaviour keys off it and a gate asserts it by name.
 NO_EDITOR = "(nobody: preview the theme above)"
 
+#: The two colours every tooltip this program shows is painted with, and the door they
+#: go in. A Qt tooltip is drawn by `QTipLabel`, one top-level of the application reused
+#: for every popup, and it takes its colours from the **palette of the widget the
+#: tooltip belongs to** - so a control whose stylesheet paints a background lends that
+#: background to the popup. The preview pane's `background:#101014` did exactly that:
+#: the popup over it measured 1.11:1 with 0 pixels of readable glyph ink, the "faint
+#: gray" being the antialiasing of the palette's own black text on near-black. That is
+#: the reported defect, in numbers.
+#:
+#: The other doors were measured and rejected. A rule written on the widget - `QToolTip
+#: { ... }` inside the pane's own stylesheet - changes nothing at all, because the popup
+#: is not the widget's child and Qt hands the label an empty rule (`/* */`). An
+#: application stylesheet paints the text everywhere but keeps the widget's own
+#: background wherever the widget brings one, and it is not free either: installing one
+#: re-polishes every widget through the stylesheet style, which moved this window's own
+#: layout: the `arc` editor box the pages label per machine - 858 px in one column, 465
+#: px in three - came out 818 and 459 on this bench, caught by the gate that holds those
+#: two figures. So the colours go in as a palette targeted at the one class that needs
+#: them, `QApplication.setPalette(pal, "QTipLabel")`: measured over the window's live
+#: tooltips, #2b2b2b behind #f2f2f2 (12.65:1) and over the pane its own #101014 behind
+#: #f2f2f2 (16.96:1), with every layout figure of the window's own and every drawn pixel
+#: left where the gates already recorded them.
+#:
+#: Dark on purpose: one house style, and the ratios stop depending on what a desktop
+#: theme decides a tooltip colour should be - the same class of accident as the one
+#: reported.
+
+TOOLTIP_BASE = "#2b2b2b"
+TOOLTIP_TEXT = "#f2f2f2"
+
+
+def apply_tooltip_colours() -> None:
+    """Paint every tooltip this program shows with `TOOLTIP_BASE` and `TOOLTIP_TEXT`.
+
+    One palette, all three groups, targeted at the class and nothing else: an application
+    palette change on the ToolTip *roles* alone moves the text but leaves the background to
+    the widget (measured), and an application stylesheet moves the window's own geometry
+    (measured: 40 px and 6 px off two box heights the pages label).  Called wherever a
+    `Window` is built, because the doors that build one are many - `main()`, the offline
+    suite, a throwaway script - and a rule only one of them remembers is a rule no gate can
+    hold.
+    """
+    qapp = QApplication.instance()
+    if qapp is None:                       # no Qt application: nothing to colour
+        return
+    pal = qapp.palette()
+    base, text = QColor(TOOLTIP_BASE), QColor(TOOLTIP_TEXT)
+    for grp in (QPalette.ColorGroup.Active, QPalette.ColorGroup.Inactive,
+                QPalette.ColorGroup.Disabled):
+        for role, colour in ((QPalette.ColorRole.ToolTipBase, base),
+                             (QPalette.ColorRole.ToolTipText, text),
+                             (QPalette.ColorRole.Window, base),
+                             (QPalette.ColorRole.WindowText, text),
+                             (QPalette.ColorRole.Base, base),
+                             (QPalette.ColorRole.Text, text)):
+            pal.setColor(grp, role, colour)
+    qapp.setPalette(pal, "QTipLabel")      # the class name, or the whole app follows suit
+
+
+#: What a colour row asks for, in the words a reader sees on hover.  One constant, because
+#: the words are now carried by the row's label (see `_ed_say_rows`) rather than by the
+#: swatch, and a gate asserts they are there by name.
+COLOUR_TIP = ("pick a colour. This file spells colours the way the vendor's do: "
+              "`rgba(r, g, b, a)` with `a` a 0..1 fraction - and typing `#ff4040` or "
+              "`amber` here is accepted and stored as rgba, in words, by the note line "
+              "under these rows")
+
 #: How much of the window's own log is kept on screen, in lines.  Not taste: the
 #: log is one wrapped QLabel, so every new line re-sets the whole text, and a
 #: window left open over a long session would otherwise spend its afternoon
@@ -591,6 +658,12 @@ class Window(QMainWindow):
         place `xigmalcd` puts it), and `tray` overrides whether closing the
         window hides it instead of quitting (`--tray` / `--no-tray`)."""
         super().__init__()
+        # Every tooltip this program shows, painted the same way wherever the window is
+        # built.  The call sits here rather than in `main()` because the doors that build a
+        # `Window` are many - `main()`, the offline suite, a throwaway script - and a rule
+        # only one of them remembers is a rule the gates cannot hold.  The function's own
+        # comment above carries the measurements that made it necessary.
+        apply_tooltip_colours()
         self.autosave = restore if save_settings is None else save_settings
         self._said_no_save = False
         # what the file needed explaining, in its own words: an older key, or two keys that
@@ -3058,11 +3131,26 @@ class Window(QMainWindow):
                 extra.setStyleSheet(
                     f"background:{spelled or 'transparent'};"
                     f"border:1px solid #666;")
-                extra.setToolTip(
-                    "pick a colour. This file spells colours the way the vendor's do: "
-                    "`rgba(r, g, b, a)` with `a` a 0..1 fraction - and typing `#ff4040` "
-                    "or `amber` here is accepted and stored as rgba, in words, by the "
-                    "note line under these rows")
+                # The sentence lives on the row's **label**, not on the
+                # swatch, and that is a measurement rather than a taste:
+                # a tooltip's popup takes its colours from the widget it
+                # belongs to, so a popup on this button would be painted
+                # in whatever colour the layout file names - and there
+                # is no text colour legible on every colour a file can
+                # name. Measured on the shipped tree with the colour
+                # spelled `rgba(0, 0, 0, 255)`: a #000000 popup with the
+                # palette's #000000 text, 1.00:1, no readable glyph
+                # pixels at all; with the tooltip colours forced onto
+                # the popup's own class the same black popup gains
+                # #f2f2f2 text (legible), but at `rgba(255, 255, 255,
+                # 255)` it keeps #ffffff behind that light text, 1.12:1.
+                # A label carries no background of its own (the refusal
+                # mark is a `color:` rule), so its popup follows the
+                # rule at 12.65:1. Taking the tooltip off the swatch
+                # changed 0 of its 2,112 grabbed bytes: the swatch
+                # paints the colour and the click still opens the
+                # dialog, and the words move.
+                extra.setToolTip("")
             # why the row exists, from the model rather than from a table here
             label.setStyleSheet("")            # clear any refusal mark from before
         self._ed_say_rows()
@@ -3091,6 +3179,27 @@ class Window(QMainWindow):
                 else (edit.field_note(kind, field, name) or
                       f"{field}: what the painter reads for a {kind} widget"))
             label.setToolTip(self._ed_says[field])
+            if _what == "colour":
+                # A colour row's second sentence, on the same label. It
+                # used to sit on the swatch button, and it cannot go
+                # back there: a tooltip's popup takes its colours from
+                # the widget it belongs to, and this button's background
+                # *is* whatever colour the layout file names. Measured
+                # on the shipped tree, with the row spelled `rgba(0, 0,
+                # 0, 255)`, that was a #000000 popup with the palette's
+                # #000000 text: 1.00:1 and no readable glyph pixel; with
+                # the tooltip colours forced on the popup's own class
+                # the same popup paints #ffffff behind light text at
+                # `rgba(255, 255, 255, 255)`: 1.12:1. A mid-grey defeats
+                # either text colour, so no wording can be made legible
+                # on every colour a file can name - the sentence moves
+                # to a widget that paints no background, and the suite
+                # measures the popup at white, black and grey
+                # (`gate_h_tooltips`, printed by the gui section).
+                # `_ed_says` stays the model's sentence alone: the note
+                # line under these rows already says this in its own
+                # words.
+                label.setToolTip(f"{self._ed_says[field]}  {COLOUR_TIP}")
 
     def _ed_explain(self, field: str) -> None:
         """Say what one row means, and what the row it belongs to paints right now.
