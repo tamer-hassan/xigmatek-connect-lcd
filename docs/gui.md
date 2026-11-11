@@ -561,19 +561,22 @@ editor commonly gets wrong:
   0 px, which is what an `arc`'s box (mostly the hole its ring is drawn around) and two vendor
   `line` rows crossing in sub-pixel coverage look like. Which pair falls on which side is a
   font question, so it is measured, and both machines are named: **122** adjacent pairs of
-  drawn rows have boxes that never meet on this bench and **118** on CI's runner, and of the
-  **13** whose boxes do meet **7** moved ink and **6** did not here, against **12 / 6 / 6**
-  the same three ways there.  The runner's two figures are what it answered *before* the
-  pinned-pair repair of 2026-11-11: `Editor.fixture()` used to hand out a shallow copy, so a
-  gate earlier in the run had taken `memory.total` out of the module's own pinned readings and
-  every draw after that could not answer `RAM Rate` - one derived rate, and the two `bars` rows
-  that ask for it: `xigma-bars-used-ram-value`, which paints only while that rate is answered,
-  and `xigma-bars-ram-rate-meter`, which asks it directly.  Three adjacent pairs of drawn rows
-  had no box to be adjacent between while the name was missing (docs/theme-editor.md keeps that
-  story).  The gate run that re-measures the runner's halves is what replaces these two
-  numbers.  Which pair falls on which side is this box's fonts, not a rule, so the two machines
-  no longer agree on the meet side either; the gate holds every run to one of the labelled
-  pairs and claims nothing else.
+  drawn rows have boxes that never meet on this bench and **120** on CI's runner, and of the
+  **13** whose boxes do meet **7** moved ink and **6** did not - the same 13 / 7 / 6 on both.
+  Those four numbers are the answer since the pinned-pair repair of 2026-11-11, and the story
+  of how they got measured is kept in docs/theme-editor.md: `Editor.fixture()` used to hand out
+  a shallow copy of the pinned readings, so a gate earlier in the same run had taken
+  `memory.total` out of the module's own pair and every draw after that could not answer
+  `RAM Rate` - the one reading lost, and with it two rows of the `bars` layout,
+  `xigma-bars-used-ram-value` (which paints only while that rate is answered) and
+  `xigma-bars-ram-rate-meter` (which asks it directly), and the three adjacencies of drawn rows
+  between them.  Before that repair the same gate printed 120 never-meet pairs here and 118
+  there, and 12 / 6 / 6 on the meet side on both boxes.  The runner's halves are not a guess:
+  the push carrying the repair failed the gate that holds a run to its labelled half, printed
+  120 and 13 / 7 / 6 as its own measurement, and the numbers above are that print written down.
+  Two pairs apart on the never-meet side and one triple agreed on the meet side is what two
+  machines' fonts answer; the gate holds every run to its own labelled half and claims nothing
+  else.
   `layerIndex` is left exactly where it was: over the vendor's files it equals the row's
   position in **23** of their **123** rows and differs in **100** (`Theme_01` gives six of its
   eight rows 0), nothing in `layout.py` reads it, and inventing a meaning the files do not

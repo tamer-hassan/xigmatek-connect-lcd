@@ -468,12 +468,19 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     them; on this bench the swap census went from 120 adjacent pairs of
     drawn rows whose boxes never meet to 122 and from 12 / 6 / 6 on the meet
     side to 13 / 7 / 6, while the suite prints what that is worth in drawn
-    boxes on whichever machine ran it. The two machines used to agree on the
-    meet side and no longer do, so docs/gui.md labels both halves and the
-    gate holds every run to one of them rather than claiming a match. The
-    runner's two new figures come from its own gate run rather than from a
-    guess: this push fails that gate once and prints them, and the next
-    commit writes them down.
+    boxes on whichever machine ran it. docs/gui.md labels both machines'
+    halves, and the runner's are its own measurement rather than a
+    prediction: this push failed the gate that holds a run to its labelled
+    half, and that gate's assertion printed 120 pairs whose boxes never meet
+    and a meet triple of 13 / 7 / 6 for CI's runner, so the next commit
+    wrote those two numbers down - the way `779 and 434` once came out of a
+    failing arc-heights gate. The repair cost the same on either box: 118 ->
+    120 never-meet pairs there against 120 -> 122 here, and 12 / 6 / 6 -> 13
+    / 7 / 6 on the meet side on both, so the two machines agree on that
+    triple again while staying two pairs apart on the other count. The
+    section prints all four face-dependent counts it measures - adds,
+    placement, both sides of the reorder census - before holding any of them
+    to a page, so one red run answers for all of them.
 
   * Two findings about this cycle's own harness, recorded rather than fixed
     in passing. The first: `Editor.fixture()` returns `dict(FIXTURE)`, a

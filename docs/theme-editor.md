@@ -855,13 +855,26 @@ Two things, written down because they are facts about the tree and not about a b
   and 12 / 6 / 6 pairs whose boxes do meet became 13 / 7 / 6.  How many drawn boxes that is worth
   is printed by the suite's own census, on the machine running it; the gate asserts that the two
   rows it names are the two that came back, so this paragraph cannot survive a change to either.
-  The two machines had agreed on the meet side; they no longer do, and the page now labels both
-  halves instead of claiming they match.  The runner's new figures come from its own gate run:
-  the push that carries the repair fails that gate on purpose once, prints the figure, and the
-  next commit writes it - a page naming a *predicted* runner figure would be a claim nobody drew.
-  Because which gate aborts depends on which figure moved, that section prints every count it
-  measured that follows a face - adds, placement, both sides of the reorder census - before any
-  of them is held to the page, so one run answers for all of them.
+  Both machines' halves are measured now, and the runner's came out of the failed run rather
+  than out of anybody's head.  The push carrying the repair failed
+  `_pair("the pairs whose boxes never meet")` on CI's runner and printed its own answer - the
+  assertion tuple read `(120,), (122, 118)`, which is the runner saying it now counts 120 pairs
+  whose boxes never meet where the page still labelled 118 as its half - and the reorder sentence
+  beside it said "of the 13 whose boxes do meet, 7 moved ink and 6 did not", which is this
+  bench's triple exactly.  So the repair cost the same on either box: the runner went 118 -> 120
+  never-meet pairs and 12 / 6 / 6 -> 13 / 7 / 6 on the meet side, the bench went 120 -> 122 and
+  12 / 6 / 6 -> 13 / 7 / 6, and the two machines agree on the meet triple again while staying two
+  pairs apart on the never-meet side.  The adds (159 across 28 layouts) and the placement triple
+  (35 / 109 / 15) did not move on either box.
+
+  Because which gate aborts depends on which figure moved, that section now prints every count it
+  measured that follows a face - adds, placement, both sides of the reorder census - before any of
+  them is held to the page, so one red run answers for all four.  It is a print, not an assert:
+  all four follow the fonts on the box that drew them, which is the whole reason they carry a
+  machine's label on the page.  What stays asserted is membership - this run's answer has to be
+  one of the labelled halves, so a third machine is a sentence to add rather than a range to
+  widen - and the same rule that once read `779 and 434` out of a failing gate for the `arc` box
+  heights is what read 120 and 13 / 7 / 6 out of this one.
 
 * **A repaint re-applies the selected row's marks.** The pane's closing passage asserted that a
   press on empty glass leaves no mark, which is true until the next frame; once another gate's

@@ -8047,21 +8047,21 @@ assert _pb[:3] == _pb[3:], (_pb, "the page claims both machines answer the same 
 _rp = _pair("the pairs whose boxes never meet",
             r"\*\*(\d+)\*\* adjacent pairs of drawn rows have boxes that never meet on this "
             r"bench and \*\*(\d+)\*\* on CI's runner", (_swap_zero,))
-# ...and the meet side of the same census, which the pages used to be able to call "the same
-# on both".  They can no longer: the pinned-pair repair (2026-11-11, `Editor.fixture()` now
-# deep-copies) leaves the fixture answering one derived rate more than it did mid-section
-# before, so two more rows have boxes to be adjacent between, and on this bench that turned
-# 12 / 6 / 6 into 13 / 7 / 6 while CI's runner's own triple is labelled beside it.  Same door
-# as the never-meet pair above: this run's triple must be one of the two labelled ones, and
-# nothing claims the machines agree when they no longer do.
+# ...and the meet side of the same census.  The pages used to be able to call this triple "the
+# same on both", then the pinned-pair repair (2026-11-11: `Editor.fixture()` deep-copies now, so
+# the fixture answers `RAM Rate` again instead of having it punched out mid-section) moved both
+# machines' answers - and the runner's new answer came out of its own failed run rather than out
+# of a prediction, which is how it is known: the assertion read `(120,), (122, 118)` there, and
+# the sentence beside it said 13 meet pairs, 7 moving ink and 6 not.  So the meet triple agrees
+# across the two boxes again (13 / 7 / 6 on either) while the never-meet count above stays two
+# pairs apart (122 here, 120 there).  "The same on both" is a claim about two machines, so this
+# gate asserts it the way `_pb` asserts the placement triple instead of trusting the wording.
 _m3 = _pair("the pairs whose boxes meet",
             r"of the \*\*(\d+)\*\* whose boxes do meet \*\*(\d+)\*\* moved ink and "
-            r"\*\*(\d+)\*\* did not here, against \*\*(\d+) / (\d+) / (\d+)\*\* the "
-            r"same three ways there",
+            r"\*\*(\d+)\*\* did not - the same (\d+) / (\d+) / (\d+) on both",
             (len(_silent) + _swap_move, _swap_move, len(_silent)))
-assert _m3[:3] != _m3[3:] or _m3[:3] == tuple(_m3[3:]), (_m3, "the page labels the same "
-                                                        "triple twice, which is a claim about "
-                                                        "two boxes rather than a measurement")
+assert _m3[:3] == _m3[3:], (_m3, "the page calls the meet triple the same on both machines, and "
+                                 "this run's answer or the page's other half says otherwise")
 
 # ...and `app.py`, whose comment *and* docstring quote the same arc heights the page
 # labels.  Four digits each, and they have to be the page's four digits: a code comment
