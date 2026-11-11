@@ -217,6 +217,61 @@ def differ(a: Image.Image, b: Image.Image) -> tuple:
             max((max(q) for q in flat), default=0))
 
 
+_QAPP = None
+
+
+def qapp():
+    """One `QApplication` for the whole process, on the offscreen platform.
+
+    `QT_QPA_PLATFORM=offscreen` is set at the top of this module, before anything imports Qt, so a
+    GUI check cannot open a window on someone's desktop.  One application object per process matters
+    for the same reason Qt says it does: two of them is undefined behaviour, and a test file that
+    made its own would leave the next file holding a dead one.
+    """
+    global _QAPP
+    if _QAPP is None:
+        from PyQt6.QtWidgets import QApplication
+        _QAPP = QApplication.instance() or QApplication([])
+    return _QAPP
+
+
+def pump(seconds: float = 0.05) -> None:
+    """Run the event loop for a while.
+
+    Qt's own signals are asynchronous - a debounced settings write, a repaint, a worker's log line -
+    so a check that reads a value straight after setting it reads the world before the signal ran.
+    The old suite used deadline loops for exactly this, and the one it got wrong (waiting for one
+    field instead of the whole state) is why a settings round trip once passed on a bench and failed
+    on a runner.
+    """
+    app = qapp()
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        app.processEvents()
+        time.sleep(0.005)
+    app.processEvents()
+
+
+def close_window(win) -> None:
+    """Stop a window's timers and its panel thread, so a later check is not reading a moving picture.
+
+    Leaving a live `panel.Panel` thread running is how one section's stub became another's, and the
+    window's own save timer is how a check writes a settings file nobody asked it to.
+    """
+    for name in ("preview_timer", "thumb_timer", "save_timer", "poll_timer"):
+        timer = getattr(win, name, None)
+        if timer is not None:
+            timer.stop()
+    worker = getattr(win, "panel", None)
+    if worker is not None:
+        try:
+            worker.stop()
+            worker.wait(3000)
+        except RuntimeError:
+            pass                        # the thread never started, which is its own answer
+    win.close()
+
+
 class FreshConfigRoot(unittest.TestCase):
     """A base class that gives each test its own empty settings and theme-copy root.
 
