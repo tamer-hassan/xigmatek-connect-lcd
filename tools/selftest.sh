@@ -12152,11 +12152,48 @@ for _phrase, _why in (("the window's only route to it", "the gap, in the door's 
                       ("no readback of pixels, but settings come", "the readback's warrant")):
     assert _phrase in _ii_app, (_phrase, _why, "`app.py` stopped saying it where a reader looks")
 
+# ---- the version boundary.  The owner's follow-up ("now able to apply layouts for the same as
+# ---- the 5 code-based themes, but unable to apply the other Theme_* layouts") is a fact about
+# ---- *which process resolves the name*, so the pages that carry it are held to file facts: the
+# ---- order of `themes.roots()`, the 0.4 boundary, and the count of layout files the themes
+# ---- package installs (which is the same count as the selectable files in this tree, since the
+# ---- package is built out of it - both are asserted here, neither is quoted from a run).
+_tm = _flat("docs/themes.md")
+assert "The name is looked up by the display" in _tm, (
+    "docs/themes.md no longer says whose lookup a `theme` command is, which is the whole "
+    "difference between the two ways a display refuses a layout")
+for _phrase, _why in (("scanned flat", "the user root's shape, and why a copy wins"),
+                      ("then the checkout's", "the roots' order"),
+                      ("try alpha bars clock dual gauge", "the pre-0.4 refusal, quoted as read"),
+                      ("ships no `xigmalcd/themes.py`", "why a 0.3 build cannot resolve a name"),
+                      ("lands in 0.4", "the version boundary"),
+                      ("`no layout named 'Theme_07' under", "the other refusal's shape"),
+                      ("`xigmalcd --list-themes`", "the test a reader runs on that machine")):
+    assert _phrase in _tm, (_phrase, _why, "docs/themes.md stopped carrying it")
+_m4 = _re.search(r"puts \*\*(\d+)\*\* layout JSONs at "
+                 r"`/usr/share/xigmalcd/themes/alpha/layouts/480X480/`", _tm)
+assert _m4, ("docs/themes.md", "the packaged layout count is gone, so nothing ties it to "
+                                "this tree's selectable count")
+assert int(_m4.group(1)) == _ii_files, (
+    _m4.group(1), _ii_files, "the page's packaged layout count and `themes.scan()`'s "
+                             "selectable count disagree: one of the two is stale")
+for _phrase in ("A refusal is quoted, not summarised",
+                "resolved by the process that holds the port",
+                "nobody to send a name to"):
+    assert _phrase in _gf, (_phrase, "docs/gui.md stopped saying, where the button is, that a "
+                                     "refusal is the display's answer and not this window's")
+for _phrase, _why in (("_refused_layout", "the refusal's own door, in the code"),
+                      ("the display's own words:", "the verbatim quote, in the code"),
+                      ("two possibilities, and those words say which", "both reasons, printed, "
+                                                                       "never one guessed at")):
+    assert _phrase in _ii_app, (_phrase, _why, "`app.py` lost the diagnosis the pages promise")
+
 print(f"  I's page figures      the picker names {len(render.THEMES)} drawn-from-code names "
       f"while this box opens {_ii_open} ({_ii_files} files + {len(themes.EXPORTS)} exports), all "
-      f"counted from the files on this run; the pages name the control, the readback and the "
-      f"background it leaves alone, and none of them quotes a box count or an unreachable-name "
-      f"tally")
+      f"counted from the files on this run, and the packaged layout count in docs/themes.md is "
+      f"the same {_ii_files}; the pages name the control, the readback, the background it leaves "
+      f"alone and both shapes of refusal, and none of them quotes a box count or an "
+      f"unreachable-name tally")
 
 # a press on empty glass names the point and selects nothing, and closing the layout takes
 # the mark with it - the pane goes back to a live preview, with nothing drawn on it
@@ -12829,6 +12866,103 @@ print(f"  the layout, on the panel   `apply to the panel` sent one command: the 
       f"paints {_m.group(1)} boxes at this machine's readings against {_i_pin_boxes} at the "
       f"pinned fixture (a printed pair, this box's), and the picker still lists "
       f"{win.theme.count()} names while this box opens {len(_i_files) + len(_i_themes.EXPORTS)}")
+# ---- the same press, twice more, against a display whose `theme` door is shaped differently.
+# ---- Reported 2026-11-11: the five code-drawn names applied for the owner and `Theme_*` did
+# ---- not.  A window cannot know which of the two reasons that is, so the gate drives both and
+# ---- asserts that what the window says quotes the display instead of guessing at it.  The
+# ---- in-process `Control` *is* the display here, and `control.Control._set_theme` imports
+# ---- `themes` inside the call, so patching this process's class or this process's `themes`
+# ---- changes what that display answers and touches nothing else - the same shape of fixture
+# ---- the mixed-version case above uses when it patches `ctl.status`.
+_i_keep_theme, _i_keep_other = args.theme, (args.clock_size, args.bg, args.scrim, args.no_fans,
+                                            args.fps, args.text_color)
+_i_door = control.Control._set_theme
+
+
+def _old_door(self, value) -> dict:
+    """The five-only door this repository shipped until 0.4.
+
+    The wording is `git show v0.3:xigmalcd/control.py` lines 223-226, and it is also what the
+    installed 0.3 service on this bench answers (`/usr/lib/python3/dist-packages/xigmalcd/
+    control.py:220-226`), read on 2026-11-11 - the build the owner's report came from.
+    """
+    _n = str(value or "")
+    if _n not in render.THEMES:
+        return {"ok": False,
+                "error": f"unknown theme {_n!r}; try {' '.join(sorted(render.THEMES))}"}
+    with self.lock:
+        self.args.theme = _n
+    return {"ok": True, "status": self.status()}
+
+
+# (a) an older display: the door has no layout half, so it refuses and names the five.
+control.Control._set_theme = _old_door
+win.ed_name.setCurrentText(_i_vendor)
+for _ in range(10):
+    qapp.processEvents()
+assert str(win.ed.name) == _i_vendor and args.theme == _i_keep_theme
+_i_mark = win.log_view.text()
+win.ed_apply_panel.click()
+for _ in range(6):
+    qapp.processEvents()
+_said3 = win.log_view.text()[len(_i_mark):]
+_old_words = (f"unknown theme {_i_vendor!r}; "
+              f"try {' '.join(sorted(render.THEMES))}")
+assert args.theme == _i_keep_theme, (_i_keep_theme, args.theme,
+                                     "a five-only door accepted a layout name")
+assert (args.clock_size, args.bg, args.scrim, args.no_fans, args.fps,
+        args.text_color) == _i_keep_other, "the refusal moved a setting on its way to refusing"
+assert ctl.take() is None, "a refusal on an old display queued a frame or an upload"
+assert f"the display's own words: {_old_words}" in _said3, (
+    _said3[-600:], "the window paraphrased the display's refusal instead of quoting it - and "
+                   "the difference between the two reasons lives in those words")
+assert f"the panel kept {_i_keep_theme}: {_i_vendor} did not reach it" in _said3, _said3[-400:]
+for _phrase in ("two possibilities, and those words say which", "took only the five",
+                "until 0.4", "names no directory is that door",
+                "the packaged service starts `/usr/bin/xigmalcd`",
+                "`xigmalcd --list-themes`", "save as your copy",
+                "~/.config/xigmalcd/themes, which every display searches first"):
+    assert _phrase in _said3, (_phrase, "the refusal stopped saying how a reader finds out "
+                                        "which display they are talking to")
+assert (_said3.index(f"the display's own words: {_old_words}")
+        < _said3.index("two possibilities, and those words say which")), (
+    "the window gave its own reason before quoting the display's, which is the order "
+    "that hides the evidence")
+control.Control._set_theme = _i_door
+
+# (b) a display new enough to have the door, whose roots do not hold this file: the real
+# `_set_theme`, with `themes.roots()` pointed at an empty directory.  `scan()` globs on every
+# call, so the whole display - the resolver, the refusal's root list, and `Editor.where` -
+# answers that layout is simply not there, which is the other half of the owner's report.
+_empty_root = os.path.join(os.environ["SOCK_DIR"], "no-layouts-here")
+os.makedirs(_empty_root, exist_ok=True)
+_i_roots = _i_themes.roots
+_i_themes.roots = lambda: ((_empty_root, "*.json"),)
+try:
+    _i_mark = win.log_view.text()
+    win.ed_apply_panel.click()
+    for _ in range(6):
+        qapp.processEvents()
+    _said4 = win.log_view.text()[len(_i_mark):]
+    assert args.theme == _i_keep_theme, (args.theme, "a display that cannot see the file "
+                                                    "accepted the name anyway")
+    assert ctl.take() is None, "the refusal queued an action for a layout nobody can draw"
+    assert f"no layout named {_i_vendor!r} under {_empty_root}" in _said4, (
+        _said4[-600:], "the refusal does not carry the display's own root list, which is the "
+                       "evidence for this branch")
+    assert "out of no file at all" in _said4, (
+        _said4[-400:], "the window stopped saying where *it* resolves the name today, and the "
+                       "two answers are what tell (a) from (b)")
+    assert "two possibilities, and those words say which" in _said4, _said4[-400:]
+finally:
+    _i_themes.roots = _i_roots
+    control.Control._set_theme = _i_door
+assert _i_themes.resolve(_i_vendor) is not None, (
+    "the roots patch was left in place, so everything after this point runs blind")
+print(f"  an old door, and an empty one   a five-only display refused {_i_vendor!r} and the "
+      f"log quoted its words verbatim ({_old_words!r}); the same press against a display whose "
+      f"only root is {os.path.basename(_empty_root)!r} quoted that root back. Neither moved "
+      f"the theme ({args.theme!r}) and neither queued anything on the port")
 win.ed_name.setCurrentText(app.NO_EDITOR)
 for _ in range(4):
     qapp.processEvents()

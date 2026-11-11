@@ -141,6 +141,43 @@ is offline behaviour: the panel is still handed nothing but `.osd` frames
 docs/gui.md what one edit is worth in pixels). The plan, the census it rests on
 and the parts that stay gaps are written out in [theme-editor.md](theme-editor.md).
 
+## The name is looked up by the display, not by the window
+
+Nothing about a layout's file travels over the socket.  A **name** travels: `--theme Theme_07`
+on a command line, `("cmd": "theme", "value": "Theme_07")` on the socket, `apply to the panel`
+in the window.  The process that owns the port is the one that looks that name up, in
+`themes.roots()`, in this order: your own copies (`$XDG_CONFIG_HOME/xigmalcd/themes`, scanned
+flat), then the checkout's `themes/alpha`, then `/usr/share/xigmalcd/themes/alpha` out of the
+package - a checkout deliberately wins over an installed package, so the figures the documents
+quote cannot drift under a build that happens to have a `.deb` on the machine.  Which means the
+same press means different things against different displays, and a window that could open the
+file has no way to know what is on the other end of the socket until it asks.
+
+Both answers were read on 2026-11-11 by driving each build's own `Control._set_theme` in
+process, with `/dev/xigma-no-such-port` never opened and no byte sent anywhere:
+
+* the **installed 0.3 package** answered `ok=True` for `alpha` and `gauge` and refused
+    `Theme_01`, `Theme_07`, the numeric id `1757491588804` and a copy of mine, each time with
+    `unknown theme '<name>'; try alpha bars clock dual gauge` - the five names, and no
+    directory.  That build ships no `xigmalcd/themes.py` at all (`find_spec` answers None in
+    that package; `git ls-tree v0.3 xigmalcd/themes.py` is empty, and the file lands in 0.4
+    with stage 1 of docs/theme-editor.md), so it has nothing to resolve a layout name with;
+* **this tree's** same door answered `ok=True` for all four of those names, and refuses only
+    a name nothing resolves, and that refusal quotes `themes.why_not`, which prints the roots
+    it searched and tells you to run `--list-themes`;
+* and the **files were never the problem**: `xigmatek-connect-lcd-themes` puts **23** layout
+    JSONs at `/usr/share/xigmalcd/themes/alpha/layouts/480X480/` on this bench, so what a 0.3
+    service is missing is the code that reads them - a newer display, not more files.
+
+So a `Theme_*` that opens, previews, edits and saves in the window and is then refused by the
+display comes down to two cases, and the display's own sentence tells them apart.  A refusal
+that lists the five drawn names and names no directory is a door from before 0.4.  A refusal
+that reads `no layout named 'Theme_07' under <roots>` is a display with the door, in front of
+roots that do not hold this file - because those are *its* roots, and this window resolved the
+name somewhere else.  `xigmalcd --list-themes` on the machine running the display prints what
+that display can resolve, and *save as your copy* writes a layout into the first of those
+roots, the one every display searches before the other two.
+
 ## The `alpha` theme, and its rings
 
 `alpha` is the vendor theme made by redrawing, widget for widget, the theme the vendor app

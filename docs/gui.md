@@ -769,6 +769,21 @@ editor commonly gets wrong:
   prints that count every run, and asserts it - so the route to a layout is in the
   window, not in a menu of twenty-eight.
 
+* **A refusal is quoted, not summarised, because two displays fail this way.** A
+  layout's name is resolved by the process that holds the port, not by this window, so
+  the same press answers differently against two machines. A build older than this
+  window's layout door refuses with the five names it draws and names no directory at
+  all; a newer build that cannot see the file refuses with the roots it did search.
+  Both possibilities, and the test that tells them apart, are printed in the log after
+  the refusal; why they differ, the roots in order, and what to do about either are
+  written out in docs/themes.md. The suite drives both shapes against its in-process
+  display - the door patched to the 0.3 shape, then the roots pointed at an empty
+  directory - and asserts the display's words reach the log unchanged, that no setting
+  moved, and that nothing was queued for the port. With no display running there is
+  nobody to send a name to, and this window's own `One frame now` still renders the
+  theme picker's picture: a layout reaches the glass as frames only through a display
+  that can resolve its name.
+
 * **The picture can be pointed at, and what a point means is the paint's answer.** The
   ink box `themes.draw` records for the selected row is marked on the pane. Press inside a
   box and that row is selected; where two boxes overlap the **later** row wins, because

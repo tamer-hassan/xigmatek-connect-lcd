@@ -541,7 +541,26 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     display still starts on its own `--theme`: the suite's socket section
     drives the button against an in-process display, asserts one command and
     one setting changed, reads the refusal path, and prints the box counts
-    for the machine that ran it.
+    for the machine that ran it. Followed up the same day: the five applied
+    and `Theme_*` did not, and the reason was read out of both builds rather
+    than guessed at. The installed 0.3 service - driven in process, its own
+    port never opened - answered `ok=True` for `alpha` and `gauge` and
+    refused `Theme_01`, `Theme_07`, the numeric id and a copy of mine with
+    the five names and no directory, because that package ships no
+    `xigmalcd/themes.py` at all: the resolver lands in 0.4, and `git ls-tree
+    v0.3` says so. Its layout *files* are already installed by the themes
+    package (23 JSONs under /usr/share/xigmalcd/themes/alpha/layouts/480X480
+    here), so the fix is a newer display, not more files. A name is resolved
+    by the process that holds the port, in the order your copies, the
+    checkout, the package - so the window now quotes the display's refusal
+    verbatim and prints both possibilities and the test for each: a refusal
+    naming no directory is a pre-0.4 door, one that reads `no layout named
+    ... under <roots>` is roots that do not hold it, `--list-themes` on that
+    machine prints what it can resolve, and saving a copy puts it in the
+    root searched first. The suite patches that in-process display's door to
+    the 0.3 shape, and its roots to an empty directory, and asserts the
+    quoted words arrive unchanged, nothing moved on the display and nothing
+    was queued for the port.
 
 
   * Still not built, and said in the pages rather than left to be found: a

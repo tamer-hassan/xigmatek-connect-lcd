@@ -3547,9 +3547,7 @@ class Window(QMainWindow):
         n_pin = len(pin_notes.get("boxes") or [])
         rep = self.daemon.send("theme", value=name)
         if not rep.get("ok"):
-            # `send` has logged the display's refusal in the display's own words already
-            _was = (self.daemon.status or {}).get("theme") or "what it had"
-            self._log(f"the panel kept {_was}: nothing moved for {name}")
+            self._refused_layout(name, rep)
             return
         shown = str((rep.get("status") or {}).get("theme") or name)
         if themes.resolve(name) is None:
@@ -3576,6 +3574,43 @@ class Window(QMainWindow):
         self._log("what a fresh display starts with is its own `--theme`, not this change: "
                   "the service's line says it, and `--theme <name>` at a start is the way "
                   "to make this one stick")
+
+    def _refused_layout(self, name: str, rep: dict) -> None:
+        """The display said no to a name this window resolves, so its words are the report.
+
+        Reported 2026-11-11: the five code-drawn names applied, `Theme_*` did not.  Both
+        shapes of door were read side by side before a line here was written.  This tree's
+        `xigmalcd.control.Control._set_theme` answers `ok=True` for `Theme_01`, `Theme_07`,
+        the numeric id `1757491588804` and a copy written into a temp user root, and refuses
+        a name nothing resolves with `themes.why_not`'s sentence - which names the roots it
+        searched, in the order `themes.roots()` gives them: your copies first, then the
+        checkout, then `/usr/share/xigmalcd/themes/alpha`.  The other door is what
+        `git show v0.3:xigmalcd/control.py` shows: `if name not in render.THEMES`, and a
+        refusal naming the five drawn names and no directory at all.  The installed 0.3
+        package ships no `xigmalcd/themes.py`, so that build has nothing to resolve a
+        layout with.  The same
+        press means different things against different displays, so this says both
+        possibilities and how to tell them apart instead of picking one: the display, not
+        this window, is what decides.
+        """
+        _was = (self.daemon.status or {}).get("theme") or "what it had"
+        self._log(f"the panel kept {_was}: {name} did not reach it")
+        # verbatim, not paraphrased: what separates the two answers below is in the
+        # display's own phrasing, and a summary of it would hide the evidence
+        self._log(f"the display's own words: {rep.get('error') or 'it gave no reason'}")
+        self._log(
+            "two possibilities, and those words say which.  (a) that display is older than "
+            "this window's layout door: the socket's `theme` command took only the five "
+            "names this program draws from `render.py` until 0.4, and a refusal that lists "
+            "exactly those five and names no directory is that door.  Which display is "
+            "running: the packaged service starts `/usr/bin/xigmalcd`, out of the installed "
+            "package, while a display started from a checkout resolves that tree's files.  "
+            "(b) that display is new enough, and this layout is not under a root it "
+            f"searches - this window opened {name} out of {self.ed.where}, and that door's "
+            "refusal names the roots it did search.  `xigmalcd --list-themes` on that "
+            "machine prints what it can resolve.  Either way the layout's file is on this "
+            "disk, and `save as your copy` writes a version of it into "
+            "~/.config/xigmalcd/themes, which every display searches first")
 
     # ------------------------------------------------------- the canvas door --
     # Pointing at the picture is the other half of the editor: a row's ink box is where
@@ -4286,7 +4321,8 @@ class Window(QMainWindow):
         self.tray_pause.triggered.connect(self._tray_pause)
         menu.addAction(self.tray_pause)
         # `theme_sub`, not `themes`: the module of that name is what the rest of this class
-        # reaches for, and a local QMenu called `themes` would answer instead of it from here on.
+        # reaches for, and a local QMenu called `themes` would answer instead of it
+        # from here on.
         self.tray_theme_menu = theme_sub = menu.addMenu("Theme on the glass")
         for name in sorted(render.THEMES):
             act = QAction(name, self)
