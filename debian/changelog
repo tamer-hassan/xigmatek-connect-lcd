@@ -1,9 +1,16 @@
-xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
+xigmatek-connect-lcd (0.6) resolute; urgency=medium
 
-  * NOT RELEASED.  This stanza describes the tree since the `v0.5` tag.  Its
-    stamp is what makes two builds of it agree on bytes, not a claim that
-    anyone published it; the release commit replaces `UNRELEASED` with the
-    record of what was tagged.
+  * Released as `v0.6`, the first tag of a tree whose layout editor writes
+    files: this stanza is the record of the work since `v0.5`, and the stamp
+    at the foot of it is a packaging fact rather than a date -
+    `dpkg-buildpackage` takes `SOURCE_DATE_EPOCH` from that line and
+    `dpkg-deb` clamps every archive member to it, which is why two builds of
+    these bytes, one on a runner and one here, come out identical.
+    `docs/packaging.md` keeps the digest census of the pair - the tag's CI
+    build against two builds made from this tag on this bench - and that
+    section lands as the commit after the tag, exactly as the 0.5 record
+    did, because a digest read before the build that produced it would be a
+    number nobody built.
 
   * The layout editor can add a row, remove one, and change which row is on
     top.  Four controls sit under the fields - `add`, `remove`, `up`,
@@ -633,7 +640,7 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     -af 'xigma[u]i'` answers the one real window and nothing else. The
     branch for "no window is running" cannot be demonstrated on this bench
     while one is, and it is not claimed to have been.
- -- Tamer Hassan <thameruddin@gmail.com>  Tue, 10 Nov 2026 16:30:41 +0200
+ -- Tamer Hassan <thameruddin@gmail.com>  Wed, 11 Nov 2026 19:34:39 +0200
 xigmatek-connect-lcd (0.5) resolute; urgency=medium
 
   * The window shows its layout editor from the start.  It is the only
