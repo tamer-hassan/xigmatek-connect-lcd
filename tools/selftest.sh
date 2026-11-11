@@ -11358,13 +11358,15 @@ assert not _gk_c["showif_changed"] and not _gk_c["sent_reason_diff"], (
 assert _gk_c["sent_value_only"] + _gk_c["sent_both_none"] == _gk_c["sent_diff"], _gk_c
 # feature D's squares never consult a reading - they are asked of a box, and the loop above
 # asserts `size_edges` answers the same at the same box.  What *can* move is which squares the
-# pane can offer at all, because a box whose ink runs off the 480 px glass has no on-screen
-# square on that side to grab: that follows drawn geometry, so the count is printed, never
-# asserted as one number for both machines, and it can only move for a row whose box moved.
-assert _gk_c["edges_changed"] <= _gk_c["box_moved"], (
+# pane can offer at all: a box that moved, or a box that is not drawn in that frame at all (a
+# runner with no `gpu` section and no tachometers simply paints fewer rows), leaves a different
+# offer.  That follows drawn geometry, so the count is printed, never asserted as one number for
+# both machines - but it can only move where the box changed, moved or gone, and that bound holds
+# wherever the suite runs.
+assert _gk_c["edges_changed"] <= _gk_c["box_moved"] + _gk_c["box_only"], (
     _gk_c, "a row's offered edges moved while its box sat still: `size_edges` is reading "
            "something other than the box it was handed")
-assert _gk_l["edges_changed"] <= _gk_l["box_moved"], (
+assert _gk_l["edges_changed"] <= _gk_l["box_moved"] + _gk_l["box_only"], (
     _gk_l, "the same rule at this machine's own readings: an offer moved at an unchanged box")
 print(f"  what another body moves   counted against the file body the peek is driven with, the "
       f"same JSON on either machine, which is why these are asserted: {_gk_c['box_moved']} of "
