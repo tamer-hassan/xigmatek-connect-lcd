@@ -12188,7 +12188,8 @@ if os.path.isdir(themes.SYSTEM_ROOT):
 else:
     assert "GitHub's runner has no such directory" in _tm, (
         "the page must say which machine this was measured on when the runner has no such root")
-for _phrase in ("`themes.roots()` narrowed to", "the newer package"):
+for _phrase in ("an install's `themes.roots()` is", "the newer package",
+                "driven the same way - in process, `/dev/xigma-no-such-port` never opened"):
     assert _phrase in _tm, (_phrase, "docs/themes.md stopped carrying the remedy for an "
                                      "installed service")
 _m4 = _re.search(r"puts \*\*(\d+)\*\* layout JSONs at "
@@ -12218,7 +12219,8 @@ assert "One path met glass on an install rather than through a driver" in _gf, (
     "docs/gui.md no longer says where the apply route met real glass, so the claim has nowhere")
 _glass = _gf.split("One path met glass on an install")[1].split("A fifth window")[0]
 for _phrase in ("no counters", "no kept transcript", "settles none",
-                "the author's to name, and this file does not guess"):
+                "package-database fact rather than a memory",
+                "this bench now carries", "its `app.py` holds no `ed_apply_panel`"):
     assert _phrase in _glass, (_phrase, "the on-glass paragraph stopped saying what it is not")
 assert not _re.search(r"\b\d[\d ]* (uploads|confirmed|refused|frames)\b", _glass), (
     "the on-glass paragraph carries a counter, and there is no run behind it to re-derive one")

@@ -168,14 +168,22 @@ process, with `/dev/xigma-no-such-port` never opened and no byte sent anywhere:
 * and the **files were never the problem**: `xigmatek-connect-lcd-themes` puts **23** layout
     JSONs at `/usr/share/xigmalcd/themes/alpha/layouts/480X480/` on this bench, so what a 0.3
     service is missing is the code that reads them - a newer display, not more files.
-* and the package's own root is enough by itself: with `themes.roots()` narrowed to
-    `/usr/share/xigmalcd/themes/alpha`, which is what an install with no checkout sees, the same
-    **23** names resolve on this bench - `Theme_07` to
-    `/usr/share/xigmalcd/themes/alpha/layouts/480X480/1757491588804.json` - and the name list
+* and the package's own root is enough by itself, which an installed build says about
+    itself: an install's `themes.roots()` is `['$XDG_CONFIG_HOME/xigmalcd/themes',
+    '/usr/share/xigmalcd/themes/alpha']` - the checkout entry is simply absent - and on this
+    bench the same **23** names resolve inside those two roots, `Theme_07` to
+    `/usr/share/xigmalcd/themes/alpha/layouts/480X480/1757491588804.json`, and the name list
     comes out identical to the checkout's.  So the remedy for an installed service is the newer
     package.  (Labelled as this bench's measurement, because GitHub's runner has no such
     directory: the suite counts the page's **23** against `themes.scan()`'s own selectable list,
     and only looks inside that root on a machine that has one.)
+* and that remedy has now been read off a newer install on the same machine, the same day: the
+    bench's `xigmatek-connect-lcd` and `-themes` packages went to **0.6**, built from this tree,
+    and driven the same way - in process, `/dev/xigma-no-such-port` never opened - that build's
+    `_set_theme` answers `ok=True` for `alpha`, `Theme_07` and `Theme_01`, and still refuses a
+    name nothing resolves, with the two roots above named in the refusal.  So the sentence that
+    starts this section is the whole of it: the name travels, and which names travel is a fact
+    about the display's build, not the window's.
 
 So a `Theme_*` that opens, previews, edits and saves in the window and is then refused by the
 display comes down to two cases, and the display's own sentence tells them apart.  A refusal

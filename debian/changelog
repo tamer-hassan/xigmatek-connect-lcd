@@ -567,10 +567,15 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     port. That boundary has now been seen from the glass side as well as the
     code side: on the machine whose packaged 0.3 service was measured
     refusing those names, the author installed a newer service and confirmed
-    applying themes work, in the author's words. It is not a driver run - no
-    counters, no transcript, nothing re-derivable - and it settles none of
-    the rows the panel still owes, but the command the suite drives over a
-    socket in a temporary directory is also one a real panel answers.
+    applying themes work, in the author's words. That bench now carries
+    `xigmatek-connect-lcd 0.6` and `-themes 0.6`, built from this tree, and
+    that build's own `_set_theme`, driven in process with its port never
+    opened, answers `ok=True` for `alpha`, `Theme_07` and `Theme_01`; its
+    `xigmaui` predates the button, so the control pressed was this
+    checkout's window talking to an installed display. It is not a driver
+    run - no counters, no transcript, nothing re-derivable - and it settles
+    none of the rows the panel still owes, but the command the suite drives
+    over a socket in a temporary directory is also one a real panel answers.
 
 
   * Still not built, and said in the pages rather than left to be found: a
