@@ -3823,11 +3823,15 @@ import hashlib as _hash
 
 
 def _n_vhash():
-    """Every layout file in the two vendor trees, as {path: sha256}.
+    """Every layout file outside the user root, as `{path: sha256}`.
 
     Hashed off the directory rather than off `scan()`, because `scan()` deliberately shows
     one record per name - a copy of yours hides the vendor's record, and this gate is about
     the vendor's *files*, which are the evidence every figure in the docs was read from.
+    How many roots answer is a fact about the machine: a bench with the themes package
+    installed holds the checkout's 27 and the same 27 again under /usr/share, while CI's
+    offline job ships the checkout alone - so what is held here is "the files the vendor
+    roots have", counted from the roots, and never a number that presumes a second tree.
     """
     out = {}
     for _root, _pat in themes.roots():
@@ -3839,7 +3843,12 @@ def _n_vhash():
 
 
 _n_vendor0 = _n_vhash()
-assert len(_n_vendor0) >= 54, len(_n_vendor0)    # 27 in the checkout, 27 in the package
+_n_vroots = sorted(r for r, _p in themes.roots()
+                   if r != themes.user_root() and os.path.isdir(r))
+assert _n_vendor0, ("no vendor layout file anywhere: the naming gates below would be "
+                    "measuring refusals against an empty library")
+assert len(_n_vendor0) >= 27, (len(_n_vendor0), _n_vroots,
+                               "fewer layout files on disk than this repository tracks")
 _n_lim = themes.NAME_LIMIT
 assert themes._safe_name("x" * _n_lim) == "x" * _n_lim, "the limit itself must be usable"
 try:
@@ -4090,7 +4099,9 @@ for _nm in themes.user_copies():
 assert themes.user_copies() == [], themes.user_copies()
 assert len(themes.scan()[0]) == len(_n_pick), (len(themes.scan()[0]), len(_n_pick),
                                                "the vendor's pickable count moved")
-print(f"  naming a copy       the two acts that invent a name. {len(_n_refused)} names "
+print(f"  naming a copy       the two acts that invent a name, over {len(_n_vendor0)} "
+      f"vendor layout files in {len(_n_vroots)} root(s) here, none of which any of it "
+      f"touched. {len(_n_refused)} names "
       f"refused by `new_name` ({', '.join(f'{k}' for k in sorted(_n_refused))[:80]}), on a "
       f"rule taken from the library itself: {len(_n_names)} names, all distinct folded, and "
       f"{len(_n_ids)} ids, all distinct, every one answered by `resolve()`. A rename moved "
