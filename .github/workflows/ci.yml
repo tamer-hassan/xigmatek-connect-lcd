@@ -100,6 +100,11 @@ jobs:
         # so on 2026-11-10 the first CI run of it printed "the pixel half of this check
         # did NOT run"; installing it is what makes that half run where the tree is
         # published from.  It stays out of the package: this is a check, not a feature.
+        #
+        # shellcheck is here for the shell that ships.  Measured on this bench: `install/install.sh`
+        # has no findings at all, so this step exists to keep it that way and costs a second.  The
+        # exclusion of `tools/selftest.sh` is explained by the step "the shell this repository
+        # ships", below.
         run: |
           ok=""
           for i in 1 2 3; do
@@ -113,7 +118,8 @@ jobs:
                              echo "  job exists to run"; exit 1; }
           sudo apt-get $APT install -y --no-install-recommends \
             python3 python3-pil python3-serial python3-pyqt6 python3-setuptools \
-            fonts-dejavu-core fonts-liberation desktop-file-utils ffmpeg tesseract-ocr
+            fonts-dejavu-core fonts-liberation desktop-file-utils ffmpeg tesseract-ocr \
+            shellcheck
           python3 -c 'import PIL, serial, PyQt6.QtWidgets, sys; print(" ", sys.version.split()[0], "Pillow", PIL.__version__)'
           ffmpeg -version | head -1
           tesseract --version | head -1
@@ -132,6 +138,22 @@ jobs:
 
       - name: tools/selftest.sh
         run: tools/selftest.sh
+
+      - name: the shell this repository ships
+        # Two tracked `.sh` files: `install/install.sh`, the installer a person runs, and
+        # `tools/selftest.sh`, the offline suite being replaced in this cycle.  Measured here,
+        # install.sh has 0 findings and selftest.sh has 2 style notes - one `cd` without `|| exit`
+        # at line 7, one `ps | grep` where `pgrep` exists at 13,851 - both in lines that will not
+        # exist at 0.7.  So the suite is excluded by name rather than dressed up on the way out:
+        # the check that would have to keep passing after its deletion is the one over install.sh.
+        run: |
+          files=$(git ls-files '*.sh' | grep -v '^tools/selftest\.sh$')
+          echo "  linting: $files"
+          test -n "$files" || { echo "  no shell files found: this step would be checking nothing"
+                                exit 1; }
+          # one word per path, and no path in this repository has a space in it
+          # shellcheck disable=SC2086
+          shellcheck $files
 
       - name: README's section count is the suite's section count
         # README's "Where the detail lives" page says how many offline sections the

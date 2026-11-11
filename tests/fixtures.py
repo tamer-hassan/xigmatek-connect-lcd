@@ -21,6 +21,7 @@ import datetime
 import os
 import sys
 import time
+import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -28,7 +29,94 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO not in sys.path:
     sys.path.insert(0, REPO)
 
+import hashlib                                              # noqa: E402
+import shutil                                               # noqa: E402
+import subprocess                                           # noqa: E402
+import tempfile                                             # noqa: E402
+
 from PIL import Image, ImageChops                           # noqa: E402
+
+# ---- isolation, done once, for the whole process -------------------------------------------------
+#
+# `tools/selftest.sh` set these three per section, in bash, and its closing guard compared the
+# sha256 of `~/.config/xigmaui/config.json` against a baseline taken before it started - because
+# in 0.4 a section really did write the author's settings.  Setting them here, at import, means a
+# test cannot forget to: `settings.path()` and `themes.user_root()` both read the environment, so
+# every window and every save in this package lands in a temporary root that outlives the process.
+#
+# `XIGMA_SOCKET` points at a path that does not exist.  The window asks for a display through that
+# socket before it would ask for a port, so a nonexistent socket is what keeps a GUI check from
+# reaching for /dev/ttyACM0 on a bench that has a panel attached.
+ISOLATED = tempfile.mkdtemp(prefix="xigma-tests-")
+os.environ["XDG_CONFIG_HOME"] = os.path.join(ISOLATED, "config")
+os.environ["XIGMA_SOCKET"] = os.path.join(ISOLATED, "no-display.sock")
+
+#: The real settings file, as this process found it.  `test_zz_isolation.py` re-reads it at the
+#: end and fails on any difference, which is the guard the old suite closed with.
+REAL_CONFIG = os.path.expanduser("~/.config/xigmaui/config.json")
+
+
+def config_fingerprint() -> str:
+    """sha256 of the real settings file, or the string 'absent' when there is none."""
+    try:
+        with open(REAL_CONFIG, "rb") as fh:
+            return hashlib.sha256(fh.read()).hexdigest()
+    except FileNotFoundError:
+        return "absent"
+
+
+BASELINE_CONFIG = config_fingerprint()
+
+#: Optional external programs.  Each check that needs one says so out loud rather than measuring a
+#: zero and calling it a result - the old suite's worst near-miss was `measure` returning 0.0 luma
+#: because ffmpeg was missing, which looked like a changed clip and was an absent decoder.
+HAVE = {name: bool(shutil.which(name))
+        for name in ("ffmpeg", "ffprobe", "tesseract", "desktop-file-validate",
+                     "dpkg-parsechangelog", "git")}
+
+
+def need(*what: str) -> None:
+    """Skip the calling test unless every named program is on this machine."""
+    gone = [w for w in what if not HAVE.get(w)]
+    if gone:
+        raise unittest.SkipTest("not installed here: " + ", ".join(gone)
+                                + " - the check that needs it is skipped, not silently passed")
+
+
+def tracked(*patterns: str) -> list:
+    """The repository's own file list, as git knows it.
+
+    "Published" means tracked, not "present in this working tree".  A bench that has just run
+    `dpkg-buildpackage` also has `debian/xigmatek-connect-lcd.substvars` and six neighbours, so a
+    check that reads what happens to be on disk counts different files on different machines -
+    104 here, 97 on CI, for one example the old suite hit.  The list the repository ships is the
+    list the rule is about, and it is the same on every machine.
+    """
+    got = subprocess.run(["git", "ls-files", *patterns], capture_output=True, text=True,
+                         check=True, cwd=REPO)
+    return sorted(n for n in set(got.stdout.split())
+                  if os.path.isfile(os.path.join(REPO, n)))
+
+
+def read(path: str) -> str:
+    """One repository file, as text, named from the top of the tree."""
+    with open(os.path.join(REPO, path), encoding="utf-8") as fh:
+        return fh.read()
+
+
+def sha256_of(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for block in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def run(*argv: str, cwd: str = REPO, env: dict | None = None):
+    """One subprocess, with stdout and stderr kept together and no shell in between."""
+    whole = dict(os.environ, **(env or {}))
+    return subprocess.run([sys.executable if a == "python" else a for a in argv],
+                          capture_output=True, text=True, cwd=cwd, env=whole)
 
 #: One body of readings, used by every drawing check.  Pinned because the machine's own sensors
 #: answer different numbers on a runner (no `gpu` section, no tachometer) and those gaps would be
@@ -77,6 +165,30 @@ def differ(a: Image.Image, b: Image.Image) -> tuple:
     flat = src.get_flattened_data() if hasattr(src, "get_flattened_data") else list(src)
     return (sum(1 for q in flat if q != (0, 0, 0, 0)),
             max((max(q) for q in flat), default=0))
+
+
+class FreshConfigRoot(unittest.TestCase):
+    """A base class that gives each test its own empty settings and theme-copy root.
+
+    The process-wide isolation in this module is what stops a check writing the real
+    `~/.config/xigmaui/config.json`; this is what stops two checks reading *each other*.  Both
+    matter: `settings.load()` after a save, and `themes.user_copies()` after a rename, are only
+    meaningful if the root they look in is empty before the test starts.  `themes.user_root()`
+    binds at import, so the environment is set here - before any test body, and therefore before
+    the first call - and `XDG_CONFIG_HOME` is the only thing either module reads.
+    """
+
+    def setUp(self) -> None:
+        self._was_config = os.environ.get("XDG_CONFIG_HOME")
+        self.config_root = tempfile.mkdtemp(prefix="xigma-cfg-")
+        os.environ["XDG_CONFIG_HOME"] = self.config_root
+
+    def tearDown(self) -> None:
+        if self._was_config is None:
+            os.environ.pop("XDG_CONFIG_HOME", None)
+        else:
+            os.environ["XDG_CONFIG_HOME"] = self._was_config
+        shutil.rmtree(self.config_root, ignore_errors=True)
 
 
 class StubPanel:

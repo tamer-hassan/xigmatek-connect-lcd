@@ -670,6 +670,20 @@ class Link:
         return notice, ack
 
 
+def _sysfs_attr(path: str) -> str:
+    """One sysfs attribute, stripped, or "" if it is not there.
+
+    Read with a `with`: these are looked up on every port scan and every session renewal, and
+    `open(p).read()` leaves the handle to the garbage collector - which is what this module's own
+    tests turned into a `ResourceWarning` naming `/sys/.../product`.
+    """
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read().strip()
+    except OSError:
+        return ""
+
+
 def usb_label(tty: str) -> str:
     """'Xigmatek USB Device [1d6b:0109]' for the USB device behind a tty node.
 
@@ -679,15 +693,10 @@ def usb_label(tty: str) -> str:
     path = os.path.realpath(f"/sys/class/tty/{tty.split('/')[-1]}/device")
     ids = ""
     for _ in range(4):
-        try:
-            prod = open(f"{path}/product").read().strip()
-        except OSError:
-            prod = ""
-        try:
-            ids = "{}:{}".format(open(f"{path}/idVendor").read().strip(),
-                                 open(f"{path}/idProduct").read().strip())
-        except OSError:
-            pass
+        prod = _sysfs_attr(f"{path}/product")
+        vendor, product = _sysfs_attr(f"{path}/idVendor"), _sysfs_attr(f"{path}/idProduct")
+        if vendor and product:
+            ids = f"{vendor}:{product}"
         if prod:
             return f"{prod} [{ids}]" if ids else prod
         if os.path.dirname(path) == path:

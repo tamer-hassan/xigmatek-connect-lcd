@@ -524,7 +524,8 @@ def _upload_background(link, args, path: str = ""):
     uploads it."""
     path = path or args.mp4
     try:
-        blob = open(path, "rb").read()
+        with open(path, "rb") as fh:
+            blob = fh.read()
     except OSError as exc:
         print(f"  ! background {path}: {exc}", file=sys.stderr)
         return False
