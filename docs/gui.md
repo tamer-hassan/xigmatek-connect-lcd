@@ -779,10 +779,15 @@ editor commonly gets wrong:
   written out in docs/themes.md. The suite drives both shapes against its in-process
   display - the door patched to the 0.3 shape, then the roots pointed at an empty
   directory - and asserts the display's words reach the log unchanged, that no setting
-  moved, and that nothing was queued for the port. With no display running there is
-  nobody to send a name to, and this window's own `One frame now` still renders the
-  theme picker's picture: a layout reaches the glass as frames only through a display
-  that can resolve its name.
+  moved, and that nothing was queued for the port. Nothing warns before the press, and
+  that is a measurement rather than a gap left open: no field of the status reply says
+  whether a display's `theme` door has the layout half - a display reports its
+  settings, its upload counters and its port, and the 0.3 build measured above reports
+  fewer still - so the only probe that every build can answer is the command itself,
+  and what comes back is quoted. With no display running there is nobody to send a
+  name to, and this window's own `One frame now` still renders the theme picker's
+  picture: a layout reaches the glass as frames only through a display that can
+  resolve its name.
 
 * **The picture can be pointed at, and what a point means is the paint's answer.** The
   ink box `themes.draw` records for the selected row is marked on the pane. Press inside a

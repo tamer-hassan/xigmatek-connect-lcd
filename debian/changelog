@@ -556,11 +556,15 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     verbatim and prints both possibilities and the test for each: a refusal
     naming no directory is a pre-0.4 door, one that reads `no layout named
     ... under <roots>` is roots that do not hold it, `--list-themes` on that
-    machine prints what it can resolve, and saving a copy puts it in the
-    root searched first. The suite patches that in-process display's door to
-    the 0.3 shape, and its roots to an empty directory, and asserts the
-    quoted words arrive unchanged, nothing moved on the display and nothing
-    was queued for the port.
+    machine prints what it can resolve, saving a copy puts it in the root
+    searched first, and what to do about it is in the pages: a display from
+    0.4 or newer, whose port has to be released by the one already running,
+    since one process holds it. Nothing warns before the press, because no
+    field of the status reply says whether a door has the layout half. The
+    suite patches that in-process display's door to the 0.3 shape, and its
+    roots to an empty directory, and asserts the quoted words arrive
+    unchanged, nothing moved on the display and nothing was queued for the
+    port.
 
 
   * Still not built, and said in the pages rather than left to be found: a

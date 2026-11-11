@@ -176,7 +176,11 @@ that reads `no layout named 'Theme_07' under <roots>` is a display with the door
 roots that do not hold this file - because those are *its* roots, and this window resolved the
 name somewhere else.  `xigmalcd --list-themes` on the machine running the display prints what
 that display can resolve, and *save as your copy* writes a layout into the first of those
-roots, the one every display searches before the other two.
+roots, the one every display searches before the other two.  So putting one of these names on the glass against an old service means a display that can
+resolve it: the loop's own `--theme <name>` door at a start, from a 0.4 or newer build, with the
+background that layout names coming by the same route (`--mp4 Theme_07.mp4`, docs/limits.md). And
+one process can hold the port, so the display that is running has to stop before another one
+starts - which is a decision about someone's panel, not a step to take quietly.
 
 ## The `alpha` theme, and its rings
 

@@ -12168,7 +12168,10 @@ for _phrase, _why in (("scanned flat", "the user root's shape, and why a copy wi
                       ("ships no `xigmalcd/themes.py`", "why a 0.3 build cannot resolve a name"),
                       ("lands in 0.4", "the version boundary"),
                       ("`no layout named 'Theme_07' under", "the other refusal's shape"),
-                      ("`xigmalcd --list-themes`", "the test a reader runs on that machine")):
+                      ("`xigmalcd --list-themes`", "the test a reader runs on that machine"),
+                      ("a 0.4 or newer build", "what a display has to be to resolve a name"),
+                      ("`--mp4 Theme_07.mp4`", "the paired background, by the same route"),
+                      ("one process can hold the port", "whose panel has to move first")):
     assert _phrase in _tm, (_phrase, _why, "docs/themes.md stopped carrying it")
 _m4 = _re.search(r"puts \*\*(\d+)\*\* layout JSONs at "
                  r"`/usr/share/xigmalcd/themes/alpha/layouts/480X480/`", _tm)
@@ -12179,7 +12182,8 @@ assert int(_m4.group(1)) == _ii_files, (
                              "selectable count disagree: one of the two is stale")
 for _phrase in ("A refusal is quoted, not summarised",
                 "resolved by the process that holds the port",
-                "nobody to send a name to"):
+                "nobody to send a name to",
+                "Nothing warns before the press"):
     assert _phrase in _gf, (_phrase, "docs/gui.md stopped saying, where the button is, that a "
                                      "refusal is the display's answer and not this window's")
 for _phrase, _why in (("_refused_layout", "the refusal's own door, in the code"),
@@ -12957,6 +12961,13 @@ try:
 finally:
     _i_themes.roots = _i_roots
     control.Control._set_theme = _i_door
+# and the reason there is no pre-flight: the status reply carries no field that says whether a
+# display's `theme` door has the layout half, so the only probe every build can answer is the
+# command itself.  If a future build adds such a field, this assert fails and the log's promise
+# ("nothing warns before the press") has to be rewritten to use it.
+_cap = [_k for _k in ctl.status() if _i_re.search(r"layout|resolv|vocab|door", _k, _i_re.I)]
+assert not _cap, (_cap, "the display now reports a capability field, so the window could warn "
+                        "before the press instead of quoting the refusal afterwards")
 assert _i_themes.resolve(_i_vendor) is not None, (
     "the roots patch was left in place, so everything after this point runs blind")
 print(f"  an old door, and an empty one   a five-only display refused {_i_vendor!r} and the "
