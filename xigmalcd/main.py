@@ -46,8 +46,8 @@ def read_metrics_file(path: str) -> tuple:
     painting a half-read body.
 
     A key starting with `_` is a comment in the file, not a section, so it never
-    reaches the renderer as part of the STATE body - measured both ways in
-    `tools/selftest.sh`, which pins a hot `cpu.temperature` and then a file whose
+    reaches the renderer as part of the STATE body - measured both ways by
+    `tests/test_pinned_metrics.py`, which pins a hot `cpu.temperature` and then a file whose
     `cpu` has a `load` and no temperature, and asks for the arc to vanish.
     """
     try:
@@ -193,8 +193,7 @@ def media_roots() -> tuple:
     `xigmalcd/themes.py` uses to find the layout that named the clip.  Media
     roots come before the library so that every name that resolved before still
     resolves to the same file, `Theme_25.mp4` included: that is why the session
-    default does not move on any box (the clip-roots section of
-    `tools/selftest.sh` holds both halves).
+    default does not move on any box (`tests/test_media_roots.py` holds both halves).
     """
     roots = []
     env = os.environ.get(MEDIA_ENV)
@@ -488,8 +487,8 @@ def _png(args, img):
     README's encode A/B/A windows, where the owner looked at both shapes on
     real glass and saw no difference.
 
-    What each shape costs, on one ringed `alpha` frame (`tools/selftest.sh`
-    prints a live pair; the frame's own seconds clock moves the byte counts by
+    What each shape costs, on one ringed `alpha` frame (`tests/test_encoder.py`
+    re-measures a live pair on every run; the frame's own seconds clock moves the byte counts by
     a few hundred): RGBA 40.8 KB and bit-exact, indexed 12.2 KB.  Indexed keeps
     a graded alpha - it moves it at ~36 100 of 230 400 pixels by up to 28/255
     and shifts the colour at ~12 700 of them by up to 26 - and the

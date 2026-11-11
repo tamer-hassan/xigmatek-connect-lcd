@@ -415,13 +415,14 @@ def draw(obj: dict, metrics: dict, when=None, scrim: int = 0) -> tuple:
 #: Not a vendor record - the vendor library holds no page for a theme it did not draw -
 #: and not a guess either: these are the clips this project's own published pictures are
 #: composited over.  The README's five MP4s are named `<theme>-<clip>.mp4` for it
-#: (`alpha-Theme_25.mp4`, `gauge-3.mp4`, ...), docs/limits.md's census table prints a row
-#: per file with that clip's measured luma, and `tools/selftest.sh` keeps the same mapping
-#: in its `VIDEOS` table and re-derives it from the written files on every run.  The suite
-#: asserts this table equals that one, so the pairing here cannot drift away from the
-#: pictures a reader judges the themes by.  Every value is a bare name, and each resolves
-#: through `main.media_roots()` - the same lookup the window and the loop share - which
-#: the suite also checks on a bare checkout with nothing installed.
+#: (`alpha-Theme_25.mp4`, `gauge-3.mp4`, ...), and docs/limits.md's census table prints a
+#: row per file with that clip's measured luma.  `tests/test_theme_library.py` derives this
+#: mapping back out of those file names on every run and fails if it disagrees, so the
+#: pairing here cannot drift away from the pictures a reader judges the themes by - which
+#: is also how the amber-ink figure falls out on its own, since its clip part is not a file
+#: any media root holds.  Every value is a bare name, and each resolves through
+#: `main.media_roots()` - the same lookup the window and the loop share - which that same
+#: file checks on a bare checkout with nothing installed.
 CODE_CLIPS = {"alpha": "Theme_25.mp4", "gauge": "3.mp4", "dual": "Theme_30.mp4",
               "clock": "Theme_07.mp4", "bars": "theme_52.mp4"}
 
@@ -666,7 +667,8 @@ def shape_of(path: str) -> bool:
     and yours is only the fields you touched, and "did my editor corrupt this?" has an
     answer that does not need a diff tool.
     """
-    raw = open(path, encoding="utf-8").read()
+    with open(path, encoding="utf-8") as fh:
+        raw = fh.read()
     obj = json.loads(raw)
     for esc in (True, False):
         if raw in (canonical(obj, esc), canonical(obj, esc) + "\n"):
@@ -1074,7 +1076,8 @@ def rename_copy(old: str, new: str) -> tuple:
                          "without the `.bak` a save keeps")
 
     shape = shape_of(src)
-    obj = json.loads(open(src, encoding="utf-8").read())
+    with open(src, encoding="utf-8") as fh:
+        obj = json.loads(fh.read())
     was_id = str(obj.get("id"))
     obj["id"] = new_id()
     tmp = dst + ".tmp"

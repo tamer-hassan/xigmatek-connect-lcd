@@ -187,9 +187,16 @@ PARITY_CASES = ({"cpu": {"temperature": 57, "load": 62},
                 {})
 
 
-def freeze_clock(render) -> None:
-    """Put `render._now` on the pinned instant, for the duration of one process."""
+def freeze_clock(render):
+    """Put `render._now` on the pinned instant, and hand back the hook it replaced.
+
+    Every class that pins the clock puts the hook back in `tearDownClass`: a later file that asks
+    "does this picture move when the second changes?" needs the real one, and a pin that outlives
+    its own file turns that question into a false answer.
+    """
+    previous = render._now
     render._now = lambda: WHEN
+    return previous
 
 
 def count_opaque(img: Image.Image) -> dict:

@@ -8,8 +8,8 @@ picture of the *window*: the same Qt application a reader gets from `xigmaui`,
 with its theme picker, its preview, its clip library and its status box, exactly as it
 lays itself out on first run.
 
-It is generated, not retouched, and the path it takes is the one `tools/selftest.sh`
-takes for its GUI section, so the window is a real one:
+It is generated, not retouched, and the path it takes is the one `tests/test_window.py`
+takes for its window checks, so the window is a real one:
 
 * `QT_QPA_PLATFORM=offscreen` - no display server needed, and the capture cannot end
   up in someone's face;

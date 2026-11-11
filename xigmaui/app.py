@@ -125,7 +125,7 @@ PANE_CHROME = 52
 #: offers, never below what the window's own contents measure, and says in its log when
 #: that floor bites.  The maximum needs no constant: Qt lets the window grow to the
 #: screen, and 3840x2160 is inside that, so what has to be proven is that the layout
-#: *uses* the width - see `_ED_COL_PX` and the fresh-window gate in tools/selftest.sh.
+#: *uses* the width - see `_ED_COL_PX` and the sizing checks in `tests/test_window_sizing.py`.
 MIN_WIDTH, MIN_HEIGHT = 1280, 1024
 
 #: The menu entry that means "this key is not in the file at all", for the one kind of
@@ -1671,8 +1671,8 @@ class Window(QMainWindow):
     #: can shrink inside (the cap in `_build` is its other half), and the two text
     #: columns are what a wrapped label plus a readable control need.  Those are only
     #: lower bounds - `_pane_floors` raises each one to what the column's own contents
-    #: measure - and `tools/selftest.sh` reads both halves back at three window sizes
-    #: and fails the build if a column ever gets less than what it holds.  That is the
+    #: measure - and `tests/test_window_sizing.py` reads both halves back at the window's
+    #: own floor and fails if a column ever gets less than what it holds.  That is the
     #: 0.4 defect: the controls column sitting on its 300 px floor while its contents
     #: measured 375 px, so it grew a horizontal scrollbar inside itself.
     PANE_FLOORS = (200, 300, 320)
@@ -2537,7 +2537,7 @@ class Window(QMainWindow):
 
     # ---- the layout editor --------------------------------------------------
     # Every claim in this group belongs to `xigmaui/edit.py`, which holds no Qt and is
-    # gated in tools/selftest.sh without a display: what an edit moves, what undo owes
+    # gated without a display in `tests/test_editor.py`: what an edit moves, what undo owes
     # back, when a file is written.  The window's job is narrow - offer the fields the
     # painter reads, show the picture that comes out of them, and never write a file
     # nobody asked for.
@@ -3027,8 +3027,8 @@ class Window(QMainWindow):
     #: the control can go that narrow while the *list* it opens still carries the
     #: entry's width (that is `_ed_shrink` doing its job, and `_readable` keeping the
     #: list honest).  240 per column is therefore the point where the next column
-    #: genuinely fits rather than merely being asked for.  `tools/selftest.sh` re-measures
-    #: those three numbers in the live window and fails the build if three columns ever
+    #: genuinely fits rather than merely being asked for.  `tests/test_window_sizing.py`
+    #: re-measures those three numbers in the live window and fails if three columns ever
     #: ask for more than this threshold says they get.
     _ED_COL_PX = 240
 

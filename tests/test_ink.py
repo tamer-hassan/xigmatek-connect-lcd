@@ -105,7 +105,11 @@ class InkOnPixels(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        fixtures.freeze_clock(R)
+        cls.real_now = fixtures.freeze_clock(R)
+
+    @classmethod
+    def tearDownClass(cls):
+        R._now = cls.real_now
 
     def test_every_theme_recolours_its_glyphs_and_nothing_else(self):
         for theme in THEMES:
@@ -147,7 +151,11 @@ class InkThroughTheFileDoor(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        fixtures.freeze_clock(R)
+        cls.real_now = fixtures.freeze_clock(R)
+
+    @classmethod
+    def tearDownClass(cls):
+        R._now = cls.real_now
 
     def test_both_doors_end_up_the_same_picture(self):
         for theme in THEMES:

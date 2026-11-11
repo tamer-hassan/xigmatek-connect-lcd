@@ -14,7 +14,11 @@ Three safety facts and two protocol facts:
   device and the fd it held died under it;
 * PROTOCOL.md §8's rule - the metrics blob goes at the head of a session, twice, and never between
   files - is what the worker's wiring has to keep, because feeding it per frame makes the panel stop
-  answering uploads.
+  answering uploads;
+* the live frame loop obeys the session limits `xigmalcd.main` owns (it reads them, so there is no
+  second copy to test): it keeps its rate, renews on a short clock without re-pushing the blob, stops
+  on a channel that answers but refuses every file, and stops with a sentence when the port is gone at
+  the moment of renewal.
 
 Two things this file deliberately does not lean on.  The re-enumeration wait (`glob.glob
 ("/dev/ttyACM*")`, for up to 30 s) is pinned rather than real: this check used to pass on a bench by
@@ -29,6 +33,7 @@ from __future__ import annotations
 import copy
 import inspect
 import os
+import time
 import types
 import unittest
 
@@ -189,6 +194,85 @@ class StubbedActions(unittest.TestCase):
         self.assertEqual(StubLink.instances[-1].states, [(0, False), (0, False)],
                          "`fans=False` takes the tach array out of the blob as well as off the "
                          "picture, and the blob still lands before the file")
+
+    def test_the_live_run_keeps_its_rate_and_pushes_the_blob_only_at_the_session_head(self):
+        """One second at 5 fps is five frames; the band allows the stub answering instantly and
+        the loop waking a few ms late, but not the rate being wrong by a factor of two."""
+        from xigmalcd import main as daemon
+        self.assertTrue(self.worker._live(theme="alpha", kw={"bg": render.OVERLAY},
+                                          fps=5.0, seconds=1.0))
+        made = StubLink.all_uploads
+        self.assertTrue(4 <= len(made) <= 6, made[-8:])
+        self.assertEqual(len(StubLink.instances), 1,
+                         "a 1 s run at the real session limits should not have reopened")
+        self.assertEqual(StubLink.instances[0].states, [(0, True), (0, True)],
+                         "the blob belongs at the head of the session, once")
+
+    def test_a_short_session_clock_reopens_and_none_of_the_reopens_re_push_metrics(self):
+        """`_live` reads the limits out of `xigmalcd.main`, so patching that is patching the
+        worker - there is no second copy of the number to test.  PROTOCOL.md §8's evidence covers
+        one session head, not every reopen, and `main.rehandshake` only re-helloes."""
+        from xigmalcd import main as daemon
+        saved = (daemon.SESSION_TTL, daemon.SESSION_MAX)
+        daemon.SESSION_TTL, daemon.SESSION_MAX = 0.2, 0
+        try:
+            self.assertTrue(self.worker._live(theme="alpha", kw={"bg": render.OVERLAY},
+                                              fps=5.0, seconds=1.0))
+        finally:
+            daemon.SESSION_TTL, daemon.SESSION_MAX = saved
+        # 1 s at a 0.2 s clock is five chances to renew; the bound is the suite's own (3),
+        # because this process is not the only thing on the machine and a loaded bench loses a
+        # couple of them to a frame that ran long
+        self.assertGreaterEqual(len(StubLink.instances), 3,
+                                f"{len(StubLink.instances)} opens in 1 s at a 0.2 s clock")
+        for link in StubLink.instances[1:]:
+            self.assertEqual(link.states, [],
+                             "a renewed session pushed the metrics blob again")
+            self.assertFalse(link.opened_as[1], "a renewal asked for a destructive link")
+
+    def test_a_panel_that_answers_but_refuses_every_file_ends_the_run_rather_than_using_its_window(self):
+        """PROTOCOL.md §6: reopening does not cure a refusal, so the run stops.  Spending the
+        whole window on a dead channel is the failure this guards against."""
+        StubLink.notice = "400"
+        started = time.monotonic()
+        try:
+            self.assertFalse(self.worker._live(theme="alpha", kw={"bg": render.OVERLAY},
+                                               fps=5.0, seconds=4.0))
+        finally:
+            StubLink.notice = "200"
+        spent = time.monotonic() - started
+        self.assertLess(spent, 2.0, f"{spent:.2f} s: the run used its whole 4 s window")
+        self.assertLessEqual(len(StubLink.instances), 7,
+                            f"{len(StubLink.instances)} reopens: one per RECOVER_AFTER at most")
+        self.assertTrue(any("in a row refused" in line for line in self.notes), self.notes[-4:])
+        for link in StubLink.instances:
+            self.assertEqual(link.uploads, [],
+                             "a refused channel still accepted something in this stub")
+
+    def test_a_port_that_goes_away_at_the_renewal_stops_the_run_and_says_so(self):
+        """Nothing raises out of the worker, and the `finally` close tolerates a link that
+        never opened."""
+        from xigmalcd import main as daemon
+        seen = {"n": 0}
+
+        def busy_after_first(port: str) -> str:
+            seen["n"] += 1
+            return f"{port} is held by pid 999 (stub)" if seen["n"] > 1 else ""
+
+        panel.port_busy = busy_after_first
+        saved = (daemon.SESSION_TTL, daemon.SESSION_MAX)
+        daemon.SESSION_TTL, daemon.SESSION_MAX = 0.2, 0
+        try:
+            self.assertFalse(self.worker._live(theme="alpha", kw={"bg": render.OVERLAY},
+                                               fps=5.0, seconds=2.0))
+        finally:
+            panel.port_busy = lambda port: ""
+            daemon.SESSION_TTL, daemon.SESSION_MAX = saved
+        self.assertEqual(len(StubLink.instances), 1,
+                         f"{len(StubLink.instances)} links: the run should stop at the first "
+                         "renewal that cannot reopen, not try again")
+        self.assertTrue(any("port went away at the renewal" in line for line in self.notes),
+                        self.notes[-3:])
 
     def test_asking_for_status_sends_no_metrics_blob(self):
         self.assertTrue(self.worker._status())

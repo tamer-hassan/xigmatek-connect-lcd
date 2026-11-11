@@ -129,7 +129,7 @@ python3 tools/thm_unlock.py --verify --to themes/alpha \
 100 files.  The 98 the tool writes come to **84 926 540 B**, and that is the figure
 quoted elsewhere in this repository, because it is a stable one: the manifest records it,
 so it does not move when this README is edited (the other two files are the manifest and
-this README, and `tools/selftest.sh` prints their live sizes rather than pinning them).
+this README, and nothing pins their sizes: `du -b manifest.json README.md` reads them).
 `thm/` is not in any of those totals because it is not here; its 27 entries are in the
 manifest, hashed.
 
@@ -165,7 +165,7 @@ themes/alpha: 125/125 files match manifest hashes (verified)
 ```
 
 That needs no Windows volume: it re-hashes what is in the tree against what
-`manifest.json` recorded when the bytes were read.  `tools/selftest.sh` runs it.  With
+`manifest.json` recorded when the bytes were read.  `tools/verify_manifest.py` runs it.  With
 the vendor volume mounted the same command takes `--from DIR` and re-hashes the 27
 containers where they live, printing `152/152 files match manifest hashes (verified)` —
 measured that way on the author's bench on 2026-11-07, which is what keeps the record of

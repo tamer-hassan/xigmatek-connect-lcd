@@ -27,8 +27,8 @@ both doors then draw the default frame while the reader asked for something else
 Machine dependence, stated: the non-zero figures sit on glyph edges and inside shapes whose
 size walks a font's metrics, so they move with the installed faces.  What does not move is
 which pairs are exactly 0, and that a non-exact pair is *far* from 0 rather than near it -
-the last line of the summary prints the smallest non-zero gap, and `tools/selftest.sh` holds
-that line and the resulting split.  Nothing here is a claim about the wire beyond the frame's
+the last line of the summary prints the smallest non-zero gap, and
+`tests/test_knobmap.py` holds that line and the resulting split.  Nothing here is a claim about the wire beyond the frame's
 own pixels: no port is opened, nothing is uploaded.
 
 The knobs are read as what they are, not as flags someone remembers:

@@ -352,10 +352,10 @@ def arc_clear(box, cx, cy, r_in, r_out, start, sweep):
 
 
 #: How far the arc fit keeps a figure's ink out of the stroke band, panel px.  Named
-#: rather than written at the two call sites because the suite measures the ring painter's
-#: own resampling tail - the faint pixels LANCZOS leaves past the stroke's edge, inside the
-#: hole - and holds this number above it: below that, a reading sized by the rule could sit
-#: on top of the gauge it belongs to (`the value pair, drawn` in tools/selftest.sh).
+#: rather than written at the two call sites because `tests/test_specials.py` measures the
+#: ring painter's own resampling tail - the faint pixels LANCZOS leaves past the stroke's
+#: edge, inside the hole - and holds this number above it: below that, a reading sized by the
+#: rule could sit on top of the gauge it belongs to (that file's `TemperatureRows`).
 ARC_FIT_GAP = 3.0
 
 
@@ -1266,7 +1266,7 @@ def to_png(img: Image.Image, palette: bool = True, colors: int = 256) -> bytes:
     one ringed `alpha` frame - and it is not the same picture either: measured
     offline it stays graded, but it moves the alpha at ~36 100 of 230 400
     pixels by up to 28/255 and shifts the colour at ~12 700 of them
-    (`tools/selftest.sh` prints a live pair).  Octree quantising treats RGBA as
+    (`tests/test_encoder.py` re-measures a live pair on every run).  Octree quantising treats RGBA as
     one four-channel colour, so it averages opacity too: of that frame's 11 149
     fully opaque pixels only 74 keep alpha 255, while its 4 029 half-transparent
     track pixels come back within 11/255.
