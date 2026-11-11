@@ -49,11 +49,30 @@ concurrency:
 
 env:
   DEBIAN_FRONTEND: noninteractive
+  # apt's own knobs for a fetch that fails.  Added on 2026-11-11 after three pushes in a row
+  # (runs 137, 138, 139) sat in `sudo apt-get update` on `Temporary failure resolving
+  # ...ubuntu.com` - a resolver fault on GitHub's runner, in a job whose whole design point is
+  # that the suite itself needs no network.  The options are measured to parse here
+  # (`apt-get -s -o Acquire::Retries=5 -o Acquire::http::Timeout=20 install -y coreutils`, exit
+  # 0, no unknown-option warning); whether they clear that fault is what the next run says, and
+  # this file does not claim it before the run does.  Nothing is hidden if apt still cannot get
+  # its lists: the step exits non-zero, and every job now carries the timeout below, so a
+  # network that stays broken fails in minutes instead of holding a runner for the six-hour
+  # default.
+  APT: "-o Acquire::Retries=5 -o Acquire::http::Timeout=20"
 
 jobs:
   selftest:
     name: offline suite, no panel
     runs-on: ubuntu-26.04
+# How long this job has actually taken, read out of GitHub's own API rather than
+# guessed at: the v0.5 tag run (sha 5bf130e) measured selftest 3 min 28 s, deb
+# 1 min 5 s, install 1 min 34 s, release 20 s; today's run 136 measured selftest
+# 6 min 30 s, deb 1 min 11 s, install 38 s.  Every number below is at least four
+# times the larger of the two, so a slow suite still passes - and a job that cannot
+# reach the network fails in minutes instead of holding a runner for GitHub's
+# six-hour default, which is what three stalled `apt-get update` steps did today.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -81,8 +100,17 @@ jobs:
         # did NOT run"; installing it is what makes that half run where the tree is
         # published from.  It stays out of the package: this is a check, not a feature.
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          ok=""
+          for i in 1 2 3; do
+            if sudo apt-get $APT update; then ok=1; break; fi
+            echo "  apt-get update failed, attempt $i of 3 - runs 137, 138 and 139 today all"
+            echo "  stopped exactly here, on a runner that could not resolve *.ubuntu.com"
+            sleep 20
+          done
+          test -n "$ok" || { echo "  no package lists after three attempts: this is the runner's"
+                             echo "  network, not this tree's suite, and the suite is what the"
+                             echo "  job exists to run"; exit 1; }
+          sudo apt-get $APT install -y --no-install-recommends \
             python3 python3-pil python3-serial python3-pyqt6 python3-setuptools \
             fonts-dejavu-core fonts-liberation desktop-file-utils ffmpeg tesseract-ocr
           python3 -c 'import PIL, serial, PyQt6.QtWidgets, sys; print(" ", sys.version.split()[0], "Pillow", PIL.__version__)'
@@ -155,6 +183,7 @@ jobs:
     name: build the .deb files
     needs: selftest
     runs-on: ubuntu-26.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -186,8 +215,8 @@ jobs:
         # step, fails the job when debian/control and this box disagree.
         run: |
           set -eu
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt-get $APT update
+          sudo apt-get $APT install -y --no-install-recommends \
             devscripts dctrl-tools lintian build-essential
           deps=$(grep-dctrl -n -s Build-Depends '' < debian/control \
                  | tr ',' '\n' | sed -e 's/([^)]*)//g' \
@@ -196,7 +225,7 @@ jobs:
                                         -e '/^$/d' | tr '\n' ' ')
           test -n "$deps" || { echo "no Build-Depends parsed out of debian/control"; exit 1; }
           echo "installing: $deps"
-          sudo apt-get install -y --no-install-recommends $deps
+          sudo apt-get $APT install -y --no-install-recommends $deps
           dpkg-checkbuilddeps            # the check that debian/control and this box agree
           dpkg -l debhelper dh-python pybuild-plugin-pyproject lintian \
                | awk '/^ii/{printf "  %-28s %s\n", $2, $3}'
@@ -324,6 +353,7 @@ jobs:
 
   install:
     name: apt install them, then debian/tests/smoke
+    timeout-minutes: 15
     needs: deb
     runs-on: ubuntu-26.04
     steps:
@@ -354,10 +384,10 @@ jobs:
         # prints `Recommended packages: xigmatek-connect-lcd-themes` without failing;
         # that was checked on the bench with `apt-get -s install`, not assumed.
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt-get $APT update
+          sudo apt-get $APT install -y --no-install-recommends \
             desktop-file-utils python3-pyqt6
-          sudo apt-get install -y ./debs/*.deb
+          sudo apt-get $APT install -y ./debs/*.deb
           dpkg-query -W -f='${Package} ${Version} ${Architecture} installed-size ${Installed-Size} KB\n' \
             'xigmatek-connect-lcd*'
 
@@ -369,6 +399,7 @@ jobs:
 
   release:
     name: publish the .deb files on the tag
+    timeout-minutes: 15
     needs: [deb, install]
     if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     runs-on: ubuntu-26.04

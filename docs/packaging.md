@@ -388,6 +388,27 @@ have a reason rather than a shrug:
   `~/.config`, so the text says `/home/runner/...` on a runner and `/home/tamer/...`
   here. Reproduced on one binary on one machine: `HOME=/home/runner xigmaui --help |
   wc -c` answers 1 499 where the same command answers 1 498.
+Three pushes on 2026-11-11 never reached the suite. Runs 137, 138 and 139 each sat in
+the offline-suite job's `sudo apt-get update`, on `Temporary failure resolving
+*.ubuntu.com` - a resolver fault on GitHub's runner, in the one job whose whole design
+point is that the suite itself needs no network. Two answers, both narrow. Every `apt-
+get` line in the workflow gains apt's own fetch options (`Acquire::Retries=5`,
+`Acquire::http::Timeout=20`, taken from apt's configuration namespace rather than
+invented; that they parse was checked here with `apt-get -s -o Acquire::Retries=5 -o
+Acquire::http::Timeout=20 install -y coreutils`, exit 0, no unknown-option warning),
+and that job's list update now tries three times twenty seconds apart before failing
+the step - a control flow exercised locally with `sudo` shadowed by a shell function,
+so no network and no system apt: all-attempts-failing gives three tries and exit 1,
+and fail-then-succeed breaks out and lets the install line run. And every job gains
+`timeout-minutes`, from GitHub's own durations rather than from a guess: the `v0.5`
+tag run (sha 5bf130e) measured the suite job at 3 min 28 s, the build at 1 min 5 s,
+the install at 1 min 34 s and the publish at 20 s, and today's green run 136 measured
+6 min 30 s, 1 min 11 s and 38 s, so the caps are 30 / 15 / 15 / 15 minutes - at least
+four times the larger of the two measurements, and the point is that a network which
+stays broken fails in minutes instead of holding a runner for GitHub's six-hour
+default. What this paragraph cannot yet say is whether the retries clear that fault:
+the run that carries this change answers that, and it will be written down whichever
+way it goes.
 
 ### What the 0.3 tree packages, measured
 

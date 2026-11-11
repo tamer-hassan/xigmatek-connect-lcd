@@ -12173,6 +12173,24 @@ for _phrase, _why in (("scanned flat", "the user root's shape, and why a copy wi
                       ("`--mp4 Theme_07.mp4`", "the paired background, by the same route"),
                       ("one process can hold the port", "whose panel has to move first")):
     assert _phrase in _tm, (_phrase, _why, "docs/themes.md stopped carrying it")
+# and the narrower claim the page now makes: that root alone answers the same names.  The
+# directory only exists on a machine with the themes package installed, so the assert is
+# conditional and the page labels the measurement - which is the same honesty the sizing gates
+# use about which machine answered.
+if os.path.isdir(themes.SYSTEM_ROOT):
+    _sys_dir = os.path.join(themes.SYSTEM_ROOT, "layouts", "480X480")
+    _sys_json = len([_e for _e in os.scandir(_sys_dir) if _e.name.endswith(".json")])
+    assert _sys_json == _ii_files, (_sys_json, _ii_files,
+                                    "the installed root holds a different number of 480X480 "
+                                    "layouts than `themes.scan()` calls selectable")
+    assert "the package's own root is enough by itself" in _tm, (
+        "docs/themes.md no longer says that an install without a checkout resolves the names")
+else:
+    assert "GitHub's runner has no such directory" in _tm, (
+        "the page must say which machine this was measured on when the runner has no such root")
+for _phrase in ("`themes.roots()` narrowed to", "the newer package"):
+    assert _phrase in _tm, (_phrase, "docs/themes.md stopped carrying the remedy for an "
+                                     "installed service")
 _m4 = _re.search(r"puts \*\*(\d+)\*\* layout JSONs at "
                  r"`/usr/share/xigmalcd/themes/alpha/layouts/480X480/`", _tm)
 assert _m4, ("docs/themes.md", "the packaged layout count is gone, so nothing ties it to "
@@ -12191,6 +12209,21 @@ for _phrase, _why in (("_refused_layout", "the refusal's own door, in the code")
                       ("two possibilities, and those words say which", "both reasons, printed, "
                                                                        "never one guessed at")):
     assert _phrase in _ii_app, (_phrase, _why, "`app.py` lost the diagnosis the pages promise")
+
+# ---- the on-glass confirmation of this route, and the two limits it carries.  It is the only
+# ---- place the apply route is claimed to have met a real panel, so the page has to say out loud
+# ---- that it is not a driver run and owes the panel's rows still: a paragraph that reads like a
+# ---- ledger entry would be the exact way to overstate a person's report.
+assert "One path met glass on an install rather than through a driver" in _gf, (
+    "docs/gui.md no longer says where the apply route met real glass, so the claim has nowhere")
+_glass = _gf.split("One path met glass on an install")[1].split("A fifth window")[0]
+for _phrase in ("no counters", "no kept transcript", "settles none",
+                "the author's to name, and this file does not guess"):
+    assert _phrase in _glass, (_phrase, "the on-glass paragraph stopped saying what it is not")
+assert not _re.search(r"\b\d[\d ]* (uploads|confirmed|refused|frames)\b", _glass), (
+    "the on-glass paragraph carries a counter, and there is no run behind it to re-derive one")
+assert "unknown theme '<name>'; try alpha bars clock dual gauge" in _glass, (
+    "the paragraph no longer quotes the 0.3 refusal it is contrasting with")
 
 print(f"  I's page figures      the picker names {len(render.THEMES)} drawn-from-code names "
       f"while this box opens {_ii_open} ({_ii_files} files + {len(themes.EXPORTS)} exports), all "

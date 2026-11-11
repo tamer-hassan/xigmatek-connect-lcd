@@ -168,6 +168,14 @@ process, with `/dev/xigma-no-such-port` never opened and no byte sent anywhere:
 * and the **files were never the problem**: `xigmatek-connect-lcd-themes` puts **23** layout
     JSONs at `/usr/share/xigmalcd/themes/alpha/layouts/480X480/` on this bench, so what a 0.3
     service is missing is the code that reads them - a newer display, not more files.
+* and the package's own root is enough by itself: with `themes.roots()` narrowed to
+    `/usr/share/xigmalcd/themes/alpha`, which is what an install with no checkout sees, the same
+    **23** names resolve on this bench - `Theme_07` to
+    `/usr/share/xigmalcd/themes/alpha/layouts/480X480/1757491588804.json` - and the name list
+    comes out identical to the checkout's.  So the remedy for an installed service is the newer
+    package.  (Labelled as this bench's measurement, because GitHub's runner has no such
+    directory: the suite counts the page's **23** against `themes.scan()`'s own selectable list,
+    and only looks inside that root on a machine that has one.)
 
 So a `Theme_*` that opens, previews, edits and saves in the window and is then refused by the
 display comes down to two cases, and the display's own sentence tells them apart.  A refusal

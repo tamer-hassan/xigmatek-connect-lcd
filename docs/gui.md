@@ -1325,6 +1325,25 @@ table against its table of bodies so a phase cannot silently point at the wrong 
 The fourth run is the one that shows the separate client: three lines from the subprocess,
 counters included, and the display never noticed the difference.
 
+**One path met glass on an install rather than through a driver.** The editor's `apply to
+the panel` - one socket command, `("theme", <the layout this box has open>)` - was
+reported working by the author after a newer service was installed on the machine
+whose packaged **0.3** service had been measured refusing those same names,
+`Theme_01`, `Theme_07`, the numeric id and a copy of the author's own, each with
+`unknown theme '<name>'; try alpha bars clock dual gauge`. The author's words in
+answer to that machine's report: "I already installed the latest service and confirmed
+applying themes work with the latest xigmalcd service". Which build was installed is
+the author's to name, and this file does not guess at it; what the pair of answers
+shows is the boundary itself, seen from the glass side - a display from 0.4 or newer
+resolves a layout name, a 0.3 one cannot, and the same window press means different
+things at either end. Two things this paragraph deliberately does not claim. It is not
+a `tools/display_glass.py` run: it carries no counters, no upload or refusal counts,
+no timings and no kept transcript, so nothing in it can be re-derived the way every
+number in the tables above can. And it settles none of the rows the panel still owes
+(the `--no-clock` look, the `bars` quiet-box re-measurement, the pairing note, stage
+6's transcript). What it does settle is narrow and worth having: the command the suite
+drives over a socket in a temporary directory is also a command a real panel answers.
+
 **A fifth window, which nobody drove.** After the 0.2 upgrade, the packaged user unit
 started on its own (docs/packaging.md keeps that story, including what is not established
 about it) and drew unattended for **56 minutes up to where this file stops** - the unit was
