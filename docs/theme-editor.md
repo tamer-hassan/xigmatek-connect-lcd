@@ -859,6 +859,9 @@ Two things, written down because they are facts about the tree and not about a b
   halves instead of claiming they match.  The runner's new figures come from its own gate run:
   the push that carries the repair fails that gate on purpose once, prints the figure, and the
   next commit writes it - a page naming a *predicted* runner figure would be a claim nobody drew.
+  Because which gate aborts depends on which figure moved, that section prints every count it
+  measured that follows a face - adds, placement, both sides of the reorder census - before any
+  of them is held to the page, so one run answers for all of them.
 
 * **A repaint re-applies the selected row's marks.** The pane's closing passage asserted that a
   press on empty glass leaves no mark, which is true until the next frame; once another gate's

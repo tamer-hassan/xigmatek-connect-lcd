@@ -8021,6 +8021,17 @@ _stated("the placement step, on the page", _gf,
         r"walked over the canvas in \*\*(\d+) px\*\* steps", (gui_edit.PLACE_STEP,))
 _stated("the layerIndex census, on the page", _gf, _LAYER,
         (_pos_same, len(_f_rows), len(_f_rows) - _pos_same))
+# One print, before any of the gates below can abort the section: every count on this page that
+# follows a face, from this run, in one line.  The pinned-pair repair of 2026-11-11 moved the
+# drawn figures on both machines, and a labelled page is only two machines' figures - so a run
+# whose half has moved fails its `_pair` gate on purpose (that print *is* the measurement, as with
+# the `arc` box heights in `52c9dfd`), and the follow-up commit writes the number down.  Which
+# gate aborts first depends on which figure moved, so all of them are said out loud up front
+# rather than left to whichever assert happens to be reached.
+print(f"                        this run's face-dependent counts: {_add_ok} adds across "
+      f"{len(generated) + len(pick)} layouts, placement {_place_clear} / {_place_moved} / "
+      f"{_place_stuck}, reorder {_swap_zero} pairs whose boxes never meet and "
+      f"{len(_silent) + _swap_move} / {_swap_move} / {len(_silent)} on the meet side")
 # ...and the counts that follow a face, now that both halves are on the page: the gate holds
 # this run to its own half, exactly as it does for a column's width.  Membership, not a
 # tolerance - a third machine's answer is a sentence to add, not a range to widen.
