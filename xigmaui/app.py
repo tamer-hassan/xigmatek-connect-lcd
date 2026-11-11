@@ -1248,11 +1248,9 @@ class Window(QMainWindow):
         # depending on the width this splitter happens to give the box (see
         # `EditorBox`), so the 18 rows of an `arc` widget make this box 889 px tall in
         # one column at a 1280x1024 window and 496 px in three at 1919x1055 - this
-        # bench's reading, CI's runner reading 779 and 434 (what it answered before the
-        # `apply to the panel` row landed, replaced by that row's own run) - each row of
-        # controls under
-        # the fields is 31 px of height here and 28 px there, against the 796/403 and
-        # 723/378 that 0.5 measured in the same pass - measured in
+        # bench's reading, CI's runner reading 807 and 462.  Each row of controls
+        # under the fields is 31 px of height here and 28 px there, against the
+        # 796/403 and 723/378 that 0.5 measured in the same pass - measured in
         # the window, printed by the suite's sizing gate, and held to whichever half of
         # the labelled pair the machine running it is.  It buys height rather than pushing
         # a scrollbar under the column, which is the failure mode 0.5 was written to catch.
@@ -3051,14 +3049,13 @@ class Window(QMainWindow):
         This is the responsive half, and it is here because the alternative is a
         scrollbar: the 18 rows of an `arc` widget make this box **889 px** tall in one
         column at a 1280x1024 window and **496 px** in three at 1919x1055 - this bench's
-        digits, where CI's runner reads 779 and 434, the figures from before the apply row
-        (a row of controls under the fields is
-        31 px of height here and 28 px there) - measured in the window and printed
-        by the suite's sizing gate with the grid's own ask of 171 / 344 / 512 px, and a
-        controls column that cannot hold what it is shown is
-        exactly the 0.4 defect the fresh-window gate now fails on.  The box asks for it
-        through `EditorBox.resizeEvent`, because the window's own `resizeEvent` never
-        fires when a splitter handle is what changed.
+        digits, where CI's runner reads 807 and 462 (a row of controls under the fields is
+        31 px of height here and 28 px there) - measured in the window and printed by the
+        suite's sizing gate with the grid's own ask of 171 / 344 / 512 px, and a controls
+        column that cannot hold what it is shown is exactly the 0.4 defect the
+        fresh-window gate now fails on.  The box asks for it through
+        `EditorBox.resizeEvent`, because the window's own `resizeEvent` never fires when a
+        splitter handle is what changed.
 
         The width that decides it is the scroll area's **viewport**, never the box's
         own: the box is laid out at `max(viewport, its own minimum)`, so measuring the

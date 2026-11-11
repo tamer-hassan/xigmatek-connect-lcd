@@ -388,13 +388,14 @@ have a reason rather than a shrug:
   `~/.config`, so the text says `/home/runner/...` on a runner and `/home/tamer/...`
   here. Reproduced on one binary on one machine: `HOME=/home/runner xigmaui --help |
   wc -c` answers 1 499 where the same command answers 1 498.
-Three pushes on 2026-11-11 never reached the suite. Runs 137, 138 and 139 each sat in
+
+**Three pushes on 2026-11-11 never reached the suite.** Runs 137, 138 and 139 each sat in
 the offline-suite job's `sudo apt-get update`, on `Temporary failure resolving
 *.ubuntu.com` - a resolver fault on GitHub's runner, in the one job whose whole design
-point is that the suite itself needs no network. Two answers, both narrow. Every `apt-
-get` line in the workflow gains apt's own fetch options (`Acquire::Retries=5`,
+point is that the suite itself needs no network. Two answers, both narrow. Every
+`apt-get` line in the workflow gains apt's own fetch options (`Acquire::Retries=2`,
 `Acquire::http::Timeout=20`, taken from apt's configuration namespace rather than
-invented; that they parse was checked here with `apt-get -s -o Acquire::Retries=5 -o
+invented; that they parse was checked here with `apt-get -s -o Acquire::Retries=2 -o
 Acquire::http::Timeout=20 install -y coreutils`, exit 0, no unknown-option warning),
 and that job's list update now tries three times twenty seconds apart before failing
 the step - a control flow exercised locally with `sudo` shadowed by a shell function,
@@ -405,10 +406,28 @@ tag run (sha 5bf130e) measured the suite job at 3 min 28 s, the build at 1 min 5
 the install at 1 min 34 s and the publish at 20 s, and today's green run 136 measured
 6 min 30 s, 1 min 11 s and 38 s, so the caps are 30 / 15 / 15 / 15 minutes - at least
 four times the larger of the two measurements, and the point is that a network which
-stays broken fails in minutes instead of holding a runner for GitHub's six-hour
-default. What this paragraph cannot yet say is whether the retries clear that fault:
-the run that carries this change answers that, and it will be written down whichever
-way it goes.
+stays broken fails in bounded time instead of holding a runner for GitHub's six-hour
+default.
+
+What those two changes turned out to be worth, read off the two runs that followed
+them. They did not fix a broken resolver, and this page will not pretend they would:
+run 140, the first push carrying them, still could not fetch its lists - it retried
+`azure.archive.ubuntu.com`, `archive.ubuntu.com` and `security.ubuntu.com` five times
+each across three attempts - and it failed the job in **25 minutes** (16:31:53 to
+16:57:03). That figure is why `Retries` is 2 rather than 5: the bound held (nothing sat
+for six hours, and the log says which side broke), but paying 25 minutes to learn that
+GitHub's network is down is a defect of its own. Run 141, forty minutes later,
+resolved everything, installed everything and ran the suite - the fault was the
+runner's and it moved on. Run 141 then failed a gate, and it is the gate this design
+intends: its assertion printed
+
+```
+AssertionError: ('the `arc` box heights', (807, 462), (889, 496, 779, 434),
+  "this machine's px figure is neither one the page labels")
+```
+
+- the runner's own measured pair, written into the page by the next commit rather than
+computed out of the old one.
 
 ### What the 0.3 tree packages, measured
 

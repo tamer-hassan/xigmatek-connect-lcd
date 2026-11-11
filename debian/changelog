@@ -97,19 +97,20 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     bench at 0.5, 827 and 434 after the row of row-level controls, and 858
     and 465 after the name box; GitHub's runner read 723 and 378, then 751
     and 406, then 779 and 434. The row that tells a running display to draw
-    the open layout is the third such row: 889 and 496 on this bench, and
-    the runner's own pair printed by the run that carries it, replacing the
-    779 and 434 the page labels as its figures before the row. So each of
-    those three rows costs 31 px of height here and 28 px there, and no
-    column's width - and the grid's own ask does not move at all (171 / 344
-    / 512 px here, 180 / 361 / 533 there), because the grid of rows is the
-    grid that was already there. The pair gate is what found this: the first
-    run of this tree failed on the bench at the gate the suite calls `the
-    arc box heights`, a later one failed on the runner at the same gate, and
-    each failure printed that machine's own pair. The three columns' floors,
-    the controls floor by columns of rows, the fresh split, the narrowest
-    column and the window's own minimum are unchanged on both machines, and
-    the suite still fails any pane that has to scroll sideways to be read.
+    the open layout is the third such row: 889 and 496 on this bench, the
+    runner reading 807 and 462, where that row costs the same 28 px the two
+    earlier rows cost there - the runner's figures come out of its own
+    failing gate, not a prediction. So each of those three rows costs 31 px
+    of height here and 28 px there, and no column's width - and the grid's
+    own ask does not move at all (171 / 344 / 512 px here, 180 / 361 / 533
+    there), because the grid of rows is the grid that was already there. The
+    pair gate is what found this: the first run of this tree failed on the
+    bench at the gate the suite calls `the arc box heights`, a later one
+    failed on the runner at the same gate, and each failure printed that
+    machine's own pair. The three columns' floors, the controls floor by
+    columns of rows, the fresh split, the narrowest column and the window's
+    own minimum are unchanged on both machines, and the suite still fails
+    any pane that has to scroll sideways to be read.
 
   * lintian has been printing one warning that no CI run has ever seen,
     because the CI job builds binary-only (`-us -uc -b`) while a source
@@ -592,7 +593,7 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     137, 138 and 139 sat in the offline suite job's `apt-get update` on
     `Temporary failure resolving *.ubuntu.com` and never reached
     `tools/selftest.sh`. Every `apt-get` line in the workflow gains apt's
-    own fetch options (`Acquire::Retries=5`, `Acquire::http::Timeout=20`)
+    own fetch options (`Acquire::Retries=2`, `Acquire::http::Timeout=20`)
     and that job's list update tries three times before failing the step -
     the loop exercised locally with `sudo` shadowed by a shell function, so
     no network and no system apt: three failures give exit 1, and a failure
@@ -601,8 +602,15 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     min 28 s, 1 min 5 s, 1 min 34 s, 20 s) and today's run 136 (6 min 30 s,
     1 min 11 s, 38 s), so 30 / 15 / 15 / 15 - at least four times the
     larger, and enough that a broken network fails in minutes instead of
-    holding a runner for the six-hour default. Whether the retries clear
-    that fault is what the run that carries this says.
+    holding a runner for the six-hour default. What the two runs after them
+    answer: run 140, the first carrying the change, still could not fetch
+    its lists - three archives retried five times each across three attempts
+    - and failed the job in 25 minutes, which is why the retry count is 2
+    and not 5; and run 141, forty minutes later, resolved and installed
+    everything and ran the suite, then failed the labelled-pair gate on the
+    `arc` box heights and printed the runner's own 807 px and 462 px. The
+    runner's fault moved on, the bound held, and the figure came out of the
+    runner's gate into the next commit.
  -- Tamer Hassan <thameruddin@gmail.com>  Tue, 10 Nov 2026 16:30:41 +0200
 xigmatek-connect-lcd (0.5) resolute; urgency=medium
 

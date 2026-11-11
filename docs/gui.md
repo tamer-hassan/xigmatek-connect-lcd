@@ -207,7 +207,7 @@ A pane
 that cannot be dragged under what it holds cannot grow a horizontal scrollbar inside
 itself, so the 0.4 failure mode is unreachable rather than merely avoided. The controls
 floor is the editor's own footprint, so it moves twice over: one column of editor rows asks for **376 px** of controls on this bench, two columns for **400**, three for **568** - and **394 / 417 / 589** on CI's runner - a closed drop-down that has to show the longest entry it holds is part of what those columns carry, and the window's own minimum rises with them. Every one of those digits is read out of this page and held to whichever of the two labelled machines is running the suite, because a floor that follows the fonts is not a constant to compare.
-The 18 rows of an `arc` widget stand **889 px** tall in one column and **496 px** in three here, the grid's own ask going **171 / 344 / 512 px** - **779** and **434 px**, asking **180 / 361 / 533**, on CI's runner, where the two heights are what it answered before the `apply to the panel` row landed and the run that carries it prints its own pair - which is the reflow buying height without buying a scrollbar, and all twelve figures come off the sizing pass the suite runs on every machine. Those four heights are what the two rows of controls under the fields cost, in height and never in a column's width: 0.5 read 796 / 403 here and 723 / 378 there, the row of row-level controls made it 827 / 434 and 751 / 406, and the name box with its two buttons made it 858 / 465 and 779 / 434, as did the editor's structural row (add / remove / up / down) and the row that tells a running display to draw the open layout - 889 / 496 here, and the runner's own pair printed by the run that carries that row - so a row of controls is 31 px on this bench and 28 px on that runner, three times over, while the grid's own ask does not move at all because the grid of rows did not change. Every one of those digits is read out of this page and held to whichever of the two labelled machines is running the suite, because a floor that follows the fonts is not a constant to compare.
+The 18 rows of an `arc` widget stand **889 px** tall in one column and **496 px** in three here, the grid's own ask going **171 / 344 / 512 px** - **807** and **462 px**, asking **180 / 361 / 533**, on CI's runner - which is the reflow buying height without buying a scrollbar, and all twelve figures come off the sizing pass the suite runs on every machine. Those four heights are what the two rows of controls under the fields cost, in height and never in a column's width: 0.5 read 796 / 403 here and 723 / 378 there, the row of row-level controls made it 827 / 434 and 751 / 406, and the name box with its two buttons made it 858 / 465 and 779 / 434, as did the editor's structural row (add / remove / up / down) and the row that tells a running display to draw the open layout - 889 / 496 here and 807 / 462 there - so a row of controls is 31 px on this bench and 28 px on that runner, three times over, while the grid's own ask does not move at all because the grid of rows did not change. Every one of those digits is read out of this page and held to whichever of the two labelled machines is running the suite, because a floor that follows the fonts is not a constant to compare.
 
 ### The preview plays, or shows one frame
 
@@ -1334,21 +1334,23 @@ whose packaged **0.3** service had been measured refusing those same names,
 answer to that machine's report: "I already installed the latest service and confirmed
 applying themes work with the latest xigmalcd service". Which build landed is a
 package-database fact rather than a memory: this bench now carries
-`xigmatek-connect-lcd 0.6` and `xigmatek-connect-lcd-themes 0.6`, built from this
-tree, and the display holding the port is `/usr/bin/python3 /usr/bin/xigmalcd --theme
-alpha --fps 2`. That installed `xigmaui` predates the button - its `app.py` holds no
-`ed_apply_panel` - so the control being pressed is this checkout's window, talking to
-an installed display over the socket, which is exactly the pairing the version
-boundary above warns about. What the pair of answers shows is the boundary itself,
-seen from the glass side: a display from 0.4 or newer resolves a layout name, a 0.3
-one cannot, and the same window press means different things at either end. Two things
-this paragraph deliberately does not claim. It is not a `tools/display_glass.py` run:
-it carries no counters, no upload or refusal counts, no timings and no kept
-transcript, so nothing in it can be re-derived the way every number in the tables
-above can. And it settles none of the rows the panel still owes (the `--no-clock`
-look, the `bars` quiet-box re-measurement, the pairing note, stage 6's transcript).
-What it does settle is narrow and worth having: the command the suite drives over a
-socket in a temporary directory is also a command a real panel answers.
+`xigmatek-connect-lcd 0.6` and `xigmatek-connect-lcd-themes 0.6`, which can only be a
+build of this tree - `git tag -l` stops at v0.5 and the 0.6 stanza still reads
+UNRELEASED, so there is no published 0.6 for apt to have found - and the display
+holding the port is `/usr/bin/python3 /usr/bin/xigmalcd --theme alpha --fps 2`. That
+installed `xigmaui` predates the button - its `app.py` holds no `ed_apply_panel` - so
+the control being pressed is this checkout's window, talking to an installed display
+over the socket, which is exactly the pairing the version boundary above warns about.
+What the pair of answers shows is the boundary itself, seen from the glass side: a
+display from 0.4 or newer resolves a layout name, a 0.3 one cannot, and the same
+window press means different things at either end. Two things this paragraph
+deliberately does not claim. It is not a `tools/display_glass.py` run: it carries no
+counters, no upload or refusal counts, no timings and no kept transcript, so nothing
+in it can be re-derived the way every number in the tables above can. And it settles
+none of the rows the panel still owes (the `--no-clock` look, the `bars` quiet-box
+re-measurement, the pairing note, stage 6's transcript). What it does settle is narrow
+and worth having: the command the suite drives over a socket in a temporary directory
+is also a command a real panel answers.
 
 **A fifth window, which nobody drove.** After the 0.2 upgrade, the packaged user unit
 started on its own (docs/packaging.md keeps that story, including what is not established

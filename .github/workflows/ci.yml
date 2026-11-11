@@ -53,13 +53,14 @@ env:
   # (runs 137, 138, 139) sat in `sudo apt-get update` on `Temporary failure resolving
   # ...ubuntu.com` - a resolver fault on GitHub's runner, in a job whose whole design point is
   # that the suite itself needs no network.  The options are measured to parse here
-  # (`apt-get -s -o Acquire::Retries=5 -o Acquire::http::Timeout=20 install -y coreutils`, exit
-  # 0, no unknown-option warning); whether they clear that fault is what the next run says, and
-  # this file does not claim it before the run does.  Nothing is hidden if apt still cannot get
-  # its lists: the step exits non-zero, and every job now carries the timeout below, so a
-  # network that stays broken fails in minutes instead of holding a runner for the six-hour
-  # default.
-  APT: "-o Acquire::Retries=5 -o Acquire::http::Timeout=20"
+  # (`apt-get -s -o Acquire::Retries=2 -o Acquire::http::Timeout=20 install -y coreutils`, exit
+  # 0, no unknown-option warning).  What they did not do is fix a broken resolver: run 140, the
+  # first under this change, still could not get its lists and failed the step - in 25 minutes
+  # (16:31:53 to 16:57:03), three archives retried five times each over three attempts, which is
+  # why `Retries` is 2 and not 5.  The bound is the part that worked: nothing sat for GitHub's
+  # six-hour default, and the log says which side broke.  Run 141, forty minutes later, resolved
+  # everything and ran the suite - the fault was the runner's, and it moved on.
+  APT: "-o Acquire::Retries=2 -o Acquire::http::Timeout=20"
 
 jobs:
   selftest:

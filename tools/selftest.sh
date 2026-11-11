@@ -12220,7 +12220,8 @@ assert "One path met glass on an install rather than through a driver" in _gf, (
 _glass = _gf.split("One path met glass on an install")[1].split("A fifth window")[0]
 for _phrase in ("no counters", "no kept transcript", "settles none",
                 "package-database fact rather than a memory",
-                "this bench now carries", "its `app.py` holds no `ed_apply_panel`"):
+                "this bench now carries", "its `app.py` holds no `ed_apply_panel`",
+                "`git tag -l` stops at v0.5 and the 0.6 stanza still reads UNRELEASED"):
     assert _phrase in _glass, (_phrase, "the on-glass paragraph stopped saying what it is not")
 assert not _re.search(r"\b\d[\d ]* (uploads|confirmed|refused|frames)\b", _glass), (
     "the on-glass paragraph carries a counter, and there is no run behind it to re-derive one")
