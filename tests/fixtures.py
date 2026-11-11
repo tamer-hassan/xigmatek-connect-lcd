@@ -137,6 +137,56 @@ WHEN_DT = datetime.datetime(*WHEN[:6])
 THEMES = ("gauge", "dual", "clock", "bars", "alpha")
 
 
+def as_datetime(st: time.struct_time) -> datetime.datetime:
+    return datetime.datetime(*st[:6])
+
+
+# ---- the pinned bodies the library and encoder checks draw with -----------------------------------
+#
+# Not one dict but four, because they answer different questions and each is pinned to the shape it
+# was measured in.  `METRICS` above is a Linux box's readings.  These are the shapes the Windows
+# sessions recorded, and the copied layouts were drawn against those:
+
+#: The encoder's loss budget is counted on an alpha overlay frame with these readings, which are the
+#: ones the captured wire traffic carried.
+CAPTURED = {"cpu": {"temperature": 57.0, "load": 42.0},
+            "gpu": {"temperature": 47.0, "load": 38.0, "fan": 45},
+            "fans": [{"name": "Fan CPU", "type": "Fan", "value": 1957}]}
+
+#: The 23 copied layouts are painted with a body that has a network section and memory as a
+#: percentage, at this instant.
+SESSION = {"cpu": {"temperature": 61, "load": 42, "power": 88.5, "speedAverage": 4338},
+           "gpu": {"temperature": 55, "load": 63, "power": 37.0, "speed": 1500},
+           "network": {"upload": 12.3, "download": 45.6}, "memory": {"load": 7}}
+SESSION_WHEN = datetime.datetime(2026, 11, 8, 3, 40, 0)
+
+#: Five bodies for the export-vs-code parity probe.  The first two answer every source every export
+#: asks for - which, once `bars` was exported, means a board temperature, a GPU memory pair and
+#: **four fan rows**, because `bars` reserves four slots and a box reporting one fan leaves three
+#: unanswered by construction.  The last three deliberately do not.  Both complete readings sit at
+#: the ends of every scale: 100 degrees, 0 % load, 12 345 RPM on a 0..3000 meter.
+PARITY_CASES = ({"cpu": {"temperature": 57, "load": 62},
+                 "gpu": {"temperature": 47, "load": 22, "memoryUsage": 2_100_000,
+                         "dedicatedTotal": 8_000_000},
+                 "motherboard": {"temperature": 41},
+                 "memory": {"used": 4_200_000, "total": 16_000_000},
+                 "fans": [{"value": 1957, "name": "Fan CPU"},
+                          {"value": 1102, "name": "Fan System 5"},
+                          {"value": 800, "name": "Fan Pump"},
+                          {"value": 640, "name": "Fan Chassis 2"}]},
+                {"cpu": {"temperature": 100, "load": 0},
+                 "gpu": {"temperature": 100, "load": 0, "memoryUsage": 0,
+                         "dedicatedTotal": 8_000_000},
+                 "motherboard": {"temperature": 0},
+                 "memory": {"used": 0, "total": 16_000_000},
+                 "fans": [{"value": 12345, "name": "Fan CPU"}, {"value": 0, "name": "Fan System 5"},
+                          {"value": 1, "name": "Fan Pump"}, {"value": 3000,
+                                                             "name": "Fan Chassis 2"}]},
+                {"cpu": {"temperature": 24}},
+                {"cpu": {"temperature": 40}, "gpu": {"temperature": 55}},
+                {})
+
+
 def freeze_clock(render) -> None:
     """Put `render._now` on the pinned instant, for the duration of one process."""
     render._now = lambda: WHEN

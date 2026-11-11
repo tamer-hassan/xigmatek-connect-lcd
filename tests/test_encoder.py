@@ -25,9 +25,6 @@ from tests import fixtures
 
 from xigmalcd import render
 
-CAPTURED = {"cpu": {"temperature": 57.0, "load": 42.0},
-            "gpu": {"temperature": 47.0, "load": 38.0, "fan": 45},
-            "fans": [{"name": "Fan CPU", "type": "Fan", "value": 1957}]}
 
 STEP = 0.2                                    # degrees between samples along the arc
 RAMP_R = render.A26_RING_R - 6                # mid-radius of the 12 px stroke
@@ -54,7 +51,7 @@ class LossBudget(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.frame = render.draw(CAPTURED, "alpha", bg=render.OVERLAY)
+        cls.frame = render.draw(fixtures.CAPTURED, "alpha", bg=render.OVERLAY)
         assert cls.frame.mode == "RGBA"
         assert cls.frame.getchannel("A").getextrema() == (0, 255), "not an overlay frame"
 

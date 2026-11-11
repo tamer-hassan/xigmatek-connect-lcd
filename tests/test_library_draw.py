@@ -20,7 +20,6 @@ and the size each layout actually names.
 from __future__ import annotations
 
 import contextlib
-import datetime
 import io
 import os
 import subprocess
@@ -36,10 +35,6 @@ from xigmalcd import themes
 #: One body of readings and one instant, deliberately not `fixtures.METRICS`: these are the shapes
 #: a Windows session recorded (a network section, memory as a percentage, integer temperatures),
 #: which is what the copied layouts were drawn against.
-CAPTURED = {"cpu": {"temperature": 61, "load": 42, "power": 88.5, "speedAverage": 4338},
-            "gpu": {"temperature": 55, "load": 63, "power": 37.0, "speed": 1500},
-            "network": {"upload": 12.3, "download": 45.6}, "memory": {"load": 7}}
-WHEN = datetime.datetime(2026, 11, 8, 3, 40, 0)
 
 
 def faces_used(records: list) -> set:
@@ -70,7 +65,8 @@ class PaintAll(unittest.TestCase):
         skipped_for_source: list = []
         for rec in self.pick:
             with self.subTest(layout=rec["name"]):
-                img, notes = themes.paint(rec, CAPTURED, when=WHEN, scrim=0)
+                img, notes = themes.paint(rec, fixtures.SESSION,
+                                     when=fixtures.SESSION_WHEN, scrim=0)
                 self.assertEqual(img.size, (480, 480))
                 alpha = img.getchannel("A")
                 lit = sum(1 for v in (alpha.get_flattened_data()
@@ -104,7 +100,8 @@ class PaintAll(unittest.TestCase):
                  - answerable}
         painted = []
         for rec in pick:
-            _img, notes = themes.paint(rec, CAPTURED, when=WHEN, scrim=0)
+            _img, notes = themes.paint(rec, fixtures.SESSION,
+                                     when=fixtures.SESSION_WHEN, scrim=0)
             if [n for n in notes["missing"] if not str(n).startswith("font:")]:
                 painted.append(rec["name"])
         self.assertEqual(set(painted), needs,
@@ -118,7 +115,8 @@ class PaintAll(unittest.TestCase):
                       in faces_used(self.pick) if not resolved((fam, bold, size))}
         reported = set()
         for rec in self.pick:
-            _img, notes = themes.paint(rec, CAPTURED, when=WHEN, scrim=0)
+            _img, notes = themes.paint(rec, fixtures.SESSION,
+                                     when=fixtures.SESSION_WHEN, scrim=0)
             reported.update(str(n)[5:] for n in notes["missing"] if str(n).startswith("font:"))
         self.assertLessEqual(reported, reported)
         if unresolved:
@@ -129,10 +127,12 @@ class PaintAll(unittest.TestCase):
     def test_bg_black_on_a_layout_theme_is_opaque_the_way_it_is_on_our_own_five(self):
         for rec in self.pick[:3]:
             with self.subTest(layout=rec["name"]):
-                solid, _notes = themes.paint(rec, CAPTURED, when=WHEN, base=render.BLACK)
+                solid, _notes = themes.paint(rec, fixtures.SESSION,
+                                     when=fixtures.SESSION_WHEN, base=render.BLACK)
                 self.assertEqual(solid.getextrema()[3], (255, 255),
                                  "the canvas should cover the panel's stored background")
-                clear, _notes = themes.paint(rec, CAPTURED, when=WHEN)
+                clear, _notes = themes.paint(rec, fixtures.SESSION,
+                                     when=fixtures.SESSION_WHEN)
                 self.assertEqual(clear.getextrema()[3][0], 0,
                                  "over a transparent canvas the layout still has clear pixels")
 

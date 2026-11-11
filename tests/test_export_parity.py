@@ -18,7 +18,6 @@ theme's drawing, not its fallback behaviour.
 """
 from __future__ import annotations
 
-import datetime
 import json
 import unittest
 
@@ -27,31 +26,6 @@ from tests import fixtures
 from xigmalcd import layout
 from xigmalcd import render
 from xigmalcd import themes
-
-WHEN = datetime.datetime(2026, 11, 8, 3, 40, 0)
-
-#: Five bodies of readings.  The first two answer every source every export asks for - which, once
-#: `bars` was exported, means a board temperature, a GPU memory pair and **four fan rows**, because
-#: `bars` reserves four slots and a box reporting one fan leaves three unanswered by construction.
-#: The last three deliberately do not.  Both complete readings sit at the ends of every scale:
-#: 100 degrees, 0 % load, 12 345 RPM on a 0..3000 meter.
-CASES = ({"cpu": {"temperature": 57, "load": 62},
-          "gpu": {"temperature": 47, "load": 22, "memoryUsage": 2_100_000,
-                  "dedicatedTotal": 8_000_000},
-          "motherboard": {"temperature": 41},
-          "memory": {"used": 4_200_000, "total": 16_000_000},
-          "fans": [{"value": 1957, "name": "Fan CPU"}, {"value": 1102, "name": "Fan System 5"},
-                   {"value": 800, "name": "Fan Pump"}, {"value": 640, "name": "Fan Chassis 2"}]},
-         {"cpu": {"temperature": 100, "load": 0},
-          "gpu": {"temperature": 100, "load": 0, "memoryUsage": 0, "dedicatedTotal": 8_000_000},
-          "motherboard": {"temperature": 0},
-          "memory": {"used": 0, "total": 16_000_000},
-          "fans": [{"value": 12345, "name": "Fan CPU"}, {"value": 0, "name": "Fan System 5"},
-                   {"value": 1, "name": "Fan Pump"}, {"value": 3000, "name": "Fan Chassis 2"}]},
-         {"cpu": {"temperature": 24}},
-         {"cpu": {"temperature": 40}, "gpu": {"temperature": 55}},
-         {})
-
 
 def missing_faces() -> list:
     """Faces the exports themselves name, probed at the family, weight and size they use."""
@@ -120,9 +94,9 @@ class Parity(unittest.TestCase):
     def test_both_doors_agree_to_the_pixel_on_every_complete_reading(self):
         reached = set()
         for name in sorted(themes.EXPORTS):
-            for index, body in enumerate(CASES[:2]):
+            for index, body in enumerate(fixtures.PARITY_CASES[:2]):
                 with self.subTest(theme=name, case=index):
-                    result = themes.parity(name, body, WHEN)
+                    result = themes.parity(name, body, fixtures.SESSION_WHEN)
                     self.assertEqual(result["missing"], [], name)
                     self.assertEqual((result["diff_px"], result["worst_channel_delta"]), (0, 0),
                                      result)
@@ -138,8 +112,8 @@ class Parity(unittest.TestCase):
         no reason next to it."""
         partial = []
         for name in sorted(themes.EXPORTS):
-            for index, body in enumerate(CASES):
-                result = themes.parity(name, body, WHEN)
+            for index, body in enumerate(fixtures.PARITY_CASES):
+                result = themes.parity(name, body, fixtures.SESSION_WHEN)
                 if not result["missing"]:
                     continue
                 said = {note[len("showIf:"):] if note.startswith("showIf:") else note
@@ -172,8 +146,8 @@ class Parity(unittest.TestCase):
         """
         agrees, differs = [], []
         for name in sorted(themes.EXPORTS):
-            for index, body in enumerate(CASES[2:]):
-                result = themes.parity(name, body, WHEN)
+            for index, body in enumerate(fixtures.PARITY_CASES[2:]):
+                result = themes.parity(name, body, fixtures.SESSION_WHEN)
                 if not result["missing"]:
                     continue
                 (agrees if result["diff_px"] == 0 else differs).append(
