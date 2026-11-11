@@ -13836,6 +13836,27 @@ if [ -n "$HOME_CFG_BEFORE" ]; then
     if [ "$HOME_CFG_BEFORE" != "$(sha256sum "$HOME_CFG")" ]; then
         echo "FAILED: $HOME_CFG was changed by this suite, and no section asked to write it"
         ls -l --time-style=full-iso "$HOME_CFG"
+        # And who else could have done it, because the honest answer depends on whether a
+        # person is at the desktop.  That file is the window's own settings, and a `xigmaui`
+        # that is simply open writes it from its save timer whenever a picker moves.  The
+        # sections that build a window point XDG_CONFIG_HOME at a temporary directory, so
+        # none of them reaches this path - which is why a live window is the first suspect
+        # and not the last.  It still fails either way: a suite that wrote the real config is
+        # a bug, and a pass that depends on nobody using the machine is a pass worth
+        # repeating.  What changes is which of the two the reader is looking at.
+        if pgrep -af 'xigma[u]i' >/dev/null 2>&1; then
+            echo "  a xigmaui process is running on this machine (the list can also catch a"
+            echo "  command that merely mentions the word, so read it as a hint and not as"
+            echo "  proof - what it is for is answering 'was someone at the window?'):"
+            ps -eo pid,lstart,cmd | grep 'xigma[u]i' | head -4 | sed 's/^/    /'
+            echo "  that window saves its own settings on a timer, and it can do it while a"
+            echo "  suite run is in progress.  Close it and re-run for a pass you can quote,"
+            echo "  or read this line as what it is: the suite cannot promise anything about"
+            echo "  a desktop someone is using."
+        else
+            echo "  no xigmaui process is running, so nothing outside this suite is a"
+            echo "  candidate: find the section that wrote it."
+        fi
         exit 1
     fi
     echo "  session file           $HOME_CFG is byte-identical to what it was at start"

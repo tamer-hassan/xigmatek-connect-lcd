@@ -611,6 +611,28 @@ xigmatek-connect-lcd (0.6) UNRELEASED; urgency=medium
     `arc` box heights and printed the runner's own 807 px and 462 px. The
     runner's fault moved on, the bound held, and the figure came out of the
     runner's gate into the next commit.
+
+  * The suite's closing guard got a second sentence, because it fired today
+    on something that was not the suite. The last check compares the sha256
+    of the real ~/.config/xigmaui/config.json before and after the run and
+    fails if it moved. It moved at 19:28:16 - the cause was a window the
+    author had open, `python3 -m xigmaui` started at 19:27:39, writing its
+    own settings on its save timer, while every section of the suite that
+    builds a window points XDG_CONFIG_HOME at a temporary directory. It
+    still fails either way: a suite that wrote the real config is a bug, and
+    a pass that depends on nobody touching the desktop is a pass worth
+    repeating. What changed is that the failure now prints whether a window
+    is running and says which of the two readings applies, with the limit on
+    its own evidence written next to it: the listing can catch a command
+    that merely mentions the word, so it answers "was someone at the
+    window?" and not "who wrote this byte". Both reachable branches were
+    exercised by extracting the guard block from the script and driving it
+    against a temporary file - unchanged gives the byte-identical line,
+    changed gives the failure and the process list - and the pattern was
+    measured not to match its own harness: run out of a script file, `pgrep
+    -af 'xigma[u]i'` answers the one real window and nothing else. The
+    branch for "no window is running" cannot be demonstrated on this bench
+    while one is, and it is not claimed to have been.
  -- Tamer Hassan <thameruddin@gmail.com>  Tue, 10 Nov 2026 16:30:41 +0200
 xigmatek-connect-lcd (0.5) resolute; urgency=medium
 
