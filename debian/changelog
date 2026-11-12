@@ -2,17 +2,73 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
 
   * The offline checks move out of one shell file and into ordinary test files.
     `tools/selftest.sh` - 13,869 lines in 22 sections, grown over six cycles -
-    is deleted, and what it checked is now 278 checks across 33 files in
+    is deleted, and what it checked is now 414 checks across 45 files in
     `tests/`, run by the standard library: `python3 -m unittest discover -s
-    tests`.
-    Measured on this bench: about two minutes, against the 497 s the
-    runner timed the suite's own step at for the `v0.6` tag.  Nothing that
-    examined code was dropped on the way - the
-    wire, the encoder's loss budget, the copied library's painting, the export
-    parity, the substitutions a layout names, `alpha`'s special rows, the
-    window, the editor's model, the control socket, the panel worker's gates,
-    the background pairing - and everything that existed to re-quote a sentence
-    from a document went with it.
+    tests`.  Measured on this bench in one sitting, the same tree both ways:
+    124 s for the 278 checks as they stood at the deletion, 288 s for the 414
+    once the sections that had not come across were ported, against the 497 s
+    the runner timed the suite's own step at for the `v0.6` tag.
+    Nothing that examined code was dropped in the end - the wire, the
+    encoder's loss budget, the copied library's painting, the export parity,
+    the substitutions a layout names, `alpha`'s special rows, the window, the
+    editor's model and its doors, the control socket, the panel worker's
+    gates, the background pairing.  That claim did not hold at the first cut,
+    and the way to find that out was to read the deleted file rather than the
+    changelog: twelve sections had gone unported.  They are back as
+    `test_tooltips.py`, `test_apply_layout.py`, `test_snapping.py`,
+    `test_row_resize.py`, `test_peek_readings.py`, `test_row_acts.py`,
+    `test_row_notes.py`, `test_fixture_shape.py`, `test_field_census.py`,
+    `test_bars_rows.py`, `test_recorded_series.py` and
+    `test_names_and_renames.py`, plus three checks in files that already
+    existed - 136 in all, each shown non-vacuous by breaking the shipped
+    code it examines and counting the failures.  What was deliberately left
+    behind is everything that existed to re-quote a figure or a sentence from
+    a document, and the six `docs/videos` files whose only gate measured
+    their own frame count, length and size.
+
+  * Four sections that were still in the deleted suite, ported because they
+    examine code rather than documents.  `test_field_census.py` holds the
+    census behind `--print-theme-fields`: 152 widgets in the 27 copied
+    layouts answering to 33 `property` keys, the four names `layout.py`
+    reads with no shipped file to show for them, the eleven the files carry
+    that nothing reads (each with a reason in `themes.UNREAD_WHY`), and the
+    rule that the extension keys the painter was found to read are exactly
+    the keys with an entry in `themes.XIGMA_KEYS`.  `test_bars_rows.py` asks
+    `bars` from both sides - the strings its painter writes, taken out of
+    the drawing by spying on `ImageDraw.text` for one frame, against the
+    strings `layout.text_for` prints from the same source names - and counts
+    the ten reserved row slots in the pixels, so a box reporting no
+    tachometer gets the same pitch as one reporting six.
+    `test_recorded_series.py` keeps the ledger beside the published clips:
+    the twelve-sample series has to record the zone its on-glass clock was
+    read at, because one instant of epoch milliseconds prints `00:25:16` on
+    this bench and `22:25:16` on a UTC runner, and every `bar` row that
+    recording could have had is answered at every one of its samples.
+    `test_names_and_renames.py` holds the name rules and the rename act 0.6
+    shipped with: the limit usable to its edge and refused one past it in
+    words that name it, `why_taken` answering for a name, its fold, its
+    swapcase and its id, a fresh id thirteen digits and above every answered
+    one, and a rename that moves the id and nothing else - the rest of the
+    file byte-identical, the pixels unmoved, the vendor's layout answering
+    again at its own path, the `.bak` travelling with the copy while a
+    crash's `.tmp` stays where it was left.
+
+  * A comment in the shipped source names the check that holds the claim it
+    makes, or says plainly that nothing does.  Sixty mentions of the deleted
+    suite are gone from `xigmalcd/`, `xigmaui/`, `tools/` and `tests/`, and
+    following them out turned up claims pointing at gates that had never
+    existed.  The `.door` marker on each `themes.SPECIALS` drawing: two
+    checks in `test_specials.py` now read every marker against the
+    `layout.draw_special_*` call inside that same body, which is the only
+    way a listing printed by `--list-specials` can stop being a lie.  The
+    editor's row pickers vanishing with a form that was built and never
+    installed: `test_window.py` walks the editor's own box and asks for the
+    three rows by name, because "no exception" is not how you notice a
+    missing control.  And the name-length limit, where the comment said the
+    window caps its box at the writer's limit while `xigmaui/app.py` says
+    the opposite on purpose - a box that stops at the limit drops characters
+    and then presses the button with a name nobody typed - so the refusal is
+    now gated at the edge and one past it, in words that quote the constant.
 
   * `tests/fixtures.py` holds the isolation and the pinning once, which the
     suite rebuilt inside each of its 22 sections: the repo root taken from this
