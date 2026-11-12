@@ -668,10 +668,20 @@ def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY, ink=None):
 #: (left-middle), a value right-aligned at `BARS_VAL_X`, and a meter `BARS_BAR_DY` below the
 #: row's centre, `BARS_BAR_WH` in size.  `BARS_SLOTS` fan rows are reserved on every machine,
 #: and that is why the pitch no longer moves between boxes - see the docstring.
+#:
+#: `BARS_BAR_DY` and `BARS_BAR_WH` are a pair, and the vertical budget is what sets them: at
+#: a pitch of 32 the theme's own faces lay 16 ink rows down for label and number, which leaves
+#: 15 rows of air for the meter - so a track 10 px tall (12 of ink once the supersampled edge
+#: is downsampled) hung 5 rows *inside* the next row's text, and the block read as a stack of
+#: smudged lines at any preview size below the glass.  `tests/test_bars_rows.py`'s
+#: `TheRowsDoNotRunIntoEachOther` measures both bands from the shipped painter - once with the
+#: meters suppressed, once as shipped - and holds the clearance positive on each side and the
+#: meter closer to its own label than to the row under it, because a bar that sits nearer the
+#: line below reads as that line's separator rather than as this row's meter.
 BARS_Y0, BARS_SPAN = 72, 320
 BARS_ROW_MIN, BARS_ROW_MAX = 28, 56
 BARS_LBL_X, BARS_VAL_X = 28, 452
-BARS_BAR_X, BARS_BAR_DY, BARS_BAR_WH = 28, 17, (424, 10)
+BARS_BAR_X, BARS_BAR_DY, BARS_BAR_WH = 28, 12, (424, 6)
 BARS_LBL_F, BARS_VAL_F, BARS_CLOCK_F = 18, 20, 28
 BARS_CLOCK_XY, BARS_CLOCK_ANCHOR = (240, 452), "mm"
 BARS_TITLE_TEXT, BARS_TITLE_X, BARS_TITLE_Y = "SYSTEM MONITOR", 240, 30

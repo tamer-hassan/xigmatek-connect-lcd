@@ -676,7 +676,8 @@ plan had not foreseen:
   than a corner - a GPU reporting used memory with no dedicated total, which an integrated GPU
   does. The theme draws neither number nor meter there, because it decides the whole row by the
   division; the file had `Used GPU Memory` as its own source, so it printed `4 GB` beside an
-  absent meter: **706 px and a worst channel of 255**. The key is what makes that dependency
+  absent meter: **651 px and a worst channel of 255** (706 px before the rows' geometry moved
+  on 2026-11-12; what the check asserts is that the difference is not zero). The key is what makes that dependency
   sayable, and `tests/test_bars_rows.py` measures it rather than taking anybody's word for it:
   it strips the key from a generated `bars`, paints it at that reading, and counts what the
   file is then off by. How far off is this bench's, so the count is printed there and this

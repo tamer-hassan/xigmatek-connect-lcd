@@ -296,7 +296,8 @@ these knobs interact in ways nobody guesses right:
 
 README's set, as `du -b docs/videos/*` and `ffprobe` read them on this bench: `alpha`
 908 420 B / 10.00 s at 24 fps, `gauge` 1 930 104 B / 12.00 s at 20 fps, `dual` 214 113 B,
-`clock` 278 884 B, `bars` 779 905 B, the amber ink figure 927 752 B — **5 039 178 B** for
+`clock` 278 884 B, `bars` 859 706 B (re-rendered 2026-11-12, when the theme's row geometry
+moved), the amber ink figure 927 752 B — **5 118 979 B** for
 six, plus 13 916 B of readings JSON. Those are this bench's figures, re-read rather than
 promised: the gate that used to fail this page when one moved is gone, and the reason it
 existed is the reason it is not worth re-writing - the 22 405 B the `bars` clip shed when

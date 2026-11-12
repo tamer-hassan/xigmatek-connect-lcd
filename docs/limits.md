@@ -480,10 +480,22 @@ What has been measured on glass, by whom, with how many frames - and what has no
   | `gauge-3.mp4` | 240 | 12.00 s | 20 fps | 1 930 104 | 41.2 → 38.4 (2.8) | 201.5 − 89.8 = **111.7** | 16.09 / 5.44 (×2.96) |
   | `dual-Theme_30.mp4` | 240 | 10.00 s | 24 fps | 214 113 | 3.3 → 3.2 (0.1) | 176.7 − 38.5 = **138.2** | 17.11 / 0.45 (×37.89) |
   | `clock-Theme_07.mp4` | 240 | 10.00 s | 24 fps | 278 884 | 176.2 → 162.6 (13.6) | 241.0 − 106.4 = **134.6** | 10.63 / 1.59 (×6.69) |
-  | `bars-theme_52.mp4` | 240 | 12.00 s | 20 fps | 779 905 | 11.9 → 9.5 (2.4) | 140.6 − 43.4 = **97.1** | 11.48 / 7.34 (×1.56) |
+  | `bars-theme_52.mp4` | 240 | 12.00 s | 20 fps | 859 706 | 11.9 → 9.5 (2.4) | 140.6 − 43.4 = **97.1** | 11.48 / 7.34 (×1.56) |
   | `alpha-Theme_25-amber.mp4` | 240 | 10.00 s | 24 fps | 927 752 | *(the ink figure: see below)* | | |
 
-  **5 039 178 B** for all six, the largest 1.93 MB, and 13 916 B of series JSON beside
+  The `bars` row is the exception in that table, and it is labelled rather than quietly
+  fixed: that clip was **re-rendered on 2026-11-12**, after the theme's row geometry moved
+  (`BARS_BAR_DY` 17 to 12 px and `BARS_BAR_WH` 10 to 6 px tall: a row's text lays down 16
+  ink rows and the old track 12, in a pitch of 32, which left 15 rows of air for a meter
+  that needed them - see the row-clearance rule in `tests/test_bars_rows.py`), so its bytes
+  are this render's (859 706, up from 779 905) and
+  its luma and motion columns are still the 2026-11-08 render's. Re-making it is one command:
+  `tools/preview_gif.py --mp4 --no-gif --theme bars --clip themes/alpha/clips/theme_52.mp4
+  --series docs/videos/readings-2026-11-08.json --gif-fps 20 --frames 240 --out
+  docs/videos/bars-theme_52.mp4`, and the tool prints the frames, the rate and the length
+  back from the file it wrote.
+
+  **5 118 979 B** for all six, the largest 1.93 MB, and 13 916 B of series JSON beside
   them - that file grew 220 B when it gained one field, the zone it was sampled in; see
   the clock-zone bullet below. Every file stays under 2 MB: GitHub's own browser upload
   limit is a thing of GitHub's and has not been measured here. The ceiling the deleted
@@ -550,7 +562,8 @@ What has been measured on glass, by whom, with how many frames - and what has no
     `curl -L` on 2026-11-08, and every one came back byte-identical to the file in the tree -
     908 420, 1 930 104, 214 113, 802 310, 278 884 and 927 752 B, each `cmp` clean, sha256
     (that record is as-of the tree at `22563ad`: `bars-theme_52.mp4` was re-rendered the
-    same day in `06de272` and is 779 905 B now, and the six sizes today are the ones the
+    same day in `06de272` at 779 905 B, and 859 706 B since the 2026-11-12 row-geometry
+    change; the six sizes today are the ones the
     launcher section re-stats from the files rather than any figure in these pages)
     `e3c272ec…`, `99c8005b…`, `5117a5c0…`, `cfe8d640…`, `0f73b6be…`, `731cb1a7…`.  What that
     proves is about the link: the URL in the markdown resolves to the tree's own bytes, so a
@@ -1118,7 +1131,8 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
     other than its own - and an integrated GPU is a normal machine that hits it, reporting
     used memory with no dedicated total. The theme draws neither number nor meter there; the
     file, which reads `Used GPU Memory` as its own source, printed `4 GB` beside an absent
-    meter: **706 px and a worst channel of 255**. The key names the dependency, an unanswered
+    meter: **651 px and a worst channel of 255**, re-measured on this bench after the 2026-11-12
+    row-geometry change (the same comparison came out 706 px before it). The key names the dependency, an unanswered
     dependency is reported in the skip list as `showIf:<source>`, and `tests/test_bars_rows.py` measures the
     key's worth by stripping it from a generated `bars` and counting the pixels it then
     differs by. The other prefix in that list came out of the editor's work: an unappliable

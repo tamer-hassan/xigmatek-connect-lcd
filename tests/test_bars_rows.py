@@ -510,5 +510,85 @@ class TheReviewDoor(unittest.TestCase):
                         "a dependency this box lacks never arrived as a `showIf:<source>` note")
 
 
+class TheRowsDoNotRunIntoEachOther(unittest.TestCase):
+    """A row's meter belongs to its own line of text, and touches neither neighbour.
+
+    This is the check the 2026-11-12 geometry change exists to satisfy.  At the old
+    constants the block was over-subscribed: on this box the theme's own faces paint a
+    row's label and number over 16 ink rows, and a 10 px track paints 12 with
+    antialiasing, in a pitch of 32 - which left 15 rows of air for a meter that needed
+    them and put the track's ink *inside* the next row's text.  `BARS_BAR_DY` and
+    `BARS_BAR_WH` moved together for that reason, and this class is what keeps them
+    from drifting back.
+
+    Everything is measured from the shipped painter twice in one run: once with the
+    meters suppressed (`BARS_BAR_WH` at zero, which leaves the text exactly as it is) and
+    once as shipped.  The difference is meter ink; the text bands are what this box's
+    faces lay down, so the pixel counts printed here are a record and the assertion is
+    the relation - clear rows on both sides, and the track nearer its own label than the
+    row below it, which is the difference between a meter and a separator line.
+    """
+
+    def profile(self, img) -> list:
+        d = img.convert("RGBA").getchannel("A").load()
+        return [sum(1 for x in range(render.W) if d[x, y] > 8) for y in range(render.H)]
+
+    def bands(self) -> tuple:
+        body = dict(ALL_SIX, fans=FANS_SIX, timestamp={})
+        real = render.BARS_BAR_WH
+        try:
+            render.BARS_BAR_WH = (0, 0)
+            text = self.profile(render.theme_bars(dict(body)))
+        finally:
+            render.BARS_BAR_WH = real
+        full = self.profile(render.theme_bars(dict(body)))
+        pitch = min(render.BARS_ROW_MAX, max(render.BARS_ROW_MIN,
+                                             render.BARS_SPAN // len(themes.BARS_ROWS)))
+        rows = []
+        for i in range(len(themes.BARS_ROWS)):
+            centre = render.BARS_Y0 + i * pitch
+            inked = [y for y in range(centre - 15, centre + 16) if text[y]]
+            if not inked:
+                self.skipTest(f"row {i} lays down no text ink here: the theme's faces are "
+                              "not installed, so there is no band to keep clear of")
+            window = range(inked[-1] + 1, inked[0] + pitch + 15)
+            # the track is 424 px wide, so any row where the ink is more than a glyph's
+            # worth is the meter: inside the next row's band that is exactly the overlap
+            # this check exists to catch, so it must be counted rather than trimmed away
+            meter = [y for y in window if full[y] > 300]
+            rows.append((i, centre, inked[0], inked[-1],
+                         (meter[0], meter[-1]) if meter else None))
+        return rows, pitch
+
+    def test_each_rows_meter_is_clear_of_the_text_above_and_below(self):
+        rows, pitch = self.bands()
+        self.assertEqual(len(rows), len(themes.BARS_ROWS), rows)
+        widest = []
+        for i, _centre, top, bottom, meter in rows[:-1]:
+            with self.subTest(row=i):
+                self.assertIsNotNone(meter, f"row {i} drew no meter at a reading that answers it")
+                next_bottom = rows[i + 1][3]
+                next_top = rows[i + 1][2]
+                above = meter[0] - bottom - 1
+                below = next_top - meter[1] - 1
+                widest.append((i, above, below))
+                self.assertGreaterEqual(above, 1,
+                                        f"row {i}: its meter starts {above} px under its own "
+                                        f"text ({bottom}..{meter[0]})")
+                self.assertGreaterEqual(below, 1,
+                                        f"row {i}: its meter ends {below} px above row "
+                                        f"{i + 1}'s text ({meter[1]}..{next_top}) - the old "
+                                        "constants put it inside that text")
+                self.assertLess(above, below,
+                                f"row {i}: its meter sits {above} px from its own label and "
+                                f"{below} px from the row below, so the bar reads as that row's")
+        self.assertTrue(widest, "no pair of rows was measured, so nothing above was checked")
+        tightest = min(widest, key=lambda t: min(t[1], t[2]))
+        self.assertGreaterEqual(min(tightest[1], tightest[2]), 2,
+                                f"the tightest clearance in the block is row {tightest[0]} at "
+                                f"{tightest[1]} px above / {tightest[2]} px below a pitch of "
+                                f"{pitch}: two rows of air is where this starts to read as one")
+
+
 if __name__ == "__main__":
     unittest.main()
