@@ -1717,8 +1717,7 @@ def bars_recipe() -> dict:
             # the memory rows: the number prints one field, the meter divides two, and the
             # drawing behind this file prints neither when the division cannot be made (a
             # GPU with no dedicated total answers `4096` and nothing else).  Named rather
-            # than assumed, and `tests/test_pinned_metrics.py` measures the
-            # case
+            # than assumed, and `tests/test_bars_rows.py` measures the case
             number["showIf"] = bar_src
         rows.append(widget(f"xigma-bars-{text_src.lower().replace(' ', '-')}-value",
                            "data", {
