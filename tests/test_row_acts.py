@@ -288,17 +288,153 @@ class AddingDeletingAndReordering(unittest.TestCase):
         # `moved > 4` and `silent < moved` used to sit here.  They were a claim about the corpus,
         # and the corpus they described was `bars` overlapping itself: its meter ran 5 rows inside
         # the text of the row under it, which is what made adjacent pairs loud.  The 2026-11-12
-        # clearance rule in `tests/test_bars_rows.py` removed those overlaps, so on this bench the
-        # shipped files now supply {moved} loud and {silent} silent pairs - a corpus that reads
-        # as separated rows, which is the point.  The price is recorded rather than hidden: with
-        # nothing in the shipped files overlapping, this loop can only prove the *negative* half
-        # of the law (a pair that meets in sub-pixel coverage, or a pair that never meets, moves
-        # 0 px), and the positive half - a swap that must move ink exactly in the overlap - is
-        # currently ungated.  Building that case means authoring two rows in deliberately
-        # different colours, which is the follow-up this comment is the note for.
+        # clearance rule in `tests/test_bars_rows.py` removed those overlaps, so on this bench
+        # the shipped files now supply loud and silent pairs of {moved} and {silent} - a corpus
+        # that reads as separated rows, which was the point.  What that costs is recorded rather
+        # than hidden: with nothing in the shipped files overlapping, this loop can only prove
+        # the *negative* half of the law (a pair whose boxes never meet, or which meets in
+        # sub-pixel coverage only, moves 0 px).  The positive half is proven one class down, in
+        # `AVisibleReorderIsBuiltOnPurpose`, where the overlap is authored rather than hoped for.
         self.assertGreater(silent + moved, 0,
                            "no pair of drawn rows in the corpus even meets, so the meeting branch "
                            "of the rule below is never exercised here")
+
+
+class AVisibleReorderIsBuiltOnPurpose(unittest.TestCase):
+    """The law's loud half, on two rows laid over each other in different colours.
+
+    The shipped corpus stopped supplying a *visible* reorder when `bars`'s meters were
+    cleared off the text of the row under them (2026-11-12): nothing in the 28 layouts
+    overlaps any more, so every pair the census above walks moves 0 px and that census can
+    only ever prove the negative half of the rule.  A swap that has to move ink therefore
+    has to be authored - and authored the way the census reads it, so the same standard
+    applies to both halves: measure the overlap band from each row painted alone, count the
+    pixels where both lie fully opaque in different colours, and require the swap to move
+    ink on exactly those pixels and in the order the list gives.
+
+    Two of `bars`'s own meters are the rows, because they are rectangles at the theme's own
+    constants - the shared band is arithmetic, not a face metric - and their declared colours
+    are made to differ.  That last part is the whole point of the fixture: an earlier attempt
+    at this case left both meters as shipped, both asking for the `heat` ramp at similar
+    fractions, and the swap moved **0** px for a perfectly correct reason - the overlap was
+    the same colour either way, so the law called it silent.  A gate that cannot tell a
+    decided pixel from an undecided one is not a gate.
+    """
+
+    def case(self) -> tuple:
+        obj = themes.export("bars")
+        widgets = obj["osd"]["widget"]
+        meters = [i for i, w in enumerate(widgets) if w["type"] == "bar"]
+        self.assertGreaterEqual(len(meters), 2, "the generated `bars` file has no two meters")
+        a, b = meters[0], meters[1]
+        pa, pb = widgets[a]["property"][0], widgets[b]["property"][0]
+        pb["y"] = pa["y"] + 2                  # b's track is made taller than a's, so the
+        pb["height"] = pa["height"] + 6        # overlap has interior rows in both, not edges
+        pb["startColor"] = pb["endColor"] = "rgba(255, 0, 0, 1)"
+        pb["bgColor"] = "rgba(0, 0, 255, 1)"
+        box = (max(pa["x"], pb["x"]), max(pa["y"], pb["y"]),
+               min(pa["x"] + pa["width"], pb["x"] + pb["width"]),
+               min(pa["y"] + pa["height"], pb["y"] + pb["height"]))
+        self.assertGreater(box[2] - box[0], 100, f"the two tracks barely meet: {box}")
+        self.assertGreaterEqual(box[3] - box[1], 1, f"the shared band has no rows: {box}")
+        return obj, a, b, box
+
+    def solo(self, widget):
+        img, _notes = paint_of({"osd": {"widget": [copy.deepcopy(widget)]}})
+        return img.convert("RGBA")
+
+    def test_a_swap_moves_ink_exactly_where_both_rows_lay_opaque_in_different_colours(self):
+        obj, a, b, box = self.case()
+        solo_a = self.solo(obj["osd"]["widget"][a])
+        solo_b = self.solo(obj["osd"]["widget"][b])
+        shared = []
+        x0, y0, x1, y1 = box
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                p, q = solo_a.getpixel((x, y)), solo_b.getpixel((x, y))
+                if p[3] == 255 and q[3] == 255 and p[:3] != q[:3]:
+                    shared.append((x, y))
+        if not shared:
+            self.skipTest(f"neither meter is opaque and different across the shared band {box} "
+                          "on this box, so there is no decided pixel to hold a swap to")
+        self.assertGreater(len(shared), 200,
+                           f"only {len(shared)} px of the shared band are opaque and different in "
+                           f"both rows ({box}): the fixture does not carry the overlap it claims")
+
+        before, _notes = paint_of(copy.deepcopy(obj))
+        before = before.convert("RGBA")
+        trial = gui_edit.Editor(copy.deepcopy(obj), origin="check", name="bars")
+        # the two meters are not neighbours in the file - every row is label, number, meter -
+        # so the swap is the model's door walked three times, which is what the window's own
+        # reorder buttons do.  Asserting the pair's relative order changed is what keeps this
+        # from passing on a swap that moved the row somewhere else in the list.
+        trial.select(a)
+        for step in range(3):
+            ok, said = trial.move_widget(+1)
+            self.assertTrue(ok, f"step {step + 1} of the swap was refused: {said}")
+        widgets_after = trial.widgets()
+        id_a = str(obj["osd"]["widget"][a].get("id"))
+        id_b = str(obj["osd"]["widget"][b].get("id"))
+        before_order = [str(w.get("id")) for w in obj["osd"]["widget"]]
+        after_order = [str(w.get("id")) for w in widgets_after]
+        self.assertLess(before_order.index(id_a), before_order.index(id_b),
+                        "the fixture does not start with the first meter earlier in the list")
+        self.assertGreater(after_order.index(id_a), after_order.index(id_b),
+                           f"three steps down the list did not put {id_a} after {id_b}: the door "
+                           f"moved the row somewhere else ({after_order})")
+        self.assertEqual(sorted(before_order), sorted(after_order),
+                         "the swap lost or invented a row")
+        after, _notes = paint_of(trial.obj)
+        after = after.convert("RGBA")
+
+        moved = px_differ(before, after)
+        # How far a track's ink reaches past the rectangle the file declares is a property of
+        # the painter, not a constant to remember: `render.bar` draws at the supersampled
+        # canvas and the frame comes back down with LANCZOS, so the edge spreads a couple of
+        # rows each way - and two translucent tracks composite in list order, which is the law
+        # working rather than a leak.  So the margin is measured here, from the same solo
+        # paintings used above: the rows that carry ink, against the rows the file declared.
+        def spread(img, rect) -> int:
+            d = img.getchannel("A").load()
+            inked = [y for y in range(render.H) if any(d[x, y] > 8 for x in range(render.W))]
+            if not inked:
+                self.skipTest("a meter laid down no ink at all, so there is no band to hold "
+                              "a reorder to")
+            return max(rect[1] - inked[0], inked[-1] - rect[3]) + 1
+
+        wa = obj["osd"]["widget"][a]["property"][0]
+        wb = obj["osd"]["widget"][b]["property"][0]
+        rect_a = (wa["x"], wa["y"], wa["x"] + wa["width"], wa["y"] + wa["height"])
+        rect_b = (wb["x"], wb["y"], wb["x"] + wb["width"], wb["y"] + wb["height"])
+        bleed = max(spread(solo_a, rect_a), spread(solo_b, rect_b))
+        self.assertLessEqual(bleed, 6, f"the track's ink spreads {bleed} rows past its declared "
+                                       "rectangle: the band this check can hold a reorder to is "
+                                       "wider than the overlap it is meant to be measuring")
+        # `Image.crop` takes a half-open box - `lower` is one past the last row it keeps - so
+        # the grown band adds one to each side beyond the measured spread, or the edge rows the
+        # bleed was measured *from* would fall outside the window they justify.
+        padded = (max(0, box[0] - bleed - 1), max(0, box[1] - bleed - 1),
+                  min(render.W, box[2] + bleed + 1), min(render.H, box[3] + bleed + 1))
+        inside = px_differ(before.crop(padded), after.crop(padded))
+        self.assertGreater(moved, 0,
+                           f"a swap of two rows with {len(shared)} decided opaque pixels in "
+                           f"{box} moved no ink at all: the draw order is not reaching the picture")
+        self.assertEqual(moved, inside,
+                         f"{moved - inside} px moved outside the shared band {box} grown by the "
+                         f"measured {bleed}-row edge bleed ({padded}): a reorder decided which row "
+                         "is on top somewhere only one of the two draws")
+
+        # and the direction, at a pixel in the middle of the band: before the swap the later
+        # row is b, after it the later row is a (the door moved a down the list), so the
+        # colour that survives at that pixel has to change from b's to a's.  Held both ways,
+        # because a painter that always drew the same row last would pass a one-sided check.
+        probe = shared[len(shared) // 2]
+        self.assertEqual(before.getpixel(probe), solo_b.getpixel(probe),
+                         f"before the swap, {probe} in the shared band was not the later row's "
+                         "colour, so the baseline picture does not follow the list either")
+        self.assertEqual(after.getpixel(probe), solo_a.getpixel(probe),
+                         f"after moving row {a} down the list, {probe} still shows the other "
+                         "row's colour: the row that is now later did not come out on top")
 
 
 if __name__ == "__main__":
