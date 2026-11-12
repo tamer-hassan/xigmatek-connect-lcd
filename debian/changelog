@@ -354,6 +354,14 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     that is a fact about your file rather than a broken install.  Three states
     pinned: a bare root 23 selectable, 4 refused, 0 hidden; one copy at a new
     name 23, 4, 0 with 1 in front; one copy at a vendor's own name 22, 4, 1.
+    And because that script ships inside the source tree while interrogating
+    the **installed** code, it now names the mismatch before it measures
+    anything: on a bench with 0.6 installed it answers that the `xigmalcd` it
+    is about to interrogate has no such rule and this checkout and this
+    install are not the same code, and stops with exit 1 instead of failing a
+    count on somebody's healthy system.  That was the sentence missing when
+    this cycle's report arrived, and the static check beside it holds the
+    wording.
 
   * The same block then found a fault in the shipped code, and it was a reader
     missing a rule the writer has had since 0.6.  `themes.save` refuses to put
