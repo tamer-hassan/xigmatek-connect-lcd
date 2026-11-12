@@ -86,8 +86,10 @@ nobody has looked at the glass to confirm, so the window's picker still lists MP
 only (docs/limits.md keeps that as an open item).
 
 All of that is about *this* program not sending those files, and it stays true: the panel
-is never handed a theme, and no plan here changes that. Two things follow from drawing
-them here instead, and both are gated in `tests/test_theme_library.py` rather than asserted here:
+is never handed a theme, and no plan here changes that. Three things follow from drawing
+them here instead - the first two are gated in `tests/test_theme_library.py`, the third in
+`tests/test_theme_files.py` and `tests/test_smoke_accounting.py`, and none of them is
+asserted here:
 
 * **23 of the 27, on the canvas.** The gate reads each file's own `ratio` field: 23 say
   `1:1` (480×480, the panel's size) and 4 say `4:3` (320×240). The four are refused, with
@@ -97,6 +99,18 @@ them here instead, and both are gated in `tests/test_theme_library.py` rather th
   it per theme), and scaling an unmeasured convention by 1.5 would put a guess on the
   glass. Keying the gate on `ratio` instead of on the directory name is deliberate: a
   future 480×480 layout must not be filtered out by a path rule.
+* **Two refusals, not one, and the listing says which.** Since 2026-11-13 `--list-themes`
+  counts the reasons out (`23 pickable, 4 refused: 4 on canvas` on a box that has never
+  edited a theme) because there are two ways a file in the library is unusable: the canvas it
+  declares, and having nothing in it to draw. The second was a hole, not a refinement -
+  `scan()` selected on `ratio` alone, so a JSON with no `osd` in your own themes directory was
+  a name `resolve()` answered, and `layout.draw_theme` walks `obj["osd"]["widget"]`, so the
+  frame naming it raised `KeyError: 'osd'` rather than painting an empty canvas. `themes.save`
+  has refused to *write* an empty layout since 0.6; the reader doors - `scan()`, `resolve()`,
+  `--theme`, `--check-theme`, and the editor's `open a file…` - now refuse to *read* one, in
+  `themes.NEED_OSD_WHY`'s words. Held by `tests/test_theme_files.py` and by
+  `tests/test_smoke_accounting.py`, which runs the installed check in three states of
+  `$XDG_CONFIG_HOME`.
 * **7 metric names over those 23, in 82 widgets' worth of counts**: `CPU Temperature` 17,
   `CPU Usage` 15, `Time` 11, `Pump Speed` 9, `GPU Usage` 6, `GPU Temperature` 3,
   `CPU Frequency` 2. 14 of the 23 need nothing this program has no reading for; 9 ask for

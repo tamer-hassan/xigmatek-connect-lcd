@@ -942,7 +942,98 @@ asked for the two doors above and not for that, and `layout` is not a session ke
 starts at `(nobody: preview the theme above)` and `reload the list` is how the names come back.
 
 
+### The installed check met a machine that had been used (2026-11-13)
+
+The 0.7 .deb files were built on the bench and installed on the owner's desktop - which is
+the first time `debian/tests/smoke` ever ran on a box that had been *used*.  It died in its
+last section:
+
+```
+AssertionError: (24, 4, 27, "the installed library's layouts are not all accounted for
+by `themes.scan()`")
+```
+
+Nothing was wrong with the install.  The assert added up what `themes.scan()` returned and
+compared it to what the package's own manifest lists, and those two quantities differ on any
+box where somebody has saved a layout, because `themes.roots()` puts
+`$XDG_CONFIG_HOME/xigmalcd/themes` **in front of** the installed library - on purpose, since
+that is the whole mechanism behind "edit a copy, keep the original".  23 selectable + 4
+refused = 27 installed, plus one `alpha_new.json`, answered 28 names.  Two more asserts in
+the same block sat on the same sand: the pairing asked every *picked* layout to name a clip
+the themes package had installed beside it, and a copy of `alpha` declares no background at
+all.
+
+The accounting is per root now, and it names the states it finds: each installed layout file
+is answered-from-the-package-and-selectable, refused-with-a-reason, or **hidden behind a copy
+of yours at the same name** - the last of those printed with the names, because it is the
+state a person is usually in without noticing.  The paint loop still walks everything
+selectable, copies included, since a copy is what a loop actually draws; the pairing claim is
+the package's own, so it walks the package's own records.
+
+| the box | installed files | answered from the package | refused | hidden behind a copy | this box's own, in front |
+| --- | --- | --- | --- | --- | --- |
+| nobody has edited a theme | 27 | 23 | 4 | 0 | 0 |
+| one copy at a new name | 27 | 23 | 4 | 0 | 1 |
+| one copy at a vendor's own name | 27 | 22 | 4 | 1 | 1 |
+
+Then the fixed block found a fault that had nothing to do with accounting.  To exercise it,
+`tests/test_smoke_accounting.py` writes a JSON that parses, declares `1:1` at 480×480 and
+carries no `osd` at all, and `layout.draw_theme` walks `obj["osd"]["widget"]` - so the
+painter raised **`KeyError: 'osd'`**.  Which meant `scan()` had been selecting on `ratio`
+alone, and such a file in a person's own themes directory was a name `--theme` accepted and
+the frame loop crashed on.  The writer has refused an empty layout since 0.6
+(`themes.save`), so this was the reader missing the same rule, and it is in the reader now:
+`scan()` marks a record unusable with a `why` and a `why_code`, `resolve()` refuses by that
+same mark, `why_not()`, `--theme`, `--check-theme` and the editor's `open a file…` all print
+`themes.NEED_OSD_WHY`'s one sentence, and `--list-themes` counts the refusals out instead of
+saying "refused":
+
+```
+  not_a_layout junk-id  480x480 ratio 1:1  NOT PICKABLE: no `osd` with a `widget` list, ...
+  23 pickable, 5 refused: 4 on canvas, 1 with nothing to draw
+```
+
+What was deliberately **not** done: `scan()` does not run `validate()`.  The loop re-resolves
+its theme name on every frame, and validating 27 layouts - 152 widgets, key by key - on every
+frame is a cost this repository has never measured, so the reader asks the one predicate the
+painter actually needs and `--check-theme` stays the door that prints the detailed report.
+That is written as a limit in docs/limits.md rather than left as an unstated difference
+between two doors.
+
+Gated, and shown to bite: `tests/test_smoke_accounting.py` (5 checks) *extracts the shipped
+heredoc from `debian/tests/smoke` and runs it*, against this checkout's copy of the same tree,
+in the three states above plus the unusable file, with the CLI cross-check aimed at this
+tree's entry point rather than whatever `xigmalcd` the package manager left on `PATH`.  As
+shipped: 5 checks, 0 failures.  Put the old identity back (`len(pick) + len(rej) == len(…)`)
+and 2 of the 5 fail - the new-name box and the shadowing box - and the static check that reads
+the script fails a third time, because it looks for the per-root wording by name.  Drop the
+new reader rule and `tests/test_theme_files.py`'s check fails on all four doors at once
+(`--theme` and `--check-theme` exit 0 instead of 2, `--list-themes` says `4 refused`, and
+`resolve()` answers the junk name).
+
+One real installed-system reading of the door fix, from the owner's desktop on 2026-11-13, the
+command printed for it:
+
+```
+$ xigmalcd --check-theme alpha_new
+  alpha_new (…): 480x480 ratio 1:1, 12 widgets, from your copy
+  drawn from this machine's readings through `themes.paint`, the door the frame loop uses
+  for a layout file: 12 boxes, 40390 lit px, skipped: nothing
+```
+
+Twelve boxes for twelve widgets, and nothing skipped - the same file that through 0.6's
+`themes.paint` reported `temp-values` and `fan-figures` with no box at all.  What this is
+*not* is a stage-6 transcript: it is the installed loop's own painter reporting what it
+found, on a machine with a panel attached but the port untouched.  The `APPLY a layout file`
+phase in `tools/display_glass.py` has still never been run, and the upgrade itself taught one
+more thing worth recording: replacing the unit file under a running unit makes systemd say
+`The unit file … changed on disk. Run 'systemctl --user daemon-reload'`, so an upgrade needs
+the reload it names before a restart draws with the new code.
+
+
 ## The surface, and the geometry it must not break
+
+
 
 
 
@@ -996,13 +1087,15 @@ real vendor themes with nothing gated on glass time. A sitting was about 3 focus
 this repo's standard: the claim measured, the number gated, the page updated in the same
 change.
 
-What the stages turned into, in the order they landed: the resolver and `--list-themes`,
-the export machinery and the file model on 2026-11-08, then the editor's model with the
-window's row over it and the canvas in that pane the same day; `bars` as a generated file
-and a changed drawing on 2026-11-09; rows added, removed, reordered and resized on
-2026-11-10; the peek on 2026-11-11; and on 2026-11-12 the peek split into a live body and a held one, with its knob moved onto the row above the picture it chooses. The census half of stage 5 is `tests/test_field_census.py`
-and `tests/test_editor.py` rather than a page of queries, and stage 6 - on glass - has not
-run.
+What the stages turned into, in the order they landed: the resolver and `--list-themes`, the
+export machinery and the file model on 2026-11-08; the editor's model with the window's row
+over it and the canvas in that pane the same day; `bars` as a generated file and a changed
+drawing on 2026-11-09; rows added, removed, reordered and resized on 2026-11-10; the peek on
+2026-11-11; and on 2026-11-12 the peek split into a live body and a held one with its knob
+moved above the picture, the two painters' value tables made into one, and the two doors that
+decide *which file* the editor's box holds.  On 2026-11-13 the check that runs against a real
+install met a machine that had been used, and the layout **reader** learned the rule the
+layout writer has always had.  What has not run is stage 6 - on glass.
 
 Optional, half a sitting: re-read the vendor's renderer bundles with
 `tools/asar_extract.py --cat out/renderer/assets/themeUtil-*.js` so every spin range and

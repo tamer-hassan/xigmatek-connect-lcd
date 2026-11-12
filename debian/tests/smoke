@@ -367,18 +367,72 @@ WHEN = datetime.datetime(2026, 11, 8, 3, 40, 0)
 pick, rej = themes.scan()
 lib = sys.argv[1]               # `python3 - "$lib"`, so the path arrives as argv
 man = json.load(open(os.path.join(lib, "manifest.json")))
-layouts = [e for e in man["files"] if e["path"].endswith(".json")
-           and e["path"].startswith("layouts/")]
-assert len(pick) + len(rej) == len(layouts), (
-    len(pick), len(rej), len(layouts),
-    "the installed library's layouts are not all accounted for by `themes.scan()`")
+listed = sorted(e["path"] for e in man["files"]
+                if e["path"].startswith("layouts/") and e["path"].endswith(".json"))
+assert listed, (lib, "the manifest lists no layouts at all")
+# What each of those files is *called* is `scan()`'s rule, not the file's own stem: the
+# vendor's layout files are named by their numeric theme id, and a layout is known by the
+# background clip it declares - `Theme_07` is what a reader types, `1757491589862.json` is
+# what sits on disk.  So the accounting has to ask the program for the names, and the only
+# thing the manifest is good for is the count of files.
+files = {}
+for rel in listed:
+    path = os.path.join(lib, *rel.split("/"))
+    assert os.path.isfile(path), (rel, "the manifest lists a layout file that is not there")
+    obj = themes.load(path)
+    known = os.path.splitext(os.path.basename(
+        (obj.get("background") or {}).get("mediaFile") or path))[0]
+    assert known not in files, (known, files.get(known), path,
+                                "two installed layout files answer one name, and `scan()` "
+                                "keeps one record per name")
+    files[known] = path
+# A box somebody has used reads a root no manifest lists - `$XDG_CONFIG_HOME/xigmalcd/themes`,
+# ahead of the package on purpose, because a copy you edited is what `--theme <name>` means
+# from then on - and such a copy can hide a package file of the same name.  So every installed
+# file is asked which of exactly three states it is in: answered from the package and
+# selectable, refused with its reason printed, or hidden behind a copy of yours.  That is the only
+# form of this file's old identity - add up everything `scan()` returns and compare it to the
+# number of files - that is true anywhere a person has saved a layout.  On 2026-11-13 the bare
+# count went red on the author's desktop over one `alpha_new.json`, with nothing wrong but the
+# assumption that nobody had used the machine.
+same = lambda r: os.path.abspath(r["root"]) == os.path.abspath(lib)
+sel, ref = [r for r in pick if same(r)], [r for r in rej if same(r)]
+theirs = sorted({r["name"] for r in pick + rej if not same(r)})
+winning = {n: themes.resolve(n) for n in files}
+hidden = sorted(n for n, path in files.items()
+                if winning[n] is not None
+                and os.path.abspath(winning[n]["path"]) != os.path.abspath(path))
+unanswered = sorted(n for n, r in winning.items() if r is None)
+named = {r["name"] for r in sel} | {r["name"] for r in ref}
+assert named | set(hidden) == set(files), (
+    sorted(set(files) - named - set(hidden))[:6], sorted(named - set(files))[:6],
+    "an installed layout is neither selectable, refused on its `ratio`, nor hidden behind a "
+    "copy of yours, and only those three states are possible")
+assert set(unanswered) == {r["name"] for r in ref}, (
+    unanswered[:6], sorted(r["name"] for r in ref)[:6],
+    "`resolve()` stops answering a name for some reason other than the `ratio` that "
+    "`scan()` already refused it on: the two doors disagree about why a name is unusable")
+assert not ({r["name"] for r in sel} & {r["name"] for r in ref}), (
+    "one name is both selectable and refused: `scan()` answers a name once")
+# Two ways a file in the library is unusable, and the records say which: the canvas they
+# declare, and having nothing in them to draw (`layout.draw_theme` reads `osd.widget`, so a
+# JSON without one used to be selected and then raise on the frame that named it).
 assert all(r["ratio"] == "1:1" for r in pick), [r["ratio"] for r in pick]
-assert all(r["ratio"] != "1:1" for r in rej), [r["ratio"] for r in rej]
-print(f"  installed selection {len(pick)} of the {len(layouts)} layouts in the manifest are "
-      f"selectable here, {len(rej)} refused on their own `ratio` field "
-      f"({', '.join(sorted({r['ratio'] for r in rej}))})")
+assert all(r.get("why") for r in rej), [r["name"] for r in rej if not r.get("why")]
+reasons = {}
+for r in rej:
+    label = themes.WHY_LABEL.get(r.get("why_code"), "refused")
+    reasons[label] = reasons.get(label, 0) + 1
+print(f"  installed selection {len(sel)} of the {len(files)} layouts the manifest lists are "
+      f"selectable and answered from {lib}, {len(ref)} refused "
+      + ", ".join(f"{n} {w}" for w, n in sorted(reasons.items()))
+      + (f", and {len(hidden)} hidden behind a copy of yours at the same name: "
+         f"{', '.join(hidden)}" if hidden else ""))
+if theirs:
+    print(f"  copies in front     {len(theirs)} layout(s) this box reads ahead of the "
+          f"package, from {themes.user_root()}: {', '.join(theirs)}")
 
-painted, asks, faces = 0, {}, set()
+painted, mine_painted, asks, faces = 0, 0, {}, set()
 for rec in pick:
     img, notes = themes.paint(rec, PIN, when=WHEN, scrim=0)
     src_skips = [m for m in notes["missing"] if not str(m).startswith("font:")]
@@ -387,16 +441,25 @@ for rec in pick:
         rec["name"], rec["widgets"], notes["boxes"], notes["missing"],
         "a widget of an installed layout neither drew nor was reported: the accounting "
         "identity the checkout's suite holds does not hold on an installed system")
-    assert notes["boxes"], (rec["name"], "an installed layout painted nothing at all")
-    painted += len(notes["boxes"])
+    assert notes["boxes"], (rec["name"], rec["path"], rec["root"],
+                            "a layout this machine reads at that name drew no widget at all, "
+                            "and a loop naming it would upload an empty OSD layer - whoever "
+                            "wrote the file is who this is about, package root or not")
+    if same(rec):
+        painted += len(notes["boxes"])
+    else:
+        mine_painted += len(notes["boxes"])
     for m in src_skips:
         asks[m] = asks.get(m, 0) + 1
     for m in face_skips:
         faces.add(str(m))
     assert img.size == (rec["w"], rec["h"]), (rec["name"], img.size, rec["w"],
                                              rec["h"])
-print(f"  installed painting  {painted} widget boxes painted across the {len(pick)} "
-      f"selectable layouts, from one pinned dict at one pinned instant, no port opened")
+print(f"  installed painting  {painted} widget boxes painted across the {len(sel)} layouts "
+      f"answered from {lib}, from one pinned dict at one pinned instant, no port opened"
+      + (f"; and {mine_painted} more across the {len(pick) - len(sel)} copy/copies this box "
+         "keeps in front of the package, held to the same identity - a copy of yours is the "
+         "file a loop actually draws" if pick and len(pick) > len(sel) else ""))
 print(f"                      sources with no reading here: "
       + (", ".join(f"{k} in {v} layouts" for k, v in sorted(asks.items(),
                                                             key=lambda kv: -kv[1]))
@@ -412,30 +475,32 @@ print(f"                      sources with no reading here: "
 # all of them, and that is what this part of the test now checks.  Before the change the
 # same code resolved 2 of the 23 by name.
 from xigmalcd.main import find_media, media_roots
+# The package's own promise, so the package's own records: a layout of yours may name a
+# clip this tree never installed, and that is a fact about your file, not a broken install.
 beside, resolvable = 0, []
-for rec in pick:
+for rec in sel:
     name, why = themes.pair(rec["name"])
     assert name and not why, (rec["name"], name, why)
     if os.path.isfile(os.path.join(lib, "clips", name)):
         beside += 1
     if os.path.basename(find_media(name)) == name and os.path.isfile(find_media(name)):
         resolvable.append(rec["name"])
-assert beside == len(pick), (beside, len(pick),
-                             "an installed layout names a clip the themes package did not "
-                             "install beside it")
+assert beside == len(sel), (beside, len(sel),
+                            "an installed layout names a clip the themes package did not "
+                            "install beside it")
 # Pinned at the count rather than printed and hoped: `media_roots()` carries the theme
 # library - the installed copy, and this checkout's where a source tree is around - so
 # a name `--list-themes` printed resolves through the loop as well.  The media roots
 # still win where both kinds of root hold the same name, which is what keeps the
 # session default exactly where it has always been.
-assert len(resolvable) == len(pick), (
-    sorted({r["name"] for r in pick} - set(resolvable)), len(pick),
+assert len(resolvable) == len(sel), (
+    sorted({r["name"] for r in sel} - set(resolvable)), len(sel),
     "an installed layout's declared clip no longer resolves by bare name through "
     "`main.media_roots()` - check that the theme library is still a root of it, and "
     "what each package installs under /usr/share/xigmalcd")
-print(f"  installed pairing   all {len(pick)} selectable layouts name one clip and the themes "
-      f"package installs {beside} of them under {lib}/clips; the loop's own name lookup "
-      f"(`--mp4 NAME`) resolves {len(resolvable)} of {len(pick)}, through: "
+print(f"  installed pairing   all {len(sel)} of the package's own selectable layouts name one "
+      f"clip and the themes package installs {beside} of them under {lib}/clips; the loop's "
+      f"own name lookup (`--mp4 NAME`) resolves {len(resolvable)} of {len(sel)}, through: "
       + ", ".join(media_roots()))
 
 # and the CLI's own door says the same thing in the same digits

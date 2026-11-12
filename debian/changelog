@@ -322,11 +322,93 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     same pass: 328 / 376 / 373 px of column floors at a 1280 px window here,
     331 / 394 / 390 there.
 
+  * The .deb files this cycle builds were installed and read back.  Built on
+    this bench from the tree above (`dh_clean`, then `dpkg-buildpackage -us
+    -uc -b`): code 5 441 716 B, themes 79 875 580 B, one mtime each, `lintian
+    --fail-on error,warning` with no tags, and the two fixes present in the
+    packaged bytes - `themes._overlay` called by both painters, and the
+    window's `open a file…`.  Installed on the owner's desktop, the same
+    `alpha_new.json` that through 0.6 reported two of its twelve widgets with
+    no box at all now prints, from `/usr/bin/xigmalcd`: 12 boxes, 40 390 lit
+    px, `skipped: nothing`, drawn through `themes.paint` - the door the frame
+    loop uses for a layout file.  That is the installed loop's own painter
+    reporting what it found on a box with a panel attached; the panel still
+    has no `APPLY a layout file` transcript, and says so below.
+
+  * The check that runs against an installed system had never run on a machine
+    that had been used.  `debian/tests/smoke`'s last section added up what
+    `themes.scan()` returned and compared that to the layouts the package's
+    own manifest lists; on the owner's desktop, with one saved copy of their
+    own in `~/.config/xigmalcd/themes`, it came out 24 + 4 against 27 and the
+    install was called broken for a reason that belonged to the check.
+    `themes.roots()` puts your directory in front of the installed library on
+    purpose - that is what makes a copy you edited mean `--theme <name>` - so
+    27 files and 28 names are both correct.  The accounting is per root now:
+    every installed layout file is either answered from the package and
+    selectable, refused with a printed reason, or **hidden behind a copy of
+    yours at the same name**, and that last state is named out loud because it
+    is the one a person is usually in without noticing.  The paint loop still
+    walks everything selectable, copies included, since a copy is the file a
+    loop actually draws; the pairing claim belongs to the package, so it walks
+    the package's own records - a copy of `alpha` declares no background, and
+    that is a fact about your file rather than a broken install.  Three states
+    pinned: a bare root 23 selectable, 4 refused, 0 hidden; one copy at a new
+    name 23, 4, 0 with 1 in front; one copy at a vendor's own name 22, 4, 1.
+
+  * The same block then found a fault in the shipped code, and it was a reader
+    missing a rule the writer has had since 0.6.  `themes.save` refuses to put
+    down a layout with an empty `osd.widget` list, but `scan()` selected on
+    the `ratio` field alone: a JSON that parses, declares 480x480 and carries
+    no `osd` at all - somebody's metrics dump, a clip's sidecar, half a config
+    file - was a name `resolve()` answered, and `layout.draw_theme` walks
+    `obj["osd"]["widget"]`, so the frame naming it raised `KeyError: 'osd'`
+    instead of drawing an empty canvas.  `scan()` marks such a record unusable
+    with a `why` and a `why_code` now, `resolve()` refuses by that same mark,
+    and `why_not()`, `--theme`, `--check-theme` and the window's `open a
+    file…` all print one sentence, `themes.NEED_OSD_WHY`; `--list-themes`
+    counts the reasons out - `23 pickable, 5 refused: 4 on canvas, 1 with
+    nothing to draw` - and names the file it refused.  What was deliberately
+    not done: `scan()` does not run `validate()`.  The loop re-resolves its
+    theme name on every frame, and validating 152 widgets every frame is a
+    cost this repository has never measured, so the reader asks the one
+    predicate the painter actually needs and `--check-theme` stays the door
+    that prints the detailed report.  That asymmetry is written as a limit in
+    docs/limits.md rather than left undeclared.
+
+  * Six checks for those two, one of which runs the other file.
+    `tests/test_theme_files.py` 5 -> 6: the unusable file is excluded and
+    listed, `resolve()` says None for its stem *and* for its id, `--theme` and
+    `--check-theme` exit 2 quoting the rule, and `--list-themes` prints the
+    file, the reason and the new tally.  `tests/test_smoke_accounting.py`, new
+    with 5 checks, extracts the accounting block out of `debian/tests/smoke`
+    and runs it against this checkout's copy of the same tree, in the three
+    states above and with the junk file, pointing the block's CLI cross-check
+    at this tree's entry point rather than at whatever `xigmalcd` the package
+    manager left on PATH - and reads the script itself, so a per-root identity
+    cannot quietly become a bare count again.  Shown to bite: put the
+    pristine-home identity back and 2 of the 5 fail, plus the static one; take
+    the new reader rule out and the theme-files check fails on all four doors
+    at once.
+
+  * An upgrade on a logged-in session, observed rather than reasoned about.
+    The owner's desktop answered `systemctl --user restart xigmalcd` with
+    `Warning: The unit file, source configuration file or drop-ins of
+    xigmalcd.service changed on disk. Run 'systemctl --user daemon-reload' to
+    reload units.`  Neither .deb has a `postinst`, so nothing in an install
+    speaks to the session's user manager - that manager belongs to the
+    desktop, not to dpkg - and the restart therefore ran the new
+    `/usr/bin/xigmalcd` under the old unit's properties.  Here the two unit
+    files agree on `ExecStart`, so nothing changed; the order that provably
+    loads a changed unit is `stop`, `daemon-reload`, `start`, and
+    `install/install.sh`, which writes the checkout's own copy of the unit,
+    already does all three.  docs/packaging.md records it beside the 0.2
+    observation that an upgrade can start the display on its own.
+
   * The suite's figures, re-read rather than inherited.  This bench, one
     sitting, the same tree both ways, `python3 -W error::ResourceWarning -m
-    unittest discover -s tests`: 475 checks in 47 files in 388.104 s, 3 skipped,
+    unittest discover -s tests`: 481 checks in 48 files in 397.077 s, 3 skipped,
     one of them the tray check naming the host it needs.  CI's runner, the
-    `tests/` step alone, over the cycles that added those 40 checks: 337 s with
+    `tests/` step alone, over the cycles that added those checks: 337 s with
     440 checks (#165), 387 with 441 (#168), 319 with 442 (#169), 413 with 446
     (#171), 416 with 447 (#172), 383 with 447 (#174), 358 with 453 (#175), 387
     with 453 (#176), 364 with 459 (#177) and 433.423 with 475 (#178) - that

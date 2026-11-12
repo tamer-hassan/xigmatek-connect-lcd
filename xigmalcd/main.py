@@ -627,9 +627,12 @@ def theme_name(value: str) -> str:
     """Validate `--theme`: one of the five drawn here, or a pickable library layout.
 
     A refused name is answered with the reason rather than with the whole vocabulary:
-    four of the 27 copied layouts are refused on canvas alone, and argparse's stock
-    "invalid choice" message would bury that under 27 spellings.  `themes.why_not()` is
-    the one place that knows why, and `--list-themes` prints it for all of them.
+    four of the 27 copied layouts are refused for the canvas they declare, and a file with
+    nothing in it to draw is refused too (`themes.NEED_OSD_WHY`) - a JSON that parses and
+    declares 480x480 but carries no `osd` used to reach the painter, where `KeyError: 'osd'`
+    is what the frame got.  And argparse's stock "invalid choice" message would bury either
+    reason under 27 spellings.  `themes.why_not()` is the one place that knows why, and
+    `--list-themes` prints it for all of them.
     """
     if value in render.THEMES:
         return value
@@ -1013,7 +1016,12 @@ def main(argv=None) -> int:
         for line in themes.census():
             print(line)
         ok, out = themes.scan()
-        print(f"  {len(ok)} pickable, {len(out)} refused on canvas alone")
+        tally: dict = {}
+        for rec in out:
+            label = themes.WHY_LABEL.get(rec.get("why_code", "ratio"), "refused")
+            tally[label] = tally.get(label, 0) + 1
+        print(f"  {len(ok)} pickable, {len(out)} refused: "
+              + ", ".join(f"{n} {w}" for w, n in sorted(tally.items())))
         used = themes.sources_used(ok)
         print("  sources the pickable set asks for: "
               + ", ".join(f"{k} {v}" for k, v in sorted(used.items(),

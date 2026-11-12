@@ -1074,7 +1074,8 @@ class Window(QMainWindow):
             "what the *loop* draws from this machine's readings, and the five are what "
             "`render.py` draws from them. The daemon does draw 23 of the library "
             "layouts - `xigmalcd --theme Theme_07`, and `--list-themes` prints the set "
-            "with the four refused on canvas - and the layout editor below previews "
+            "with the four refused for their canvas and any file with nothing in it to "
+            "draw refused for that reason - and the layout editor below previews "
             "those files on this same pane, at a pinned fixture rather than live "
             "readings. docs/themes.md says what the library is and is not, including "
             "that the panel is never handed a layout file (PROTOCOL.md §11).")

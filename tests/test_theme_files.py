@@ -156,6 +156,52 @@ class Saving(fixtures.FreshConfigRoot):
         self.assertNotIn("from your copy", after.stdout)
         self.assertIn("nothing saved yet", after.stdout, after.stdout)
 
+    def test_a_file_with_nothing_to_draw_is_not_a_name_the_loop_can_be_told(self):
+        """The writer has refused an empty layout since 0.6; the reader now does too.
+
+        `themes.save` will not put down a file with an empty `osd.widget` list, but until
+        2026-11-13 a file like that could still arrive by another door - a JSON dropped into
+        `~/.config/xigmalcd/themes` by hand, a metrics body saved with the wrong name, a clip's
+        sidecar - and `scan()` selected on the `ratio` field alone, so `resolve()` answered it.
+        What happened next was measured on 2026-11-13 while fixing `debian/tests/smoke`: the
+        file has no `osd` key at all, `layout.draw_theme` walks `obj["osd"]["widget"]`, and the
+        loop raised `KeyError: 'osd'` on the frame that named it.  A name the panel could be
+        told is a name the painter can paint, so the same rule is now asked at both doors, and
+        printed by whichever one refuses.
+        """
+        os.makedirs(themes.user_root(), exist_ok=True)
+        junk = os.path.join(themes.user_root(), "not_a_layout.json")
+        with open(junk, "w", encoding="utf-8") as fh:
+            json.dump({"id": "junk-id", "ratio": "1:1", "width": 480, "height": 480}, fh)
+        pick, reject = themes.scan()
+        self.assertNotIn("not_a_layout", [r["name"] for r in pick],
+                         "a file with nothing to draw is still selectable, so the loop can be "
+                         "pointed at it")
+        here = [r for r in reject if r["name"] == "not_a_layout"]
+        self.assertEqual(len(here), 1, "the file is not even listed as excluded: an invisible "
+                                       "refusal is how a person ends up hunting for their typo")
+        self.assertIn("osd", str(here[0].get("why")), here[0])
+        self.assertIsNone(themes.resolve("not_a_layout"), "the drawer still answers the name")
+        self.assertIsNone(themes.resolve("junk-id"), "and answering it by its `id`")
+        self.assertNotIn("not_a_layout", themes.names())
+        said = themes.why_not("not_a_layout")
+        for needle in ("osd", "widget"):
+            self.assertIn(needle, said, f"`why_not` does not say {needle!r}: {said}")
+        sentence = "no `osd` with a `widget` list"
+        for args in (("--check-theme", "not_a_layout"),
+                     ("--theme", "not_a_layout", "--dry-run", "unused")):
+            got = fixtures.run(sys.executable, "-m", "xigmalcd", *args)
+            self.assertEqual(got.returncode, 2,
+                             f"`xigmalcd {' '.join(args)}` did not refuse: exit "
+                             f"{got.returncode}, stdout {got.stdout[:300]!r}")
+            self.assertIn(sentence, got.stdout + got.stderr,
+                          f"`{args[0]}` refused without naming the rule: "
+                          f"{(got.stdout + got.stderr)[:400]}")
+        listed = fixtures.run(sys.executable, "-m", "xigmalcd", "--list-themes")
+        for needle in ("not_a_layout", sentence, "with nothing to draw"):
+            self.assertIn(needle, listed.stdout,
+                          f"--list-themes does not say {needle!r}: {listed.stdout[:400]}")
+
     def test_every_path_that_is_not_a_user_copy_is_refused_in_words(self):
         cases = (
             ("outside the user directory",

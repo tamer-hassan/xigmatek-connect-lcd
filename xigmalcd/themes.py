@@ -76,6 +76,20 @@ def roots() -> tuple:
 
 #: The canvas a layout must declare to be pickable, and the reason it is the one.
 NEED_RATIO = "1:1"
+
+#: How a listing counts the two refusals out, so a line like `--list-themes`'s does not have
+#: to say "refused" and leave the reader to guess which kind: the code is on the record.
+WHY_LABEL = {"ratio": "on canvas", "empty": "with nothing to draw"}
+
+#: The other thing a file has to have to be a layout at all, and the one wording every door
+#: that refuses it uses.  `layout.draw_theme` reads `obj["osd"]["widget"]`: a JSON without
+#: that list is not a layout with an empty canvas in it, it is a file the painter raises
+#: `KeyError` over - and until 2026-11-13 `scan()` selected on `ratio` alone, so such a file
+#: sitting in your own themes directory was a name `--theme` accepted and the loop crashed on.
+NEED_OSD_WHY = ("no `osd` with a `widget` list, which is the one thing every layout file in "
+                "this library has: it is nothing to draw, and `layout.draw_theme` reads that "
+                "key (a `STATE all 1` metrics body, a clip's sidecar or a config file all "
+                "look like this from here)")
 RATIO_WHY = ('ratio {ratio}: {w}x{h}, and the em-box anchor convention this program '
              'draws text by was measured at 480 only - docs/theme-editor.md keeps that '
              'plan and its cost')
@@ -84,9 +98,11 @@ RATIO_WHY = ('ratio {ratio}: {w}x{h}, and the em-box anchor convention this prog
 def scan() -> tuple:
     """(selectable, excluded) records for every layout file in `roots()`.
 
-    A record is {name, id, ratio, w, h, path, root, widgets, background}.  First-winning
-    root by name, exactly like the clip library, so a checkout and an installed package
-    never both answer for one name.
+    A record is {name, id, ratio, w, h, path, root, widgets, background}, and an excluded
+    one also carries `why` and `why_code` - the sentence this module prints for it and the
+    short label beside it - and that same sentence is what `resolve()` refuses by.
+    First-winning root by name, exactly like the clip library, so a checkout and an
+    installed package never both answer for one name.
     """
     by_name: dict = {}
     for root, pattern in roots():
@@ -106,9 +122,24 @@ def scan() -> tuple:
             # manifest is re-hashed in both, `tools/verify_manifest.py` in a checkout
             # and the same walk over the installed tree in `debian/tests/smoke`
             by_name.setdefault(stem, rec)
-    ok = sorted((r for r in by_name.values() if r["ratio"] == NEED_RATIO),
+    # Two things make a file unusable, and both are cheap to ask: the canvas it declares,
+    # and whether it holds anything to draw at all.  The second rule arrived on 2026-11-13
+    # with `debian/tests/smoke`'s accounting: a JSON that parses, declares 480x480 and carries
+    # no `osd` - somebody's metrics dump, a clip's sidecar, half a config file - is a name
+    # `resolve()` answered, and `layout.draw_theme` walks `obj["osd"]["widget"]`, so the loop
+    # did not draw an empty canvas: it raised `KeyError: 'osd'` on the frame that named the
+    # file.  `validate` has always said this in words about a file's contents; this is the
+    # same rule one door earlier, where it costs two dict lookups per file per scan rather
+    # than a full validation on every frame the loop draws.
+    for rec in by_name.values():
+        if rec["ratio"] != NEED_RATIO:
+            rec["why"], rec["why_code"] = (
+                RATIO_WHY.format(ratio=rec["ratio"], w=rec["w"], h=rec["h"]), "ratio")
+        elif not rec["widgets"]:
+            rec["why"], rec["why_code"] = NEED_OSD_WHY, "empty"
+    ok = sorted((r for r in by_name.values() if not r.get("why")),
                 key=lambda r: r["name"].lower())
-    out = sorted((r for r in by_name.values() if r["ratio"] != NEED_RATIO),
+    out = sorted((r for r in by_name.values() if r.get("why")),
                  key=lambda r: r["name"].lower())
     return ok, out
 
@@ -152,10 +183,14 @@ def resolve(name: str):
     ok, out = scan()
     want = str(name).strip()
     for rec in ok + out:
+        # one rule for both spellings, and `scan()`'s own `why` is what says it: the door
+        # that lists layouts and the door that draws one cannot be allowed to disagree
+        # about whether a file is usable, or a name appears in `--list-themes` and raises
+        # in the painter
         if want == rec["name"] or want.lower() == rec["name"].lower():
-            return rec if rec["ratio"] == NEED_RATIO else None
+            return None if rec.get("why") else rec
         if want == rec["id"]:
-            return rec if rec["ratio"] == NEED_RATIO else None
+            return None if rec.get("why") else rec
     return None
 
 
@@ -165,7 +200,8 @@ def why_not(name: str) -> str:
     want = str(name).strip()
     for rec in out:
         if want.lower() in (rec["name"].lower(), rec["id"].lower()):
-            return RATIO_WHY.format(ratio=rec["ratio"], w=rec["w"], h=rec["h"])
+            return rec.get("why") or RATIO_WHY.format(ratio=rec["ratio"], w=rec["w"],
+                                                      h=rec["h"])
     if want in render.THEMES:
         return "one of the five this program draws itself"
     return (f"no layout named {name!r} under {' or '.join(r for r, _ in roots())} "

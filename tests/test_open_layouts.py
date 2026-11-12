@@ -282,6 +282,19 @@ class AFileThatIsNotInALibrary(OpeningAWindow):
                               f"the refusal does not name what was refused: {said[:240]}")
                 self.assertIn(needle, said,
                               f"the refusal for {bad} does not say {needle!r}: {said[:240]}")
+        # and the two rules that decide whether a file is a layout at all are quoted in the
+        # library's own words, not invented at this door: `themes.NEED_OSD_WHY` and
+        # `themes.RATIO_WHY` are what `--theme`, `--check-theme` and `--list-themes` print for
+        # the same two faults, and a wording of its own here is a rule that can drift
+        self.win._editor_open_path(os.path.join(self.root, "metrics.json"))
+        fixtures.pump(0.1)
+        self.assertIn("no `osd` with a `widget` list", self.win.ed_note.text(),
+                      "the editor's path door refuses a file with nothing to draw in words of "
+                      "its own, which is how a rule ends up said three ways")
+        self.win._editor_open_path(wide)
+        fixtures.pump(0.1)
+        self.assertIn("em-box anchor", self.win.ed_note.text(),
+                      "the canvas refusal is not `themes.RATIO_WHY`'s sentence")
         self.win._editor_open_path(self.path)
         fixtures.pump(0.3)
         holding = self.win.ed.name

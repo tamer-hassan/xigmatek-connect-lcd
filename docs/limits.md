@@ -914,6 +914,19 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   under the layout menu prints which of those three cases a name is in, by asking
   `themes.resolve()` rather than remembering what it said when the file was opened
   (`tests/test_open_layouts.py`, thirteen checks).
+* **A file with nothing to draw is refused at the reader as well as at the writer.**
+  `themes.save` has refused an empty `osd.widget` list since 0.6, but until 2026-11-13
+  `scan()` and `resolve()` selected on the `ratio` field alone: a JSON with no `osd` key at
+  all, dropped into `~/.config/xigmalcd/themes` by hand or written by something that meant
+  its own metrics dump, was a name `--theme` accepted - and `layout.draw_theme` walks
+  `obj["osd"]["widget"]`, so the frame naming it raised `KeyError: 'osd'` rather than drawing
+  an empty canvas. Selection asks both rules now, `--list-themes` counts the refusals out by
+  reason instead of saying "refused", and the editor's by-path door quotes the same sentence
+  (`themes.NEED_OSD_WHY`). What did **not** change, and would cost a measurement first:
+  selection still does not run `validate()`. The loop re-resolves its theme name on every
+  frame, and validating 27 layouts - 152 widgets, every field - per frame is a cost that has
+  never been measured here, so the reader asks the one predicate the painter actually needs
+  and `--check-theme` is where the detailed report is printed.
 * **The five drawn-from-code names cannot be saved as files.** A `gauge.json` would be a
   second source of truth for `render.theme_gauge`, which is exactly the drift the export
   design exists to avoid; a save that tried it is refused, and `--check-theme gauge` says

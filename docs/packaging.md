@@ -131,6 +131,16 @@ Four things an install does that a checkout does not:
   summary for a reader is the operational one: **upgrading this package on a logged-in
   session can bring the display up on its own**, so stop it first (`systemctl --user stop
   xigmalcd`) if something else is holding the port or you are mid-run on the glass.
+  The 0.6 → 0.7 upgrade on the owner's desktop on 2026-11-13 printed the other half of the
+  same picture: `systemctl --user restart xigmalcd` answered `Warning: The unit file, source
+  configuration file or drop-ins of xigmalcd.service changed on disk. Run 'systemctl --user
+  daemon-reload' to reload units.` Neither .deb has a `postinst`, so nothing in an install
+  talks to the session's user manager - deliberately, since that manager belongs to the
+  desktop, not to dpkg - which means the restart ran the **new** `/usr/bin/xigmalcd` under the
+  **old** unit's properties. For this upgrade that made no difference (the two unit files
+  agree on `ExecStart`), but the order that provably loads a changed unit is `stop`,
+  `daemon-reload`, `start` - and `install/install.sh`, which writes the checkout's own copy
+  of the unit, does all three in that order.
 * no `.pyc` is in either `.deb` - they are written on the target, by the target's
   interpreter;
 * the udev rule lands in `/usr/lib/udev/rules.d`, the distro's own directory rather than

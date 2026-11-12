@@ -113,11 +113,18 @@ such upload; docs/themes.md).
 `tests/test_theme_library.py`, so the paragraph is a record, not a
 claim:
 
-* **23 pickable, 4 refused, and the refusal is on the file's own `ratio` field** - the
-  23 declare `1:1` at 480×480, the 4 declare `4:3` at 320×240. A 320×240 layout would
-  multiply the em-box anchor convention by 1.5, and that convention was measured at 480
-  only. Keying the gate on `ratio` rather than on the directory name is what stops a
-  future 480×480 file from being filtered out by a path rule.
+* **23 pickable, 4 refused, and every refusal is a property of the file, printed with its
+  own reason** - the 23 declare `1:1` at 480×480, the 4 declare `4:3` at 320×240. A 320×240
+  layout would multiply the em-box anchor convention by 1.5, and that convention was measured
+  at 480 only. Keying the gate on `ratio` rather than on the directory name is what stops a
+  future 480×480 file from being filtered out by a path rule. The listing counts the reasons
+  out rather than saying "refused": a box that has never edited a theme prints `23 pickable,
+  4 refused: 4 on canvas`, and one with a stray JSON in its own themes directory prints
+  `23 pickable, 5 refused: 4 on canvas, 1 with nothing to draw`. That second rule is new on
+  2026-11-13: `layout.draw_theme` reads `obj["osd"]["widget"]`, so a file without one is not
+  an empty canvas but a `KeyError` in the painter - `themes.save` has always refused to
+  *write* such a file, and now `scan()`, `resolve()`, `--theme` and `--check-theme` all refuse
+  to *read* one, in `themes.NEED_OSD_WHY`'s words, with the file named in `--list-themes`.
 * **7 metric names are asked for** over those 23 files: `CPU Temperature` 17 widgets,
   `CPU Usage` 15, `Time` 11, `Pump Speed` 9, `GPU Usage` 6, `GPU Temperature` 3,
   `CPU Frequency` 2. **14 of the 23 need nothing this program has no reading for**; the

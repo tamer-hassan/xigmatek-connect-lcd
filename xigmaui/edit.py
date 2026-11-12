@@ -441,11 +441,7 @@ class Editor:
         except json.JSONDecodeError as exc:
             raise ValueError(f"{here} is not JSON: {exc}") from exc
         if not isinstance(obj, dict) or not (obj.get("osd") or {}).get("widget"):
-            raise ValueError(
-                f"{here} is JSON but not a layout: it carries no `osd` with a `widget` list, "
-                f"which is the one thing every layout file in this library has "
-                f"(a `STATE all 1` metrics body, a clip's sidecar or a config file all look "
-                f"like this from here)")
+            raise ValueError(f"{here} is JSON but not a layout: {themes.NEED_OSD_WHY}")
         stem = os.path.splitext(os.path.basename(here))[0]
         rec = themes.resolve(stem)
         if rec is not None and os.path.abspath(rec["path"]) == here:
