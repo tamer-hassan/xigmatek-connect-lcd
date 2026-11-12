@@ -170,5 +170,147 @@ class HitAndMove(unittest.TestCase):
                          f"validate objected to a legal anchor: {soft}")
 
 
+class AReadOfTheMachineIsNotPartOfAnEdit(fixtures.FreshConfigRoot):
+    """An act on the editor repaints the file; it must not re-read this box.
+
+    The pane's layer paint begins with `sensors.collect()`, which is what puts the machine's
+    numbers in the line under the picture.  With a layout open that reading paints nothing:
+    `Editor.paint` draws the file at the pinned fixture, deliberately, so a field change is the
+    only thing that can move a pixel.  So every mouse-move of a drag - and every arrow-key
+    repeat - paid for a full sensor read to colour one line of text.  Measured on the author's
+    bench while writing this: 189.9 ms for `sensors.collect()`, 10.3 ms for the layout paint,
+    so a dragged row followed the cursor about five times a second on a machine that was doing
+    nothing else, playing or not.
+
+    What is asserted is a **count**, which holds on any box, never a duration.  And two guards go
+    with it, because "the drag stopped reading" is one step from "nothing reads any more": the
+    preview tick still reads with an editor open, and the live pane still reads when no layout is
+    open at all.
+    """
+
+    LAYOUT = "bars"
+
+    @classmethod
+    def setUpClass(cls):
+        fixtures.qapp()
+
+    def setUp(self):
+        super().setUp()
+        self.win = app.Window(MISSING_PORT, None, restore=False, save_settings=False)
+        self.win.show()
+        self.win.resize(1280, 900)
+        fixtures.pump(0.4)
+        self.win.ed_name.setCurrentText(self.LAYOUT)
+        fixtures.pump(0.5)
+        self.addCleanup(fixtures.close_window, self.win)
+        self.ed = self.win.ed
+        self.assertIsNotNone(self.ed, f"opening {self.LAYOUT} left the window with no editor")
+        self.row = next(i for i in range(len(self.ed.widgets()))
+                        if self.ed._row_box(self.ed.obj, i))
+        box = self.ed._row_box(self.ed.obj, self.row)
+        self.point = (box[0] + 2, (box[1] + box[3]) // 2)
+        self.win.ed_widget.setCurrentIndex(self.row)
+        fixtures.pump(0.2)
+
+    # ---- the shipped door, counted rather than replaced -------------------------------------
+    def count_reads(self) -> list:
+        real, seen = app.sensors.collect, []
+
+        def counted(*args, **kw):
+            out = real(*args, **kw)
+            seen.append(1)
+            return out
+
+        app.sensors.collect = counted
+        self.addCleanup(setattr, app.sensors, "collect", real)
+        return seen
+
+    def event(self, which: str, x: int, y: int):
+        from PyQt6.QtCore import QEvent, QPointF, Qt as QQt
+        from PyQt6.QtGui import QMouseEvent
+        kinds = {"press": QEvent.Type.MouseButtonPress, "move": QEvent.Type.MouseMove,
+                 "release": QEvent.Type.MouseButtonRelease}
+        pos = QPointF(x, y)
+        return QMouseEvent(kinds[which], pos, pos, QQt.MouseButton.LeftButton,
+                           QQt.MouseButton.LeftButton, QQt.KeyboardModifier.NoModifier)
+
+    def pane_point(self, px: int, py: int) -> tuple:
+        ox, oy = self.win.preview._origin()
+        k = self.win.preview.side / render.W
+        return int(round(ox + px * k)), int(round(oy + py * k))
+
+    def number_of(self, index: int) -> int:
+        props = (self.ed.widgets()[index].get("property") or [{}])[0]
+        return int(props["x"])
+
+    def test_a_drag_across_the_glass_reads_this_machine_no_more_than_a_tick(self):
+        seen = self.count_reads()
+        ox, oy = self.pane_point(*self.point)
+        self.win.preview.mousePressEvent(self.event("press", ox, oy))
+        self.assertTrue(self.win._drag, "the press found no row, so the moves below prove nothing")
+        base, before = len(seen), self.number_of(self.row)
+        frame = self.win._osd
+
+        for step in (4, 8, 12, 16, 20, 24):
+            x, y = self.pane_point(self.point[0] + step, self.point[1])
+            self.win.preview.mouseMoveEvent(self.event("move", x, y))
+
+        self.assertNotEqual(self.number_of(self.row), before,
+                            "the drag never moved the row, so a read count of zero would be "
+                            "measuring an empty act")
+        self.assertNotEqual(self.win._osd.tobytes(), frame.tobytes(),
+                            "the pane's layer did not change under the drag: a read count of "
+                            "zero would then be measuring an act that painted nothing, which is "
+                            "how a dead pane would look like a fast one")
+        reads = len(seen) - base
+        self.assertEqual(reads, 0,
+                         f"{reads} sensor reads for 6 drag moves: the file at the pinned "
+                         "fixture is what this pane paints, so the reads colour one line of "
+                         "text and nothing else")
+        self.win.preview.mouseReleaseEvent(self.event("release", *self.pane_point(
+            self.point[0] + 24, self.point[1])))
+
+    def test_an_arrow_key_nudge_reads_this_machine_no_more_than_a_drag(self):
+        seen = self.count_reads()
+        before = self.number_of(self.row)
+        for _ in range(6):
+            self.win._canvas_nudge(1, 0)
+        self.assertEqual(self.number_of(self.row), before + 6,
+                         "six nudges did not move the row six px")
+        self.assertEqual(len(seen), 0,
+                         f"{len(seen)} sensor reads for 6 key repeats: a held arrow key is the "
+                         "same act as a drag, at the same rate")
+
+    def test_editing_a_field_reads_this_machine_no_more_than_a_drag(self):
+        seen = self.count_reads()
+        before = self.number_of(self.row)
+        self.ed.select(self.row)
+        _label, _box, ctl, _extra, what = self.win.ed_rows["x"]
+        self.assertEqual(what, "num", f"the `x` row is a {what} control here, not a number box")
+        ctl.setValue(before + 3)
+        self.win._ed_apply_row("x", True)
+        self.assertEqual(self.number_of(self.row), before + 3, "the field did not reach the model")
+        self.assertEqual(len(seen), 0,
+                         f"{len(seen)} sensor reads for one field write")
+
+    def test_the_preview_tick_still_reads_with_an_editor_open(self):
+        seen = self.count_reads()
+        self.win._repaint()                     # what `preview_timer` calls, with no arguments
+        self.assertEqual(len(seen), 1,
+                         "the tick stopped reading the machine: with an editor open, the line "
+                         "under the picture would freeze at whatever it last saw")
+
+    def test_the_live_pane_still_reads_with_no_layout_open(self):
+        seen = self.count_reads()
+        self.win.ed = None                      # the state the window starts in
+        self.win._repaint()
+        self.assertEqual(len(seen), 1,
+                         "the live preview stopped reading: `render.draw` needs the body, so "
+                         "this is the one path where the read is the picture")
+
+
+E = __import__("PyQt6.QtCore", fromlist=["QEvent"]).QEvent
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

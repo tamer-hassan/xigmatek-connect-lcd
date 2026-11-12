@@ -1844,7 +1844,7 @@ class Window(QMainWindow):
         params = inspect.signature(render.THEMES[theme]).parameters
         return {k: v for k, v in kw.items() if k in params} | {"scrim": want}
 
-    def _repaint(self) -> None:
+    def _repaint(self, readings: bool = True) -> None:
         """Redraw **our layer** from fresh readings, then show it.
 
         This is the expensive half, and it is deliberately the only half tied to
@@ -1855,8 +1855,20 @@ class Window(QMainWindow):
         Before that split the pane's redraw rate *was* the animation rate, and a
         24 fps clip at the default 2 fps - or the author's own saved 1 fps - was a
         slideshow, which is what "it stutters at about 1 fps" meant.
+
+        `readings=False` is for an act the reader made with a layout open: a drag, a
+        held arrow key, one field written.  With an editor in the pane the picture
+        **is** the file painted at the pinned fixture, so the one part of a tick that
+        costs the most paints nothing at all - it only colours the line under the
+        picture, which keeps the body this tick did not read.  Measured on the author's
+        bench, and the reason the parameter exists: 189.9 ms for `sensors.collect()`
+        against 10.3 ms for the layout paint, so a dragged row followed the cursor
+        about five times a second.  `tests/test_canvas.py` counts the reads an act
+        makes - a count, never a duration, because a duration belongs to a box - and
+        guards the other side of it: the `preview_timer` tick and the live pane with
+        no layout open still read, so the line under the picture cannot freeze.
         """
-        m = sensors.collect()
+        m = sensors.collect() if readings else (self._last or {})
         self._last = m
         theme = self.theme.currentText()
         if self.ed is not None:
@@ -3317,7 +3329,7 @@ class Window(QMainWindow):
                 self._ed_bind_rows(field)      # show the rgba the model stored
             if not note:
                 self._ed_explain(field)
-            self._repaint()
+            self._repaint(readings=False)
         self._editor_state()
 
     def _ed_pick_colour(self, field: str) -> None:
@@ -3776,7 +3788,7 @@ class Window(QMainWindow):
             # a row that stops 2 px short of the cursor needs a reason on the glass rather
             # than a mystery, and the reason is the file's: this is the number it is on
             self.ed_note.setText(self._snap_said)
-        self._repaint()
+        self._repaint(readings=False)
         self._canvas_marks()
 
     def _canvas_resize_move(self, px: int, py: int) -> None:
@@ -3905,7 +3917,7 @@ class Window(QMainWindow):
             self.ed_note.setText(note)
             return
         self._ed_bind_rows()                # the x/y rows show the new position
-        self._repaint()
+        self._repaint(readings=False)
         self._canvas_marks()
         self._editor_state()
         if self._off_glass:
