@@ -5,9 +5,10 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     is deleted, and what it checked is now 414 checks across 45 files in
     `tests/`, run by the standard library: `python3 -m unittest discover -s
     tests`.  Measured on this bench in one sitting, the same tree both ways:
-    124 s for the 278 checks as they stood at the deletion, 288 s for the 414
-    once the sections that had not come across were ported, against the 497 s
-    the runner timed the suite's own step at for the `v0.6` tag.
+    124.240 s for the 278 checks as they stood at the deletion, 287.827 s for
+    the 414 once the sections that had not come across were ported - and on
+    CI's runner the `tests/` step measures 323 s for the 414, against the
+    497 s the same runner spent on the suite's single step for `v0.6`.
     Nothing that examined code was dropped in the end - the wire, the
     encoder's loss budget, the copied library's painting, the export parity,
     the substitutions a layout names, `alpha`'s special rows, the window, the
