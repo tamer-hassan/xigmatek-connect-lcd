@@ -419,9 +419,12 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     `tests/` step alone, over the cycles that added those checks: 337 s with
     440 checks (#165), 387 with 441 (#168), 319 with 442 (#169), 413 with 446
     (#171), 416 with 447 (#172), 383 with 447 (#174), 358 with 453 (#175), 387
-    with 453 (#176), 364 with 459 (#177) and 433.423 with 475 (#178) - that
-    last run skipping 4 rather than 3, the extra one being the glass ledger
-    naming transcripts a runner with no panel has never made.  The spread is
+    with 453 (#176), 364 with 459 (#177), 433.423 with 475 (#178) and 442.333
+    with 481 (#180) - those last two runs skipping 4 rather than 3, the extra
+    one being the glass ledger naming transcripts a runner with no panel has
+    never made, and the 9 s between them being what the six new checks cost:
+    five of them run a shipped script as a subprocess, and the interpreter
+    start-up that belongs to that is measured, not assumed.  The spread is
     the runner's; the 435 in this entry's first bullet is what the port landed
     at, not what the tree holds.
 
