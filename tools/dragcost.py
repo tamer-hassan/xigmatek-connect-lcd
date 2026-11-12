@@ -90,6 +90,16 @@ def main() -> int:
                     help="whether the `--preview-fps` timer runs (default on, as in a "
                          "session: a tick that lands mid-drag is part of the feel)")
     ap.add_argument("--dx", type=int, default=1, help="px per move, the pointer's stride")
+    ap.add_argument("--pane-readings", choices=("fixture", "sensors", "file"), default="fixture",
+                    help="which body the editor's picture is painted from while the drag runs "
+                         "(the knob on the row above the pane).  `sensors` is the live pane: it "
+                         "should cost the same as the fixture, and a second drawing of the "
+                         "pinned file there is the mistake this switch exists to catch.  `file` "
+                         "needs --metrics-file and refuses the press by design, so it reports "
+                         "the refusal rather than pretending to drag")
+    ap.add_argument("--metrics-file", default="", metavar="PATH",
+                    help="a JSON `STATE all 1` body for --pane-readings file (the same shape "
+                         "`--metrics-file` takes)")
     ap.add_argument("--profile", action="store_true",
                     help="also run the moves under cProfile and print the top frames by "
                          "time in this package")
@@ -196,6 +206,19 @@ def main() -> int:
     win.anim_toggle.setChecked(a.playing == "on")
     if a.timer == "off":
         win.preview_timer.stop()
+    # the knob on the row above the pane, driven through the shipped door
+    if a.pane_readings != "fixture":
+        if a.pane_readings == "file":
+            if not a.metrics_file:
+                print("--pane-readings file needs --metrics-file PATH: a body has to be named "
+                      "before it can be held", file=sys.stderr)
+                return 2
+            win.ed_peek_file.setText(a.metrics_file)
+        win.ed_peek.setCurrentIndex(1 if a.pane_readings == "sensors" else 2)
+        win._editor_peek()
+        for _ in range(6):
+            app_q.processEvents()
+            time.sleep(0.05)
     for _ in range(8):
         app_q.processEvents()
         time.sleep(0.05)
@@ -204,6 +227,8 @@ def main() -> int:
           f"{os.path.basename(win.mp4) if win.mp4 else 'none'}, playing "
           f"{win.anim_toggle.isChecked()}, preview fps {win.preview_fps}, thumbnails "
           f"pending {len(getattr(win, '_pending', []))}")
+    print(f"  pane readings   {a.pane_readings}"
+          f"{'' if a.pane_readings == 'fixture' else (' - ' + str((win._peek or {}).get('source')))}")
     ed = win.ed
     if ed is None:
         print(f"opening {a.layout!r} left the window with no editor: nothing to drag",
@@ -304,7 +329,13 @@ def main() -> int:
         start = (box[0] + 2, (box[1] + box[3]) // 2)
         win.preview.mousePressEvent(event("press", *pane(*start)))
         if not win._drag:
-            print(f"drag {nth}: the press found no row at panel {start}", file=sys.stderr)
+            # A held peek refuses a press on purpose, so the refusal is the finding here and
+            # not a failure of this tool: say what the mode is and which knob opens the doors.
+            held = bool(win._peek) and not win._peek.get("live")
+            print(f"drag {nth}: the press found no row to grab at panel {start}"
+                  + (" - and this mode refuses a press by design: a held `metrics file` frame "
+                     "is a look, not an editing surface.  The moves below would measure "
+                     "nothing" if held else ""), file=sys.stderr)
             return []
         times = []
         for step in range(1, a.moves + 1):

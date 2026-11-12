@@ -390,7 +390,12 @@ reader.
   temporary settings root and restores *that*, so the number is of a session somebody
   actually runs and the real settings file cannot be written; `--drags N` matters because the
   first drag lands while the clip library is still probing clips and is not the same act as
-  the later ones; `--profile` adds a cProfile pass, labelled with its own overhead. Like
+  the later ones; `--pane-readings fixture|sensors|file` drags while the pane is painted from
+  the pinned body, **live** from this machine, or a held `--metrics-file`, because a mode that
+  draws the file twice per event and one that draws it once look identical on screen and 8 ms
+  apart under the pointer; `--profile` adds a cProfile pass, labelled with its own overhead.
+  In held mode it says so and stops rather than reporting a drag: that mode refuses a press by
+  design, and a measurement of nothing is not a figure. Like
   `tools/screenshot.py` it refuses a `--device` path that exists - the window's status read
   would open the port - and `--allow-port` is there when measuring the real session is the
   point; either way it sends no frame.
