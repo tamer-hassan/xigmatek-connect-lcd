@@ -390,6 +390,8 @@ nudge it with the arrow keys.
 What each of the following claims rests on - every one of them is something an editor
 commonly gets wrong:
 
+#### What a row's field says, and what a value it cannot dress does
+
 * **The note line under the rows says what the row paints.** For a `text` or `data` widget
   the keys that choose the line - `content`, `source`, `xigma.format`, `fontFamily`,
   `fontSize`, `bold`, `anchor`, `autoFitMax`, `xigma.showIf` - print the sentence the row
@@ -447,6 +449,8 @@ commonly gets wrong:
   frame against frame for a real vendor row: **0 px** of difference. Nothing else folds
   - `source`, `showIf`, `name` and `anchor` are keys the painter matches exactly, and
   `source: cpu temperature` is still refused in words.
+
+#### Rows: added as a copy, resized at an edge, moved by the list
 
 * **Rows can be added, removed and reordered, and a new row is always a copy of a row that
   already draws.** Four controls under the fields do it - `add`, `remove`, `up`, `down` - and
@@ -538,6 +542,8 @@ commonly gets wrong:
   spot, still meeting another box and saying so in the sentence - and **35 / 109 / 15** on
   CI's runner, and `tests/test_row_acts.py` holds whichever machine is running it to its half
   of that pair.
+#### Snapped to a number this same file already uses
+
 * **A drag can be pulled onto a number this same file already uses, 2 px at most.** The lines are
   the layout's own, and the reach comes out of counting them rather than out of taste: of the
   **185** rows that carry an `x` or a `y` in the **28** layouts this pane can open, **89** hold an
@@ -633,6 +639,8 @@ commonly gets wrong:
   end of the list, the last row - all leave `dirty`, the undo count and the file exactly where
   they found them, which `tests/test_row_acts.py` checks rather than hopes.
 
+#### Files, names and the field list a kind is offered
+
 * **Opening writes nothing.** The file appears at `save`, because your copy of a name is
   what `--theme` and the control socket find first, and that shadowing is a fact about
   files: browsing a theme's fields must not quietly change what the loop draws. `tests/test_editor.py`
@@ -711,6 +719,8 @@ commonly gets wrong:
   instead of trusting the prose: a declared pitch and the two figures' ink-box centres
   agree to within 2 px on the painted frame, and narrowing the pitch moves each figure
   half the difference inboard.
+#### Pinned readings, and looking at another body's
+
 * **The pane shows the file, at pinned readings.** `themes.draw` - the door
   `--check-theme` uses and the frame loop uses for a layout theme - with the fixture every
   documented figure in this repo was read at (CPU 57.0 °C, GPU 47.0 °C, 2026-02-17
@@ -830,6 +840,8 @@ commonly gets wrong:
   name to, and this window's own `One frame now` still renders the theme picker's
   picture: a layout reaches the glass as frames only through a display that can
   resolve its name.
+
+#### Pointing at the picture, and the chrome over it
 
 * **The picture can be pointed at, and what a point means is the paint's answer.** The
   ink box `themes.draw` records for the selected row is marked on the pane. Press inside a
