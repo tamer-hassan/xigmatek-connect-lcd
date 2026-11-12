@@ -73,17 +73,53 @@ def popup_of(widget: QWidget) -> tuple:
     The popup is a `QTipLabel`, a top-level Qt creates on demand and destroys on a timer, so it is
     waited for rather than assumed: asking once, immediately, is what made the first version of
     this helper flake between one spelling of a colour and the next.
+
+    The wait is counted in **event-loop spins**, not in seconds.  This helper used a 2 s
+    wall-clock deadline, and that deadline belongs to a box: with eight CPU hogs on a
+    24-core bench the label was not there inside 2 s, on this tree and on CI's runner during
+    a full suite run, and the failure said `no QTipLabel within 2 s` - a check about
+    readable colours that had quietly become a check about CPU load.  The popup exists when
+    Qt has *delivered* the events, so spins are the honest currency and the elapsed seconds
+    are only ever reported, never required.
+
+    And `QToolTip.showText` is a request, not a paint: called on a widget that is not on
+    screen yet - and `_ed_bind_rows()` rebuilds these labels a moment before they are asked
+    about - it does nothing at all, and no amount of waiting afterwards produces a popup.
+    So the widget is waited for first, then the request is repeated until a popup turns up,
+    and a failure says which state it was stuck in.
     """
-    QToolTip.showText(widget.mapToGlobal(QPoint(widget.width() // 2, widget.height() // 2)),
-                      widget.toolTip(), widget)
-    label = None
-    deadline = time.monotonic() + 2.0
-    while time.monotonic() < deadline and label is None:
-        fixtures.pump(0.05)
-        label = next((top for top in fixtures.qapp().topLevelWidgets()
-                      if top.metaObject().className() == "QTipLabel"), None)
+    def ask() -> None:
+        QToolTip.showText(widget.mapToGlobal(QPoint(widget.width() // 2, widget.height() // 2)),
+                          widget.toolTip(), widget)
+
+    def find():
+        return next((top for top in fixtures.qapp().topLevelWidgets()
+                     if top.metaObject().className() == "QTipLabel"), None)
+
+    spins = 0
+    while not widget.isVisible() and spins < 400:
+        spins += 1
+        fixtures.pump(0.005)
+    label, asked = None, 0
+    started = time.monotonic()
+    while label is None and asked < 40:
+        asked += 1
+        ask()
+        for _ in range(10):             # the popup's own turn through the loop
+            if find() is not None:
+                break
+            spins += 1
+            fixtures.pump(0.005)
+        label = find()
     if label is None:
-        raise AssertionError(f"no QTipLabel within 2 s of showText for {type(widget).__name__}")
+        tops = sorted({top.metaObject().className() for top in fixtures.qapp().topLevelWidgets()})
+        raise AssertionError(
+            f"no QTipLabel after {asked} showText requests and {spins} event-loop spins "
+            f"({time.monotonic() - started:.1f} s on this box, a figure and not a limit). "
+            f"{type(widget).__name__} visible={widget.isVisible()} "
+            f"window visible={widget.window().isVisible()} "
+            f"active window={fixtures.qapp().activeWindow() is widget.window()}. "
+            f"Top-level classes present: {tops}")
     image = label.grab().toImage()
     counts: dict = {}
     for y in range(image.height()):

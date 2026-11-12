@@ -2330,8 +2330,16 @@ class Window(QMainWindow):
         # the row you selected first, then whatever is on screen, then the rest
         self._pending.remove(first)
         self._pending.insert(0, first)
-        self.thumb_timer = QTimer(self)
-        self.thumb_timer.timeout.connect(self._thumb_batch)
+        if not hasattr(self, "thumb_timer"):
+            # **Once, for the life of the window**, and connected once.  A second `QTimer`
+            # made here would orphan the first: `closeEvent` and
+            # `tests/fixtures.py:close_window` stop the one the window *names*, so an
+            # orphan keeps firing `_thumb_batch` - two subprocesses a tick - at whoever
+            # runs next, which is how one file's check starved another's deadline.  Nothing
+            # calls this twice today; the trap is that it reads as if it may.
+            self.thumb_timer = QTimer(self)
+            self.thumb_timer.setObjectName("thumb")
+            self.thumb_timer.timeout.connect(self._thumb_batch)
         self.thumb_timer.start(0)
 
     def _filter_clips(self, text: str = "") -> None:

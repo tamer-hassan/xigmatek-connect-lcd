@@ -81,6 +81,18 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   rows as the width allows), `test_canvas.py`, `test_pairing.py`, `test_display_remote.py`,
   `test_control_socket.py`, `test_panel_safety.py`, `test_loop_counters.py` and
   `test_zz_isolation.py` (nothing here wrote your session file).
+  One rule this suite keeps, restated because it was broken and went red on two boxes at
+  once: an offline check may **count**, but it may not *wait on a duration* - a duration
+  belongs to a box.  `tests/test_tooltips.py`'s popup helper waited 2 s of wall-clock for
+  Qt's `QTipLabel` to appear; on a loaded CI runner (run #170) and on a loaded bench it did
+  not, so a check about readable colours failed as a check about CPU load, on 2026-11-12.
+  It now waits for the widget to be on screen, repeats the request, and counts event-loop
+  spins - and its failure prints the spin count, the visibility state and the top-level
+  classes present, so the next one says which end failed.  The same day's other cause was
+  suite hygiene rather than timing: a check that ran the window's clip-library populate
+  door twice left a `QTimer` nobody could stop (the window names one, and an orphan keeps
+  firing two subprocesses a tick into whichever file runs next), so `xigmaui/app.py` makes
+  that timer once per window and `test_canvas.py` counts how many there are.
 * `tools/verify_manifest.py` — the copied vendor library against its own manifest: all 125
   `files[]` entries re-hashed (27 backgrounds, 27 foregrounds, 27 layouts, 44 clips,
   128,106,463 B), `counts` cross-checked against `files` and against the tree, anything extra

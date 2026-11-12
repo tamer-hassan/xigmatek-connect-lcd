@@ -474,9 +474,14 @@ class TheRestOfTheWindowWaitsWhileARowIsHeld(fixtures.FreshConfigRoot):
         app.clipdb.frame = lambda *a, **kw: seen.append(("frame",))
         self.addCleanup(setattr, app.clipdb, "probe", real_probe)
         self.addCleanup(setattr, app.clipdb, "frame", real_frame)
-        self.win._populate_clips()              # the shipped door that arms the queue
-        self.win.thumb_timer.stop()             # the pass itself is not the subject here
-        seen.clear()                            # arming the queue already drew a row or two
+        # the window's own queue and the window's own timer: `_populate_clips()` is not
+        # called here, because re-running it *replaces* `thumb_timer` and the pass that was
+        # already running goes on firing under the new one.  Stopping the named timer leaves
+        # the queue, which is the only state this door reads.
+        self.win.thumb_timer.stop()
+        self.addCleanup(self.win.thumb_timer.stop)
+        if not self.win._pending:
+            self.win._pending = list(range(len(self.win.all_clips)))
         self.assertTrue(self.win._pending,
                         "no clip was left pending, so the deferral below would have been "
                         "proved by an empty queue rather than by a held row")
@@ -497,6 +502,45 @@ class TheRestOfTheWindowWaitsWhileARowIsHeld(fixtures.FreshConfigRoot):
                          "a probe and a frame - or the pass never finishes")
         self.assertEqual(len(self.win._pending), queue - 1,
                          "the queue did not shrink by one, so nothing is being consumed")
+
+    def test_the_library_has_one_thumbnail_timer_for_the_life_of_the_window(self):
+        """The queue is consumed by one timer, and a second populate may not leave a second.
+
+        A `QTimer` made and forgotten inside `_populate_clips` cannot be stopped by
+        `closeEvent` or by the suite's `close_window`, both of which stop the timer the
+        window *names*.  An orphan fires `_thumb_batch` at interval 0 - two subprocesses a
+        tick - for as long as the queue lasts, into whichever test file runs next.  That is
+        not hypothetical here: this file's own thumbnail check did exactly that to
+        `tests/test_tooltips.py`'s tooltip deadline on 2026-11-12, on CI and on the bench.
+        """
+        from PyQt6.QtCore import QTimer
+        named = lambda: [t for t in self.win.findChildren(QTimer)      # noqa: E731
+                         if t.objectName() == "thumb"]
+        self.assertEqual(len(named()), 1,
+                         f"{len(named())} timers named `thumb`: the door that arms the "
+                         "thumbnail pass should not be able to make another one")
+        armed = self.win.thumb_timer
+        self.win._populate_clips()                    # the shipped door, run a second time
+        self.addCleanup(self.win.thumb_timer.stop)
+        self.assertEqual(len(named()), 1,
+                         f"a second `_populate_clips()` left {len(named())} timers running "
+                         "the pass: the first one is unstoppable by name and keeps spawning")
+        self.assertIs(self.win.thumb_timer, armed,
+                      "`thumb_timer` was replaced, so the window's own `closeEvent` would "
+                      "stop the wrong timer")
+        queue = len(self.win._pending)
+        self.assertGreater(queue, 0, "a second populate armed no queue, so the pass below "
+                                     "could not be counted")
+        self.win.thumb_timer.stop()
+        seen = []
+        real = app.clipdb.probe
+        app.clipdb.probe = lambda *a, **kw: seen.append(1)
+        self.addCleanup(setattr, app.clipdb, "probe", real)
+        self.win._thumb_batch()
+        self.win._thumb_batch()
+        self.assertEqual(len(seen), 2,
+                         f"{len(seen)} probes for two ticks: a tick connected twice, or a "
+                         "queue that is not being consumed")
 
 
 if __name__ == "__main__":
