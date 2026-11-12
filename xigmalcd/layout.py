@@ -134,9 +134,10 @@ VENDOR_FORMAT = {
     # `bars`'s per-sensor rows need source names the vendor never had (docs/theme-editor.md).
     "CPU Fans Speed": lambda v: f"{int(round(v))}",
     "GPU Fans Speed": lambda v: f"{int(round(v))}",
-    # `bars`'s rows, and the rule the suite holds them to: every `source` this program can
-    # answer has a display shape here, so a text row can never reach the painter and die for
-    # want of one.  The two gigabyte shapes are what the theme's own text prints - a
+    # `bars`'s rows, and the rule `tests/test_bars_rows.py` holds them to: every
+    # answer this program can give has a display shape here, so a text row can never
+    # reach the painter and die for want of one.  The two gigabyte shapes are what the
+    # theme's own text prints - a
     # percentage meter with a gigabyte number beside it, which is why one row reads two
     # sources - and the per-sensor fan names cut the label to the same 10 characters the
     # drawing cuts, because the shape that hides a long `sensors` name belongs with the row,
@@ -272,11 +273,11 @@ def draw_special_values(draw: ImageDraw.ImageDraw, prop: dict, strings) -> tuple
     The placement vocabulary is `draw_special_pair`'s - `x` is the pair's centre, `width`
     the distance between the two figures' centres, `fontSize` the size ceiling,
     `textColor`/`bold` the ink, `xigma.anchor` says what an `x` means - and what differs is
-    how the size is found: against the ring in `xigma.fitArc` rather than a width, because
-    that is the rule this drawing uses.  It is not a gap in the design that the row has to
-    name a ring: `xigma.autoFitMax` is a width, and the suite searches every whole-pixel
-    budget this canvas can hold and finds none that reproduces what the ring decides
-    (docs/limits.md, printed by the `the value pair, apart` line).
+    how the size is found: against the ring in `xigma.fitArc` rather than a width,
+    because that is the rule this drawing uses.  It is not a gap in the design that the
+    row has to name a ring: `xigma.autoFitMax` is a width, and `tests/test_specials.py`'s
+    exhaustive search over every whole-pixel budget this canvas holds, against all six
+    readings at once, finds no width that reproduces the sizes the ring's hole decides.
 
     Returns `(size, union ink box in panel px)`, or `(None, None)` when the family cannot be
     resolved or the row declares no ring to clear.  `draw_theme` reports the first, and
@@ -416,11 +417,11 @@ def colour_ramp(prop: dict) -> tuple:
 #:             those rectangles overlap by a device pixel and the track's box includes its
 #:             far edge, which is what the code does and what is reproduced here rather than
 #:             tidied away: the claim of a `barPaint: hbar` file is that it paints this
-#:             program's picture, and the gate says whether it does - it does, at zero
-#:             differing pixels (docs/limits.md).  A declared `cornerRadius` is ignored by
-#:             this convention, because the function it names has no radius argument: the
-#:             suite paints this bar with a corner of 0 and of 5 and gets the same picture
-#:             both ways.
+#:             program's picture, and `tests/test_fixture_shape.py` says whether it does -
+#:             it does, at zero differing pixels (docs/limits.md).  A declared
+#:             `cornerRadius` is ignored by this convention, because the function it names
+#:             has no radius argument: `tests/test_row_resize.py` plants a corner of 6 on
+#:             real `bar` rows, pushes it to 14, and gets the same box both ways.
 #:
 #: Selected by `xigma.barPaint`; no key means `vendor`, which is what every copied layout
 #: is.  A `bar` may also name a colour ramp (`xigma.colourRamp`) or declare stops
@@ -598,9 +599,10 @@ ARC_COLOUR_MEASURED = {
 
 #: How a ring's fill is rasterised.  There are two conventions in this repo's evidence,
 #: they belong to different painters, and on the same declared geometry they are *not* the
-#: same picture - the suite paints one arc both ways and prints the pixel count between
-#: them (164 / 3 366 / 3 889 / 6 989 differing pixels at four values, worst channel
-#: delta 255), which is the whole reason this key exists.
+#: same picture - `tests/test_conventions.py` paints one arc both conventions and insists
+#: the two answers differ at all.  How far they differ was measured at four geometries:
+#: 164 / 3 366 / 3 889 / 6 989 differing pixels, worst channel delta 255 - a record of that
+#: measurement, not a number a check re-quotes - which is the whole reason this key exists.
 #:
 #:   `vendor` - ALPHA's own ring, as measured off its captured frames: one degree per
 #:              segment, colour sampled at the middle of each segment, butt caps, and
@@ -786,7 +788,7 @@ def draw_arc(draw: ImageDraw.ImageDraw, prop: dict, value) -> tuple:
     # of the two conventions runs here is decided by `xigma.arcPaint`: a copied layout gets
     # the vendor's (measured off ALPHA's frames), an exported built-in gets this program's
     # (what `render.gauge` does), and the difference between them on identical geometry is
-    # printed by the suite rather than argued about.
+    # measured by `tests/test_specials.py` rather than argued about.
     conv, conv_name = arc_paint(prop)
     if conv is None:
         return (x // SS, y // SS, x // SS + sw, y // SS + sh), \

@@ -11,7 +11,8 @@ Two shapes, for two different jobs, and the difference is the *digits*:
 
 * **The GIFs are short and say one thing.**  12 frames, 2.04 s, the pinned readings
   from `tools/preview_pin.py` and `--clock` holding the time still, so a caption can
-  quote the numbers and the suite can measure the file against them.  GIF because
+  quote the numbers afterwards - and nothing in `tests/` re-measures these files, so
+  `docs/tools.md` names the command that reads their length and size back off disk.  GIF because
   GitHub's markdown turns `![alt](clip.mp4)` into `<img src="...clip.mp4">` which no
   browser plays, so inline motion has to be a GIF.
 * **The MP4s are long and move.**  10-12 s at the clip's own 20-24 fps, driven by
@@ -73,8 +74,9 @@ from xigmaui import clips as clipdb                      # noqa: E402
 #: a measurement.  `--live` draws those instead.
 from preview_pin import PINNED                                      # noqa: E402
 
-#: `render.clock_str` before anything patches it.  Both this tool and the suite set
-#: that attribute to pin or advance the clock on the glass, so anything that wants the
+#: `render.clock_str` before anything patches it.  Both this tool and
+#: `tests/fixtures.py::freeze_clock` patch that attribute to pin or advance the clock
+#: on the glass, so anything that wants the
 #: real formatting - `series_note`, or a later draw - has to hold on to the original.
 CLOCK_STR_REAL = render.clock_str
 
@@ -185,8 +187,8 @@ def load_clock_offset(where: str):
 def series_note(series: list[dict], offset=None) -> str:
     """What actually moved in this series, as one line: min -> max per field.
 
-    Printed by the tool and asserted by the suite, because "the numbers change" is
-    the whole point of these files and it is worth checking rather than assuming:
+    Printed by the tool, because "the numbers change" is the whole point of these files
+    and it is worth reading off the series rather than assuming:
     an idle box can sit at one temperature and one fan figure for a quarter minute.
     """
     def vals(section, key):

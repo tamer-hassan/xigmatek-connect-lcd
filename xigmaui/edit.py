@@ -5,7 +5,8 @@ number* - what a field means, what changing it does to the picture, and what und
 owes you - and the window is a thin shell over it.  That split is deliberate: the
 claim of stage 4 in docs/theme-editor.md is not "there is a form", it is "an edit
 you make here is the frame the loop would send", and the only way to gate that is to
-keep the drawing and the file model in one place that the suite can drive headless.
+keep the drawing and the file model in one place a check can drive headless:
+`tests/test_editor.py` fails the moment this module imports Qt.
 
 Three rules, all of them borrowed from the library (xigmalcd/themes.py) rather than
 invented here:
@@ -221,7 +222,8 @@ def _overlaps(box: tuple, others: list) -> bool:
 
 #: The five keys that every one of the **185** widget rows in the **28** layouts this
 #: editor opens carries - measured over the 23 vendor files and the 5 generated exports,
-#: and re-counted by the suite on every run rather than remembered here: one distinct key
+#: re-counted from the files by `tests/test_row_acts.py` rather than remembered here: one
+#: distinct key
 #: set, `id`, `layerIndex`, `property`, `type`, `widgetContent`, and `property` a
 #: one-element list in all 185 (`themes.validate` makes that hard, because
 #: `layout.draw_theme` reads `property[0]` and would silently leave the rest unwritten).
@@ -231,7 +233,8 @@ WIDGET_KEYS = ("id", "layerIndex", "type", "property", "widgetContent")
 #: How far the placement scan steps across the canvas when it is looking for a free spot:
 #: fine enough to find a gap a copied row fits in, coarse enough that the scan is a few
 #: thousand overlap tests rather than a few hundred thousand.  It is a cost, not a claim
-#: about the glass - what the suite holds is the behaviour (a row that would meet another
+#: about the glass - `tests/test_row_acts.py` holds the behaviour (a row that would meet
+#: another
 #: box is moved to the nearest place it does not, and a row with nowhere to go stays where
 #: its source sits and says so in words) and it prints, per machine, how many of the adds
 #: went which way.
@@ -244,8 +247,9 @@ PLACE_STEP = 4
 #: exactly as it stands: the order that draws is the order of `osd.widget` - which is what
 #: `hit` follows ("later row wins an overlap") and what the painter walks - and giving an
 #: inert key a meaning the vendor's own files do not show is the silent repair this repo
-#: refuses.  Every digit in that sentence is the suite's, re-counted from the files on each
-#: run: the gate fails if it stops being true, here or in docs/gui.md.
+#: refuses.  Every digit in that sentence is re-counted from the files by
+#: `tests/test_row_acts.py`; the copy of them in docs/gui.md is a record of one run, and no
+#: check re-quotes a page.
 _UUID_ID = re.compile(r"\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z")
 
 _REF_ROWS: dict = {}
@@ -361,8 +365,9 @@ class Editor:
         take: the two vendor trees, and the five drawn-from-code names - a saved
         `gauge.json` would be a second `theme_gauge` to disagree with `render.theme_gauge`
         (docs/limits.md).  A refusal comes back as (None, the reasons), because a window
-        should print that sentence rather than unwind through it, and the suite can then
-        read the same words the reader sees.
+        should print that sentence rather than unwind through it, and the checks can then
+        read the same words the reader sees - `tests/test_theme_files.py` and
+        `tests/test_editor.py` assert the phrases, not a paraphrase of them.
         """
         hard, _soft = themes.validate(self.obj)
         if hard:
@@ -606,11 +611,11 @@ class Editor:
     #: two are spaced".  Three is not that break: a drag of 3 px right is pulled onto
     #: another row's `x` 11% of the time at 1 px, **12%** at t=2 and **57%** at t=3,
     #: because rows sharing a column sit within 3 px of each other's landing - a snap
-    #: arguing with the person dragging.  Those counts read only the numbers in the files,
-    #: so the suite re-counts them on every machine and the gate holds this module's
-    #: sentence, docs/gui.md and the changelog stanza to whatever it answers.
-    #: `SNAP_PX` is also the measure of what the arrow keys do **not** do: a 1 px nudge
-    #: pulled back is a keypress that did nothing.
+    #: arguing with the person dragging.  Those counts read only the numbers in the
+    #: files, so `tests/test_snapping.py` re-counts them on every machine; the copy of
+    #: them in docs/gui.md is a record of one such run, labelled as one, because no
+    #: check re-quotes a page.  `SNAP_PX` is also the measure of what the arrow keys do
+    #: **not** do: a 1 px nudge pulled back is a keypress that did nothing.
     SNAP_PX = 2
 
     @staticmethod
@@ -619,13 +624,14 @@ class Editor:
 
         The vendor's rows keep Pillow's two-letter anchor name under `xigma.anchor`, and
         the **first** letter is the horizontal one (`la` left-ascender, `rm` right-middle,
-        `mm` middle-middle); the second says only where the line sits vertically.  That is
-measured rather than read off the name: the suite draws the layouts this pane can
-        open and compares each row's declared `x` with its ink box, and finds `la` and `lm`
-        rows with `x` exactly at the box's left edge, `rm` rows exactly at its right edge,
-        and `ma`/`mm`/`ms` rows strictly between the two - their `x` *is* the centre.  Those
-        are pixels, so they follow the face they were drawn in: the assertion belongs to the
-        run that makes it, not to this sentence.  A row with no `xigma.anchor` is
+        `mm` middle-middle); the second says only where the line sits vertically.
+        That is measured rather than read off the name: `tests/test_snapping.py` draws
+        the layouts this pane can open and compares each row's declared `x` with its
+        ink box, finding `la` and `lm` rows with `x` exactly at the box's left edge,
+        `rm` rows exactly at its right edge, and `ma`/`mm`/`ms` rows strictly between
+        the two - their `x` *is* the centre.  Those are pixels, so they follow the face
+        they were drawn in: the assertion belongs to the run that makes it, not to this
+        sentence.
         `layout.py`'s default, `la`.
         """
         pr = (row.get("property") or [{}])[0]
@@ -675,9 +681,10 @@ measured rather than read off the name: the suite draws the layouts this pane ca
 
         * another row's declared `x`, **only within one anchor class**.  **317** pairs of
           rows in this library hold the same number; snapped across classes, the two rows'
-          ink would sit most of a canvas apart rather than lined up (the suite measures how
-          far, on the machine it runs on, and refuses the pair if the answer ever comes back
-          small), so a number aligns only when both rows agree what it means.  A row with a
+          ink would sit most of a canvas apart rather than lined up
+          (`tests/test_snapping.py` measures how far on the machine it runs on, and fails if
+          that answer ever comes back small), so a number aligns only when both rows agree
+          what it means.  A row with a
           declared width offers its other edge too: `x + width` for a `bar`, `x + sizeWidth`
           for an `arc`, `x + width` for a `line` (the rect `layout.line_rect` draws, which
           D's resize door already reads), and the two figures' centres - `x - width/2` and
@@ -849,8 +856,8 @@ measured rather than read off the name: the suite draws the layouts this pane ca
         reuse ids across themes - **152** rows in **27** files answering to **54** distinct
         ids, one id shared by **18** of those rows - so a row is keyed by theme and id,
         never by id alone.  The model obeys the soft rule anyway rather than collecting a
-        warning on every add, and the suite re-counts those four digits from the files on
-        each run.
+        warning on every add, and `tests/test_row_acts.py` re-counts those four digits from
+        the files on each run.
         """
         ids = [str(w.get("id") or "") for w in self.widgets()]
         if ids and all(_UUID_ID.match(i) for i in ids):
@@ -1037,11 +1044,12 @@ measured rather than read off the name: the suite draws the layouts this pane ca
     def move_widget(self, delta: int, index: int | None = None) -> tuple:
         """Slide one row through the list, which *is* the draw order.
 
-        `osd.widget` order is what the painter walks and what `hit` follows ("the later row
-        wins an overlap"), so a reorder changes which of two overlapping rows is on top while
-        moving no ink at all - and that is the half the suite proves with pixels rather than
-        with an assert about list indices.  `layerIndex` is left exactly as it was: see
-        `WIDGET_KEYS` above for what the vendor's own files say that key means.
+        `osd.widget` order is what the painter walks and what `hit` follows ("the later
+        row wins an overlap"), so a reorder changes which of two overlapping rows is on
+        top while moving no ink at all - and that is the half `tests/test_row_acts.py`
+        proves with pixels rather than with an assert about list indices.
+        `layerIndex` is left exactly as it was: see `WIDGET_KEYS` above for what the
+        vendor's own files say that key means.
         """
         ws = self.widgets()
         i = self.index if index is None else int(index)
@@ -1069,8 +1077,9 @@ measured rather than read off the name: the suite draws the layouts this pane ca
     #: drawing.  A figure that follows a face is printed per machine, not kept here.
     #:
     #:   `bar`    `width`, `height`.  The box *is* `(x, y, x+width, y+height)` for every
-    #:            `bar` row the painter draws a box for - the suite asserts that as a rule,
-    #:            and prints how many rows had a box to check this run, because a `Fan 3` or
+    #:            `bar` row the painter draws a box for - `tests/test_row_resize.py`
+    #:            asserts that as a rule and reports how many rows had a box to check when it
+    #:            runs, because a `Fan 3` or
     #:            `Fan 4` speed with no reading on this machine draws nothing and so has no
     #:            edge to grab.  `cornerRadius` moves the ink and not the box: of the rows
     #:            that carry one and draw one, pushing it +8 left every box where it was, so
@@ -1082,8 +1091,8 @@ measured rather than read off the name: the suite draws the layouts this pane ca
     #:            box's corner is not the declared rect's corner: `x`/`y` are corrected from
     #:            that same prediction and the sentence says they were.  When a row carries a
     #:            non-zero `lineWidth`, `draw_line` replaces the thickness with it, so the
-    #:            drag writes `lineWidth` instead - no shipped file carries one, so the suite
-    #:            builds that case rather than waiting for a file.
+    #:            drag writes `lineWidth` instead - no shipped file carries one, so
+    #:            `tests/test_row_resize.py` builds that case rather than waiting for a file.
     #:   `arc`    `sizeWidth`, `sizeHeight`, and with them `radius` and `width`.  The box is
     #:            that band, while `radius` and the stroke's `width` move the ink inside it
     #:            and leave the box exactly where it was - measured on all 6 arc rows: +8 px
@@ -1098,7 +1107,8 @@ measured rather than read off the name: the suite draws the layouts this pane ca
     #:   `data`   `height` at all - 145 rows, none with either - because the box is the ink
     #:            the face lays down: pushing the face +8 moves that box's width by an
     #:            amount that is never 8 px, differs from row to row, and belongs to this
-    #:            machine's fonts - the suite measures the spread and prints it.
+    #:            machine's fonts - `tests/test_row_resize.py` holds that spread as a
+    #:            relation: never the push itself, and never one answer for every row.
     #:            So the pane offers no side handles on those kinds, the drag searches faces
     #:            by drawing them, and the sentence names the box that *reached* instead of
     #:            claiming the edge followed the cursor.  A row fitted to `xigma.autoFitMax`
@@ -1629,8 +1639,8 @@ measured rather than read off the name: the suite draws the layouts this pane ca
         if field in CASE_FOLDED_FIELDS and isinstance(value, str):
             # the painter's fold, applied once and said out loud: the row keeps a family
             # name `layout.FONTS` actually carries, and the reader is told the picture did
-            # not move (the suite checks that, pixel by pixel, for a vendor row that writes
-            # the capitalised spelling).
+            # not move (`tests/test_row_notes.py` checks that, pixel by pixel, for a vendor
+            # row that writes the capitalised spelling).
             _choice = choices(field)
             if value not in _choice:
                 canon = next((c for c in _choice if isinstance(c, str)
@@ -1832,20 +1842,21 @@ measured rather than read off the name: the suite draws the layouts this pane ca
         answered 20 of the 21 `source` names the library asks rather than 21, and the
         only visible trace was a census of drawn boxes two short. A pair that anyone can
         edit in place is not a pinned pair. The copy is deep and cheap - measured and
-        printed by the suite, in the section that also proves the module's own dict
-        comes out of it unchanged.
+        measured on whatever box runs it, and `tests/test_editor.py` proves the module's own
+        dict comes out of a round trip through it unchanged.
 
         Nothing that *writes* a number goes through any other pair, on purpose: an edit
         shown against sensors that move underneath it cannot be judged, and every
-        byte-for-byte comparison in the gates (the frame before an edit, the frame
-        after, the frame read back off disk) means something only because the readings
+        byte-for-byte comparison in `tests/test_export_parity.py` and
+        `tests/test_apply_layout.py` (the frame before an edit, the frame after, the
+        frame read back off disk) means something only because the readings
         and the instant are fixed.  Showing this machine's readings exists now as the
         pane's **peek** - `xigmaui/app.py` holds the sample and paints it through
         `paint`, never through this door, and while a peek is up the acts that write a
         number are refused with `peek_refusal`'s sentence.  That is the split the
         measurements asked for: at another body of readings some of the row boxes this
-        library draws move elsewhere - the suite counts how many, on the machine it runs
-        on, and prints it - and feature F's centring number moves with the ink width, so
+        library draws move elsewhere - how many is a fact about the machine, so no page here
+        quotes a count of it - and feature F's centring number moves with the ink width, so
         the peek is a look and not an editing surface.
         """
         return copy.deepcopy(FIXTURE), FIXTURE_WHEN
@@ -1892,8 +1903,10 @@ measured rather than read off the name: the suite draws the layouts this pane ca
         of those three names, and **17** rows read them - so a live clock rewrites those
         rows every second and the same peek twice would not be the same picture.  Held
         means the numbers are re-read only when the reader asks again: a frame that
-        followed this machine's sensors moved a lot of pixels with no edit involved, and
-        the suite measures how much on the machine it runs on.
+        followed this machine's sensors moved a lot of pixels with no edit involved.  What
+        `tests/test_peek_readings.py` holds is the rule - a body is sampled once per press and
+        left alone by a repaint; how much a second of this box's load is worth belongs to the
+        box.
         """
         return (f"peeking: the picture is {source}, at the pinned instant "
                 f"{when:%Y-%m-%d %H:%M:%S}" + (f", held since {held}" if held else "")
@@ -1904,8 +1917,9 @@ measured rather than read off the name: the suite draws the layouts this pane ca
     def peek_refusal(self, action: str = "A press") -> str:
         """Why an act that writes a number is refused while the pane is peeking.
 
-        The measurements are the reason, and the suite makes them on the machine it runs
-        on: drawing these layouts at the fixture and at this box's own readings moves some
+        The measurements are the reason, and `tests/test_peek_readings.py` is what keeps the
+        rule under them: drawing these layouts at the fixture and at this box's own readings
+        moves some
         of the row boxes, and probing the glass on a grid answers a **different row** at
         some points in one frame than in the other.  A handle drawn at a pinned edge would
         then sit over another row's ink, and a drag would grab a row nobody pointed at.
@@ -1943,8 +1957,9 @@ measured rather than read off the name: the suite draws the layouts this pane ca
         nothing either - which is also what a row with *no* `fontFamily` at all does,
         since there is no default face to fall back to - and the claim that this *is* the
         painted line is proved by painting, not by agreement between two pieces of code:
-        for every text-bearing row of the 28 layouts this editor opens, the suite draws
-        the file, then draws a copy of the file with that one row replaced by a literal
+        for every text-bearing row of the 28 layouts this editor opens,
+        `tests/test_row_notes.py` draws the file, then draws a copy of the file with that one
+        row replaced by a literal
         `text` widget whose `content` is the string returned here, and requires the two
         frames to be byte-identical.  145 rows in 28 layouts, 132 of them painting a line
         at this fixture on the author's bench - 131 on CI's runner, whose fonts have no CJK
@@ -2069,13 +2084,13 @@ _NOT_A_LINE = {
 #: differing pixels at this fixture** for all five themes, at the window's ink choices
 #: too, and it asserts the coverage: every source a real box can answer for these five
 #: files has a pinned value here, so a new reading in a new export has to be answered
-#: here before the preview is allowed to be quiet about it.
-#:
-#: **Every key here is a key a real box reports** - the set is a subset of the metrics
-#: shape `sensors.py` documents at the top of the module and PROTOCOL.md 10 records, and
-#: the suite asserts that against the module's own sample rather than against this
-#: comment.  It used to be otherwise, and that is how the pane went wrong quietly: this
-#: dict carried `gpu.usage`, `cpu.frequency`, `gpu.frequency` and `memory.used_percent`,
+#: here before the preview is allowed to be quiet about it. **Every key here is a key a
+#: real box reports** - the set is a subset of the metrics shape `sensors.py` documents
+#: at the top of the module and PROTOCOL.md 10 records, and
+#: `tests/test_fixture_shape.py` asserts that against the module's own documented shape
+#: rather than against this comment. It used to be otherwise, and that is how the pane
+#: went wrong quietly: this dict carried `gpu.usage`, `cpu.frequency`, `gpu.frequency`
+#: and `memory.used_percent`,
 #: which **nothing in the library reads** (`themes.values` asks `gpu.load`,
 #: `cpu.speedAverage`, `gpu.speed`, and `memory.used`/`total`), while the keys that are
 #: read were missing.  A fixture can be wrong in both directions at once, and only a gate

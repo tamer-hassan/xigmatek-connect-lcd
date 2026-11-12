@@ -47,7 +47,7 @@ ARC_TRACK = (104, 118, 130, 150)
 # What it is *not*: the vendor's themes keep their text colour inside their own
 # files, and those colours are not all white.  Counted, over the 23 480x480
 # layout files the themes package installs (the same bytes this repository
-# carries under themes/alpha/layouts, and the suite re-derives them): 106
+# carries under themes/alpha/layouts, and `themes.field_census()` re-derives them): 106
 # `textColor` values, 9 distinct, 88 of them `rgba(255, 255, 255, 1)`, in 18 of
 # the 23 files exclusively and in 5 mixed with greys and near-blacks.  The theme
 # ALPHA has selected is one of the exclusively-white ones - 6 of its 6.  That
@@ -57,7 +57,8 @@ ARC_TRACK = (104, 118, 130, 150)
 #
 # `INK_DIM` is a design constant, not a measurement: how much darker the lines
 # a theme treats as secondary get when a reader picks an ink.  It lives here so
-# the suite can pin the arithmetic rather than trust the prose.
+# `tests/test_ink.py::test_dim_ratio_is_pinned` can hold the arithmetic rather than
+# the prose about it.
 INK_DIM = 0.62
 
 #: spellings that mean "use the theme's own skin"
@@ -424,8 +425,9 @@ def pct_pair(part: dict, numerator: str, denominator: str):
     0 dropped the row, while the memory row kept it - and it read `mem["used"]` outright, so
     a dict reporting a total with no used raised `KeyError` inside the frame loop instead of
     drawing a hole.  Neither of those is a shape a layout file can describe, so the rule is
-    stated once here (the source table calls it from the other door, and the suite measures
-    both).  A zero numerator is a reading: the row exists, at nothing filled.
+    stated once here (the source table calls it from the other door, and both doors are
+    measured against each other by `tests/test_export_parity.py`).  A zero numerator is a
+    reading: the row exists, at nothing filled.
     """
     part = part or {}
     den = part.get(denominator)
@@ -654,8 +656,8 @@ def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY, ink=None):
         # line has always had, it lands at x 29..450 (font 22) for the pinned set and
         # 27..452 (font 20) for the worst one - 421 and 425 px of ink in a 480 px
         # panel.  Counted by drawing the string and reading the alpha channel's bbox,
-        # 2026-11-07; the suite crops each of the theme's three lines to its own y
-        # band and fails if any of them touches a panel edge.
+        # 2026-11-07; `tests/test_gauges.py` crops each of the theme's three lines to its own
+        # y band and fails if any of them touches a panel edge.
         _text(img, (240, 358), line, _fit(img, line, 440, 26), acc)
     return img.resize((W, H), Image.LANCZOS)
 
@@ -972,11 +974,12 @@ def fan_figures(draw, figures, xs, y, colour=A26_WHITE, bold=False,
     is fitted against `max_w` panel px by `_fit_draw`'s walk, and the pair draws at the
     smaller of the two fits, never below `floor`: the wider figure decides the size for
     both, so the two columns always match.  Sized one at a time they would not - over the
-    30 reading pairs the suite walks, 25 come out at two different sizes and drawing each
-    at its own moves the row by 1 763 to 2 915 px on this bench (the suite prints the
-    counts beside its own machine, and docs/limits.md labels them as one bench's, because
-    both depend on the faces installed).  The pair is one drawing because the sizes are
-    not independent (docs/theme-editor.md).
+    30 reading pairs `tests/test_specials.py` walks, the two figures' own fits disagree on
+    25 of them and drawing each at its own moves the row by 1 763 to 2 915 px - both of
+    those counts are one bench's, recorded here, because they depend on the faces
+    installed.  The check holds the relation: the joint rule shows up as a moved row
+    **exactly when** the two fits disagree, and nowhere else.  The pair is one drawing
+    because the sizes are not independent (docs/theme-editor.md).
 
     `anchor` is the anchor of each figure, which the layout says (`xigma.anchor`) for the
     same reason it says it for a text row: what an `x` means.  The theme's own row anchors
@@ -1011,9 +1014,10 @@ def value_pair(draw, strings, xs, y, ring, colour=A26_WHITE, bold=True,
     This is `alpha`'s temperature row, and it is a drawing rather than two text rows
     because of how its size is chosen: both strings are measured and one size comes out
     (`_fit_arc`'s joint rule), and what they are measured against is the ring's clear
-    radius, not a width.  The schema's only fit key is a width, and the suite searches every
-    whole-pixel budget this canvas can hold and finds none that reproduces the six sizes
-    this rule picks for `--`, 5, 22, 57, 100 and 241 degrees (docs/limits.md).
+    radius, not a width.  The schema's only fit key is a width, and
+    `tests/test_specials.py`'s exhaustive search over every whole-pixel budget this
+    canvas can hold finds none that reproduces the six sizes this rule picks for
+    `--`, 5, 22, 57, 100 and 241 degrees.
 
     `ring` is the six numbers `arc_clear` works from - `(cx, cy, inner, outer, start,
     sweep)`, panel px and Pillow degrees - and it describes **one** of the two rings: they

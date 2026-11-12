@@ -131,8 +131,9 @@ WIN_STATIC = "/media/windows-c/Program Files/ALPHA/resources/static/media"
 WIN_UPLOADS = ("/media/windows-c/Users/Tamer/AppData/Roaming/alpha/media"
                "/background")
 # the vendor app's own state file: the store whose `currentThemeId` picks which
-# theme is selected, and whose `textColor` values are counted by the suite (it is
-# on the mounted Windows volume, so the check says when it cannot read it)
+# theme is selected, and whose `textColor` values were counted off it on the bench -
+# the volume itself is not in this repository, so a clone cannot read it.  The same
+# count over the layouts this repo does ship is `themes.field_census()`.
 WIN_STORE = "/media/windows-c/Users/Tamer/AppData/Roaming/alpha/store.json"
 
 # Where this program's own clips are, in the order the spellings win over each
@@ -886,8 +887,8 @@ def main(argv=None) -> int:
         for k in sub:
             print(f"    {k:<14} {themes.XIGMA_KEYS[k]}")
         print(f"                        that list is read out of `layout.py` with `ast`: "
-              f"a key nobody wrote a reason for still shows up here, and the suite fails "
-              f"when the two sets disagree")
+              f"a key nobody wrote a reason for still shows up here, and "
+              f"`tests/test_field_census.py` fails when the two sets disagree")
         unread = sorted(set(cen["keys"]) - set(read))
         print(f"  carried by vendor files, never read here ({len(unread)}), with what the "
               f"value would have done:")
@@ -983,7 +984,9 @@ def main(argv=None) -> int:
             print(f"  {exc.args[0]}", file=sys.stderr)
             return 2
         # sorted keys and no generated-at-run-time values: two runs of this command are
-        # byte-identical, which is what the suite gate compares
+        # byte-identical, which is what
+        # `tests/test_export_parity.py::test_two_exports_of_one_theme_are_the_same_bytes`
+        # compares
         print(json.dumps(obj, indent=1, sort_keys=True))
         return 0
 

@@ -102,8 +102,8 @@ ICON = next((p for p in ICONS if os.path.exists(p)), ICONS[0])
 
 # What this window calls itself - in the title bar, in the tray tooltip, and as the
 # `Name=` of both menu entries (install/xigmaui.desktop.in and
-# debian/xigmaui.desktop).  One string, four places that show it; the suite's
-# packaging-parity section reads this constant back against both files, so the entry a
+# debian/xigmaui.desktop).  One string, four places that show it; the pair that
+# `tests/test_packaging_parity.py` reads back against both files, so the entry a
 # shell lists and the window it launches cannot end up named differently.  It is the
 # vendor's family, not the author's model - the paragraph in
 # install/xigmaui.desktop.in says what has actually been measured on which Connect.
@@ -161,12 +161,13 @@ NO_EDITOR = "(nobody: preview the theme above)"
 #: background wherever the widget brings one, and it is not free either: installing one
 #: re-polishes every widget through the stylesheet style, which moved this window's own
 #: layout: the `arc` editor box the pages label per machine - 858 px in one column, 465
-#: px in three - came out 818 and 459 on this bench, caught by the gate that holds those
-#: two figures. So the colours go in as a palette targeted at the one class that needs
-#: them, `QApplication.setPalette(pal, "QTipLabel")`: measured over the window's live
-#: tooltips, #2b2b2b behind #f2f2f2 (12.65:1) and over the pane its own #101014 behind
+#: px in three - came out 818 and 459 on this bench, and that pair is a record of this
+#: box rather than a number a check re-quotes (docs/gui.md). So the colours go in as a
+#: palette targeted at the one class that needs them, `QApplication.setPalette(pal,
+#: "QTipLabel")`: measured over the window's live tooltips, #2b2b2b behind #f2f2f2
+#: (12.65:1) and over the pane its own #101014 behind
 #: #f2f2f2 (16.96:1), with every layout figure of the window's own and every drawn pixel
-#: left where the gates already recorded them.
+#: left where `tests/test_window.py` and `tests/test_tooltips.py` record them.
 #:
 #: Dark on purpose: one house style, and the ratios stop depending on what a desktop
 #: theme decides a tooltip colour should be - the same class of accident as the one
@@ -439,7 +440,7 @@ class Canvas(QLabel):
         Which edges are live is the window's to say - it asks the model, whose answer comes
         from its own resize door (`edit.Editor.size_edges`) - and where those edges *sit* is
         the pane's, because the pane is the thing holding the box.  The names are the same
-        eight both files use: `edit.Editor.EDGES`, which the suite holds this table to.
+        eight both files use: `edit.Editor.EDGES`, the table `tests/test_row_resize.py` holds.
         """
         if not self.marks or len(self.marks) < 4:
             return ()
@@ -660,8 +661,8 @@ class Window(QMainWindow):
         super().__init__()
         # Every tooltip this program shows, painted the same way wherever the window is
         # built.  The call sits here rather than in `main()` because the doors that build a
-        # `Window` are many - `main()`, the offline suite, a throwaway script - and a rule
-        # only one of them remembers is a rule the gates cannot hold.  The function's own
+        # `Window` are many - `main()`, `tests/`, a throwaway script - and a rule only
+        # one of them remembers is a rule no check can hold.  The function's own
         # comment above carries the measurements that made it necessary.
         apply_tooltip_colours()
         self.autosave = restore if save_settings is None else save_settings
@@ -1143,8 +1144,8 @@ class Window(QMainWindow):
         # grabbed by itself.  `activated` rather than `currentIndexChanged`: choosing the
         # entry you are already on is how the reader says "read them again", and the
         # sample is held until then: a frame that follows the sensors moves with every
-        # reading, and the gate measures - and prints - how far that is on the machine
-        # that runs it, because the answer belongs to those sensors.
+        # reading, and `tests/test_peek_readings.py` measures - and prints - how far that
+        # is on the machine that runs it, because the answer belongs to those sensors.
         self.peek_box = QGroupBox("Pane readings")
         pk = QGridLayout(self.peek_box)
         self.ed_peek = QComboBox()
@@ -1194,8 +1195,8 @@ class Window(QMainWindow):
         # installed before anything is added to it: a layout that is built and never
         # put into the box is destroyed at the end of _build(), and with it every
         # widget that was addRow'd into it - which is how the layout and widget
-        # pickers vanished without a trace (the suite now checks the box contains
-        # them, because "no exception" is not how you notice a missing control)
+        # pickers vanished without a trace (`tests/test_window.py` walks the editor's box
+        # and asks for them by name, because "no exception" is not how you notice a missing control)
         eform.addLayout(head)
         # one growth policy, stated rather than inherited from whatever style
         # this desktop happens to use: every field fills the field column, so a
@@ -1251,7 +1252,7 @@ class Window(QMainWindow):
         # bench's reading, CI's runner reading 807 and 462.  Each row of controls
         # under the fields is 31 px of height here and 28 px there, against the
         # 796/403 and 723/378 that 0.5 measured in the same pass - measured in
-        # the window, printed by the suite's sizing gate, and held to whichever half of
+        # the window, printed by `tests/test_window_sizing.py`, and held to whichever half of
         # the labelled pair the machine running it is.  It buys height rather than pushing
         # a scrollbar under the column, which is the failure mode 0.5 was written to catch.
         self._ed_host = QWidget()
@@ -1372,7 +1373,7 @@ class Window(QMainWindow):
         self.ed_note.setWordWrap(True)
         self.ed_note.setStyleSheet("color:#999;font-style:italic;")
         eform.addWidget(self.ed_note)
-        self.ed_group = editor                   # the suite's gate names it from outside
+        self.ed_group = editor    # `tests/test_window.py` and `test_snapping.py` name it
         col.addWidget(editor)
         self.ed = None                        # nothing open until a name is picked
         self._ed_notes = {}                   # what the last editor frame reported
@@ -1392,7 +1393,7 @@ class Window(QMainWindow):
         # the model's own sentence about the pull, shown rather than paraphrased.
         # What the pane is *looking at* while a layout is open (feature G): None means
         # the pinned fixture, which is what every geometry door uses and what every
-        # byte-for-byte claim in the suite is made against.  A dict here holds a body of
+        # byte-for-byte claim in `tests/` is made against.  A dict here holds a body of
         # readings, the instant they are drawn at (always the pinned one) and when they
         # were read; it is never written to the session file.
         self._peek = None
@@ -1570,7 +1571,7 @@ class Window(QMainWindow):
         self.btn_reset.clicked.connect(self._do_reset)
         row2.addWidget(self.btn_reset)
         dlay.addLayout(row2)
-        self.reset_box = danger           # the suite's gate names it from outside
+        self.reset_box = danger   # `tests/test_window.py` names it from outside the class
         self._adv_hide.append(danger)
         # The tail of the column: without it, QBoxLayout shares a tall window's
         # leftover height out between every box, so a one-line note label came
@@ -1704,7 +1705,7 @@ class Window(QMainWindow):
         number of columns.  A single pass can therefore only see the state before it -
         CI's runner found a 366 px column floor under 380 px of contents, which is the
         overflow this function exists to prevent.  `_FLOOR_PASSES` bounds the follow-ups,
-        so a floor that keeps moving is a thing the suite fails on rather than a loop
+        so a floor that keeps moving fails `tests/test_window_sizing.py` rather than looping
         that runs; a pass that changes nothing ends the chain.
         """
         changed = False
@@ -1870,17 +1871,18 @@ class Window(QMainWindow):
             # decides whether it can be honoured: for one of the five names generated from
             # `render.py` the theme has a declared skin and the preview follows the
             # reader's colour, for a vendored or saved file the colours are the file's.
-            # Both halves of that are measured, not asserted - the suite paints each of
-            # the five both ways at every ink choice this combo offers and asks for zero
-            # differing pixels (docs/theme-editor.md).
+            # Both halves of that are measured, not asserted - `tests/test_ink.py` paints
+            # the generated layouts and the code drawing at every colour its own parser
+            # knows and asks for zero differing pixels (docs/theme-editor.md).
             img, self._ed_notes = self.ed.paint(*self.ed.fixture(), ink=self._ink())
             if self._peek is not None:
                 # The picture the reader asked for, and *only* the picture.  `_ed_notes`
                 # above stays the pinned frame's, because it is what `hit`, `_mark_box`,
                 # the snap lines and the size edges all read. At another body's readings
                 # the boxes move, so painting marks from this frame would point a handle
-                # at ink that is not the row it owns - and the gate counts how many boxes
-                # move, on the machine it runs on, before it prints the number.
+                # at ink that is not the row it owns.  How many boxes move between the two
+                # bodies is counted by `tests/test_peek_readings.py`, which fails if the
+                # count comes back empty; no number for it is kept here.
                 img, _pk_notes = self.ed.paint(metrics=self._peek["metrics"],
                                                when=self._peek["when"], ink=self._ink())
         else:
@@ -2042,7 +2044,7 @@ class Window(QMainWindow):
         # screen: a height taken from the current pixmap feeds back - the card
         # shrinks to a narrow pane, and then its own maximum height keeps it
         # small when the pane widens again, which is how a 1 919 px window came
-        # back with a 343 px frame (the suite caught it as QSize(343, 343)).
+        # back with a 343 px frame, which `tests/test_window_sizing.py` now holds.
         # Width is set by the splitter, so it is the quantity that is actually
         # free to grow.
         want = min(room.width(), render.W) + FRAME_CHROME
@@ -2682,7 +2684,8 @@ class Window(QMainWindow):
 
         The only place a read happens, which is what *held* means: `sensors.collect()`
         once per press, never per repaint - the cost belongs to the machine and the
-        moment, so the suite measures it and prints it rather than quoting it here.  A
+        moment, so no figure for it belongs in a source file: docs/limits.md names the
+    # command that prints one.  A
         named file goes through `main.read_metrics_file` - the door `--metrics-file`
         uses - and
         its sections replace this machine's whole sections, exactly as `main.sample` does
@@ -2747,10 +2750,11 @@ class Window(QMainWindow):
     def _note_pair(self) -> tuple:
         """The readings the note lines describe: the peek's, while peeking.
 
-        Measured before choosing it, and re-measured by the gate wherever it runs: some of
-        the rows' sentences change between the fixture and this machine's readings, and
-        every change the suite found was a *value* (`57°C` to `65°C`) with the reason
-        strings left alone - so recomputing them makes the lines say what the frame on
+        Measured before choosing it, and re-measured by `tests/test_peek_readings.py`
+        wherever it runs: some of the rows' sentences change between the fixture and
+        this machine's readings, and every change that file has found was a *value*
+        (`57°C` to `65°C`) with the reason strings left alone - so recomputing them
+        makes the lines say what the frame on
         screen shows, which is the whole rule of the note line. The pinned sentences are
         still one press away, and the geometry doors keep answering from the fixture
         whatever these lines say: the note describes the picture, the doors write the file.
@@ -3211,9 +3215,9 @@ class Window(QMainWindow):
                 # `rgba(255, 255, 255, 255)`: 1.12:1. A mid-grey defeats
                 # either text colour, so no wording can be made legible
                 # on every colour a file can name - the sentence moves
-                # to a widget that paints no background, and the suite
-                # measures the popup at white, black and grey
-                # (`gate_h_tooltips`, printed by the gui section).
+                # to a widget that paints no background, and
+                # `tests/test_tooltips.py` measures the popup at white, black and grey and
+                # fails on any pair of them it can read.
                 # `_ed_says` stays the model's sentence alone: the note
                 # line under these rows already says this in its own
                 # words.
@@ -3637,12 +3641,13 @@ class Window(QMainWindow):
         """
         self._off_glass = ""
         if self._peek is not None:
-            # A peek carries no marks. The box, the eight squares and any guide line are
-            # drawn from the pinned row's edges, and at the readings on screen that ink
-            # sits elsewhere: the gate probes the glass on a grid and counts how many
-            # points answer a different row in the live frame than in the pinned one, on
-            # the machine it runs on. Hiding the marks is the honest half of the rule that
-            # a peek cannot be edited in - a handle drawn over nothing is a lie - and the
+            # A peek carries no marks. The box, the eight squares and any guide line
+            # are drawn from the pinned row's edges, and at the readings on screen
+            # that ink sits elsewhere.  `tests/test_peek_readings.py` probes the glass
+            # on a grid and counts how many points answer a different row in the other
+            # body's frame than in the pinned one, and fails if none of them does.
+            # Hiding the marks is the honest half of the rule that a peek
+            # cannot be edited in - a handle drawn over nothing is a lie - and the
             # tooltip says so before a press is wasted.
             self.preview.set_marks(None)
             self.preview.setToolTip("the pane is peeking at readings rather than at the "
@@ -3954,7 +3959,7 @@ class Window(QMainWindow):
             self._marked_bg = self._stored_bg
         # First the file itself, with the daemon's own rule (control.py's
         # `check_media_file` - one implementation, so the window can never
-        # promise something the socket would refuse).  A clip the gate refuses is
+        # promise something the socket would refuse).  A clip that check refuses is
         # said out loud before the button is ever pressed: the bench's whole
         # afternoon of "the background change failed" started with a refusal that
         # had no place to be read.
@@ -4044,7 +4049,7 @@ class Window(QMainWindow):
                 self._queued_bg = os.path.basename(path)
                 rep = self.daemon.upload(path)
                 if rep.get("ok"):
-                    # `ok` here only means the gate let it into the loop's one
+                    # `ok` here only means the socket let it into the loop's one
                     # action slot.  The panel's verdict is a separate thing, and
                     # it is the display's own list that carries it.
                     self._log(f"asked the running display for {self._queued_bg}: "

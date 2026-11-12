@@ -101,8 +101,9 @@ def scan() -> tuple:
                    "widgets": len((obj.get("osd") or {}).get("widget") or []),
                    "background": (obj.get("background") or {}).get("mediaFile") or ""}
             # first-winning root: `roots()` is already in order, and the vendor's own
-            # name-space cannot disagree between a checkout and a package (the suite
-            # asserts the two trees carry the same 27 layouts, byte for byte)
+            # name-space cannot disagree between a checkout and a package: the
+            # manifest is re-hashed in both, `tools/verify_manifest.py` in a checkout
+            # and the same walk over the installed tree in `debian/tests/smoke`
             by_name.setdefault(stem, rec)
     ok = sorted((r for r in by_name.values() if r["ratio"] == NEED_RATIO),
                 key=lambda r: r["name"].lower())
@@ -226,8 +227,9 @@ FAN_SLOTS = tuple((f"Fan {i} Speed", f"Fan {i} Name")
 #: `bars`'s rows in the order the drawing lays them out: the label it prints - a literal for
 #: the six fixed rows, `None` for a fan slot, whose label is its `Fan N Name` source - then
 #: the source the meter divides, the source the number beside it prints, and the scale.  One
-#: table, because the gate compares it row for row against where `render`'s own drawing puts
-#: ink, and `bars_recipe()` will build its rows out of it rather than a second copy of it.
+#: table, because `tests/test_bars_rows.py` compares it row for row against the
+#: strings `render`'s own drawing writes and the ink it leaves, and `bars_recipe()` will
+#: build its rows out of it rather than a second copy of it.
 BARS_FIXED_ROWS = (
     ("CPU", "CPU Temperature", "CPU Temperature", 30, 90),
     ("GPU", "GPU Temperature", "GPU Temperature", 30, 90),
@@ -258,8 +260,10 @@ UNMAPPED = {"Pump Speed": "no pump tachometer has been measured on this box "
 
 def source_names() -> tuple:
     """Every `source` name this program can put a reading behind: the flat fields, the
-    derived ratios, the clock, and the positional fan slots.  `answerable` in the suite is
-    asked through this so a new source cannot be invisible to the gates that count them."""
+    derived ratios, the clock, and the positional fan slots.  The checks that
+    count them - `tests/test_theme_library.py` and `tests/test_library_draw.py` -
+    ask through this door rather than keeping a list of their own, so a new source
+    cannot be invisible to the check that would have to know about it."""
     return (tuple(SOURCES) + tuple(DERIVED) + CLOCKED
             + tuple(n for pair in FAN_SLOTS for n in pair))
 
@@ -290,8 +294,11 @@ def _clock(when=None):
     type it wants.  Defaulting through `render._now()` is the point: that is the one hook
     this repo has for "what moment is this frame", so patching it - which is how
     `tools/preview_gif.py` pins a recorded series to the second it was sampled, and how
-    the suite proves a zone change moves nothing - moves a library theme's clock too.  A
-    caller holding a `struct_time` is taken apart and rebuilt rather than passed through,
+    a zone change moves nothing this program draws, and it does move a library
+    theme's clock - measured on the bench on 2026-11-08, four runs identical
+    with the machine's own zone set to UTC, a record rather than a gate, since
+    nothing in `tests/` re-runs that comparison. A caller holding a
+    `struct_time` is taken apart and rebuilt rather than passed through,
     because `time.struct_time` has no `strftime` (the first run here proved it by failing).
     """
     if when is None:
@@ -522,8 +529,9 @@ def field_census() -> dict:
 #: The `xigma` sub-keys this program reads, each with the reason it had to be added.  The
 #: list is *derived* - `keys_read()` finds them by reading `layout.py`'s source - so this
 #: table cannot grow silently: a new extension key appears in the census whether or not it
-#: has a reason written here, and the suite asserts the two agree.  That is the whole
-#: mechanism for "every schema addition has a stated reason, or it does not go in".
+#: has a reason written here, and `tests/test_conventions.py` asserts the
+#: two agree. That is the whole mechanism for "every schema addition has a
+#: stated reason, or it does not go in".
 XIGMA_KEYS = {
     "anchor": "our five draw text centred (`render._text` anchors on \"mm\"); the vendor's "
               "files anchor on the em box's top-left, so an export has to say which",
@@ -551,8 +559,9 @@ XIGMA_KEYS = {
               "enough: the pair's two are congruent, and the row is symmetric about its "
               "own x.  The key exists because our `_fit_arc` picks one size for the two "
               "temperature columns by measuring their ink against this hole, and no width "
-              "can do that job: the suite searches every whole-pixel budget this canvas "
-              "can hold and none reproduces the six sizes it picks (docs/limits.md). "
+              "can do that job: `tests/test_specials.py` searches every whole-pixel "
+              "budget this canvas holds and finds none that reproduces the six sizes "
+              "it picks (docs/limits.md). "
               "A `values` row that declares no ring cannot be sized, and `--check-theme` "
               "says which of its keys is missing rather than drawing at the ceiling and "
               "letting a reader find the overlap on the glass",
@@ -645,8 +654,9 @@ def keys_read() -> tuple:
 
 # ------------------------------------------------------- canonical file shape --
 #: Every one of the 27 copied layouts is, byte for byte, `canonical()` of its own parsed
-#: content - one indentation, sorted keys, no trailing whitespace - checked on all 27 by
-#: the suite.  The only thing the vendor's own files disagree with each other about is
+#: content - one indentation, sorted keys, no trailing whitespace - checked on all
+#: 27 by `tests/test_theme_files.py`.  The only thing the vendor's own files disagree
+#: with each other about is
 #: escaping: **18** write non-ASCII strings as `\uXXXX` and **9** keep them raw (the ones
 #: carrying a `宋体` family or CJK `content`), which is `json.dump`'s `ensure_ascii` switch
 #: and nothing else.  Measured, because it decides what "the round trip is the identity"
@@ -801,9 +811,11 @@ def user_theme_path(name: str) -> str:
     return os.path.join(user_root(), f"{name}.json")
 
 
-#: How long a layout name may be.  The window puts this on its name box as a `maxLength`,
-#: so a reader cannot type a name the writer would refuse for length - and the suite holds
-#: the two to the same number rather than trusting either to remember it.
+#: How long a layout name may be.  The window deliberately does *not* cap its name box
+#: at this (`xigmaui/app.py` says why: a box that stops at the limit drops characters and
+#: then presses the button with a name nobody typed), so the writer has to refuse past it
+#: in words that name the limit - which is what `tests/test_names_and_renames.py` holds:
+#: the edge usable, one past it refused, the refusal quoting this constant.
 NAME_LIMIT = 64
 
 #: What this module writes *beside* a layout file: `<name>.json.bak` is the previous
@@ -1149,11 +1161,13 @@ def _sp_fan_figures(draw, prop, values):
 
     One row and not two, because the two figures share a single text size - each is fitted
     to its own budget and both draw at the smaller of the two fits, so a long CPU figure
-    takes the GPU figure down with it.  Sized separately they would not match: the suite
-    walks 30 reading pairs and finds 25 of them landing at two different sizes, the row
-    moving 1 763 to 2 915 px on the bench that draws with these faces (printed by the
-    `the fan pair, apart` line, and labelled as one machine's measurement in
-    docs/limits.md).  The vendor schema has no way to say "these two rows are one size",
+    takes the GPU figure down with it. Sized separately they would not match:
+    `tests/test_specials.py` walks 30 reading pairs and insists the joint rule
+    shows up as a moved row exactly when the two fits disagree. How many of
+    those 30 disagree, and how far the row moves when they do - 25 of them, 1
+    763 to 2 915 px - are one bench's figures, recorded here, because both
+    follow the faces installed. The vendor schema has no way to say "these two
+    rows are one size",
     and the owner's decision (2026-11-08) was to keep the pair one code drawing rather than
     invent a group key.  The row can be moved, re-pitched, recoloured and resized; what
     stays in `render.fan_figures` is the rule that makes it a pair, which is the same
@@ -1200,8 +1214,9 @@ def _sp_temp_labels(draw, prop, values):
     the figures under them (`render.A26_TLBL_TEXT` names them together for that reason).
     Two `text` rows cannot say "we are one size": the schema's only fit key is a width, and
     the size the ring decides is a face metric of the machine drawing it - docs/limits.md
-    has the suite's exhaustive search showing no width reaches it.  Baking the size this
-    bench measured would be a layout that paints other pixels where the fonts differ, and
+    has `tests/test_specials.py`'s exhaustive search showing no width reaches
+    it. Baking the size this bench measured would be a layout that paints other
+    pixels where the fonts differ, and
     an export that cannot be driven to a zero diff is not shipped.
 
     So it is one `special` with the `values` door, placing a pair of strings that never
@@ -1219,8 +1234,9 @@ def _sp_temp_labels(draw, prop, values):
 #: one built string (`layout.draw_special_line`), `pair` two figures at one width-fitted
 #: size (`draw_special_pair`), `values` two figures at one ring-fitted size
 #: (`draw_special_values`).  The door is what decides what the row's fields mean, so the
-#: marker lives here rather than in a table beside the registry - and the suite reads each
-#: function's own source to check the marker agrees with the call it makes.
+#: marker lives here rather than in a table beside the registry - and
+#: `tests/test_specials.py` reads each function's own source to check the
+#: marker agrees with the call it makes.
 _sp_clock_readings.door = "line"
 _sp_dual_status.door = "line"
 _sp_fan_figures.door = "pair"
@@ -1357,8 +1373,9 @@ def widget(wid: str, kind: str, prop: dict, layer: int = 0) -> dict:
 def clock_recipe() -> dict:
     """`clock` as a layout: two readings from the clock, one code-drawn line.
 
-    Determinism, because the gate compares two runs byte for byte: ids are derived from
-    the theme name (`xigma-clock-time`), never random; the vendor's `property[].time`
+    Determinism, because `tests/test_export_parity.py` compares two runs byte
+    for byte: ids are derived from the theme name (`xigma-clock-time`), never
+    random; the vendor's `property[].time`
     (its editor's stamp: one epoch per theme, on 82 of the 152 widgets) is **omitted**,
     because a generated file has no editor and a stamp with nothing behind it would be a
     field that lies; and no rendered date or number appears anywhere - only `source`
@@ -1403,10 +1420,13 @@ def gauge_recipe() -> dict:
     arcs, each drawn 0.4 degrees past its end so the joints do not show, colour taken at the
     segment's *start* and mixed by truncation; the vendor's ring, measured off ALPHA's
     captured frames, is 1-degree arcs with the colour at each segment's middle and butt
-    ends.  Same geometry, same two colours, different raster: the suite paints one arc both
-    ways and prints the count - 164 / 3 366 / 3 889 / 6 989 differing pixels at four
-    readings, worst channel delta 255.  So the widget says `xigma.arcPaint: "render"`, no
-    copied layout says anything, and the default stays the measured vendor convention
+    ends.  Same geometry, same two colours, different raster:
+    `tests/test_conventions.py` paints one arc both ways.  How far apart the
+    two rasters land - 164 / 3 366 / 3 889 / 6 989 differing pixels at four
+    readings, worst channel delta 255 - is a record of that measurement, not a
+    number a check re-quotes.  So the widget says `xigma.arcPaint: "render"`,
+    no copied layout says anything, and the default stays the measured vendor
+    convention
     (`layout.ARC_PAINT` carries both, and `--check-theme` refuses an unknown name).
 
     One colour detail worth writing down while it is in front of us: the pair that has a
@@ -1549,8 +1569,9 @@ def alpha_recipe() -> dict:
     The ramp is data, and it is exact *because* it is the three-stop one. `temp_arc` colours
     its fill through `render.temp_colour`, green at `A26_ARC_LO`, amber at `A26_ARC_MID`, red
     at `A26_ARC_HI`; the stop fractions come out of those same three constants, which is the
-    spelling the suite checks against `temp_colour` at all 100 sampled segment positions
-    (docs/limits.md - `render.heat`, by contrast, is off by one unit at 8 of its own stop
+    spelling `tests/test_gauges.py` checks against `temp_colour` at all 100
+    sampled segment positions (docs/limits.md - `render.heat`, by contrast, is
+    off by one unit at 8 of its own stop
     positions, which is why `dual` names its ramp instead of copying it).
 
     Two rows are `text`/`data` rather than `special` because nothing is joint about them:
@@ -1696,7 +1717,8 @@ def bars_recipe() -> dict:
             # the memory rows: the number prints one field, the meter divides two, and the
             # drawing behind this file prints neither when the division cannot be made (a
             # GPU with no dedicated total answers `4096` and nothing else).  Named rather
-            # than assumed, and the suite measures the case
+            # than assumed, and `tests/test_pinned_metrics.py` measures the
+            # case
             number["showIf"] = bar_src
         rows.append(widget(f"xigma-bars-{text_src.lower().replace(' ', '-')}-value",
                            "data", {
@@ -1737,7 +1759,8 @@ def export(name: str) -> dict:
 
 
 def parity(name: str, metrics: dict, when=None) -> dict:
-    """Code-drawn vs layout-drawn, in pixels: the gate that makes an export mean something.
+    """Code-drawn vs layout-drawn, in pixels: the check that makes an export
+    mean something.
 
     Both doors get the same metrics and the same instant.  Returned numbers: painted
     pixels each way, the count of pixels where they disagree, and the notes from

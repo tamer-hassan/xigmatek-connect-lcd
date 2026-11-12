@@ -44,8 +44,9 @@ comes first in the order below is the row that stays, because that is the file
   tree - correctly, since the supported route to that library was the package, and
   wrong for anything that wanted to follow a layout's declared background.  Both
   sentences are measured now: a checkout on its own walks 46 tracked mp4 files into the
-  same **40 rows** this bench walks out of 204 files, and the suite asserts that all 23
-  selectable layouts can pair there (docs/gui.md).
+  same **40 rows** this bench walks out of 204 files, and `tests/test_media_roots.py`
+  asserts that every selectable layout can pair there - counting them, not quoting a
+  number for them (docs/gui.md).
 
   Wider than the daemon's name lookup in one direction only, and that is the whole
   reason the list is built from `media_roots()`: every root the loop searches is a
@@ -355,14 +356,13 @@ def list_clips(extra: str = "") -> list[Clip]:
     that.  It was keying on (name, length), which left 69 rows standing where 40
     exist.
 
-    The vendor's library repeats itself too, inside our own tracked copy: 43 clip
-    files, 40 distinct, because `Theme_31.mp4` == `Theme_26.mp4`, `theme_38.mp4` ==
-    `Theme_27.mp4` and `theme_51.mp4` == `Theme_29.mp4` (sha256, measured
-    2026-11-07).  Those files stay in the tree - the identity claim is that the
-    library was copied as the vendor ships it, manifest and all, and the suite
-    verifies every byte against it - but the list shows one row for them, and
-    `scan["library_dups"]` says how many.
-    """
+    The vendor's library repeats itself too, inside our own tracked copy: 43 clip files,
+    40 distinct, because `Theme_31.mp4` == `Theme_26.mp4`, `theme_38.mp4` ==
+    `Theme_27.mp4` and `theme_51.mp4` == `Theme_29.mp4` (sha256, measured 2026-11-07).
+    Those files stay in the tree - the identity claim is that the library was copied as
+    the vendor ships it, manifest and all, and `tools/verify_manifest.py` verifies every
+    byte against it - but the list shows one row for them, and `scan["library_dups"]`
+    says how many. """
     from xigmalcd.main import (MEDIA_ENV, REPO_CLIP_LIB, SYSTEM_CLIP_LIB,
                                SYSTEM_MEDIA, SYSTEM_THEMES, WIN_STATIC,
                                WIN_UPLOADS, media_roots)

@@ -7,8 +7,10 @@ up quoting digits that no longer match the file beside it - and the README quote
 digits.
 
 Why the readings are pinned at all: a committed picture that drew whatever the machine
-was doing at the moment of generation changes on every run, and the suite checks those
-pictures.  So the set is fixed in this file, and every number in it has a source.
+was doing at the moment of generation changes on every run, and the README quotes the
+digits that came out of it.  So the set is fixed in this file, and every number in it
+has a source.  What is *not* claimed: nothing in `tests/` re-measures the pictures
+these tools write, so `docs/tools.md` names the command that reads them back.
 
 Two kinds of source, and the difference matters, so they are labelled:
 
