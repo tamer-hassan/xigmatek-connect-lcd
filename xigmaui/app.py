@@ -767,7 +767,7 @@ class Window(QMainWindow):
         self.split.setSizes(self.cfg["split"])
         self._build_tray()
         self.preview_timer = QTimer(self)
-        self.preview_timer.timeout.connect(self._repaint)
+        self.preview_timer.timeout.connect(self._preview_tick)
         self.preview_timer.start(max(200, int(1000 / self.preview_fps)))
         self._load_background(self.mp4)
         # A file that needed explaining gets explained here, once, before anything the
@@ -1844,11 +1844,33 @@ class Window(QMainWindow):
         params = inspect.signature(render.THEMES[theme]).parameters
         return {k: v for k, v in kw.items() if k in params} | {"scrim": want}
 
+    def _preview_tick(self) -> None:
+        """What `preview_timer` actually calls: a repaint, unless the reader is dragging.
+
+        While a canvas drag or a canvas resize drag is in flight, the pointer owns the
+        picture: every move event already repainted the layer, from the same pinned
+        fixture, with the same file.  So a tick arriving in that moment repaints pixels
+        that cannot differ from the ones on screen, and pays for the most expensive call
+        in the program to do it - `sensors.collect()`, 189.9 ms on the author's bench,
+        100.3 ms for the tick overall.  That is what "laggy" feels like when it is not the
+        move itself: a stall in the middle of a drag, once every `--preview-fps` seconds,
+        for a frame the drag has already drawn.
+
+        The release repaints with a read, so the line under the picture is fresh again the
+        moment the drag ends; nothing here holds a caption back past the pointer.
+        `tests/test_canvas.py` counts the paints a tick makes - with a drag in flight and
+        without one - rather than timing anything, because a duration belongs to a box.
+        """
+        if self._drag or self._resize:
+            return
+        self._repaint()
+
     def _repaint(self, readings: bool = True) -> None:
         """Redraw **our layer** from fresh readings, then show it.
 
         This is the expensive half, and it is deliberately the only half tied to
-        `--preview-fps`: `sensors.collect()` is 71.8 ms and `render.draw` another
+        `--preview-fps` (through `_preview_tick`, which stands down while a canvas drag
+        owns the picture): `sensors.collect()` is 71.8 ms and `render.draw` another
         11.9 ms measured here, so a tick of this costs ~84 ms.  The background does
         not move at this rate and never should have: it plays on `bg_timer`, at the
         file's own rate, compositing over the layer cached here (`self._osd`).
@@ -2336,7 +2358,23 @@ class Window(QMainWindow):
         Visible rows go first. 115 clips is 115 ffmpeg seeks: 12.7 s of them
         measured on this box (15.7 s when something else is busy), and the ones
         below the fold are not the ones you are looking at.
+
+        **It stands down while the reader is holding a row.**  A tick is two
+        subprocesses - `ffprobe` for the loop length and `ffmpeg` to seek a frame -
+        and this timer runs at interval 0, so the library's first pass takes the
+        event loop for as long as it has rows left to do.  Measured on this bench
+        while writing the sentence: opening the window and dragging at once costs
+        **108 ms per mouse-move event** for the first 25 moves (24 `ffprobe`/`ffmpeg`
+        spawns across 8 of them), against **11.7 ms** for every drag after the pass
+        is done.  That is the shape of "dragging is laggy" when nothing is playing:
+        the pane is not the slow part, the queue beside it is.  Nothing is lost by
+        waiting - `_pending` keeps the row, the pass resumes on the next tick, and an
+        icon arriving 200 ms late is not a fact about the file.
+        `tests/test_canvas.py` counts the probes one tick makes with a drag in flight
+        and without one: zero and one, never a silent never-finishing pass.
         """
+        if self._drag or self._resize:
+            return
         if not self._pending:
             self.thumb_timer.stop()
             return

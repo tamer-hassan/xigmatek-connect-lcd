@@ -295,7 +295,7 @@ class AReadOfTheMachineIsNotPartOfAnEdit(fixtures.FreshConfigRoot):
 
     def test_the_preview_tick_still_reads_with_an_editor_open(self):
         seen = self.count_reads()
-        self.win._repaint()                     # what `preview_timer` calls, with no arguments
+        self.win._preview_tick()                # what `preview_timer` is connected to
         self.assertEqual(len(seen), 1,
                          "the tick stopped reading the machine: with an editor open, the line "
                          "under the picture would freeze at whatever it last saw")
@@ -309,7 +309,194 @@ class AReadOfTheMachineIsNotPartOfAnEdit(fixtures.FreshConfigRoot):
                          "this is the one path where the read is the picture")
 
 
-E = __import__("PyQt6.QtCore", fromlist=["QEvent"]).QEvent
+class TheRestOfTheWindowWaitsWhileARowIsHeld(fixtures.FreshConfigRoot):
+    """Holding a row is an act on one picture; three other kinds of work stand down.
+
+    `AReadOfTheMachineIsNotPartOfAnEdit` above holds the sensors read off the pointer's
+    path.  This class holds the three things that turned out to be *bigger* than that read,
+    found by profiling 40 real move events of a drag on `bars` on the author's bench rather
+    than by guessing at the picture:
+
+    * **the painter's own source.**  `themes.keys_read()` derives the readable field names
+      by reading `layout.py` off disk, compiling it and walking ~29 000 AST nodes.  The
+      model consults it to decide which fields a kind carries - `move_to` once, each `set`
+      twice - so one mouse move paid for **five** parses: 20.3 ms of a 30.1 ms move (67%),
+      against 9.7 ms for the actual painting.  A source file does not change while a process
+      runs, so the derivation is memoised; what is gated here is the *count*, because the
+      derivation itself is the census's whole point.
+    * **the `--preview-fps` tick.**  With a row held, the pointer has just repainted the
+      layer from the pinned fixture, so a tick arriving in that instant repaints pixels that
+      cannot differ - and pays for the read to do it.  Injecting one tick into every fourth
+      move, on this bench: mean 32.2 ms and worst **113.9 ms** per move before, mean 10.9 and
+      worst 12.0 ms after.
+    * **the clip library's thumbnails.**  `thumb_timer` runs at interval 0, one clip per
+      tick, and a clip is two subprocesses - `ffprobe` for the loop length, `ffmpeg` to seek
+      the frame.  Opening the window and dragging into it costs **108 ms per move** for the
+      first 25 moves (24 spawns counted across 8 of them) and 11.7 ms once the pass is done.
+      This is what "slow even with playing off" meant: nothing was playing; the queue beside
+      the pane was working.
+
+    Every check is a count, and each count is answered from both sides, because "it stopped
+    doing the expensive thing" is one edit away from "it stopped doing the thing".
+    """
+
+    LAYOUT = "bars"
+
+    @classmethod
+    def setUpClass(cls):
+        fixtures.qapp()
+
+    def setUp(self):
+        super().setUp()
+        self.win = app.Window(MISSING_PORT, None, restore=False, save_settings=False)
+        self.win.show()
+        self.win.resize(1280, 900)
+        fixtures.pump(0.4)
+        self.win.ed_name.setCurrentText(self.LAYOUT)
+        fixtures.pump(0.5)
+        self.win.preview_timer.stop()       # a timer firing between steps is not the subject
+        self.addCleanup(fixtures.close_window, self.win)
+        self.ed = self.win.ed
+        self.assertIsNotNone(self.ed, f"opening {self.LAYOUT} left the window with no editor")
+        self.row = next(i for i in range(len(self.ed.widgets()))
+                        if self.ed._row_box(self.ed.obj, i))
+        box = self.ed._row_box(self.ed.obj, self.row)
+        self.point = (box[0] + 2, (box[1] + box[3]) // 2)
+
+    # ---- the shipped doors, in the window's own coordinates -------------------------------
+    def event(self, which: str, x: int, y: int):
+        from PyQt6.QtCore import QEvent, QPointF, Qt
+        from PyQt6.QtGui import QMouseEvent
+        kinds = {"press": QEvent.Type.MouseButtonPress, "move": QEvent.Type.MouseMove,
+                 "release": QEvent.Type.MouseButtonRelease}
+        pos = QPointF(x, y)
+        return QMouseEvent(kinds[which], pos, pos, Qt.MouseButton.LeftButton,
+                           Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+
+    def pane(self, px: int, py: int) -> tuple:
+        ox, oy = self.win.preview._origin()
+        k = self.win.preview.side / render.W
+        return (int(round(ox + px * k)), int(round(oy + py * k)))
+
+    def hold(self) -> None:
+        """Press the row, and say so if the press found nothing to hold."""
+        self.win.preview.mousePressEvent(self.event("press", *self.pane(*self.point)))
+        self.assertTrue(self.win._drag,
+                        "the press found no row under the pointer, so every count below is "
+                        "measuring a window that is doing nothing")
+
+    def moves(self, steps: int = 6) -> None:
+        for step in range(1, steps + 1):
+            self.win.preview.mouseMoveEvent(self.event("move", *self.pane(self.point[0] + step,
+                                                                          self.point[1])))
+
+    def x_of_row(self) -> int:
+        return int((self.ed.widgets()[self.row].get("property") or [{}])[0]["x"])
+
+    # ---- 1. the painter's source is not re-read by an act ----------------------------------
+    def test_a_drag_reads_the_painter_s_source_no_more_than_a_field_write_does(self):
+        import inspect
+        real, seen = inspect.getsource, []
+
+        def counted(module):
+            if getattr(module, "__name__", "") == "xigmalcd.layout":
+                seen.append(1)
+            return real(module)
+
+        inspect.getsource = counted
+        self.addCleanup(setattr, inspect, "getsource", real)
+        before, anchor = self.x_of_row(), themes.keys_read()
+        self.hold()
+        self.moves()
+        self.assertEqual(self.x_of_row(), before + 6,
+                         "the drag did not move the row six px, so a count of zero source "
+                         "reads would be measuring an act that changed nothing")
+        self.assertEqual(seen, [],
+                         f"{len(seen)} reads of `layout.py`'s source for 6 drag moves: the "
+                         "readable-field set is a fact about a file that cannot change inside "
+                         "a run, and five parses a move is twice what the painting costs")
+        self.win.preview.mouseReleaseEvent(self.event("release", *self.pane(self.point[0] + 6,
+                                                                            self.point[1])))
+        # the memo may not become a second source of truth: the names still come from the
+        # painter, and the model still refuses a key that painter never reads
+        self.assertEqual(themes.keys_read(), anchor,
+                         "`keys_read()` stopped answering with the names it derives from the "
+                         "painter - a cache that loses the derivation is a census that lies")
+        self.assertGreater(len(anchor[0]), 20,
+                           f"the derived set is {len(anchor[0])} names: too small to mean the "
+                           "painter was read at all")
+        ok, note = self.ed.set("italic", True)
+        self.assertFalse(ok, f"the model took a key nothing reads: {note}")
+        self.assertIn("does not carry", note, note)
+
+    # ---- 2. the preview tick stands down while a row is held -------------------------------
+    def count_paints(self) -> list:
+        """Count the layer paints the editor is asked for, through the model's own door."""
+        real, seen = self.ed.paint, []
+
+        def counted(*args, **kw):
+            out = real(*args, **kw)
+            seen.append(1)
+            return out
+        self.ed.paint = counted
+        self.addCleanup(setattr, self.ed, "paint", real)
+        return seen
+
+    def test_a_preview_tick_while_a_row_is_held_paints_nothing(self):
+        paints = self.count_paints()
+        self.hold()
+        self.win._preview_tick()
+        self.assertEqual(paints, [],
+                         f"{len(paints)} layer paints for a tick that arrived mid-drag: the "
+                         "pointer has already drawn this file at this fixture, so the tick can "
+                         "only repaint identical pixels and pays a sensor read to do it")
+        self.win.preview.mouseReleaseEvent(self.event("release", *self.pane(*self.point)))
+        paints.clear()                          # the release repaints with a read: not the subject
+        self.win._preview_tick()
+        self.assertEqual(len(paints), 1,
+                         f"{len(paints)} paints for a tick with no row held: the line under "
+                         "the picture has stopped following the machine")
+
+    def test_a_held_key_is_not_treated_as_a_drag_by_the_tick(self):
+        paints = self.count_paints()
+        self.win._canvas_nudge(2, 0)            # an arrow key: no press, so no `_drag`
+        paints.clear()
+        self.win._preview_tick()
+        self.assertEqual(len(paints), 1,
+                         f"{len(paints)} paints for a tick after an arrow-key nudge: only a "
+                         "press-and-hold is a drag, and a gate that silences the tick for any "
+                         "edit would freeze the caption")
+
+    # ---- 3. the ffmpeg/thumbnail pass waits for the pointer -------------------------------
+    def test_a_thumbnail_tick_while_a_row_is_held_probes_no_clip(self):
+        real_probe, real_frame, seen = app.clipdb.probe, app.clipdb.frame, []
+        app.clipdb.probe = lambda *a, **kw: seen.append(("probe",))
+        app.clipdb.frame = lambda *a, **kw: seen.append(("frame",))
+        self.addCleanup(setattr, app.clipdb, "probe", real_probe)
+        self.addCleanup(setattr, app.clipdb, "frame", real_frame)
+        self.win._populate_clips()              # the shipped door that arms the queue
+        self.win.thumb_timer.stop()             # the pass itself is not the subject here
+        seen.clear()                            # arming the queue already drew a row or two
+        self.assertTrue(self.win._pending,
+                        "no clip was left pending, so the deferral below would have been "
+                        "proved by an empty queue rather than by a held row")
+        queue = len(self.win._pending)
+        self.hold()
+        self.win._thumb_batch()
+        self.assertEqual(seen, [],
+                         f"{len(seen)} media probes started inside a drag: ffprobe and ffmpeg "
+                         "take the event loop for as long as they run, which is what a stall "
+                         "in the middle of a drag feels like")
+        self.assertEqual(len(self.win._pending), queue,
+                         "the deferred tick threw the queue away instead of waiting: the "
+                         "library would silently keep its old rows forever")
+        self.win.preview.mouseReleaseEvent(self.event("release", *self.pane(*self.point)))
+        self.win._thumb_batch()
+        self.assertEqual(len(seen), 2,
+                         f"{seen}: a tick with no row held should do exactly one clip - "
+                         "a probe and a frame - or the pass never finishes")
+        self.assertEqual(len(self.win._pending), queue - 1,
+                         "the queue did not shrink by one, so nothing is being consumed")
 
 
 if __name__ == "__main__":

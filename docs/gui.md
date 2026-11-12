@@ -307,6 +307,27 @@ suite run on this bench, 2026-11-11).  Frames are dropped rather than queued -
 `_advance` pulls as many as real time is worth and keeps the last one, so a slow moment
 costs a frame of the animation and never a backlog that plays later as a burst.
 
+The same ffmpeg pass costs something else, and it was found from the other direction: a
+reader complained that dragging a row inside the editor's pane was slow *with `playing`
+off*. It was, and the frame it was slow about was not the expensive half of the table
+above. Three things were counted on this bench, on 40 real move events of a drag on `bars`
+(each figure this box's, none of them a spec), and the pair of classes in
+`tests/test_canvas.py` holds the counts rather than the durations:
+
+| what one drag move paid | per move, this bench |
+|---|---|
+| `themes.keys_read()` re-reading `layout.py` off disk, compiling it and walking ~29 000 AST nodes — the model asks which fields a kind carries (`move_to` once, each `set` twice), so **five parses per event** | **20.3 ms of a 30.1 ms move**, against 9.8 ms for the paint |
+| the first drag after opening the window, while `thumb_timer` (interval 0, `ffprobe` + `ffmpeg` per clip) still had rows pending — 24 spawns counted across 8 moves | **108 ms**, where every later drag costs 11.7 ms |
+| a `--preview-fps` tick landing mid-drag, repainting a layer the pointer had just drawn and reading this machine to do it (mean over 40 moves, a tick injected into every fourth) | mean **32.2 ms**, worst **113.9 ms**, against 10.9 and 12.0 ms |
+
+So: the derivation is memoised (a source file cannot change under a running process, and
+the census still derives it - `keys_read()` returns names, and the model still refuses a
+key `layout.py` never reads); `_preview_tick` - what `preview_timer` is connected to -
+stands down while a row is held; and the thumbnail pass stands down too, keeping its queue,
+because an icon arriving 200 ms later is not a fact about the file. A move then costs
+**~11 ms**, of which **9.8 ms** is `Editor.paint` of the 480×480 frame: the picture itself,
+which is the floor until somebody draws a smaller picture.
+
 The rate is capped at 30 fps and floored at 5 (`_set_player`), because past 30 the
 difference is not something an eye separates and every extra frame is a composite and a
 paint; a file whose rate ffprobe will not give is played at 24 and the line says so. A

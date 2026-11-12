@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import copy
 import datetime
+import functools
 import glob as _glob
 import json
 import os
@@ -624,6 +625,7 @@ UNREAD_WHY = {
 }
 
 
+@functools.lru_cache(maxsize=1)
 def keys_read() -> tuple:
     """The `property` keys this program actually reads - taken out of `layout.py`'s own
     source with `ast`, not from a hand-kept list.
@@ -632,6 +634,20 @@ def keys_read() -> tuple:
     is the way the census goes wrong: the painter gains or drops a key and the table keeps
     claiming the old set.  This asks the module instead - every `prop["k"]` and
     `prop.get("k")` in it - so the two cannot disagree.
+
+    **Memoised, because the derivation is a fact about a source file and not about a
+    call.**  `layout.py` does not change while a process runs, so reading the file,
+    compiling it and walking ~29 000 AST nodes is work that can be done once.  It was not:
+    `Editor.move_to` asks which fields a kind offers, and `Editor.set` asks twice, so one
+    mouse-move of a drag in the layout editor paid for **five** parses of the painter.
+    Measured on the author's bench while writing this, profiling 40 real move events of a
+    drag on `bars`: 30.1 ms per move, of which 20.3 ms (67%) was this function - more than
+    twice the 9.7 ms the actual painting costs.  `tests/test_canvas.py` counts the source
+    reads an act makes, which is a count and not a duration, so it holds on any box.
+
+    A caller that swaps `xigmalcd.layout` for something else - no shipped code does, and
+    the census tests above re-derive the set rather than trusting a copy - has to say so
+    with `keys_read.cache_clear()` first.
     """
     import ast
     import inspect
