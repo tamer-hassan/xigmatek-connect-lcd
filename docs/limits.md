@@ -6,7 +6,7 @@ What has been measured on glass, by whom, with how many frames - and what has no
   palette encoding.** `--text-color` and the window's `text colour` row change the ink of
   the glyphs this program draws; the frame is then uploaded as pixels, which is the only
   reason the option exists on a device that answers nothing (§11). Measured off-glass by
-  the suite: painting `gauge` in red leaves its painted area at exactly 6 087 px as with
+  `tests/test_ink.py`: painting `gauge` in red leaves its painted area at exactly 6 087 px as with
   the theme's own white, moves 1 509 solid white glyph pixels to 1 830 red ones with none
   left white, and holds for all five themes; and after the default 256-colour palette
   encoding (§12) the ink returns within **1/255 per channel**.
@@ -22,7 +22,7 @@ What has been measured on glass, by whom, with how many frames - and what has no
   next frame, at that fps - and the colours reading as the colours sent, `#8a2be2`
   included. That last one is the interesting case: it is not one of this program's palette
   names, so the only thing between it and the glass was the loop's default 256-colour PNG
-  encoding, whose drift the suite measures at 1/255 per channel and the eye agreed with.
+  encoding, whose drift `tests/test_encoder.py` measures at 1/255 per channel and the eye agreed with.
   One session renewal landed inside the run and the reported colour never drifted from
   what was sent - it is a setting the frame loop re-reads, not session state.
   Still unmeasured on glass: a **dark** ink over a **bright** clip (the automatic scrim
@@ -61,7 +61,7 @@ What has been measured on glass, by whom, with how many frames - and what has no
   black, which for a layout theme means the frame covers the background layer completely -
   and for three of our five drawn themes does not, because their own translucent fills are
   replaced rather than blended and keep the stored background visible (the `--bg` row in
-  docs/usage.md, and the suite derives which themes from the exports' colour keys). `--mp4 [PATH]` uploads a background the way
+  docs/usage.md, and `tests/test_conventions.py` derives which themes from the exports' colour keys). `--mp4 [PATH]` uploads a background the way
   ALPHA does at session start - `media/Theme_25.mp4` (215 KB, the vendor's own pairing for
   this theme) by default, which the panel holds across session renewals (only `recovery`
   clears it); `--no-mp4` skips the upload and leaves the panel's stored file playing.
@@ -473,8 +473,10 @@ What has been measured on glass, by whom, with how many frames - and what has no
   **5 039 178 B** for all six, the largest 1.93 MB, and 13 916 B of series JSON beside
   them - that file grew 220 B when it gained one field, the zone it was sampled in; see the
   clock-zone bullet below. Every file stays under 2 MB: GitHub's own browser upload limit is a thing of
-  GitHub's and has not been measured here, so the ceiling the suite holds is 9 MB per file,
-  which is comfortably below where that limit is reported to be.
+  GitHub's and has not been measured here. The ceiling the deleted suite held every run was
+  9 MB per file, comfortably below where that limit is reported to be; nothing re-measures the
+  published files now, so `du -b docs/videos/*` re-reads the sizes and this sentence names it
+  as a gap rather than a gate (docs/tools.md).
 
   * **What the digits in them are.** One recorded series drives all six files:
     `docs/videos/readings-2026-11-08.json`, 12 `sensors.collect()` calls at a 1 s cadence
@@ -494,7 +496,7 @@ What has been measured on glass, by whom, with how many frames - and what has no
     by at least 3/255 mean absolute change over the pixels the layer paints, and more than
     the untouched part of the frame does (the ratios above, 1.55 to 37.89 - the low one is
     `bars` over `theme_52.mp4`, which moves a great deal on its own). And the two layers the
-    file was built from, re-rendered in the suite with each sample's readings *and each
+    file was built from, re-rendered against each sample's readings *and each
     sample's clock*, differ at more than 8/255 on 622-6 226 pixels each. One of those
     checks without the other is worthless in a predictable direction: a frozen layer over a
     moving clip passes the file-level test on the background's own motion, and a video whose
@@ -596,7 +598,7 @@ What has been measured on glass, by whom, with how many frames - and what has no
     skip-because-of-fonts branch of that gate was dead code from the day it was written.
     Asking for `font_for(...)[0] is not None` is the whole fix. It is also the second time
     tonight that a font-independent assertion had to be pulled apart from a font-dependent
-    number: what the gate asserts on any machine is the accounting identity (boxes +
+    number: what `tests/test_library_draw.py` asserts on any machine is the accounting identity (boxes +
     skipped sources + skipped faces == the widgets in the file), that every pickable layout
     paints at least one box and more than 500 lit pixels, and that exactly 9 layouts report
     an unanswered *source*, every one of them `Pump Speed`. The totals are printed with
@@ -608,13 +610,13 @@ What has been measured on glass, by whom, with how many frames - and what has no
     the export names the face its own code uses (`layout.FONTS["dejavu"]`, built out of
     `render._FONT_GLOBS`) instead of a vendor family that resolves to the same files here by
     luck.
-  * **A gate that compares two pictures has to say *when*, and the suite now measures that
+  * **A check that compares two pictures has to say *when*, and `tests/test_theme_files.py` measures that
     rule as well as following it.** The file-model section draws one layout from memory and
     the same layout written to disk and read back, and asserts the two pictures are
     byte-identical. Run 42472937258 is the first CI failure of the night and it is a method
     bug, not a restless runner: the two `themes.draw` calls took their "now" from the wall
     clock, so the pair that disagreed differed **because a second went by**, not because of
-    anything about the file model. Measured inside the suite now, so the rule cannot be
+    anything about the file model. Measured in `tests/test_theme_files.py`, so the rule cannot be
     forgotten again: the same `clock` layout drawn twice with no pinned instant differs by
     **2 819 px** across 1.05 s of wall clock (the count moves with which digits change), and
     drawn twice at one pinned instant it differs by **0** - the assertion being `drift > 0`
@@ -644,8 +646,9 @@ What has been measured on glass, by whom, with how many frames - and what has no
     mild 2.49 against 1.29).
   * **The GIF path is still here, and still measured**, because it is the shape whose
     digits a caption can quote: pinned readings from `tools/preview_pin.py`, `--clock
-    11:07:42`, and the suite writes a 160 px GIF every run to keep that honest. The
-    measurements made while README used it are still true of it: a 6 fps request becomes 12
+    11:07:42`, and `tools/preview_gif.py` writes a 160 px GIF whenever it is asked to - though
+    nothing writes one as a check any more, which is the difference between a measured path and
+    a gated one. The measurements made while README used it are still true of it: a 6 fps request becomes 12
     frames at a **170 ms** delay because GIF stores delays in 10 ms units (**2.04 s**, not
     2.00); **128 colours** for the whole animation measured 23 % smaller than 256 with the
     drawn colour within 1/255 at 480 px, and 64 colours at 320 px is where ink starts to
@@ -668,7 +671,7 @@ What has been measured on glass, by whom, with how many frames - and what has no
     end is not on the picture at all. All three lines now take the 440 px budget the time line
     always had, and the ink lands at x 29..450 (font 22) for the pinned set and 27..452 (font
     20) for the worst realistic one. Counted by drawing the string and reading the alpha
-    channel's bbox, 2026-11-07; the suite crops each of the theme's three lines to its own y
+    channel's bbox, 2026-11-07; `tests/test_gauges.py` crops each of the theme's three lines to its own y
     band and fails if any of them touches a panel edge.
   * **A meter needs a ring that stays out of its way.** `dual` drew its unfilled arc in
     `TRACK` (120,200,220,255), a pale cyan picked at import time with nothing measured behind
@@ -685,7 +688,7 @@ What has been measured on glass, by whom, with how many frames - and what has no
     | `Theme_07.mp4` (180.7) | 7.0 / 4.8 | 27.3 / 20.1 |
 
     Seven luma out of 255 is the complaint stated numerically - the fill used to be *dimmer*
-    than its own track - and the suite re-counts the dark-clip case (100.4 against 7.4) every
+    than its own track - and `tests/test_gauges.py` re-counts the dark-clip case (100.4 against 7.4) every
     run. That last row is the honest limit of a half-transparent track over a bright field, and
     the reason the scrim plate exists rather than a reason to go hunting for a third colour.
     Off screen, both times: these are picture measurements, and the panel still cannot be asked
@@ -827,7 +830,7 @@ them; `big` is a *size* (`theme_clock(big=140)`), not a flag, and the first vers
 map mistook it for one and asked with `True`.
 
 What belongs to the machine: the non-zero pixel counts walk glyph edges and installed faces,
-so the suite prints them beside the machine and this page carries only the counts, the sets
+so `tests/test_knobmap.py` reports them beside the machine and this page carries only the counts, the sets
 and the floor.  What does not: which pairs are exactly 0, and that no option in a
 signature is left unread - both are re-derived on every run by the section that runs the
 tool, and it asserts the words above against the run.  And **none of this has
@@ -881,12 +884,12 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   Export ids are `xigma-*`, never a random uuid, so a generated file is byte-stable.
 * **An exported layout is a picture of the theme *with its readings*, and the two doors
   differ where a reading is missing.** `gauge` reaches a zero-pixel diff on every metrics
-  dict that answers `CPU Temperature`, and the suite's parity gate asserts that. Handed an
+  dict that answers `CPU Temperature`, and `tests/test_export_parity.py` asserts that. Handed an
   empty one, the code theme still paints what does not depend on a reading - it draws the
   ring's track with no fill, 17 451 lit pixels - while the exported layout paints 4 319,
   because a layout skips each widget whose `source` has no value (the same rule that makes
   `Theme_28` draw six boxes instead of seven). Measured across the fixture readings
-  the suite keeps, code px against layout px: `alpha` missing `GPU Temperature` and both
+  `tests/test_export_parity.py` keeps, code px against layout px: `alpha` missing `GPU Temperature` and both
   loads is 32 106 against 22 932, missing only the two loads 40 497 against 31 323, and with
   nothing answered at all 25 396 against 16 222; `dual` without a GPU temperature is 29 228
   against 18 743 and with nothing answered 27 388 against 6 409; `gauge` 17 451 against
@@ -896,7 +899,7 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   are right by their own rule, so the counts are printed side by side rather than
   reconciled: an export translates the drawing, not the theme's fallback behaviour. Where a
   code theme skips a widget too - a `dual` with no load reading draws no bar and no status
-  line - the two doors agree to the pixel anyway, and the gate counts those cases
+  line - the two doors agree to the pixel anyway, and `tests/test_export_parity.py` counts those cases
   separately rather than folding them into the pass.
 * **A ramp can be written as data, and this was measured rather than assumed.**
   `xigma.colourStops` holds `[fraction, rgba()]` pairs interpolated piecewise-linearly,
@@ -928,7 +931,7 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   (`render.gauge`). ALPHA's own ring, measured off its captured frames, is 1-degree arcs
   sampled at the middle, butt caps, with `ARC_COLOUR_MEASURED` consulted for its declared
   colour pair. Same geometry, same two declared colours: **164 / 3 366 / 3 889 / 6 989
-  differing pixels** at four readings, worst channel delta 255 - the suite paints one arc
+  differing pixels** at four readings, worst channel delta 255 - `tests/test_conventions.py` paints one arc
   both ways and prints it. That is why `xigma.arcPaint` exists as an enumerated key instead
   of being left to the painter's mood, and why the copied library, which carries no such
   key, keeps drawing exactly as stage 1 measured it: 114 boxes, 315 287 lit pixels here.
@@ -938,7 +941,7 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   `min(height/2, int(width x max(fraction, 0.02))/2)` - corners that change with the
   reading). One bar, 360x14 at (60, 340), declared cornerRadius 5, drawn both conventions:
   **203 / 306 / 327 / 206 differing pixels** at 0, 3, 63.5 and 100 % (worst channel delta
-  235-255), printed by the suite. At 63.5 % the fill ends at device px 457 under one rule
+  235-255), recorded by `tests/test_conventions.py`. At 63.5 % the fill ends at device px 457 under one rule
   and 456 under the other, which is the whole difference and shows how easy it is to lose a
   pixel to a rounding convention nobody wrote down.
 * **A third bar convention, measured against the function it names.** `vendor` and `render`
@@ -949,7 +952,7 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   the fill's left edge and `endColor` at its right, so the ramp's far end travels with the
   value. A vendor `bar` cannot say that: it declares one colour pair and, under `vendor`,
   fills with the near one.
-  Measured at `render.py`'s own geometry and inks - the suite reads `A26_BAR_XY`,
+  Measured at `render.py`'s own geometry and inks - `tests/test_pinned_metrics.py` reads `A26_BAR_XY`,
   `A26_BAR_WH`, `A26_TRACK`, `A26_BAR_A` and `A26_BAR_B` out of the module rather than
   writing them down, so the probe cannot drift from the theme it tests - and it is a
   **zero diff**: 28 pairs at device resolution and 7 more after the same LANCZOS downsample
@@ -962,7 +965,7 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
     drew the file's rounded track - `square` was falling through to "declared". `hbar` has
     no radius argument at all, so a declared 5 must not leak in; the second value of that
     pair is what catches it now;
-  * a diff of zero can be reached by drawing *nothing*, so the gate also counts how many
+  * a diff of zero can be reached by drawing *nothing*, so `tests/test_export_parity.py` also counts how many
     pixels of the declared rect still read the track's own colour as the value rises:
     **1 376 at 0 % -> 955 at 30 % -> 512 at 62 % -> 0 at 100 %**, the same numbers in both
     drawings. The fill is being walked column by column, not hidden under a track that
@@ -975,25 +978,26 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   whenever `frac > 0.01` but rounds its corners off `max(frac, 0.02)` - **two** different
   floors - and the convention table had a single `floor` doing both jobs, so a load between
   1 % and 2 % drew **no fill at all** as a layout widget while `render.bar` drew one. The
-  parity gate that landed `dual` never stepped in that band, so nothing caught it until
-  this gate did; `corner_floor` is a key of its own now.
+  parity checks as they then stood never stepped in that band, so nothing caught it until
+  `tests/test_conventions.py` did; `corner_floor` is a key of its own now, and that file's load
+  list walks 1.5 % and 2 % - the two values that found it.
 * **Two widgets can share one text size, and the schema has no way to say so.** `alpha`
   draws its two fan figures at one size, and its two temperature values at one size, each
   chosen from *both* readings at once. Measured, then decided (owner, 2026-11-08): each
   pair stays one code-drawn `special` and the layout only places it, rather than a new
-  `xigma.fitGroup` key. The numbers behind that, all printed by the suite:
+  `xigma.fitGroup` key. The numbers behind that, all recorded by `tests/test_specials.py`:
   * the fan pair landed. It is one `special` named `fan-figures`, and painted through the
     frame loop's door - `themes.SPECIALS` injected, the instant pinned through
     `render._now` - it puts down the same pixels `theme_alpha` puts down for that row:
     30 reading pairs, and for each one the row's painted-pixel set is exactly the set that
     changes when `fan` switches off, every one of those bytes equal, with nothing reported
-    missing and no gaps. The shared size is spelled out again by the gate as
+    missing and no gaps. The shared size is spelled out again by `tests/test_specials.py` as
     `max(A26_FAN_MIN, min(fits))`, walked through `render._fit_size` (the loop the other
     themes use), and compared with what `layout.draw_special_pair` chose: equal in all 30.
   * sized one at a time the two figures would not match each other: 25 of those 30 reading
     pairs fit at two different sizes, and drawing each at its own size moves the row by
     1 763 to 2 915 px - both counted on the author's bench, on its installed faces, which
-    is why the suite prints them beside the machine rather than pinning them. What is
+    is why `tests/test_specials.py` reports them beside the machine rather than pinning them. What is
     pinned is the shape of it: the row differs from the joint sizing exactly when the two
     fits disagree, so those pixel counts are a real drawing difference and not rounding.
   * the value pair is the same problem with a harder limit. `render._fit_arc` takes **both**
@@ -1025,7 +1029,7 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
     suite holds it above the tail it measures, because a clearance below that would put a
     reading on top of the gauge it belongs to.
   * **ink means alpha, and the difference bites.** A text-only frame still disagrees with the
-    theme at a couple of pixels inside that hole, and the gate asserts that *every* one of
+    theme at a couple of pixels inside that hole, and `tests/test_specials.py` asserts that *every* one of
     those carries alpha 0: colour channels left non-zero by the downscale of a bright stroke
     against a transparent canvas, invisible, and a residual of the ring's own drawing rather
     than of these rows. That is the assembly's remaining job - with the rings drawn as `arc`
@@ -1061,7 +1065,7 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   32 px everywhere, and a row with no reading keeps its place: it is not drawn, and the
   advance still happens. That is what the 27 library layouts do, and it is the rule
   docs/themes.md states as "a hole that says what it is, rather than a zero that reads as a
-  measurement"; the suite holds the ten-slot layout and the keep-place behaviour by counting
+  measurement"; `tests/test_bars_rows.py` holds the ten-slot layout and the keep-place behaviour by counting
   ink in the slots, and it is what made the earlier stance - "invent a repeat group" -
   unnecessary: the 23 selectable library layouts ask for 7 `source` names and none of them is
   a fan, so `Fan 1` is a new name in our own table, while a repeat group would have been a
@@ -1070,15 +1074,17 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   What the change costs, stated rather than left to be noticed: on the glass a missing
   reading now leaves a gap where the rows used to close up, and the `bars` preview clip had
   to be re-rendered from the recorded series in the same change - not for tidiness, because
-  the preview gate re-draws the layer from `docs/videos/readings-2026-11-08.json` and scores
-  the tracked file against it, so a stale clip is a failing gate. The sources followed on
+  the deleted suite re-drew the layer from `docs/videos/readings-2026-11-08.json` and scored
+  the tracked file against it, so a stale clip failed. Nothing does that now: the six video
+  files are 0.7's deliberate gap, and `ffprobe` plus `du -b` are the doors to re-measure them
+  at (docs/tools.md). The sources followed on
   2026-11-09, and so did the file: `themes.BARS_ROWS` names the ten rows, four of them
   per-sensor fan slots (`Fan N Speed`, `Fan N Name`) - which the vendor's own vocabulary has
   no word for, since it offers the aggregates `cpuFansSpeed` "CPU Fans Speed" and
   `gpuFansSpeed` and never a row per tachometer (PROTOCOL.md 10) - while `RAM Rate` and
   `Used RAM` come out of that record's `RAMRate` and `UsedRAM`; and `themes.bars_recipe()`
   generates the 32 widgets out of that table and the `BARS_*` constants. It is pixel-identical
-  to `render.py` at all 13 readings the suite gives it, answered and unanswered alike. Two
+  to `render.py` at every reading `tests/test_bars_rows.py` and `tests/test_export_parity.py` give it, answered and unanswered alike. Two
   things that took were not in the plan:
 
   * **`xigma.showIf`, a new extension key.** `bars`'s memory rows divide a percentage for the
@@ -1087,7 +1093,7 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
     used memory with no dedicated total. The theme draws neither number nor meter there; the
     file, which reads `Used GPU Memory` as its own source, printed `4 GB` beside an absent
     meter: **706 px and a worst channel of 255**. The key names the dependency, an unanswered
-    dependency is reported in the skip list as `showIf:<source>`, and the suite measures the
+    dependency is reported in the skip list as `showIf:<source>`, and `tests/test_bars_rows.py` measures the
     key's worth by stripping it from a generated `bars` and counting the pixels it then
     differs by. The other prefix in that list came out of the editor's work: an unappliable
     `xigma.format` is reported as `format:<source> (ValueError)`, because the model refuses
@@ -1097,7 +1103,7 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
     read `mem["used"]` outright, so a reading with a total and no used raised `KeyError`
     inside the frame loop; and its two memory meters were formed by different tests - the GPU
     row required its numerator to be *truthy*, so a reading of exactly 0 dropped the row while
-    the memory row kept it. Both go through `render.pct_pair` now, and the suite measures the
+    the memory row kept it. Both go through `render.pct_pair` now, and `tests/test_bars_rows.py` measures the
     rules that follow: at `memory: {total, no used}` the frame draws and the RAM row keeps its
     label with no number and no meter, and at `gpu: {memoryUsage: 0, dedicatedTotal: 8192}`
     the VRAM row draws `0 GB` with its track unfilled. A zero numerator is a reading; a zero

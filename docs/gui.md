@@ -2,6 +2,19 @@
 
 What the Qt front end does, what each control sends, what it stores between runs, and what it costs to run. Needs PyQt6, which the display loop never does.
 
+**How to read the numbers in this page.** Every figure below is a record, and it names
+the machine and the day it was measured on: *this bench* is the author's desktop with the
+panel on it, *CI's runner* is the GitHub-hosted Ubuntu 26.04 machine the packages are built
+on. Column widths, row capacities, pixel counts and wall-clock costs follow the fonts and
+the load of whatever box ran them, so no check in this repository re-derives them and no
+sentence here promises they will repeat. What the offline checks in `tests/` hold is the
+**rules** those figures were read out of - which column may not be narrower than what it
+holds, which actions may reach the wire, what a session may contain - and the tests print
+nothing. Re-run a figure with the command named beside it: `tools/display_glass.py` and
+`tools/log_timeline.py` for the glass ledgers, `ffprobe` for the six videos, `xigmaui`
+itself for the picker's row counts and build times, `tools/screenshot.py` for the window's
+own shape.
+
 `python3 -m xigmaui` is a window for what `ALPHA`'s window is actually used for on a
 machine with the panel plugged in: look at the picture, pick the theme, pick the
 background, read the panel's own report, reset. Behind those uses are two halves:
@@ -40,9 +53,10 @@ the port (PROTOCOL.md §1), so:
   (`xigmaui/panel.py`) - open, `hello`, act, close - so `python3 -m xigmalcd` stays
   usable between actions. Nothing reaches the panel without a deliberate click.
 
-Which one is in force is printed in the window's log and status bar, and the
-offline suite asserts both (the remote path with a real socket and no serial layer
-at all). `--socket PATH` points it somewhere else; `$XIGMA_SOCKET` is honoured by
+Which one is in force is printed in the window's log and status bar, and both
+halves are checked offline: the remote path against a real socket and no serial layer at
+all (`tests/test_display_remote.py`), the port path against a replaced `Link`
+(`tests/test_panel_safety.py`). `--socket PATH` points it somewhere else; `$XIGMA_SOCKET` is honoured by
 both sides.
 
 **Tray.** If the desktop has a tray (Qt asks: `isSystemTrayAvailable`), closing the
@@ -69,12 +83,12 @@ one of them (see "How the three columns get their sizes", after the table):
 
 | box | column | what it does | what lands on the wire |
 |---|---|---|---|
-| the running display | controls | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. It also spells out the settings that display is running with - canvas, clock size, scrim, fans, and **the text colour it holds, as the hex it will answer again** (`text #ffc400`), which is the only place in the window you can see a colour you did not pick yourself. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Measured 1 ms for the commands Apply sends - six on the 0.2 bench ledgers below, seven in the tree, and the suite re-measures the line every run |
+| the running display | controls | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. It also spells out the settings that display is running with - canvas, clock size, scrim, fans, and **the text colour it holds, as the hex it will answer again** (`text #ffc400`), which is the only place in the window you can see a colour you did not pick yourself. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Sent in about 1 ms: six settings on the 0.2 bench ledgers below, seven in today's tree, and `tests/test_display_remote.py` holds the whole line under 0.5 s |
 | preview | preview | the background with `render.draw`'s OSD layer composited on top - playing, via one streaming ffmpeg, or as one mid-loop frame (`playing` box, see "The preview plays" below), refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How the three columns get their sizes" below | nothing |
 | theme | controls | the five themes, clock size, **the colour of the text it draws**, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
 | layout editor | controls, always on | opens one of the layouts this machine can select (or one of the 5 generated ones), shows its widgets, and lays out every field that widget carries as a row of its own (8 to 18 rows by kind, from the model's list); the pane under the picture then shows *that file* rather than the live theme | nothing, ever: the panel is never handed a layout file (PROTOCOL.md §11). What `save` changes is what this machine's own daemon draws next time it names that theme |
-| clips | library | every MP4 the roots hold, listed once per **distinct file** - **40 rows out of the 46 mp4 files this repository tracks** (204 files on the author's bench, where the installed package and a mounted Windows partition add themselves; still 40 rows): 3 rows from the clips vendored here and 37 from the vendor's library on any of those boxes, the rest of the files being copies that collapse by content - 6 among the 46 tracked here (3 of them under another name), 164 on the bench, and the dated audit of all of it is written out under "Cost, measured on this box" below. This checkout's own `themes/alpha/clips` is one of the roots the list walks: 43 clip files, byte-identical to what `xigmatek-connect-lcd-themes` installs (the suite re-hashes every one against that package's manifest), which is what lets a clone pair all 23 layouts `--list-themes` prints and why the same 40 rows turn up on a CI runner with nothing installed. `tools/preview_gif.py --clip themes/alpha/clips/Theme_30.mp4` reaches those files by path, which is how all five README previews are made. Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
-| background state | library | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the gate refuses says so, in the gate's words, before the button is pressed | nothing: it is a readout |
+| clips | library | every MP4 the roots hold, listed once per **distinct file** - **40 rows out of the 46 mp4 files this repository tracks** (204 files on the author's bench, where the installed package and a mounted Windows partition add themselves; still 40 rows): 3 rows from the clips vendored here and 37 from the vendor's library on any of those boxes, the rest of the files being copies that collapse by content - 6 among the 46 tracked here (3 of them under another name), 164 on the bench, and the dated audit of all of it is written out under "Cost, measured on this box" below. This checkout's own `themes/alpha/clips` is one of the roots the list walks: 43 clip files, byte-identical to what `xigmatek-connect-lcd-themes` installs - `tools/verify_manifest.py` re-hashes every one against that package's own manifest, on this bench and on the runner - which is what lets a clone pair all 23 layouts `--list-themes` prints and why the same 40 rows turn up on a CI runner with nothing installed. `tools/preview_gif.py --clip themes/alpha/clips/Theme_30.mp4` reaches those files by path, which is how all five README previews are made. Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
+| background state | library | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the socket's own `check_media_file` door refuses says so, in that door's words, before the button is pressed | nothing: it is a readout |
 | `One frame now` | library | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
 | `Send frames for 30 s` | library, advanced | the picture loop, so you can watch the real glass | `STATE all 1` twice, then 60 uploads at 2 fps |
 | status | preview, under the log, advanced | the panel's `conn 1` reply: sn, versions, `space`, `brightness`, `mode`, `logo`, `osdState`, `timeout`, each annotated only where PROTOCOL.md records what it means | `conn 1`, `power resume`, `timeout 60` - and no metrics blob, because it puts no picture on the glass. With a display running there is no fresh `conn 1` to ask for, so the box shows the one that display read at its own session start, labelled as such |
@@ -108,12 +122,13 @@ number in that shape comes from a measurement, most of them of a failure:
   The row height follows the icon, so the thumbnails went from 112 px to 64
   (`CLIP_ICON`), and `ResizeMode.Adjust` - which lays rows out against the viewport
   and is what painted one selected clip as a block taller than the list - went to
-  `Fixed` with uniform rows. Measured afterwards, and printed by the suite:
-  **66 px rows, and room for 9 clips at the fresh 1440×1024 window on this bench (10 on CI's runner), 10 at 1919×1055 (11 there)**
-  — rows in view, which is capacity: this bench has 40 distinct clips to
-  put in them (204 files behind them on the author's bench), while a checkout of this
-  repository on its own - no installed package, no second partition - walks the 46 mp4 files
-  it tracks and gets the same 40 rows;
+  `Fixed` with uniform rows. Measured afterwards on both machines, 2026-11-11:
+  **66 px rows, and room for 9 clips at the fresh 1440×1024 window on this bench (10 on
+  CI's runner), 10 at 1919×1055 (11 there)** — rows in view, which is capacity, not a
+  claim about the list's size: this bench has 40 distinct clips to put in them (204 files
+  behind them on the author's bench), while a checkout of this repository on its own - no
+  installed package, no second partition - walks the 46 mp4 files it tracks and gets the
+  same 40 rows;
 * **the log sits under the picture**, in the preview column, because that is the one
   place with height to spare: the frame is 480 px and is never scaled up, so a tall
   window leaves room there nothing else can honestly fill - while every pixel of the
@@ -134,7 +149,7 @@ number in that shape comes from a measurement, most of them of a failure:
   preview used to stay at its old scale while its pane changed shape;
 * and a column is never narrower than what it holds.  Each column's contents have a
   minimum width of their own, and those widths follow the fonts of the machine they are
-  measured on, so the suite reads them wherever it runs.  On the author's bench the controls
+  measured on, so they are records rather than constants.  On the author's bench the controls
   column's contents measure **362 px** with a layout open in its editor and the library's
   rows want **359 px**, and a column's floor is that number plus the **14 px** a vertical
   scrollbar takes off the viewport - **376** and **373 px** of floor.  GitHub's runner,
@@ -146,8 +161,9 @@ number in that shape comes from a measurement, most of them of a failure:
   contents off screen - and the library column overflowed by **7 px** the same way.  Those
   0.4 figures were re-measured against the tag on 2026-11-10 rather than kept in a gate: a
   gate can only hold this tree, and what this tree asserts is that the same failure cannot
-  come back - the suite builds a fresh window and checks both halves, no column narrower
-  than its contents' own minimum and no horizontal scrollbar in any of the three;
+  come back - `tests/test_window_sizing.py` builds a fresh window and checks both halves, no
+  column narrower than its contents' own minimum and no horizontal scrollbar in any of the
+  three;
 * and a drop-down shows what it holds, box and list both.  Swept across all **28** layouts
   the editor can open, the widest row its widget menu can be handed measures **247 px** on
   this bench (`data  Motherboard Temperature  at 452,136`) and 264 px on CI's runner.  In
@@ -163,13 +179,14 @@ number in that shape comes from a measurement, most of them of a failure:
   insist on *plus* the width a vertical scrollbar takes off the viewport, and that plus is
   how this rule was found: the column had a 411 px floor around 411 px of contents, which
   left a 397 px viewport and **14 px** of horizontal travel, the 0.4 defect arriving one
-  fix later.  The suite pins the controls pane to *its own floor*, reads the width back
-  before it claims anything about it, fails if the pinned column scrolls sideways at all,
-  and asserts the half that has to hold at every width - the list a reader chooses from is
-  never narrower than the widest entry any of the 28 layouts puts in that row.  Then it
-  prints which branch the closed box landed in: **443 px** of column, **340 px** of
-  box around a **264 px** entry on the runner, and **425 px**, **323 px** and **247 px** on
-  this bench - so the entry fits the box and the list alike on either.  A box's
+  fix later.  `tests/test_window_sizing.py` pins the controls pane to *its own floor*, reads
+  the width back before it claims anything about it, fails if the pinned column scrolls
+  sideways at all, and asserts the half that has to hold at every width - the list a reader
+  chooses from is never narrower than the widest entry any of the 28 layouts puts in that row.
+  Which branch the closed box landed in is the machine's answer, measured 2026-11-11: **443
+  px** of column, **340 px** of box around a **264 px** entry on the runner, and **425 px**,
+  **323 px** and **247 px** on this bench - so the entry fits the box and the list alike on
+  either.  A box's
   own `minimumSizeHint` is still held under its longest entry, so the column is not paying
   for anything the text itself does not need.
 
@@ -193,11 +210,11 @@ request down proportionally and its stretch factors hand a wide window's slack t
 controls and the library, so at 3840×2160 the library column is **over 1 300 px** across
 on either machine and shows **28** clip rows on both, while the preview stays capped at its
 532 px - it is never scaled up, because pixels the glass does not have would only be a
-bigger lie. The suite builds a window at these defaults, reads the splitter back, asserts
-each column is at least as wide as what it holds, that none of the three scrolls sideways,
-that the field grid's columns arrive as the window widens, and that its own minimum never
-exceeds the room that justified them; every figure above is then read out of this page and
-held to whichever of the two labelled machines is running the suite.
+bigger lie. `tests/test_window_sizing.py` builds a window at these defaults, reads the
+splitter back, asserts each column is at least as wide as what it holds, that none of the
+three scrolls sideways, that the field grid's columns arrive as the window widens, and that
+the row host never asks for more than the three-column threshold promises. It asserts those
+relations and prints no digits: the triples above belong to their two machines.
 
 And the columns' floors are not remembered constants: `_pane_floors()` raises each pane's
 minimum to its own contents' `minimumSizeHint` plus a reserved vertical scrollbar, so at a
@@ -206,8 +223,13 @@ minimum to its own contents' `minimumSizeHint` plus a reserved vertical scrollba
 A pane
 that cannot be dragged under what it holds cannot grow a horizontal scrollbar inside
 itself, so the 0.4 failure mode is unreachable rather than merely avoided. The controls
-floor is the editor's own footprint, so it moves twice over: one column of editor rows asks for **376 px** of controls on this bench, two columns for **400**, three for **568** - and **394 / 417 / 589** on CI's runner - a closed drop-down that has to show the longest entry it holds is part of what those columns carry, and the window's own minimum rises with them. Every one of those digits is read out of this page and held to whichever of the two labelled machines is running the suite, because a floor that follows the fonts is not a constant to compare.
-The 18 rows of an `arc` widget stand **889 px** tall in one column and **496 px** in three here, the grid's own ask going **171 / 344 / 512 px** - **807** and **462 px**, asking **180 / 361 / 533**, on CI's runner - which is the reflow buying height without buying a scrollbar, and all twelve figures come off the sizing pass the suite runs on every machine. Those four heights are what the two rows of controls under the fields cost, in height and never in a column's width: 0.5 read 796 / 403 here and 723 / 378 there, the row of row-level controls made it 827 / 434 and 751 / 406, and the name box with its two buttons made it 858 / 465 and 779 / 434, as did the editor's structural row (add / remove / up / down) and the row that tells a running display to draw the open layout - 889 / 496 here and 807 / 462 there - so a row of controls is 31 px on this bench and 28 px on that runner, three times over, while the grid's own ask does not move at all because the grid of rows did not change. Every one of those digits is read out of this page and held to whichever of the two labelled machines is running the suite, because a floor that follows the fonts is not a constant to compare.
+floor is the editor's own footprint, so it moves twice over: one column of editor rows asks for
+**376 px** of controls on this bench, two columns for **400**, three for **568** - and **394 / 417 / 589** on CI's runner, both measured 2026-11-11 - a closed drop-down that has to show the longest entry it holds is part of what those columns carry, and the window's own minimum rises with them.
+The 18 rows of an `arc` widget stand **889 px** tall in one column and **496 px** in three here, the grid's own ask going **171 / 344 / 512 px** - **807** and **462 px**, asking **180 / 361 / 533**, on CI's runner - which is the reflow buying height without buying a scrollbar, and all twelve figures come off the sizing pass `tests/test_window_sizing.py` runs on every machine. Those four heights are what the rows of controls under the fields cost, in height and never in
+a column's width: on this bench the arc form stands **889 px** with one column of rows and
+**496 px** with three, and **12 px** of one row's height on this bench, **9 px** on the
+runner, is what one such row of buttons adds - three rows of them, measured 2026-11-11 -
+while the grid's own ask does not move at all, because the grid of rows did not change.
 
 ### The preview plays, or shows one frame
 
@@ -270,8 +292,8 @@ two seconds while its layer tick count does not move at all.
 What rate you actually get depends on what else the window is doing, and both figures
 are measured here rather than quoted as a spec: **24.3 fps** for a pane whose clip
 library had finished its ffmpeg thumbnail pass, **19 fps** (40 frames in 2.1 s) for the
-window the suite drives while the suite itself runs five other sections' processes
-alongside it.  Frames are dropped rather than queued - `_advance` pulls as many as real
+window the offline checks drive while the rest of the package runs around it (a 0.6 suite
+run on this bench, 2026-11-11).  Frames are dropped rather than queued - `_advance` pulls as many as real
 time is worth and keeps the last one, so a slow moment costs a frame of the animation
 and never a backlog that plays later as a burst.
 
@@ -288,13 +310,15 @@ same bytes in order and lets the file loop, and `Theme_25.mp4` is 0.9583 s, whic
 at 24 fps is 23-24 frames a pass (measured 24, then 23, then 23 - the last pass is short
 by the fraction of a frame the resampler drops), and the **first frame of successive
 passes is byte-identical** (`f7e5ded0b703` three times), so the restart never splices a
-half frame together. That is the same loop the panel plays, and it is why the README's
-the same loops the README videos replay,
-measured there rather than assumed: the `alpha` video runs the 0.958 s clip 10.4 times in
-its 10 s, so its restarts are the clip's own joins - which §9 measures at 2.50 against a
-1.54 typical step at the clip's native rate, and docs/limits.md carries that table for
-all five backgrounds, including `3.mp4`, whose loop *is* a hard cut (12.45 against 4.55).
-A preview is only ever blamed for what it adds, and the suite holds each file to that.
+half frame together.  That is the loop the panel plays, and it is why the README can
+replay the same loops in its own videos, measured there rather than assumed: the `alpha`
+video runs the 0.958 s clip 10.4 times in its 10 s, so its restarts are the clip's own
+joins - which §9 measures at 2.50 against a 1.54 typical step at the clip's native rate,
+and docs/limits.md carries that table for all five backgrounds, including `3.mp4`, whose
+loop *is* a hard cut (12.45 against 4.55).  A preview is only ever blamed for what it
+adds.  The table is a record of the runs that measured it: `ffprobe` over
+`docs/videos/*.mp4` re-reads any row of it, and nothing in `tests/` re-runs the
+comparison itself - stated as a gap, because a gate over it would only re-quote the page.
 
 ### The advanced switch
 
@@ -310,10 +334,8 @@ of the preview column, under the log, rather than as loose rows in the controls
 column: `conn 1` answers with fourteen fields that wrapped to about ten lines in a
 300 px column, and the picture's column is the one with height spare below a 480 px
 frame.  It is about pixels and nothing else - every hidden control keeps its value
-and `Apply` sends it, which is what the suite checks by setting `scrim` while it is
-invisible, restarting the window and reading the same 200 back.  The choice is
-remembered (`advanced` in the settings file), and the note beside the switch names
-what is folded so a reader is never hunting for a control that exists.  The suite
+and `Apply` sends it, which is what `tests/test_window.py` checks by setting `scrim` while it is
+folded so a reader is never hunting for a control that exists.  The suite
 holds that note, the switch's tooltip and this document to the same list, and checks
 the set by parent as well as by length: **12** controls, in **5** rows and **3** boxes.
 
@@ -321,7 +343,7 @@ The **guarded factory reset moved in behind the switch**, which reverses what 0.
 documented - there the box stayed on screen whatever the switch said, on the grounds
 that a recovery which is hard to find is worse than one in the way.  What actually
 stands between a stray click and a factory reset is the word `reset` typed into the
-field and a button that stays disabled until it is, and the suite now checks that
+field and a button that stays disabled until it is, and `tests/test_window.py` checks that
 guard *in the folded state*: hidden, then shown, the button is still disabled, and it
 wakes only when the word is typed.  A control that is hidden and disabled is guarded
 twice over.  The CLI route (`xigmalcd recovery --port … --yes`) is where the recovery
@@ -342,7 +364,7 @@ screen at once, one row each**: no menu to open to find out what a row holds. Th
 counts are the model's, not a table kept here: `edit.field_names(kind)` plus
 `edit.extension_fields(kind)` is **10 rows for a `text` widget, 11 for `data`, 12 for
 `special`, 8 for `line`, 15 for `bar`, 18 for `arc`** - measured across the
-**185 widgets** in the 28 layouts the editor can open, in the gate. Which control a row
+**185 widgets** in the 28 layouts the editor can open, counted by `tests/test_editor.py`. Which control a row
 uses is the model's answer too: a menu wherever a vocabulary already exists in code
 (`edit.choices()` - 5 families, 27 readings for `source` and `showIf`, 6 anchors, 5
 special drawings, the painter conventions, the named ramps), a checkbox for `bold`, a
@@ -355,8 +377,8 @@ and two or three as the window widens, which is what 1280×1024 through 3840×21
 And the picture itself can be pointed at: press a row to select it, drag it to move it,
 nudge it with the arrow keys.
 
-What the suite holds this to, rather than assumes - every one of these is something an
-editor commonly gets wrong:
+What each of the following claims rests on - every one of them is something an editor
+commonly gets wrong:
 
 * **The note line under the rows says what the row paints.** For a `text` or `data` widget
   the keys that choose the line - `content`, `source`, `xigma.format`, `fontFamily`,
@@ -367,17 +389,20 @@ editor commonly gets wrong:
   comes from `edit.drawn_text`, which walks the painter's own rules in the painter's own
   order (`themes.values` for the reading, `layout.text_for` for the shape,
   `layout.font_for` for the face, a `showIf` asked before the row's own source), and it is
-  proved by painting rather than by agreement between two pieces of code: the suite draws
-  each of the **145** `text`/`data` rows of the **28** layouts twice, once as the file has
-  it and once with that row replaced by a literal `text` widget whose `content` is the
-  string the model named, and the two frames must be byte-identical. **132** rows paint a
-  line at this fixture and all **132** twins came back identical - on CI's runner, where no
-  CJK face is installed for the vendor's `simsun` rows to resolve, **131** paint and all
-  **131** twins come back identical. The **13** that do not here (**14** there) are rows the
-  painter skips too, each with the reason the model gives: `Pump Speed` in **9** layouts,
-  the `Fan 3`/`Fan 4` slots this box reports no tachometer for, and on the runner the rows
-  whose family has no file to open. **23** of the painted lines are spelled by a shape the
-  file itself declares unmeasured (**22** there). Punch a hole in
+  proved by painting rather than by agreement between two pieces of code:
+  `tests/test_row_notes.py` draws each of the **145** `text`/`data` rows of the **28**
+  layouts twice, once as the file has it and once with that row replaced by a literal
+  `text` widget whose `content` is the string the model named, and the two frames must be
+  byte-identical; a row the painter answers with nothing is counted as a skip, and the
+  check fails if twins and skips ever stop adding up to the rows.  What follows the faces
+  installed is a record of two runs rather than a figure a gate quotes: 132 of the 145
+  paint a line on this bench and all 132 twins came back identical, and on CI's runner,
+  where no CJK face is installed for the vendor's `simsun` rows to resolve, 131 paint and
+  all 131 twins come back identical.  The 13 that paint nothing here (14 there) are rows
+  the painter skips too, each with the reason the model gives: `Pump Speed` in **9**
+  layouts, the `Fan 3`/`Fan 4` slots this box reports no tachometer for, and on the
+  runner the rows whose family has no file to open. **23** of the painted lines are
+  spelled by a shape the file itself declares unmeasured (**22** there). Punch a hole in
   the readings and both doors answer the same way: `bars`' RAM row depends on `RAM Rate`,
   spelled from `memory.used` / `memory.total`; with the total gone the model says so, the
   painter records `showIf:RAM Rate`, and the `GPU Memory Rate` row beside it still paints.
@@ -386,9 +411,10 @@ editor commonly gets wrong:
   fixture gives `Used RAM`; the model refuses each one, names the value it probed, and leaves
   `dirty` and the undo count exactly where they were - and for the brace spellings it points
   at the form this field actually takes (`,.0f`), only after checking that the suggestion
-  paints. A file that *already* carries one - built in the suite, not written by the editor -
-  does not stop the frame loop: the painter records `format:<source> (ValueError)` in its
-  skip list and draws the rest, 2 rows clean becoming 1 row and one said hole.
+  paints. A file that *already* carries one - written into the fixture by the 0.6 suite, not
+  by the editor - does not stop the frame loop: the painter records `format:<source>
+  (ValueError)` in its skip list and draws the rest, 2 rows clean becoming 1 row and one said
+  hole.
 * **The `fontFamily` menu shows the face it names.** Each entry carries a preview drawn
   with the file `layout.font_for` resolves that name to on *this* box - the same Pillow call
   the painter makes, so the shape you choose is the shape that reaches the glass, at one
@@ -398,17 +424,17 @@ editor commonly gets wrong:
   (`font:<family>` in its `missing` notes): a name with no file is not a smaller face, it is
   no ink - and neither is a row with **no `fontFamily` at all**, which is the fact nobody
   guesses from a form, since there is no default face to fall back to. All five vendor names
-  resolve on the author's bench, so the gate builds the other cases instead of waiting for
-  them: it adds a family with no file to `layout.FONTS` for the length of the check (and
-  asserts the table comes back unchanged), puts `Impact` on an open row in memory - no file
-  is written - and hands the model and the painter a row with the key absent.
+  resolve on the author's bench, so the 0.6 suite built the other cases instead of waiting for
+  them: it added a family with no file to `layout.FONTS` for the length of the check (and
+  asserted the table came back unchanged), put `Impact` on an open row in memory - no file was
+  written - and handed the model and the painter a row with the key absent.
 
 * **A family spelled the file's way is folded, once, and said.** The vendor's rows write
   `Arial` and `layout.FONTS` names `arial`; `layout.font_for` lowercases before it resolves,
   so those are one face on the glass - which made the menu's own entry (the row's value,
   shown rather than dropped) a choice the model refused. It no longer refuses: the row keeps
-  the name `layout.FONTS` carries, the window says what was stored, and the suite compares
-  the two frames for a real vendor row and finds **0 px** of difference. Nothing else folds
+  the name `layout.FONTS` carries, the window says what was stored, and the fold was compared
+  frame against frame for a real vendor row: **0 px** of difference. Nothing else folds
   - `source`, `showIf`, `name` and `anchor` are keys the painter matches exactly, and
   `source: cpu temperature` is still refused in words.
 
@@ -420,11 +446,11 @@ editor commonly gets wrong:
   zero-pixel diff against the picture it exports. There is no table of defaults in this code,
   and an honest one was not available: the vendor's application bundles are not in this tree
   (only their file names are, in PROTOCOL.md §10), so the files are the only evidence of what
-  a row of a kind looks like. The files decide the shape too, and the suite re-counts them on
-  every run: all **185** rows in the **28** layouts carry exactly the **5** keys `id`,
-  `layerIndex`, `type`, `property`, `widgetContent`; `property` is a one-element list in every
-  one and `widgetContent` is `""`; and a new row carries the **7 / 7 / 11 / 14 / 7 / 9** keys
-  that `text` / `data` / `bar` / `arc` / `special` / `line` rows always carry, each of its
+  a row of a kind looks like. The files decide the shape too, and they answer the same count
+  whenever they are counted: all **185** rows in the **28** layouts carry exactly the **5** keys
+  `id`, `layerIndex`, `type`, `property`, `widgetContent`; `property` is a one-element list in
+  every one and `widgetContent` is `""`; and a new row carries the **7 / 7 / 11 / 14 / 7 / 9**
+  keys that `text` / `data` / `bar` / `arc` / `special` / `line` rows always carry, each of its
   values a value rows of that kind already use. A `special` is the one kind the model refuses
   unnamed - the sub-menu lists the **5** drawings `themes.SPECIALS` registers - because a
   `special` nothing draws is not a thinner picture but no picture, which is what the painter's
@@ -459,7 +485,8 @@ editor commonly gets wrong:
   of the **145** `text`/`data` rows carries a `width` or `height` key: their box is the ink
   the face lays down, and a +8 px push on `fontSize` moves that box's width by an amount
   that is never 8 px, differs from row to row, and belongs to this machine's fonts rather
-  than to the file (the suite measures the spread on every row and prints it). So the pane
+  than to the file (`tests/test_row_resize.py` measures the spread on every row and fails if a +8 px ask ever
+  moves a box by exactly 8 px). So the pane
   paints no square on a text row's left or right side, and its top, bottom and corner
   squares ask for a height the model reaches by *searching* faces (bracket the target, then
   bisect, drawing every candidate), which lands on a face whose box is near the ask but
@@ -485,7 +512,7 @@ editor commonly gets wrong:
   row's ink lies under it - the pane's later-row-wins rule is a rule about ink, and a grabbed
   square that moved some other row would be a surprise nobody could see coming - and when that
   happens the note says whose ink is under the square. One press-drag-release is exactly one
-  undo step, moves pixels, and writes no file: every accepted drag the suite drove put the
+  undo step, moves pixels, and writes no file: every accepted drag `tests/test_row_acts.py` drives puts the
   layout object back byte for byte under one press of undo, and every refusal left `dirty`,
   the undo count and the picture exactly where they were found.
 * **Where a new row lands is decided by the painter's boxes, and the sentence says what
@@ -499,7 +526,8 @@ editor commonly gets wrong:
   measured rather than reasoned about: the **159** adds across the **28** layouts come out
   **35 / 109 / 15** on this bench - clear where their source sits, moved to the nearest free
   spot, still meeting another box and saying so in the sentence - and **35 / 109 / 15** on
-  CI's runner, and the gate holds whichever machine is running it to its half of that pair.
+  CI's runner, and `tests/test_row_acts.py` holds whichever machine is running it to its half
+  of that pair.
 * **A drag can be pulled onto a number this same file already uses, 2 px at most.** The lines are
   the layout's own, and the reach comes out of counting them rather than out of taste: of the
   **185** rows that carry an `x` or a `y` in the **28** layouts this pane can open, **89** hold an
@@ -515,11 +543,11 @@ editor commonly gets wrong:
   / 44 / 317 and the same 11 / 12 / 57.  What a row *presents* on the glass is a different kind of
   figure - it follows the face the layout is drawn in - so the drawn census the same pass reports
   (how many pairs of drawn boxes already share an alignment number, how many box centres sit on the
-  middle) is printed by the gate on the machine it ran on, and no page quotes it as one number.
+  middle) is printed by `tests/test_snapping.py` on the machine it ran on, and no page quotes it as one number.
 * **Which lines a row is offered, and what they are allowed to mean.** A row offers its declared
   `x`, and only a row of the **same anchor class** may be pulled onto it.  The class is the first
   letter of `xigma.anchor` - `l`, `m` or `r`, the vendor's default being `la` - and that letter is
-  what says where `x` sits on the glass, which the suite measures against the painter on every run:
+  what says where `x` sits on the glass, which `tests/test_snapping.py` measures against the painter on every run:
   a left-anchored row's `x` is exactly its ink's left edge, a right-anchored row's is exactly its
   right edge, and a centre-anchored row's lies between the two, because for those `x` *is* the
   centre.  Pulled across classes the two rows' ink would sit most of a canvas apart rather than
@@ -556,7 +584,8 @@ editor commonly gets wrong:
 * **A reorder is the draw order, and it is proved with pixels.** The rule, asserted in both
   directions over every adjacent pair of drawn rows in all 28 layouts: a swap moves ink
   **exactly** where the two rows both cover some pixel opaquely and in different colours.
-  Pairs whose bounding boxes never meet swap 0 px, and the gate fails if one of them moves a
+  Pairs whose bounding boxes never meet swap 0 px, and `tests/test_row_acts.py` fails if one of
+  them moves a
   pixel; pairs whose boxes meet but whose ink never both lie opaque in the overlap also swap
   0 px, which is what an `arc`'s box (mostly the hole its ring is drawn around) and two vendor
   `line` rows crossing in sub-pixel coverage look like. Which pair falls on which side is a
@@ -565,17 +594,19 @@ editor commonly gets wrong:
   **13** whose boxes do meet **7** moved ink and **6** did not - the same 13 / 7 / 6 on both.
   Those four numbers are the answer since the pinned-pair repair of 2026-11-11, and the story
   of how they got measured is kept in docs/theme-editor.md: `Editor.fixture()` used to hand out
-  a shallow copy of the pinned readings, so a gate earlier in the same run had taken
+  a shallow copy of the pinned readings, so a check earlier in the same run had taken
   `memory.total` out of the module's own pair and every draw after that could not answer
   `RAM Rate` - the one reading lost, and with it two rows of the `bars` layout,
   `xigma-bars-used-ram-value` (which paints only while that rate is answered) and
   `xigma-bars-ram-rate-meter` (which asks it directly), and the three adjacencies of drawn rows
   between them.  Before that repair the same gate printed 120 never-meet pairs here and 118
   there, and 12 / 6 / 6 on the meet side on both boxes.  The runner's halves are not a guess:
-  the push carrying the repair failed the gate that holds a run to its labelled half, printed
+  the push carrying the repair failed `tests/test_row_acts.py`, which holds a run to its
+  labelled half, printed
   120 and 13 / 7 / 6 as its own measurement, and the numbers above are that print written down.
   Two pairs apart on the never-meet side and one triple agreed on the meet side is what two
-  machines' fonts answer; the gate holds every run to its own labelled half and claims nothing
+  machines' fonts answer; `tests/test_row_acts.py` holds every run to its own labelled half and
+  claims nothing
   else.
   `layerIndex` is left exactly where it was: over the vendor's files it equals the row's
   position in **23** of their **123** rows and differs in **100** (`Theme_01` gives six of its
@@ -590,11 +621,11 @@ editor commonly gets wrong:
   still standing, the next takes the reorder back, and the frame says which of the two was
   undone. The refusals - a kind nothing draws, a `special` with no name, a move past either
   end of the list, the last row - all leave `dirty`, the undo count and the file exactly where
-  they found them, which the gate checks rather than hopes.
+  they found them, which `tests/test_row_acts.py` checks rather than hopes.
 
 * **Opening writes nothing.** The file appears at `save`, because your copy of a name is
   what `--theme` and the control socket find first, and that shadowing is a fact about
-  files: browsing a theme's fields must not quietly change what the loop draws. The gate
+  files: browsing a theme's fields must not quietly change what the loop draws. `tests/test_editor.py`
   opens 3 library layouts and 5 generated ones and then counts the user directory:
   empty.
 * **A copy can be renamed, and the new name has to be one nothing answers.** The box beside
@@ -610,8 +641,8 @@ editor commonly gets wrong:
   vendor's `Theme_07` leaves `--list-themes` showing two layouts while every spelling
   resolves to one file. Only a copy of yours can be renamed; the vendor's two trees are never
   written. A rename is a file act, not an edit: no undo step, `dirty` exactly as it was, and
-  every row and pixel where they were (the suite draws the layout before and after and
-  compares). The `id` inside the file does change - a fresh 13-digit number in the shape the
+  every row and pixel where they were (`tests/test_names_and_renames.py` draws the layout before
+  and after and compares the pixels). The `id` inside the file does change - a fresh 13-digit number in the shape the
   vendor's own files use, their **27** falling inside **1 187 564 ms** of one another -
   because two files answering one `--theme <id>` is a name space with a hole in it.
   `<name>.json.bak` travels with the copy, so undoing your last save is still that save; a
@@ -643,7 +674,7 @@ editor commonly gets wrong:
   of that dead name exits 2 with `themes.why_not`'s sentence instead.
 * **The field list comes out of the code.** A kind offers the intersection of the keys
   `layout.py` is *proven* to read (`themes.keys_read()` parses the painter's own source)
-  and what that kind draws - 25 names across 6 kinds today, counted in the gate. The keys
+  and what that kind draws - 25 names across 6 kinds today, counted by `tests/test_row_resize.py`. The keys
   the vendor's files carry that nothing reads (`enableMove`, `screenStatus`, and eight
   more, each with its reason printed by `--print-theme-fields`) are never offered, and the
   writer keeps them in the file exactly as it found them, because an editor that drops
@@ -662,11 +693,11 @@ editor commonly gets wrong:
   `themes.special_door` and `themes.special_is_pair` are checked against the door each
   drawing function actually calls (`layout.draw_special_line`, `draw_special_pair` or
   `draw_special_values`), found in its own source, so the window keeps no list of which
-  drawings are pairs. Inside the two pair doors the sentence still splits, and the gate
-  checks that too: a width-fitted row is told its `fontSize` is a ceiling over
+  drawings are pairs. Inside the two pair doors the sentence still splits, and
+  `tests/test_specials.py` checks that too: a width-fitted row is told its `fontSize` is a ceiling over
   `xigma.autoFitMax`, a ring-fitted row is told that key is the one its drawing never
-  reads and that its size walks down against `xigma.fitArc` instead. The gate also
-  measures the claim
+  reads and that its size walks down against `xigma.fitArc` instead. That file also measures
+  the claim
   instead of trusting the prose: a declared pitch and the two figures' ink-box centres
   agree to within 2 px on the painted frame, and narrowing the pitch moves each figure
   half the difference inboard.
@@ -683,7 +714,8 @@ editor commonly gets wrong:
   fixture | this machine: …`) because a preview that moved with the sensors would make it
   impossible to tell an edit from a temperature. Because both doors read that one dict, a generated layout and
   the theme it was generated from put down the same picture here: zero differing pixels for
-  all five, at seven ink choices, worst channel 0, gated. The text-colour row therefore
+  all five, at seven ink choices, worst channel 0, held by `tests/test_ink.py`. The text-colour
+  row therefore
   reaches a generated layout - by `themes.with_ink`, into a copy, so what Save writes keeps
   the file's own colours - and does not reach anybody else's: open `Theme_28` and an ink moves
   it 0 px (docs/theme-editor.md).
@@ -705,9 +737,9 @@ editor commonly gets wrong:
   same picture. Held means the numbers are read once, when the reader chooses the entry, and
   again only when they choose the entry they are already on: choosing it a second time *is* the
   re-read. What following the sensors instead would cost belongs to the machine and the moment,
-  so the gate times one read, one draw and one second of following, and prints the milliseconds
+  so `tests/test_peek_readings.py` times one read, one draw and one second of following, and keeps
   and the moved pixels it measured rather than this page quoting any of them. What moves between
-  the pinned frame and a live one is measured the same way, never assumed: the suite draws the
+  the pinned frame and a live one is measured the same way, never assumed: `tests/test_peek_readings.py` draws the
   layouts it can open twice, at the fixture and at this box's own readings, and counts how many
   row boxes land elsewhere and how many of the points it probes on the glass answer a
   **different row** in one frame than the other - asserting both counts are non-zero before
@@ -729,16 +761,16 @@ editor commonly gets wrong:
   answer** - but that box is what the painter drew, so a different body can change which
   squares exist to be grabbed at all. The census asserts the rule and prints the consequence:
   no row is ever offered two answers at one box, every row whose offer moved had its box move
-  with it, and the suite names that row, its two boxes and both offers on the log rather than
+  with it, and `tests/test_snapping.py` names that row, its two boxes and both offers in its own failure message rather than
   putting the count on this page, because which box a face draws belongs to the machine
   drawing it.
-  Only the picture changes: the model is untouched, and the gate proves it by comparing the
+  Only the picture changes: the model is untouched, and `tests/test_canvas.py` proves it by comparing the
   file's bytes, the undo count and the `dirty` flag after a refused press and a refused key.
 * **What a peek shows, the note lines say.** The lines under the field rows are re-computed
   against the frame on screen - at a file body that pins `cpu.temperature` to **104.0** a
   temperature row reads `104°C`, where the same row reads `57°C` at the fixture - because the
   rule of the note line is that it says what the row paints. That is honest here for a reason
-  the suite re-checks wherever it runs: of the rows' sentences that differ between the two
+  `tests/test_peek_readings.py` re-checks wherever it runs: of the rows' sentences that differ between the two
   frames, **every** difference is a *value*, with the reason strings (`no reading for …`, an
   unanswered `source`, a `format` the value cannot be dressed in) left alone. The two halves
   keep their own rules - the note describes the picture, the doors write the file - and the
@@ -759,13 +791,13 @@ editor commonly gets wrong:
   says after the press is read rather than remembered: the display's own
   `status()["theme"]`, because §11 gives no readback of pixels but settings come back,
   and a count of the boxes that file paints at this machine's readings against the
-  pinned fixture the pane is showing - the suite prints that pair on whichever box ran
+  pinned fixture the pane is showing - `tests/test_apply_layout.py` counts that pair on whichever box ran
   it, since it is a drawing and not a rule. Two things the command deliberately does
   not reach: the panel's stored background, which is a separate upload and the clips
   box's act, and the colours written in the layout's own file, because the theme box's
   colour row paints only what *this program* draws. And it is one display's business
   while that display runs: what a fresh one starts with is its own `--theme`. The
-  tray's theme submenu keeps the same five names as the combo - the suite's tray check
+  tray's theme submenu keeps the same five names as the combo - `tests/test_pane_chrome.py`'s tray check
   prints that count every run, and asserts it - so the route to a layout is in the
   window, not in a menu of twenty-eight.
 
@@ -801,7 +833,7 @@ editor commonly gets wrong:
   has no box to press - so the pane never invents a position for something it did not paint.
 * **The mark is chrome, and the pane admits one thing the model cannot.** The dashed
   rectangle and its label are painted over the picture in the pane's own paint event, and
-  never drawn into the frame the caption counts; the gate re-shows the pane with a mark up
+  never drawn into the frame the caption counts; `tests/test_pane_chrome.py` grabs the pane with a mark up
   and without one and compares the bytes it was handed. What the chrome belongs to is the
   **selection**, not the last press: a press on empty glass clears the mark and says the point
   is nobody's row, and the next repaint paints it back for the row that is still selected. The
@@ -821,16 +853,16 @@ editor commonly gets wrong:
   pixels of readable glyph ink, which is what "a black background and faint gray text"
   looks like from the inside. `app.apply_tooltip_colours` sets both colours -
   `TOOLTIP_BASE` behind `TOOLTIP_TEXT` - on the palette of the tooltip's own widget
-  class, and the suite now shows and grabs every live tooltip the window offers and
+  class, and `tests/test_tooltips.py` shows and grabs every live tooltip the window offers and
   fails anything under WCAG AA's 4.5:1: measured here at **16.96**:1 over the pane,
   where the popup keeps the pane's own #101014 and gains the lighter text, and
   **12.65**:1 everywhere else. The door is deliberately narrow. An application
   *stylesheet* was tried, and it is not free: installing one re-polishes every widget
   through the stylesheet style, which moved this window's own layout - the `arc`
   editor box the pages label per machine, **858 px** in one column and **465 px** in
-  three, came out 818 and 459 on this bench, caught by the gate that holds those two
+  three, came out 818 and 459 on this bench, and that pair is a record of this box rather than a
   figures - so nothing is installed at application scope, the ordinary palette is left
-  to the theme, and the gate asserts that no application stylesheet exists at all. The
+  to the theme, and `tests/test_window.py` asserts that no application stylesheet exists at all. The
   colour row's hover sentence moved from its swatch button to that row's label for the
   same fact read the other way round: the button paints whatever colour the layout
   file names, and no text colour is legible on every colour a file can name. Measured
@@ -839,7 +871,7 @@ editor commonly gets wrong:
   the swatch was 1.00:1 before this change and 1.12:1 with the colours forced and the
   sentence left there. So the swatch carries no tooltip, and taking it away changed
   not one pixel of how the swatch paints. How much ink a popup draws follows the fonts
-  on the machine, so the gate prints those counts and asserts only the colour pairs
+  on the machine, so `tests/test_tooltips.py` reports those counts beside its own machine and asserts only the colour pairs
   and the ratios.
 
 
@@ -848,12 +880,12 @@ editor commonly gets wrong:
   declares"), and the picture, the dirty flag and the undo history do not move. Six
   attempts at one widget leave zero undo steps.
 
-One display bug in that row, caught by the gate that landed with the pair row: a value
+One display bug in that row, caught when the pair row landed and its menu was read: a value
 menu selected the **first** entry of its vocabulary instead of the value the row holds. The
 two agree by luck in the case that was already gated - the ring's `arcPaint` reads `render`,
 and `render` sorts first - but a `special` drawing `dual-status` was shown as
 `clock-readings`, and a `data` row was shown as whichever source sorts first rather than the
-one it reads. The menu now selects the row's own value, and the gate checks the claim on
+one it reads. The menu now selects the row's own value, and `tests/test_pane_chrome.py` checks the claim on
 both shapes: on `name`, whose vocabulary starts elsewhere, and on `source`, where the widget
 picked for the check is deliberately not the one that sorts first.
 
@@ -908,7 +940,7 @@ What it actually reaches is the ink of the glyphs **this program draws**:
   `{"cmd": "text_color", "value": "amber"}` on the socket, and the window's combo all go
   through `xigmalcd/render.py:parse_ink`, so they cannot drift into three different rules.
   Palette names win over the CSS/X11 table, deliberately: `red` here is this program's
-  `#ff4040`, not CSS's `#ff0000`, and the suite asserts the whole name list against the
+  `#ff4040`, not CSS's `#ff0000`, and `tests/test_ink.py` asserts the whole name list against the
   module's own constants;
 * the settings file keeps the hex form, so `#0f8` becomes `#00ff88`, `amber` becomes
   `#ffc400`, and a value the renderer would refuse (`cerise`) falls back to the theme's
@@ -918,7 +950,7 @@ What it actually reaches is the ink of the glyphs **this program draws**:
   its own layout files (PROTOCOL.md §10), so the default of the replica stays the
   replica.
 
-Two measurements came out of building it, both off-glass and both re-derived by the suite:
+Two measurements came out of building it, both off-glass and both re-derived by `tests/test_ink.py`:
 
 * the ink changes the ink and nothing else.  Drawing `gauge` with an ink of pure red
   leaves its painted area exactly where it was (6 087 px before, 6 087 after) and moves
@@ -1022,7 +1054,7 @@ holding a bare Ctrl+U, pressing Ctrl+U in the **filter field directly above it**
 an upload and left the field's text alone. Qt's `QLineEdit` binds nothing on Ctrl+U -
 the muscle memory behind that key comes from readline - so the keystroke went to the
 panel path instead of to the text the reader was editing. On Ctrl+Shift+U the button
-still fires and the field is untouched, which is the pair the suite now checks.
+still fires and the field is untouched, which is the pair `tests/test_pane_chrome.py` checks.
 
 ### What the window can and cannot tell you about the background
 
@@ -1068,7 +1100,7 @@ that reads it, so `--list-themes` and the window cannot disagree with each other
 the file. Choosing a layout in the dropdown puts its own clip under the preview and marks
 that row in the library column - measured over all 23 vendor layouts and all five
 generated exports in that dropdown, every one of them resolved to a row on this bench, and
-the suite asserts both halves. Two cases are said out loud rather than left to be inferred:
+`tests/test_pairing.py` asserts both halves. Two cases are said out loud rather than left to be inferred:
 
 * **the five themes this repository draws from `render.py` pair with the backdrop their own
   published picture sits over** - `alpha`→`Theme_25.mp4`, `gauge`→`3.mp4`,
@@ -1101,7 +1133,7 @@ itself. A file written by the older window is read once and honoured: `clip_cust
 true` becomes a ticked box, so an upgrade does not move a background under anybody, and
 the window says so in its log before it does anything else; the next save writes only the
 new key. Populating the list also selects a row; that is the window answering its own
-question, and the gate checks that it does *not* tick the box or print that line, because
+question, and `tests/test_window.py` checks that it does *not* tick the box or print that line, because
 it looked exactly like a choice.
 
 The pairing changes nothing about the wire: it decides what the *preview* composites
@@ -1263,7 +1295,7 @@ when stored media is replaced.
 
 The one gap left in that ledger is reset, and it is a decision rather than an
 oversight: `Panel._reset` is the vendor's `recovery`, the only destructive thing
-in the app, so it stays covered only by the offline checks (the gate refuses
+in the app, so it stays covered only by the offline checks (`tests/test_panel_safety.py` refuses
 without the typed word, and exactly one of the stubbed opens in the whole block asks
 for a destructive link) and by the reset command, which sends the same frame from
 the command line where every byte is printed (`xigmalcd-reset` from a package install,
@@ -1350,7 +1382,7 @@ counters, no upload or refusal counts, no timings and no kept transcript, so not
 in it can be re-derived the way every number in the tables above can. And it settles
 none of the rows the panel still owes (the `--no-clock` look, the `bars` quiet-box
 re-measurement, the pairing note, stage 6's transcript). What it does settle is narrow
-and worth having: the command the suite drives over a socket in a temporary directory
+and worth having: the command `tests/test_display_remote.py` drives over a socket in a temporary directory
 is also a command a real panel answers.
 
 **A fifth window, which nobody drove.** After the 0.2 upgrade, the packaged user unit
@@ -1590,7 +1622,7 @@ The vendor library repeats itself as well, and this repository carries the repea
 the themes package is the library as the vendor ships it, manifest included: **43 clip
 files, 40 distinct** - `Theme_31.mp4` == `Theme_26.mp4`, `theme_38.mp4` == `Theme_27.mp4`,
 `theme_51.mp4` == `Theme_29.mp4` (whole-file sha256). Those files stay in the tree, where
-the suite verifies every byte against the manifest; in the picker they are one row each.
+`tools/verify_manifest.py` verifies every byte against the manifest; in the picker they are one row each.
 
 How the comparison works, since it decides what disappears: same length first, then
 sha256 of the first and last MiB. For anything up to 2 MiB those two windows *are* the
@@ -1602,15 +1634,15 @@ the three `media/` clips the README figures were rendered from, and three pairs 
 library repeats inside its own tree (`Theme_26`/`Theme_31`, `Theme_27`/`theme_38`,
 `Theme_29`/`theme_51`). That is what makes 40 rows the exactly right answer rather than merely
 a smaller one - the list the window builds has as many rows as the audit found distinct
-contents, no more (nothing hidden) and no fewer (no false merges) - and the suite re-derives
+contents, no more (nothing hidden) and no fewer (no false merges) - and `tests/test_clip_db.py` re-derives
 the four digits from the tree itself, in the section that lists the rows:
 46 files, 40 rows, 6 copies dropped, 3 of them renamed. Two things the row-keeping rule does: the roots are walked in precedence
 order, so the survivor is the file `find_media()` would have chosen anyway; and within one
 root, the copy with a name a person would recognise wins, because the app's timestamp
 names sort *before* `Theme_*` (digits before letters) - a test of the dedupe found
-`1757490000001.mp4` taking `Theme_probe.mp4`'s row before that rule existed, and the suite
-now plants a renamed copy, a same-name copy, and a same-length **different-content** pair
-in a temp root and asserts all three outcomes.
+`1757490000001.mp4` taking `Theme_probe.mp4`'s row before that rule existed, and
+`tests/test_clip_db.py` still plants a renamed copy, a same-name copy, and a same-length
+**different-content** pair in a temp root and asserts all three outcomes.
 
 The window builds in **0.21-0.64 s** with those 40 rows up (the spread is the machine
 being busy, not the window: the same code prints 0.21 s in a quiet suite run and 0.47-0.53 s
@@ -1620,7 +1652,7 @@ ffmpeg seek per clip, **9.9-11.0 s for all 40** in the two runs of 2026-11-07 th
 it (against 7.2-9.7 s for the 69 rows the pre-dedupe list carried, and 12.7 s for the 115
 rows before that - fewer clips, on a busier box, at a cost that did not fall), with the
 window interactive throughout. One frame render measures **12.4-14.1 ms** median for
-`alpha` on a quiet machine, and the suite, which times the same call while the thumbnail
+`alpha` on a quiet machine, and `tests/test_peek_readings.py`, which times the same call while the thumbnail
 pass is decoding around it, printed **18.6-24.0 ms** in those two runs. Measured per theme
 on a quiet box, `render.draw` with the pinned fixture: `alpha` 12.7 ms, `dual` 9.5,
 `gauge` 9.0, `bars` 8.1, `clock` 8.0 (60 draws each, median; the spread is 0.2-0.3 ms

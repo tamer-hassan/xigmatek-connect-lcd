@@ -167,6 +167,14 @@ class TheMarksStayOutOfTheFrame(PaneHarness):
         self.assertEqual(image_without.toImage(), image_clear.toImage(),
                          "a mark changed the image the model painted")
 
+        # the other half of the same rule: the chrome belongs to the *selection*, not to the
+        # last press, so the next repaint paints it back for the row that is still selected
+        self.win.preview.update()
+        fixtures.pump(0.4)
+        self.assertTrue(self.win.preview.marks,
+                        "the repaint left the pane unmarked while a row was still selected: "
+                        "the chrome follows the last press rather than the selection")
+
 
 class TheMenusSayWhatTheRowHolds(PaneHarness):
     def test_a_value_menu_shows_the_rows_own_value_not_the_first_choice(self):

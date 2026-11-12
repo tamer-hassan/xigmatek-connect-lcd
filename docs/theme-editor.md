@@ -3,10 +3,11 @@
 **This is a plan, part of it landed.** As of 2026-11-08, stage 0's write-up (this file)
 and stages 1-3 are in the tree: `xigmalcd/themes.py` finds the library and the file model
 under `~/.config/xigmalcd/themes`, `--list-themes` and `--check-theme` print
-it with the counts, `--theme <background name>` selects a layout, the canvas refusal is a
-gate on each file's own `ratio` field, and the same names work over the control socket.
+it with the counts, `--theme <background name>` selects a layout, the canvas refusal comes from
+each file's own `ratio` field, and the same names work over the control socket.
 Stage 2 is **built**: the export machinery, the `special` kind, the extension keys it
-needed, the determinism rules and both gates are in the tree, and all five drawn themes
+needed, the determinism rules and both checks are in the tree (`tests/test_export_parity.py`),
+and all five drawn themes
 (`alpha`, `bars`, `clock`, `dual`, `gauge`) generate to layouts that paint *exactly* what
 `render.py` paints - zero differing pixels on every reading that answers what they ask,
 worst channel delta 0. `alpha` was the one that had to earn its keys; `bars` was the one
@@ -37,7 +38,7 @@ the two (docs/limits.md).
    There is no multi-row table UI: the row set is what the inspector reads, and
    `--print-theme-fields` is what makes it reviewable in a log rather than only on screen.
 2. **Our five themes become exportable data**: `--export-theme NAME` writes
-   vendor-shape JSON on demand. The export is *generated and gated*, never committed -
+   vendor-shape JSON on demand. The export is *generated and checked*, never committed -
    a committed copy of `gauge.json` goes stale the first time anyone edits
    `theme_gauge`, and this repo has already recorded a comparison that failed because a
    file changed between two builds (docs/packaging.md).
@@ -47,8 +48,8 @@ the two (docs/limits.md).
    `--text-color`, the ink halo and supersampling; no PNG assets, no new media roots,
    nothing extra to hash. The plate is not a row: it is the theme-level `scrim` the frame
    loop already applies, from the frame's own alpha.
-4. **The four 320×240 themes are excluded**, with the reason kept next to the gate rather
-   than in a comment: the em-box anchor convention is measured only at 480
+4. **The four 320×240 themes are excluded**, with the reason kept next to the check that holds it rather than
+   in a comment: the em-box anchor convention is measured only at 480
    (`xigmalcd/render.py`, and `themes/alpha/README.md`'s layout table).
 
 ## Why this is all host-side work, and why that is what bounds the cost
@@ -82,9 +83,9 @@ From `themes/alpha/layouts/**/*.json`, counted with plain `python3 -` over the t
 | widgets over all themes | **152** (min 3, max 10 per theme - a theme is a short list, not a form) |
 | kinds used | `data` 66, `text` 66, `bar` 15, `line` 4, `arc` 1 |
 | distinct property keys | **33**, split by who reads them: **22 read by `layout.py`** (that set is taken out of the module with `ast`, not from a hand-kept table, so the painter and the census cannot drift apart); **11 carried by vendor files and never read** - `canvasProperties`, `controlName`, `coordBoundary`, `enableMove`, `italic`, `italicAngle`, `screenStatus`, `time`, `type`, `underline`, `valueChangeType`, every one of them the vendor editor's own bookkeeping, each with a stated reason in the print; and **4 read with no vendor file to show** - `name` (a `special`'s drawing to pick), `xigma` (our theme-level block) and `lineColor`/`lineWidth` (the line ink, measured off the two baked overlays that have a line rather than out of a file). By field: x, y on all 152; `fontFamily`/`fontSize`/`bold`/`italic`/`underline`/`textColor` on 132; `source` on 82; `content` on 66; width on 20 widgets, `height` and `rotate` on 19 each; `minValue`/`maxValue`/`bgColor`/`cornerRadius`/`startColor`/`endColor` on 16; `radius`/`angleStart`/`angleEnd`/`sizeWidth`/`sizeHeight` on the one arc. All of it is re-derived by `xigmalcd --print-theme-fields` |
-| distinct `source` values | **12 named** over 82 widgets, across all 27 files (`CPU Temperature` 22, `CPU Usage` 16, `Time` 13, `Pump Speed` 9, `GPU Temperature` 6, `GPU Usage` 6, `CPU Frequency` 3, `Date` 3, `CPU Power`, `GPU Power`, `Upload Speed`, `Week` one each); 70 widgets carry no source at all. Across the **23 pickable** files it is **7 names** - `CPU Temperature` 17, `CPU Usage` 15, `Time` 11, `Pump Speed` 9, `GPU Usage` 6, `GPU Temperature` 3, `CPU Frequency` 2 - which is what `--list-themes` prints and what the suite gates |
+| distinct `source` values | **12 named** over 82 widgets, across all 27 files (`CPU Temperature` 22, `CPU Usage` 16, `Time` 13, `Pump Speed` 9, `GPU Temperature` 6, `GPU Usage` 6, `CPU Frequency` 3, `Date` 3, `CPU Power`, `GPU Power`, `Upload Speed`, `Week` one each); 70 widgets carry no source at all. Across the **23 pickable** files it is **7 names** - `CPU Temperature` 17, `CPU Usage` 15, `Time` 11, `Pump Speed` 9, `GPU Usage` 6, `GPU Temperature` 3, `CPU Frequency` 2 - which is what `--list-themes` prints and `tests/test_theme_library.py` holds |
 | display formats measured | **4 of the 12** - `xigmalcd/layout.py`'s `FORMATS_MEASURED` is CPU/GPU Temperature and CPU/GPU Usage. The rest are this repo's own choice and `draw_theme` reports them in `notes["gaps"]` |
-| fonts | 4 families (`Arial` 115, `simsun` 13, `Verdana` 3, `宋体` 1), 10 sizes (12, 14, 16, 20, 24, 32, 40, 70, 100, 140), `textColor` on 132 widgets in **13** distinct spellings over all 27 files - and 106 values in 9 spellings, 88 of them white, across the 23 `1:1` files alone. That narrower count is the table docs/themes.md carries, re-derived by the suite's vendor-library section, so either number has to name its scope when it is quoted |
+| fonts | 4 families (`Arial` 115, `simsun` 13, `Verdana` 3, `宋体` 1), 10 sizes (12, 14, 16, 20, 24, 32, 40, 70, 100, 140), `textColor` on 132 widgets in **13** distinct spellings over all 27 files - and 106 values in 9 spellings, 88 of them white, across the 23 `1:1` files alone. That narrower count is the table docs/themes.md carries, re-derived by `tests/test_field_census.py`'s vendor-library section, so either number has to name its scope when it is quoted |
 | widget ids | all 152 UUID-shaped but only **54 distinct**: unique inside one theme, reused across themes. The editor must key a row by (theme, id), never by id alone |
 | `property[].time` | 82 widgets carry it, **27 distinct values**, and the census shows the shape of that: each of the 27 files answers exactly one value inside itself. A save stamp per theme, from the vendor editor - not a reading, and not something a generated file has, so our exports omit it (`--print-theme-fields` re-derives all three numbers) |
 | backgrounds | `background.mediaFile` names exactly one clip per theme, 27 distinct names |
@@ -92,7 +93,7 @@ From `themes/alpha/layouts/**/*.json`, counted with plain `python3 -` over the t
 The media side, and what the panel makes of it, is already in docs/themes.md and
 docs/limits.md: 43 clips and 28 images per install, 40 of 43 clips 480×480 and **3 of them
 320×240**, 23 clips at 24 fps and 20 at 20 fps, largest `clips/Theme_22.mp4` at
-7 662 077 B - inside the socket gate's 8 MB ceiling.
+7 662 077 B - inside the 8 MB ceiling the socket's own `check_media_file` enforces.
 
 ## What runs today, and what does not
 
@@ -141,9 +142,9 @@ pins the counts it finds.)
   settle it: the 4:3 themes have baked pictures too.
 - The degrade-and-print behaviour stage 1 needs is already half-built: `xigmalcd/layout.py`
   records every skipped source in `notes["missing"]` and every unmeasured format in
-  `notes["gaps"]`, and the suite already has a vendor-library section that re-derives the
-  library's colour, clip and aspect figures from the files. The work is to surface those
-  notes in the loop's own log and gate them, not to invent them.
+  `notes["gaps"]`, and the checks already had a vendor-library section re-deriving the library's
+  colour, clip and aspect figures from the files (`tests/test_theme_library.py`). The work
+  was to surface those notes in the loop's own log and hold them there, not invent them.
 - The reference material for closing the format gaps is in the tree: each theme's baked
   overlay (`themes/alpha/foreground/<id>.png`) is what the vendor drew for its own sample
   values, and `tools/theme_check.py` already measures our drawing against those pictures,
@@ -175,9 +176,9 @@ nothing in it is written outside that directory.
   that, the diff between the vendor's file and yours is only what you touched.
 * **Shadowing works as a file operation:** moving one text widget's `x` by 20 in a copy of
   `Theme_28` moves exactly that widget's box by `(20, 0)` and changes 1 163 of 230 400
-  pixels on this bench (that count depends on which face resolves the label, so the gate
-  prints it per machine and asserts only the `(20, 0)`-once, everything-else-still
-  shape), while the vendor's file is still `2d9ccf610ab9…` byte for byte; `--list-themes`
+  pixels on this bench (that count depends on which face resolves the label, so
+  `tests/test_theme_files.py` reports it per machine and asserts only the `(20, 0)`-once,
+  everything-else-still shape), while the vendor's file is still `2d9ccf610ab9…` byte for byte; `--list-themes`
   and `--check-theme Theme_28` both say "your copy", and after `delete_user_theme` both
   say "checkout" again. The moved widget is deliberately a *literal* text with no
   `source`, so a box that fails to move means the edit was ignored, not that a sensor
@@ -215,21 +216,21 @@ nothing in it is written outside that directory.
   answer. What is left in `alpha` is the assembly. The
   "segmented tick strip" this row originally named does not exist: it was a guess about a
   drawing `render.py` turned out not to make, and what `theme_alpha` actually draws is now
-  printed from its own source by the suite); `autoFit` on a `text`/`data` row, because
+  printed from its own source by `tests/test_specials.py`); `autoFit` on a `text`/`data` row, because
   `_fit`/`_fit_size` in
   `xigmalcd/render.py` shrink a face until the string fits and the vendor schema has a
   fixed `fontSize` with no such key; and one top-level `xigma` block for theme-level
-  properties - ink halo, cold/hot scale, gauge source, scrim mode. The round-trip gate
-  below is what makes extra keys safe: unknown keys survive a save.
-- **The export is byte-stable or the gate is noise**, and building it settled three of
-  those rules: ids are derived from the theme name (`xigma-clock-time`), never `uuid4()`;
+  properties - ink halo, cold/hot scale, gauge source, scrim mode. The round-trip check below -
+  `tests/test_theme_files.py`, which reads all 27 files back through the parser - is what
+  makes extra keys safe: unknown keys survive a save.
+- **The export is byte-stable or the comparison is noise**, and building it settled three
+  of those rules - `tests/test_export_parity.py` holds all four of them: ids are derived from the theme name (`xigma-clock-time`), never `uuid4()`;
   `property[].time` is **omitted** rather than derived - it is the vendor editor's stamp,
   nothing in a drawing depends on it, and a stamp with nothing behind it would be a field
-  that lies, so the gate asserts no export carries one; and an export never contains a
+  that lies, so `tests/test_export_parity.py` asserts no export carries one; and an export never contains a
   rendered date or number, only `source` rows - the same rule `render.py`'s `_now()` and
-  `date_str()` learned for frames and previews. `ratio: "1:1"` is emitted, the key the
-  exclusion gate reads.
-- Two gates on the export, both printed: **byte-stability** over two runs, and **pixel
+  `date_str()` learned for frames and previews. `ratio: "1:1"` is emitted, the key that keeps the 4:3 themes out of the picker.
+- Two checks on the export, both printed: **byte-stability** over two runs, and **pixel
   parity** - the generated JSON rendered by `layout.draw_theme` against the code drawing,
   with the painted-pixel difference printed per theme. Parity is what proves completeness:
   if an export forgets the gauge ring, the diff shows the hole rather than hiding it. A
@@ -238,16 +239,16 @@ nothing in it is written outside that directory.
 
 ### What the editor's first half measured (stage 4, 2026-11-08)
 
-The model is `xigmaui/edit.py`, and it holds no Qt on purpose: the suite drives it in the
-GUI section under a temp `XDG_CONFIG_HOME`, so every save, revert and refusal below
-happens somewhere that cannot touch the reader's own `~/.config`. The window's group is a
-shell over that model, and the gates say so in counts.
+The model is `xigmaui/edit.py`, and it holds no Qt on purpose: `tests/test_editor.py`
+drives it under a temp `XDG_CONFIG_HOME`, so every save, revert and refusal below happens
+somewhere that cannot touch the reader's own `~/.config`. The window's group is a shell
+over that model, and the checks say so in counts.
 
 * **Opening writes nothing.** 3 library layouts and 5 generated ones opened, and
   the user theme directory still holds 0 files. This was not the first version: an
   earlier `open_theme` copied the file on open, which left a shadow of `Theme_28` behind
   whenever a later assertion failed - and a shadow is not inert, because `--theme
-  Theme_28` and the socket both find it first. The count is the gate against that coming
+  Theme_28` and the socket both find it first. That count is what keeps it from coming
   back.
 * **The field list comes out of the code.** 25 field names across 6 kinds
   (`arc bar data line special text`), every one a key `themes.keys_read()` proves
@@ -258,7 +259,8 @@ shell over that model, and the gates say so in counts.
 * **An edit is the picture, and only the picture.** The literal `text` in `Theme_28`,
   x nudged to 227 over **20** spinbox keystrokes, is **1** undo step; exactly one ink box
   moves - by `(20, 0)` - and the other 5 stay put; **1 163 of 230 400** pixels change.
-  That is the same edit, the same fixture and the same count as stage 3's shadowing gate,
+  That is the same edit, the same fixture and the same count as stage 3's shadowing check
+(`tests/test_theme_files.py`),
   reached through the row rather than through the library, which is the point.
 * **The file draws what the row drew.** After `save`, `--theme Theme_28` reads the copy
   (origin: *your copy*) and paints a frame byte-identical to the one that was on screen;
@@ -278,8 +280,8 @@ shell over that model, and the gates say so in counts.
   byte-identically to the start and leaves 2 undo steps with `dirty` **false**: that flag
   answers "does memory disagree with the file?", not "was anything typed?", so it is
   derived from two snapshots rather than a counter.
-* **The rows do not lie about the model.**  Counted by the gate rather than remembered
-  here: the layout combo offers 28 names (5 generated + 23 files); a `bar` widget gets
+* **The rows do not lie about the model.**  Counted by `tests/test_editor.py` rather than
+  remembered here: the layout combo offers 28 names (5 generated + 23 files); a `bar` widget gets
   **15** rows - **11** keys the painter reads for that kind plus **4** of our own; an `x`
   of 9999 sits in the spinbox, refused in words while the picture stays put; and the one
   library layout that carries an `arc` shows `(not set)` in its `arcPaint` row rather
@@ -287,8 +289,8 @@ shell over that model, and the gates say so in counts.
   rather than derived, and went stale the day `xigma.showIf` was added for `bars`: it
   said a `bar` had 14 fields.  The pane's cap - never larger than the 480 px glass -
   holds with the rows in it.
-* **Pixel counts mean one thing.** `px_differ` in the suite counts pixels that disagree in
-  any channel, the same count `themes.parity` reports. The first version divided a byte
+* **Pixel counts mean one thing.** `fixtures.differ` counts pixels that disagree in any
+  channel, the same count `themes.parity` reports. The first version divided a byte
   count by four, which printed 905 where the honest number is 1 163 - a fifth out, in the
   direction that flatters the edit.
 
@@ -314,8 +316,8 @@ answers with the name it is drawing so the window can show that rather than reme
 
 ### What the canvas half measured (stage 4, 2026-11-08)
 
-Pointing at the picture is the same model with a different input device, and the gates are
-in that order: one block drives `xigmaui/edit.py` with no Qt at all, the next one hands the
+Pointing at the picture is the same model with a different input device, and the checks
+are in that order: one block drives `xigmaui/edit.py` with no Qt at all, the next one hands the
 pane real `QMouseEvent`/`QKeyEvent` objects and asserts the same outcomes. (There is no
 `QTest` in this environment, so the events are constructed and delivered to the widget
 rather than synthesised by the toolkit - which is also what the plan expected.)
@@ -325,8 +327,8 @@ rather than synthesised by the toolkit - which is also what the plan expected.)
   prints - and returns the row's index in `osd.widget`. That is not pedantry on this
   layout: the clock line is row 11 and sits ninth in the drawn-box list, because rows whose
   source the fixture cannot answer draw nothing and contribute no box. A row with no box
-  cannot be pointed at, and the gate finds a point on the glass with no row under it, so
-  the pane can say "that press selects no row" instead of selecting whatever is nearest.
+  cannot be pointed at, and `tests/test_canvas.py` finds a point on the glass with no row
+  under it, so the pane can say "that press selects no row" instead of selecting whatever is nearest.
 * **Overlaps resolve to the later row, because that is the one on top.** More than one box
   covers the CPU ring's centre, and the temperature figure standing inside it is what a
   press there selects. A ring that claimed every press inside its own bounding box would
@@ -346,9 +348,12 @@ rather than synthesised by the toolkit - which is also what the plan expected.)
   scaled drag can land one panel px short of the cursor - which is why the note reports
   what the row moved by, measured from the model.
 * **The marks never reach the frame.** The dashed box and its label are painted in the
-  pane's own paint event, over the picture. The gate re-shows the pane with a mark up and
-  without one and compares the PNG bytes the label was given - identical - and the layer
-  the caption counts stays byte for byte what `themes.draw` returned. The plan asked for
+  pane's own paint event, over the picture. `tests/test_pane_chrome.py` grabs the pane with a
+  mark up and without one: the two grabs differ, which is what proves the chrome is painted at
+  all, while the pixmap the label is handed and the image the model painted are the same either
+  way - the layer the caption counts stays byte for byte what `themes.draw` returned. The same
+  file holds the rule's other half: the chrome belongs to the selection, not to the last press,
+  so a repaint paints the mark back for the row that is still selected. The plan asked for
   this specifically, and it is the claim that keeps "our composite ... not a picture of the
   glass" true with a selection on it.
 * **The one thing the model cannot say, the pane does.** A row's *anchor* is bounded by the
@@ -362,7 +367,8 @@ rather than synthesised by the toolkit - which is also what the plan expected.)
 What the plan predicted, and what did not match: the boxes were already there
 (`notes["boxes"]`) and adding the row's index to them was indeed a few lines and one
 caller; the pinned fixture and the still preview were what made a drag readable; the marks
-going on an overlay rather than into the composite was the right call and is now gated. The
+going on an overlay rather than into the composite was the right call, and
+`tests/test_pane_chrome.py` is what says so. The
 plan expected editing **only at 1:1** - it is offered at any scale instead, because
 `to_panel` derives the mapping from the size `_fit` drew at, and the cost of that choice is
 the rounding above, said out loud rather than hidden behind a mode.
@@ -372,8 +378,8 @@ declared placement is 1), and anything at all to the panel. Live readings came i
 2026-11-11 as the peek, and its shape is the measured half of this section: the pane can
 *look* at another body, held and at the pinned instant, while every act that writes a number
 stays drawn and judged at the pinned fixture - because at another body's readings the row boxes
-move and the same point on the glass answers a different row, counts the suite makes on the
-machine it runs on rather than quoting here. What landed on 2026-11-10 is the structural edit - a row
+move and the same point on the glass answers a different row, counts
+  `tests/test_peek_readings.py` makes on the machine it runs on rather than quoting here. What landed on 2026-11-10 is the structural edit - a row
 added is a copy of a row that already draws, its position chosen by the painter's boxes
 rather than guessed, its order the list's order, its removal refused at the last row in
 the library's own words - and the edges: eight squares on the selected row's box, only
@@ -421,8 +427,8 @@ finding that out before an editor is built on top of it:
   beside an absent meter, because the file's own source answers and the theme's does not. So
   the number row names the meter's source here; a row whose dependency is unanswered is
   reported in the skip list as `showIf:<source>`, the same way an unanswered source is, and
-  the difference the key makes is measured rather than asserted (the gate strips the key from
-  a generated `bars` and counts the pixels it then differs by).
+  the difference the key makes is measured rather than asserted (`tests/test_bars_rows.py`
+  strips the key from a generated `bars` and counts the pixels it then differs by).
 * **`xigma.format`, and the two answers a bad one needs.** A format string goes to
   `strftime` for a clock and to `format()` for a reading, and either door raises when the
   specifier does not fit the value behind it - `%q`, `%d %d`, `{}` and `{:,.0f}` all raise on
@@ -432,8 +438,8 @@ finding that out before an editor is built on top of it:
   which probes the value this row's `source` actually carries and says which probe it used),
   and the painter survives a file that already carries one - it records
   `format:<source> (ValueError)` in the skip list, like every other hole, and draws the rest
-  of the frame. Nine candidates, both doors, same verdict on each: the gate is the agreement,
-  not a list of bad specifiers kept in either place.
+  of the frame. Nine candidates, both doors, same verdict on each - `tests/test_row_notes.py`
+  is the agreement, not a list of bad specifiers kept in either place.
 * **`xigma.fitArc`**. A width budget is the schema's only fit rule, and it cannot express
   what `alpha`'s two temperature columns are sized by: the ring's hole, measured as ink,
   both strings against it at once. So a `special` row that draws that pair names the ring
@@ -443,7 +449,7 @@ finding that out before an editor is built on top of it:
   vendor's ring). One ring is enough, because the pair's two are congruent and the row is
   symmetric about its own `x`. A row that declares no ring is not drawn, and
   `--check-theme` says which key is missing rather than letting the digits land on the
-  gauge. Why this is a key and not a width: the suite searches every whole-pixel budget
+  gauge. Why this is a key and not a width: `tests/test_specials.py` searches every whole-pixel budget
   this canvas can hold and none reproduces the sizes the ring picks (docs/limits.md).
 * **`xigma.format`**. Our date line is `%A %d %B %Y` (`render.date_str`); this repo's
   vendor `Date` shape is `%m/%d/%Y`; and *neither* is measured off the vendor's picture.
@@ -467,9 +473,10 @@ answers what the theme asks for: 25 530, 25 343, 22 944, 25 010 and 21 003 lit p
 `clock`, 20 608, 21 391, 20 498 and 20 743 for `gauge`, 40 006 and 41 842 for `dual`, 40 426
 and 39 186 for `alpha`, 76 916 and 76 022 for `bars`, every one of them **zero** differing pixels and a worst channel delta of 0. The diff is taken over all four channels on purpose: an alpha-only comparison
 would not see a colour that had drifted, and colour is exactly what a layout carries in
-`textColor`. The same gate watches the vendor side from the other direction: all 23
+`textColor`. `tests/test_library_draw.py` watches the vendor side from the other direction: all 23
 pickable layouts still paint **114 boxes and 315 287 lit pixels** (the total moved by
-1 118 px when the `line` measurement landed, and the suite's bench record moved with it),
+1 118 px when the `line` measurement landed, and the bench record in docs/limits.md moved
+with it),
 which is what proves the
 anchor/autoFit keys and the `special` branch changed nothing about a vendor theme.
 
@@ -490,7 +497,7 @@ degrees past its end so the joints do not show, with the colour taken at each se
 *start* and mixed by truncation. The vendor's ring, measured off its own frames, is
 1-degree arcs with the colour at each segment's middle and butt caps. One arc, two
 unchanged colours, **164 / 3 366 / 3 889 / 6 989 differing pixels** at four readings, worst
-channel delta 255 - printed by the suite, because an export whose claim is "this layout
+channel delta 255 - printed by `tests/test_conventions.py`, because an export whose claim is "this layout
 paints what the code paints" cannot be tested while two painters differ silently. No copied
 layout carries the key; `layout.ARC_PAINT` defaults to the vendor's convention, and an
 unknown name is a soft finding in `validate` and a `missing` note at draw time rather than
@@ -514,12 +521,13 @@ temperatures (including one below the scale and one above).
 
 **Holding a convention to the function it names is worth doing separately, and doing on
 every shape that has one.** Widening that check to 14 load values, with the bar painted
-against `render.bar` itself, found a bug the `dual` parity gate could not see: `render.bar`
+against `render.bar` itself, found a bug the parity checks as they then stood could not see: `render.bar`
 draws a fill whenever `frac > 0.01` but rounds its corners off `max(frac, 0.02)` - two
 different floors - and `BAR_PAINT["render"]` had one number doing both jobs, so a layout
 bar at a load between 1 % and 2 % drew **no fill at all**. Parity missed it because none of
 its readings land in that band: the two values that found it are 1.5 % and 2 %. The entry
-has a `corner_floor` of its own now, and the band is in the gate.
+has a `corner_floor` of its own now, and `tests/test_conventions.py`'s load list walks
+1.5 % and 2 % - the two values that found it.
 
 **The ramp question was answered by naming rather than rewriting.** A ramp can be data -
 `xigma.colourStops` is, and it reproduces `render.temp_colour` at all 100 sampled segment
@@ -533,12 +541,12 @@ the names with their reasons). The same rule the fan figures and the two composi
 follow.
 
 What the last one needs, and it is not what `alpha` needed. `alpha`'s list was no guess:
-the suite prints the calls `theme_alpha`'s own body makes, so the row that closed it is a
-claim about this source and not a memory of it.
+`tests/test_specials.py` prints the calls `theme_alpha`'s own body makes, so the row that
+closed it is a claim about this source and not a memory of it.
 
 | theme | what it took, or what is missing | why it is a decision, not a lookup |
 |---|---|---|
-| `alpha` | **exported 2026-11-08:** 12 rows, 6 312 characters, **zero differing pixels** | every item on the derived list landed as a row: the two `temp_arc` rings as `arc` widgets with `xigma.arcPaint: render` and the ramp as `xigma.colourStops` (the three stops come out of `A26_ARC_LO`/`MID`/`HI`, which is the spelling the suite checks against `render.temp_colour` at all 100 sampled positions); the two usage bars as `bar` widgets with `xigma.barPaint: hbar`, the case a vendor `bar` cannot spell, since it declares one flat fill and `render.hbar` gradients per **column** - measured at 28 device-px pairs and 7 at 1x at zero pixels against `render.hbar`; the three pairs of lettering as `special` rows (`fan-figures`, `temp-values`, `temp-labels`), because each pair shares one text size that only the drawing can decide; the usage labels and percentages as `text`/`data` rows, which need nothing joint; and the clock line as a `data` row with `xigma.format` and a width to fit to. The rows were each measured against `theme_alpha`'s own drawing before any of them was assembled (docs/limits.md), which is why the assembled frame reaches zero on the first try rather than after a week of chasing seams |
+| `alpha` | **exported 2026-11-08:** 12 rows, 6 312 characters, **zero differing pixels** | every item on the derived list landed as a row: the two `temp_arc` rings as `arc` widgets with `xigma.arcPaint: render` and the ramp as `xigma.colourStops` (the three stops come out of `A26_ARC_LO`/`MID`/`HI`, which is the spelling `tests/test_conventions.py` checks against `render.temp_colour` at all 100 sampled positions); the two usage bars as `bar` widgets with `xigma.barPaint: hbar`, the case a vendor `bar` cannot spell, since it declares one flat fill and `render.hbar` gradients per **column** - measured at 28 device-px pairs and 7 at 1x at zero pixels against `render.hbar`; the three pairs of lettering as `special` rows (`fan-figures`, `temp-values`, `temp-labels`), because each pair shares one text size that only the drawing can decide; the usage labels and percentages as `text`/`data` rows, which need nothing joint; and the clock line as a `data` row with `xigma.format` and a width to fit to. The rows were each measured against `theme_alpha`'s own drawing before any of them was assembled (docs/limits.md), which is why the assembled frame reaches zero on the first try rather than after a week of chasing seams |
 | `bars` | **the shape was found by measuring, 2026-11-08:** optional fan slots (`Fan 1` through `Fan 4`), and one change to our own drawing - written out under "The last theme, and the shape it turned out to need" |
 
 **The second schema question `alpha` raised was joint text sizing, and it was measured
@@ -547,7 +555,7 @@ once: the fan pair, the two temperature figures inside the rings, and the two la
 them. The vendor schema
 has no way to say "these rows are one size", so there were three candidate answers - one
 `special` per group, a `xigma.fitGroup` key, or a `fitText` list hung off the `arc` widget.
-The measurements (docs/limits.md, all printed by the suite):
+The measurements (docs/limits.md, all printed by `tests/test_specials.py`):
 
 * the joint size is *exactly* the smaller of the members' own fits - 30 fan reading pairs
   and 36 temperature reading pairs, no exception - so a group key would have been enough
@@ -569,7 +577,7 @@ thing the fan row does not have: the row has to say **which ring** its pair is s
 against one hole.  `temp-labels` is that same row with two strings that never change, and it
 is a row rather than two `text` widgets for the same measurement - see the row-by-row walk
 in docs/limits.md, which is where the two of them are checked together. `render.value_pair` is the door both the theme and the row go
-through, and the suite counts the pixels: the row's ink is exactly the theme's in the hole
+through, and `tests/test_specials.py` counts the pixels: the row's ink is exactly the theme's in the hole
 the ring painter leaves free, at the size `_fit_arc` picks, in all 36 pairs it walks
 (docs/limits.md). What that costs is stated plainly: a reader cannot size or move one
 member of a group on its own, and the editor's inspector offers the row's own fields (`x`,
@@ -588,7 +596,7 @@ at 8 of them for `heat` - which is the last obstacle to `dual`, and it is an obs
 our own code (`heat` divides by the literals 0.3 and 0.2 where its breakpoints would give
 0.30000000000000004 and 0.19999999999999996).
 
-And the **first authored layout reaches a zero diff**: the suite writes a one-widget ring
+And the **first authored layout reaches a zero diff**: `tests/test_export_parity.py` writes a one-widget ring
 with that ramp through the file model, saves it into the user directory, resolves it back and
 draws it through the loop's own door - 0 differing pixels and worst channel 0 against
 `render.temp_arc` at six values including one below the declared scale. No export, no
@@ -596,8 +604,8 @@ generator, nothing shipped: a file somebody edited, held to the same standard as
 themes. That is stage 4's premise, demonstrated a stage early.
 
 The plan's rule holds while all of this happens: **an export that cannot be driven to a zero
-diff is not shipped**, and the suite prints all five in, with each one's pixel diff
-counted at every reading it can be given.
+diff is not shipped**, and `tests/test_export_parity.py` puts all five through the two
+doors, with each one's pixel diff counted at every reading it can be given.
 
 ### The last theme, and the shape it turned out to need
 
@@ -634,8 +642,10 @@ advance happens anyway. That is the rule the 27 library layouts already follow a
 hole-that-says-what-it-is rule docs/themes.md states. `bars` is this project's own drawing
 rather than a reproduction of a vendor frame, so nothing measured off glass is invalidated by
 changing it; what it costs is a visible gap on the glass where rows used to close up, and the
-`bars` preview clip re-rendered from the recorded series in the same change (the preview gate
-re-draws the layer and scores the tracked file, so a stale clip fails rather than misleads).
+`bars` preview clip re-rendered from the recorded series in the same change. Nothing re-draws
+that layer against the tracked clip any more - the six `docs/videos` files are the deliberate
+gap of 0.7, docs/limits.md and docs/tools.md - so a stale clip is caught by `ffprobe` and an
+eyeball, not by a check.
 The per-machine cost this document recorded an hour ago shrinks with it: the pitch no longer
 depends on this box's fan inventory, and what still varies per box is which slots draw.
 
@@ -653,7 +663,8 @@ handed the wrong tenth of a percent.
 
 **And `bars` is a file now** (2026-11-09): `themes.bars_recipe()` generates 32 widgets out of
 that table and those constants - the heading, the clock line, and three rows per reading -
-and it reaches **zero differing pixels at all 13 readings** the parity gate gives it, the ones
+and it reaches **zero differing pixels at every reading** `tests/test_bars_rows.py` and
+`tests/test_export_parity.py` give it, the ones
 that answer everything and the ones that answer almost nothing. Two things it needed that the
 plan had not foreseen:
 
@@ -663,9 +674,10 @@ plan had not foreseen:
   does. The theme draws neither number nor meter there, because it decides the whole row by the
   division; the file had `Used GPU Memory` as its own source, so it printed `4 GB` beside an
   absent meter: **706 px and a worst channel of 255**. The key is what makes that dependency
-  sayable, and the suite measures it rather than taking my word for it: it strips the key from
-  a generated `bars`, paints it at that reading, and counts what the file is then off by - and
-  holds that number against all three places it is quoted.
+  sayable, and `tests/test_bars_rows.py` measures it rather than taking anybody's word for it:
+  it strips the key from a generated `bars`, paints it at that reading, and counts what the
+  file is then off by. How far off is this bench's, so the count is printed there and this
+  page keeps only the fact that stripping the key changes the picture.
 * **Two defects in the theme's own ratio code, found by chasing that number.** `theme_bars`
   read `mem["used"]` outright, so a dict reporting a total with no used raised `KeyError`
   inside the frame loop; and it formed its two memory meters by different tests - the GPU row
@@ -682,10 +694,10 @@ name prints only where `sensors` reported a tachometer at that position. That is
 split the file makes - a literal `text` row for the six fixed labels, a `data` row on
 `Fan N Name` for the four slots - and it is what let one drawing and one file agree at every
 reading instead of only at the complete ones: a fan slot whose position exists but reports no
-RPM, or no name, is exactly such a reading, and the suite's own case list is what keeps that
-from being a claim.
+RPM, or no name, is exactly such a reading, and `tests/test_bars_rows.py`'s own case list is
+what keeps that from being a claim.
 
-What the suite holds, all of it measured: an `ImageDraw.text` spy runs while the frame is
+What `tests/test_bars_rows.py` holds, all of it measured: an `ImageDraw.text` spy runs while the frame is
 painted, and the label-and-value strings it captures equal, row for row, what
 `layout.text_for` produces from `themes.BARS_ROWS` - over four boxes and all ten rows - and
 the rows the sources answer are the rows ink lands in. The generated file's row count, kinds
@@ -694,7 +706,7 @@ against remembered numbers, `xigma.showIf` appears on exactly the two rows whose
 meter read different sources, and the review door's skip list is checked against the same
 report's own "cannot answer" half. And `--check-theme bars` no longer warns that its own
 new sources are unknown: `themes.source_names()` is one vocabulary, consulted by the painter,
-the checker, the editor's menus and the gates.
+the checker, the editor's menus and the checks.
 
 ## What the preview's two doors had to agree about
 
@@ -711,8 +723,8 @@ missing from one door and `--%` in the other: 4 587 px at one clock instant.
 So the preview was fixed by fixing the fixture, not the layout.  `edit.FIXTURE` now answers
 15 of the 19 sources, and the four it leaves are `Fan 3`/`Fan 4` name and speed - the
 slots past the two tachometers this shape reports, empty in **both** doors, which is `bars`'s
-reserved-slots rule being visible rather than hidden.  Three claims about it are gated, in the
-section that already holds the editor's model:
+reserved-slots rule being visible rather than hidden.  Three claims about it are held in
+`tests/test_fixture_shape.py`:
 
 * **every key is a key a box reports.**  The group-and-field set is checked against the
   metrics sample `sensors.py` prints at the top of its own module, so an unread key cannot sit
@@ -736,8 +748,8 @@ layout.  `themes.with_ink` closes it for the five names drawn from code: it copi
 and moves the colours `render.SKIN` declares, and `render.SKIN` is now the one table both
 doors read, because a `theme_*` body calls `_skin(ink, *SKIN[theme])`.  The substitution is
 **key-scoped**, and that is not a detail: `bars` uses `CYAN` both as a heading glyph and as
-the `startColor` of all ten of its meters, and only the 22 `textColor` roles may move.  The
-gate measures ink through the file door at every colour the parser itself knows - the ten
+the `startColor` of all ten of its meters, and only the 22 `textColor` roles may move.  `tests/test_ink.py`
+measures ink through the file door at every colour the parser itself knows - the ten
 palette names read out of `parse_ink`, plus a hex and a tuple, 13 inks x 5 layouts, all 65
 comparisons at zero pixels - because a preview of *our* theme follows the reader's colour
 while a vendor's file never does: open `Theme_28` and the ink row moves it 0 px and says
@@ -767,10 +779,10 @@ per-theme milliseconds in docs/gui.md stay labelled as owed a quiet-box re-measu
   invalidates all of them and they all have to be re-measured.
 - **Nothing in this repo had ever delivered a pointer event to this window** when this was
   written: no `mousePressEvent`, no `setMouseTracking`, no `QTest`/`sendEvent` anywhere.
-  That, not the drawing, was the new surface - and it is what the canvas gate is: real
+  That, not the drawing, was the new surface - and it is what `tests/test_canvas.py` is: real
   press/move/release and key events handed to the offscreen pane, asserting the model's
   `x`/`y` moved by the right number of panel pixels. There is still no `QTest` in this
-  environment, so the gate constructs the `QMouseEvent`/`QKeyEvent` objects itself.
+  environment, so `tests/test_canvas.py` constructs the `QMouseEvent`/`QKeyEvent` objects itself.
 - Mapping is small arithmetic once it is written down: `_fit()` computes
   `side = max(16, min(pane.w, pane.h, 480))` and centres the scaled pixmap, so the panel
   coordinate under a pointer is `(label - offset) * 480 / pm.width()`. The plan expected
@@ -789,8 +801,8 @@ per-theme milliseconds in docs/gui.md stay labelled as owed a quiet-box re-measu
   composite the caption describes ("our composite of the background clip playing under the
   OSD layer we would send... not a picture of the glass") - it goes on an overlay, so that
   claim keeps its meaning. Both predictions held: an open layout is drawn from the fixture,
-  and the marks live in the pane's paint event, gated by comparing what it was shown with a
-  mark up and with none.
+  and the marks live in the pane's paint event, held by `tests/test_pane_chrome.py`
+  comparing what it was shown with a mark up and with none.
 
 ## Stages, and what each one costs
 
@@ -801,9 +813,10 @@ number gated, the docs updated in the same change.
 |---|---|---|---|
 | 0 | this document, plus the schema written out properly: the `special` list, `autoFit`, the `xigma` block, the determinism rules, and how `--theme` opens past `choices=sorted(render.THEMES)` | 1 | 3 |
 | 1 | **landed 2026-11-08.** the 23 `1:1` layouts selectable in the loop: name→layout resolver, human names from `background.mediaFile`, the source→`sensors.collect()` table, `--list-themes`, `notes["missing"]` printed as "no pump tachometer here, widget skipped" and again over the socket's `status`, the four `4:3` themes excluded by a gate on `ratio` so a future 480 layout cannot be dropped by a filter, and a `--theme` name that is canonicalised once at parse time so the CLI, the log and the socket all spell it the same | 1-1½ | 3-4½ |
-| 2 | **machinery landed 2026-11-08,** `--export-theme NAME`, `--list-specials`, the `special` kind and its injected registry, the `xigma` extension keys, byte-stability and parity gates over four readings; four of five generate today: `alpha` (12 widgets, 6 312 chars), `clock` (3, 1 448), `gauge` (5, 2 314) and `dual` (10, 4 677) each reach a **zero-pixel diff** on every reading that answers what they ask; `bars` does not, and the table under "What settled the ring and the bar" says what it still needs - including that `bars` may not be expressible as one file at all. (`--print-theme-fields`, listed here as unbuilt, landed with stage 3.) | 2-2½ | 6-7½ **Completed 2026-11-09:** `bars` joined them - 32 widgets, zero differing pixels at all 13 readings the gate gives it - which took a change to that theme's own drawing (ten reserved rows, a row with no reading keeping its place) and one key the schema had never had, `xigma.showIf`. |
+| 2 | **machinery landed 2026-11-08,** `--export-theme NAME`, `--list-specials`, the `special` kind and its injected registry, the `xigma` extension keys, byte-stability and parity gates over four readings; four of five generate today: `alpha` (12 widgets, 6 312 chars), `clock` (3, 1 448), `gauge` (5, 2 314) and `dual` (10, 4 677) each reach a **zero-pixel diff** on every reading that answers what they ask; `bars` does not, and the table under "What settled the ring and the bar" says what it still needs - including that `bars` may not be expressible as one file at all. (`--print-theme-fields`, listed here as unbuilt, landed with stage 3.) | 2-2½ | 6-7½ **Completed 2026-11-09:** `bars` joined them - 32 widgets, zero differing pixels at every reading `tests/test_bars_rows.py`
+and `tests/test_export_parity.py` give it - which took a change to that theme's own drawing (ten reserved rows, a row with no reading keeping its place) and one key the schema had never had, `xigma.showIf`. |
 | 3 | **landed 2026-11-08.** the file model: the user root `~/.config/xigmalcd/themes` read before the checkout and before `/usr/share`, so an edited copy shadows the vendor's by file operation alone and deleting it puts the vendor's back; `canonical()`/`shape_of()`, `validate()` split into hard (will not draw) and soft (worth saying), `save()` (atomic tmp + `os.replace`, `.bak`, trailing newline, user root only, the five code names refused, traversal names refused), `copy_for_edit()`, `delete_user_theme()`, `user_copies()`, `themes.draw()` for an object that never touched a disk, and `--check-theme NAME` as the review door. The round-trip gate is in: **27/27 layouts reproduce byte for byte** and **23/23 copies are byte-identical to their source**. Not built: the window that drives it | 1-1½ | 3-4½ |
-| 4 | **landed 2026-11-08, in the two changes the plan named.** First the model (`xigmaui/edit.py`, no Qt, driven headless by the suite) and the window's layout-editor row over it: one layout combo (3 generated + 23 files), one widget, one field, one value; opening writes nothing; the field list is derived from `themes.keys_read()`; colours are stored in the vendor's `rgba()` spelling; refusals move nothing; 20 keystrokes are 1 undo step; the saved file redraws byte-identically what was on screen (1 163 px for the `(20, 0)` nudge, through both doors). Then the canvas inside that same pane: press a row's ink box to select it (the file's row index, later row wins an overlap), drag to move it - one drag, one undo step, the row follows the cursor and the pane repaints as it goes - and the arrow keys nudge 1 px / 10 px. **Amended 2026-11-10 (0.5):** the field dropdown became rows - every field the kind carries, one row each, **10 for `text` up to 18 for `arc`** counted off the model's lists across 185 widgets, one to three columns as the window's width allows (the window's floor is 1280x1024 now, per the owner), and each row carries a note line saying what that row paints at the pinned fixture - `edit.drawn_text` walking the painter's rules in the painter's order, proved by drawing every text-bearing row twice and requiring the two frames to be byte-identical. **Amended 2026-11-10 (0.6):** the rows themselves became editable - `add`, `remove`, `up`, `down` under the fields - and a new row is always a copy of a row that already draws: this layout's own row of that kind, otherwise a real row from the 28 layouts the editor opens, this repo's five exports ranked first because every row in them is carried to a zero-pixel diff. There is no default table, and none was invented: the vendor's application bundles are not in this tree, so the files are the only evidence of what a row of a kind looks like, and the suite re-counts that evidence (the 5-key envelope, the mandatory keys per kind, the id reuse, what `layerIndex` does not mean) on every run. Where a copy lands is decided by a trial draw and the painter's own boxes, and what a reorder does is proved by pixels in both directions. Built later, in the 0.6 cycle: snapping a row to a *neighbour*'s own numbers (2026-11-11) and the peek at another body's readings (2026-11-11).  Still not built: a snap to a grid - the corpus carries none to snap to | 3-3½ | 9-10½ |
+| 4 | **landed 2026-11-08, in the two changes the plan named.** First the model (`xigmaui/edit.py`, no Qt, driven headless by `tests/test_editor.py`) and the window's layout-editor row over it: one layout combo (3 generated + 23 files), one widget, one field, one value; opening writes nothing; the field list is derived from `themes.keys_read()`; colours are stored in the vendor's `rgba()` spelling; refusals move nothing; 20 keystrokes are 1 undo step; the saved file redraws byte-identically what was on screen (1 163 px for the `(20, 0)` nudge, through both doors). Then the canvas inside that same pane: press a row's ink box to select it (the file's row index, later row wins an overlap), drag to move it - one drag, one undo step, the row follows the cursor and the pane repaints as it goes - and the arrow keys nudge 1 px / 10 px. **Amended 2026-11-10 (0.5):** the field dropdown became rows - every field the kind carries, one row each, **10 for `text` up to 18 for `arc`** counted off the model's lists across 185 widgets, one to three columns as the window's width allows (the window's floor is 1280x1024 now, per the owner), and each row carries a note line saying what that row paints at the pinned fixture - `edit.drawn_text` walking the painter's rules in the painter's order, proved by drawing every text-bearing row twice and requiring the two frames to be byte-identical. **Amended 2026-11-10 (0.6):** the rows themselves became editable - `add`, `remove`, `up`, `down` under the fields - and a new row is always a copy of a row that already draws: this layout's own row of that kind, otherwise a real row from the 28 layouts the editor opens, this repo's five exports ranked first because every row in them is carried to a zero-pixel diff. There is no default table, and none was invented: the vendor's application bundles are not in this tree, so the files are the only evidence of what a row of a kind looks like, and `tests/test_editor.py` re-counts that evidence (the 5-key envelope, the mandatory keys per kind, the id reuse, what `layerIndex` does not mean) on every run. Where a copy lands is decided by a trial draw and the painter's own boxes, and what a reorder does is proved by pixels in both directions. Built later, in the 0.6 cycle: snapping a row to a *neighbour*'s own numbers (2026-11-11) and the peek at another body's readings (2026-11-11).  Still not built: a snap to a grid - the corpus carries none to snap to | 3-3½ | 9-10½ |
 | 5 | docs and gates: docs/themes.md's "not in the picker, and that is not an oversight" section brought up to date, docs/usage.md's CLI table, docs/gui.md's window census, README's five-theme claims, the window's own theme tooltip (it still says the vendor files are for the panel's firmware, which §11 contradicts), `smoke` rendering every installed layout offline against a pinned values dict. The suite grows by at least one section - stage 1's gates belong in the vendor-library section that already re-derives docs/themes.md's colour census, not in a new one - and then every place `twenty` is a gate moves with it: README, docs/tools.md, docs/packaging.md, the top changelog stanza, and the count `.github/workflows/ci.yml` compares against | 1 | 3 |
 | 6 | on glass, with the panel attached and the owner watching: the runnable set at 1 and 2 fps, achieved fps, loop seams for the vendor clips, the dark-ink-over-bright question that docs/limits.md still carries, `--no-clock` on `clock` (that frame changed in 0.4 - docs/limits.md's knob map), the quiet-box re-measurement docs/gui.md's cost paragraph owes to `bars`, and the transcript kept the way docs/packaging/ keeps installs | 1 | 3 |
 | | **total** | **10-12** | **30-36 h** |
@@ -829,31 +842,35 @@ PROTOCOL.md §10 - so this needs the installed app off the Windows machine again
    live apply second), then stage 5's docs and census in one.
 5. Stage 6 on the bench, own sitting, transcript kept.
 
-### What feature G's gates found about this suite's own harness
+### What feature G's checks found about the checks' own harness
 
 Two things, written down because they are facts about the tree and not about a bad day:
 
 * **The pinned pair was shared, and a shallow copy did not protect it - so it deep-copies
   now.** `Editor.fixture()` used to return `dict(FIXTURE)`: one level deep, so every inner dict
-  - `memory`, `cpu`, `gpu`, `fans` - was the module's own object.  This section's
-  hole-in-the-readings gate pops `memory.total` out of the body it is handed, in order to ask
-  what a row does when the reading it depends on vanishes, and with a shallow copy that punch
-  went into the module and stayed punched for **every later draw in that process**: the live
+  - `memory`, `cpu`, `gpu`, `fans` - was the module's own object.  The check that asked about a
+  missing reading popped `memory.total` out of the body it was handed, to ask what a row does
+  when the reading it depends on vanishes, and with a shallow copy that punch went into the
+  module and stayed punched for **every later draw in that process**: the live
   fixture answered 20 of the 21 `source` names the library asks rather than 21, and the only
   visible trace was a census of drawn boxes two short.  Both machines printed the same
-  diagnosis, which is how it was caught: feature G's gates count from a fresh parse of
-  `edit.py`'s own literal and then say what the live dict had become.
+  diagnosis, which is how it was caught: the checks count from a fresh parse of `edit.py`'s own
+  literal and then say what the live dict had become.
 
   Repaired on 2026-11-11, and the repair is what the earlier draft of this section said it
   would need its own change for.  `fixture()` returns `copy.deepcopy(FIXTURE)`, the five draws
   inside `edit.py` go through one `_fixture_metrics()` door rather than each inventing its own
-  copy, the hole-punch gate now asserts the module's own dict still holds the key it punched
-  out of its copy, and feature G's census ends by comparing the live `edit.FIXTURE` with a
-  fresh parse of the literal - so a fixture edited on purpose still passes and one worn down by
-  a caller does not.  The census prints what the deep copy costs beside the layer draw next to it
-  - 0.004 ms here, the median of 200, against a draw measured in milliseconds - so
-  pinning the pair properly is free, and the two figures come from the run that
-  says them rather than from this page.
+  copy, and the rule is held twice now, on both sides of
+  the door: `tests/test_editor.py` punches the key out of what `fixture()` hands out and then
+  asserts the module's own `FIXTURE` still holds it *and* still equals a fresh
+  `ast.literal_eval` of the literal in `edit.py`, and `tests/test_export_parity.py` asks the
+  same question of the shipped painters - neither `themes.parity`, `render.draw` nor
+  `themes.values`/`fill_lines` writes to the readings it is handed, over all five themes and
+  all five shared bodies.  So a fixture edited on purpose still passes and one worn down by a
+  caller does not.  What the deep copy costs beside a layer draw was printed by the run that
+  settled it - 0.004 ms, the median of 200 on the author's bench, against a draw measured in
+  milliseconds - and nothing in `tests/` re-times that pair, which makes the figure a record of
+  one sitting rather than a check's answer.
 
   What it cost is the part worth writing down, and the measurement names the rows,
   because a count of drawn boxes belongs to the machine that drew it and a row's `id` does not.
@@ -865,8 +882,9 @@ Two things, written down because they are facts about the tree and not about a b
   while the name was missing (`bars` rows 13/14, 14/15 and 15/16), and the figures docs/gui.md
   labels per machine moved with them - 120 adjacent pairs whose boxes never meet became 122 here,
   and 12 / 6 / 6 pairs whose boxes do meet became 13 / 7 / 6.  How many drawn boxes that is worth
-  is printed by the suite's own census, on the machine running it; the gate asserts that the two
-  rows it names are the two that came back, so this paragraph cannot survive a change to either.
+  is printed by `tests/test_row_acts.py`'s own census, on the machine running it; that check
+  asserts that the two rows it names are the two that came back, so this paragraph cannot
+  survive a change to either.
   Both machines' halves are measured now, and the runner's came out of the failed run rather
   than out of anybody's head.  The push carrying the repair failed
   `_pair("the pairs whose boxes never meet")` on CI's runner and printed its own answer - the
@@ -884,13 +902,13 @@ Two things, written down because they are facts about the tree and not about a b
   census prints next to them - a copy's median, the layer draw beside it, the counts of boxes and
   pairs inside `bars` - belongs to whichever box ran it, and no page quotes those.
 
-  Because which gate aborts depends on which figure moved, that section now prints every count it
+  Because which check aborts depends on which figure moved, `tests/test_row_acts.py` prints every count it
   measured that follows a face - adds, placement, both sides of the reorder census - before any of
   them is held to the page, so one red run answers for all four.  It is a print, not an assert:
   all four follow the fonts on the box that drew them, which is the whole reason they carry a
   machine's label on the page.  What stays asserted is membership - this run's answer has to be
   one of the labelled halves, so a third machine is a sentence to add rather than a range to
-  widen - and the same rule that once read `779 and 434` out of a failing gate for the `arc` box
+  widen - and the same rule that once read `779 and 434` out of a failing check for the `arc` box
   heights is what read 120 and 13 / 7 / 6 out of this one.
 
 * **A byte compare against a generated theme's frame was a race with this machine's clock,
@@ -902,18 +920,23 @@ Two things, written down because they are facts about the tree and not about a b
   says every generated theme reads.  So the two frames were drawn a second apart, and measured
   here unpinned that is 772 of 921 600 bytes differing, every one of them inside the bbox
   (274, 446, 292, 468): the last digit of the clock `theme_gauge` paints at (236, 458).  Pinned
-  the way the theme-census gates already pin it - `render._now` pointed at the section's `WHEN`,
+  the way `tests/test_field_census.py` already pins it - `render._now` pointed at the section's `WHEN`,
   restored in a `finally` - the same two frames a second apart are one picture byte for byte.
   Why only this one: every other byte compare in that section draws through the **file** door,
-  and `themes.draw` takes its instant as an argument.  The gate now also asserts the loop drew
-  something *other* than `gauge` before the rename, so the identity after it is about a fallback
-  rather than about two names that never differed, and its failure message carries a differing-
-  byte count and a bbox - what a byte compare ought to print when a race is suspected of it.
+  and `themes.draw` takes its instant as an argument.  What survives of the check is the
+  pinning rule, and it is asserted in `tests/test_theme_files.py`: the same layout drawn twice
+  with no pinned instant has to differ, drawn twice at one pinned instant it has to be one
+  picture.  The race itself - a display loop drawing a name that has just been renamed out from
+  under it, falling back to the stock skin and saying so - is not re-run by anything in `tests/`
+  and stays a gap on this page; `xigmalcd --theme <copy>` is the door to re-measure it at, and
+  what that check used to print, a differing-byte count and a bbox, is what a byte compare ought
+  to print when a race is suspected of it.
 * **A repaint re-applies the selected row's marks.** The pane's closing passage asserted that a
-  press on empty glass leaves no mark, which is true until the next frame; once another gate's
+  press on empty glass leaves no mark, which is true until the next frame; once another check's
   `time.sleep()` left a timer tick queued, the assert was reading that tick rather than its own
-  act. The passage now stops the preview timer, asserts the clearing, then repaints and asserts
-  the honest consequence - the mark returns, because the row is still selected.
+  act. `tests/test_pane_chrome.py` holds the honest consequence: it asserts the marks are up,
+  clears them, compares the two readings with no repaint between them, then asks for a repaint
+  and requires the mark back for the row that is still selected.
 
 ## What this document does not claim
 
