@@ -43,7 +43,7 @@ class WindowWithoutPanel(fixtures.FreshConfigRoot):
         self.win = app.Window(MISSING_PORT, 1.0, restore=False)
         self.addCleanup(fixtures.close_window, self.win)
         # a child widget of a window that was never shown reports isVisible() False, which is
-        # Qt's rule and not this window's; the suite showed every window it inspected
+        # Qt's rule and not this window's; `tools/selftest.sh` showed every window it inspected
         self.win.show()
         fixtures.pump(0.1)
 
@@ -56,6 +56,40 @@ class WindowWithoutPanel(fixtures.FreshConfigRoot):
                 self.assertGreater(self.win.preview.pixmap().width(), 0,
                                    "a theme that cannot be previewed is a theme the "
                                    "combo should not offer")
+
+    def test_the_layout_and_row_pickers_are_owned_by_the_form_they_are_added_to(self):
+        """The pickers a person needs in order to open a layout at all are in the box, not just
+        in the method that made them.
+
+        The accident this exists to notice: a `QFormLayout` that is built and never put into its
+        box is destroyed at the end of `_build()`, taking every widget `addRow`'d into it with it.
+        The layout picker, its state line and the row picker once vanished that way - no
+        exception, no traceback, a window that looked built.  So the assertion is not "the window
+        constructed": it walks the editor's own box and asks for the three rows by name.
+        """
+        box = self.win.ed_group
+        held = []
+        stack = [box.layout()]
+        while stack:
+            layout = stack.pop()
+            if layout is None:
+                continue
+            for i in range(layout.count()):
+                item = layout.itemAt(i)
+                if item.widget() is not None:
+                    held.append(item.widget())
+                elif item.layout() is not None:
+                    stack.append(item.layout())
+        self.assertTrue(held, f"{box.__class__.__name__} owns no widgets at all")
+        for name in ("ed_name", "ed_state", "ed_widget"):
+            widget = getattr(self.win, name)
+            self.assertTrue(any(widget == found for found in held),
+                            f"{name} is not in any layout the editor's box owns: the form it "
+                            f"was added to was never installed, and it died with that form")
+            owner, steps = widget.parentWidget(), 0
+            while owner is not None and owner is not box and steps < 12:
+                owner, steps = owner.parentWidget(), steps + 1
+            self.assertIs(owner, box, f"{name} is parented outside the editor's box")
 
     def test_the_window_builds_against_a_port_that_is_not_there(self):
         """No exception, and the failed action lands in the log where a person can read it."""

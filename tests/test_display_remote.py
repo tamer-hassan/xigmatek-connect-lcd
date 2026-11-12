@@ -46,7 +46,14 @@ class DisplayArgs:
     no_fans = False
 
 
-class WindowDrivingADisplay(fixtures.FreshConfigRoot):
+class DisplayHarness(fixtures.FreshConfigRoot):
+    """A window pointed at a running display: a real socket, an in-process `Control`, and a port
+    name that does not exist.
+
+    Split out from the checks below because a second file drives the same harness to a different
+    door (`test_apply_layout.py`), and building that shape twice is how the two would drift.
+    """
+
     @classmethod
     def setUpClass(cls):
         fixtures.qapp()
@@ -80,6 +87,8 @@ class WindowDrivingADisplay(fixtures.FreshConfigRoot):
     def logs(self) -> str:
         return "\n".join(self.win._log_lines)
 
+
+class WindowDrivingADisplay(DisplayHarness):
     def test_the_window_finds_the_display_and_reads_its_published_counters(self):
         self.assertTrue(self.win.daemon.present, self.win.daemon.path)
         self.assertTrue(self.win.d_line.text().startswith("showing alpha"), self.win.d_line.text())

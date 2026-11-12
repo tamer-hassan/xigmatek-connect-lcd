@@ -16,10 +16,10 @@ bytes - 5,218,596 B against 5,218,614 B, all 37 file md5s and every control fiel
 columns to 82 and failed the .deb job in both packages while the python suite stayed green.  And
 dpkg's grammar for a changelog body allows three things - an indented line, a well-formed heading,
 a trailer - so a body line at column 0 is read as a heading and fails as
-`syntax-error-in-debian-changelog`, once per package that ships `changelog.gz`.  That one came from
-a helper that wrapped continuation lines at four spaces and left the first line at none: the suite
-was green on both machines, because reading the top stanza's stamp through `dpkg-parsechangelog`
-never looks at body indentation.
+`syntax-error-in-debian-changelog`, once per package that ships `changelog.gz`. That one
+came from a helper that wrapped continuation lines at four spaces and left the first
+line at none: `tools/selftest.sh` was green on both machines, because reading the top
+stanza's stamp through `dpkg-parsechangelog` never looks at body indentation.
 """
 from __future__ import annotations
 

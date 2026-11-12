@@ -7,7 +7,7 @@ for the same drawings through one row each.  The claim this file defends is not 
 place" but: **the pixels the row paints are exactly the pixels the theme paints, with the theme's own
 bytes, at the size the theme's own rule picks.**
 
-Three rules, and each is spelled out a second way rather than read off the thing it checks:
+Four rules, and each is spelled out a second way rather than read off the thing it checks:
 
 * the fan pair's shared size is `max(FAN_MIN, min(fit(left), fit(right)))`, and a pair sized apart
   differs from the joint drawing exactly when the two fits disagree - which is what makes the joint
@@ -17,7 +17,10 @@ Three rules, and each is spelled out a second way rather than read off the thing
   every whole-pixel budget the canvas holds, against all six readings at once;
 * the temperature rows own the free part of each ring's hole, and the zone is derived from the
   ring's own drawing - `temp_arc` on a bare canvas, same supersampling, same downscale - so the
-  check is not a rectangle somebody picked.
+  check is not a rectangle somebody picked;
+* and each registered drawing's `.door` marker, which `--list-specials` prints, is read against
+  the `layout.draw_special_*` call inside that same function's body - two places one fact is
+  written down, and the listing can lie without anything else noticing.
 
 One trap is worth keeping in prose, because it fooled this repository once: a probe that forgets to
 inject `themes.SPECIALS` draws nothing at all and reports `boxes: []`, which reads like an empty
@@ -26,6 +29,7 @@ answer rather than like a broken probe.
 from __future__ import annotations
 
 import datetime
+import inspect
 import itertools
 import unittest
 from PIL import Image, ImageDraw, ImageChops
@@ -331,6 +335,40 @@ class TemperatureRows(unittest.TestCase):
                 self.assertLessEqual(theirs - painted, set(),
                                      f"the theme paints {len(theirs - painted)} px of the free "
                                      "zone that neither row takes")
+
+
+class TheDoorMarkers(unittest.TestCase):
+    """Each registered drawing says which door its fields go through, and the marker has to
+    agree with the call inside the body.
+
+    `themes.SPECIALS` marks every registered function with a `.door` - `line`, `pair` or
+    `values` - and `--list-specials` prints that word.  The marker and the `layout.draw_special_*`
+    call in the body are two places the same fact is written down, so they can come apart without
+    anything breaking: the row would still draw, and the listing would lie about what its fields
+    mean.  Read out of each function's own source with `inspect`, never from a table kept here.
+    """
+
+    DOOR_CALLS = {"line": "layout.draw_special_line(", "pair": "layout.draw_special_pair(",
+                  "values": "layout.draw_special_values("}
+
+    def test_every_registered_drawing_carries_a_marker(self):
+        for name, fn in sorted(themes.SPECIALS.items()):
+            with self.subTest(special=name):
+                self.assertIn(getattr(fn, "door", None), self.DOOR_CALLS,
+                              f"{name}: `door` is {getattr(fn, 'door', None)!r}, not one of "
+                              f"{sorted(self.DOOR_CALLS)}")
+
+    def test_the_marker_is_the_call_the_body_actually_makes(self):
+        for name, fn in sorted(themes.SPECIALS.items()):
+            with self.subTest(special=name):
+                source = inspect.getsource(fn)
+                called = sorted(door for door, call in self.DOOR_CALLS.items() if call in source)
+                self.assertEqual(len(called), 1,
+                                 f"{name}'s body calls {called}: exactly one door, or the "
+                                 f"marker cannot mean anything")
+                self.assertEqual(fn.door, called[0],
+                                 f"{name} is marked {fn.door!r} and its body calls "
+                                 f"{self.DOOR_CALLS[called[0]]!r}")
 
 
 if __name__ == "__main__":

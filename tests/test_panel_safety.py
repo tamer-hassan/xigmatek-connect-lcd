@@ -3,7 +3,7 @@
 
 Ported from the stubbed-actions block of `tools/selftest.sh`'s GUI section.  `panel.Link` is
 **replaced, not wrapped**, so this file cannot open a port even by accident - which is the whole
-reason the block exists in the suite and the reason it survives into tests/.
+reason the block existed in `tools/selftest.sh` and the reason it survives here.
 
 Three safety facts and two protocol facts:
 
@@ -220,7 +220,7 @@ class StubbedActions(unittest.TestCase):
                                               fps=5.0, seconds=1.0))
         finally:
             daemon.SESSION_TTL, daemon.SESSION_MAX = saved
-        # 1 s at a 0.2 s clock is five chances to renew; the bound is the suite's own (3),
+        # 1 s at a 0.2 s clock is five chances to renew; the bound is this file's own (3),
         # because this process is not the only thing on the machine and a loaded bench loses a
         # couple of them to a frame that ran long
         self.assertGreaterEqual(len(StubLink.instances), 3,
