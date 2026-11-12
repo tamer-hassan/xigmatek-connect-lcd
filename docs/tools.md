@@ -29,6 +29,7 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
 | could a generated layout draw one of our five themes instead? | `tools/knobmap.py` | per option, per theme: the best edit of that theme's own export, and the pixels between the two doors. 28 of the 37 pairs land at 0 px; the other 9 are far from 0, and `tests/test_knobmap.py` holds that split, the counts and the floor being ignored |
 | the README's previews move, and how would I make another? | `tools/preview_gif.py --clip CLIP --theme T --series FILE --no-gif` (README's set: `--scale 480 --frames 240 --gif-fps 20-or-24 --crf 20 --no-gif`) | the preview pane's composite as a 10-12 s H.264 MP4 — the shape the README links, uploaded through GitHub's editor because an `.mp4` written into markdown becomes an `<img>` nothing plays; with `--series FILE` or `--live-seconds N` every reading in it comes from a recorded `sensors.collect()` series, so the digits, meters and clock move; it prints the bytes, the frame count and length as the written file reports them, how many passes of the clip that is, and the min→max of what it drew |
 | what does the window look like, and does the README's picture match the code? | `tools/screenshot.py` | `docs/screenshot-xigmaui.png`: the real Qt window, offscreen, with a port path that does not exist so nothing on the glass is touched |
+| dragging a row in the editor's pane is slow — what does a move cost, and what is it paying for? | `tools/dragcost.py`, `--session` for the reader's own saved session | a real `QMouseEvent` drag through the pane's own handlers: per-move mean/median/worst, the split by call, and the counts (`layout.py` source reads, `ffprobe`/`ffmpeg`/`sensors` spawns, tick paints) that `tests/test_canvas.py` asserts |
 | what are ALPHA's theme files, and what do its themes actually contain? | `tools/thm_unlock.py`, `tools/theme_previews.py` | the `.thm` container opened with the app's own constants: 27 layouts, 44 clips, 27 baked overlays in `themes/alpha/`, every byte hashed; and a sheet showing each theme over its own clip |
 
 * `tools/probe.py` — the body-key question: does the panel validate bodies, and
@@ -364,6 +365,28 @@ with the floors under those columns, which is what a 1180 px window could not ho
 and row-count sentences above are labelled as bench figures and re-read by whoever looks; no
 gate keeps this page's copy of them honest, and that is said here rather than discovered by a
 reader.
+* `tools/dragcost.py` — what one drag of a row inside the editor's pane costs, **on the box
+  running it**. It drives the shipped door and nothing else: a real `xigmaui`, a real
+  `QMouseEvent` press/move/release handed to the preview pane's own handlers, the row moving
+  through `Editor.move_to`, `processEvents()` between the moves as an event loop gets them.
+  It prints per-move mean, median and worst, the time split by the call that pays
+  (`Editor.paint`, `_repaint`, `_show`, `_fit`, `_captions`, `_canvas_marks`, `snap_move`),
+  and the **counts** - `keys_read` calls, reads of `layout.py`'s source, `ffprobe`/`ffmpeg`/
+  `sensors` subprocesses, tick paints - which are the same quantities `tests/test_canvas.py`
+  asserts, so a figure here and a check there are one statement about one path. `--session`
+  copies the reader's saved config (window size, split, clip, canvas, `preview_fps`) into a
+  temporary settings root and restores *that*, so the number is of a session somebody
+  actually runs and the real settings file cannot be written; `--drags N` matters because the
+  first drag lands while the clip library is still probing clips and is not the same act as
+  the later ones; `--profile` adds a cProfile pass, labelled with its own overhead. Like
+  `tools/screenshot.py` it refuses a `--device` path that exists - the window's status read
+  would open the port - and `--allow-port` is there when measuring the real session is the
+  point; either way it sends no frame.
+  **The record, this bench, 2026-11-12**, `--session --layout bars --moves 25 --drags 3`,
+  the same command run against the tree before the three fixes and the tree after: first drag
+  **133.2 ms** a move and the drags after it **44.8 / 40.8 ms** (worst **242.5 ms**) before,
+  **11.6 / 11.5 / 10.8 ms** (worst **13.6 ms**) after, with reads of `layout.py`'s source
+  going from **5.72 per move to 0.00** and media/sensor subprocesses from **0.71 to 0.01**.
 * `tools/asar_extract.py ASAR` — read an Electron `.asar` without node: list, unpack,
   `--cat` one file, or `--find TEXT` to grep file *contents*, which is how the string
   constants in the app's compiled main process (`out/main/index.jsc`) get mined.

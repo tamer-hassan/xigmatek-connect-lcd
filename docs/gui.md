@@ -310,9 +310,10 @@ costs a frame of the animation and never a backlog that plays later as a burst.
 The same ffmpeg pass costs something else, and it was found from the other direction: a
 reader complained that dragging a row inside the editor's pane was slow *with `playing`
 off*. It was, and the frame it was slow about was not the expensive half of the table
-above. Three things were counted on this bench, on 40 real move events of a drag on `bars`
-(each figure this box's, none of them a spec), and the pair of classes in
-`tests/test_canvas.py` holds the counts rather than the durations:
+above. Three things were counted, on 40 real move events of a drag on `bars`, and they are
+re-measurable with one command - `tools/dragcost.py`, which drives the same handlers and
+prints the same counts `tests/test_canvas.py` asserts (every duration below is this box's,
+on 2026-11-12; none of them is a spec):
 
 | what one drag move paid | per move, this bench |
 |---|---|
@@ -327,6 +328,15 @@ stands down while a row is held; and the thumbnail pass stands down too, keeping
 because an icon arriving 200 ms later is not a fact about the file. A move then costs
 **~11 ms**, of which **9.8 ms** is `Editor.paint` of the 480×480 frame: the picture itself,
 which is the floor until somebody draws a smaller picture.
+
+The same command, the same day, against both trees at the geometry this bench's own saved
+session runs at (`tools/dragcost.py --session`, a 3072×1646 window, the reader's clip and
+canvas and `preview_fps`): first drag **133.2 ms** a move and the drags after it
+**44.8 / 40.8 ms**, worst **242.5 ms**, against **11.6 / 11.5 / 10.8 ms** and a worst of
+**13.6 ms** - with reads of `layout.py`'s source **5.72 per move** becoming **0.00** and
+`ffprobe`/`ffmpeg`/`sensors` spawns **0.71 per move** becoming **0.01**. That first number is
+the one the complaint was about: a drag you start before the clip library has finished is
+not the drag you start afterwards, and nothing about the pane looked different between them.
 
 The rate is capped at 30 fps and floored at 5 (`_set_player`), because past 30 the
 difference is not something an eye separates and every extra frame is a composite and a
