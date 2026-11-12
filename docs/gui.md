@@ -89,6 +89,7 @@ one of them (see "How the three columns get their sizes", after the table):
 | preview | preview | the background with `render.draw`'s OSD layer composited on top - playing, via one streaming ffmpeg, or as one mid-loop frame (`playing` box, see "The preview plays" below), refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How the three columns get their sizes" below | nothing |
 | theme | controls | the five themes, clock size, **the colour of the text it draws**, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
 | layout editor | controls, always on | opens one of the layouts this machine can select (or one of the 5 generated ones), shows its widgets, and lays out every field that widget carries as a row of its own (8 to 18 rows by kind, from the model's list); the pane under the picture then shows *that file* rather than the live theme | nothing, ever: the panel is never handed a layout file (PROTOCOL.md §11). What `save` changes is what this machine's own daemon draws next time it names that theme |
+| `reload the list`, `open a file…` | layout editor, under the menu; never fold | the two doors that decide **which file the box holds**: the first re-reads the roots the menu is built from, the second opens one layout file by path, wherever it is | nothing. Opening reads, never writes - and a layout that only a path answers is **refused** by `apply to the panel` until `save as your copy` puts it in a root the display can read |
 | clips | library | every MP4 the roots hold, listed once per **distinct file** - **40 rows out of the 46 mp4 files this repository tracks** (204 files on the author's bench, where the installed package and a mounted Windows partition add themselves; still 40 rows): 3 rows from the clips vendored here and 37 from the vendor's library on any of those boxes, the rest of the files being copies that collapse by content - 6 among the 46 tracked here (3 of them under another name), 164 on the bench, and the dated audit of all of it is written out under "Cost, measured on this box" below. This checkout's own `themes/alpha/clips` is one of the roots the list walks: 43 clip files, byte-identical to what `xigmatek-connect-lcd-themes` installs - `tools/verify_manifest.py` re-hashes every one against that package's own manifest, on this bench and on the runner - which is what lets a clone pair all 23 layouts `--list-themes` prints and why the same 40 rows turn up on a CI runner with nothing installed. `tools/preview_gif.py --clip themes/alpha/clips/Theme_30.mp4` reaches those files by path, which is how all five README previews are made. Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
 | background state | library | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the socket's own `check_media_file` door refuses says so, in that door's words, before the button is pressed | nothing: it is a readout |
 | `One frame now` | library | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
@@ -221,25 +222,34 @@ those relations and prints no digits: the triples above belong to their two mach
 
 And the columns' floors are not remembered constants: `_pane_floors()` raises each
 pane's minimum to its own contents' `minimumSizeHint` plus a reserved vertical
-scrollbar, so at a 1280×1024 desktop the three columns' floors are **272 / 376 / 373
-px** on this bench and **282 / 394 / 390 px** on CI's runner, where the code's lower
-bounds are 200, 300 and 320. A pane that cannot be dragged under what it holds cannot
-grow a horizontal scrollbar inside itself, so the 0.4 failure mode is unreachable rather
-than merely avoided. The controls floor is the editor's own footprint, so it moves twice
-over: one column of editor rows asks for **376 px** of controls on this bench, two
-columns for **400**, three for **568** - and **394 / 417 / 589** on CI's runner, both
-measured 2026-11-11 - a closed drop-down that has to show the longest entry it holds is
-part of what those columns carry, and the window's own minimum rises with them. The 18
-rows of an `arc` widget stand **889 px** tall in one column and **496 px** in three
-here, the grid's own ask going **171 / 344 / 512 px** - **807** and **462 px**, asking
-**180 / 361 / 533**, on CI's runner - which is the reflow buying height without buying a
-scrollbar, and all twelve figures come off the sizing pass `tests/test_window_sizing.py`
-runs on every machine. Those four heights are what the rows of controls under the fields
-cost, in height and never in a column's width: on this bench the arc form stands **889
-px** with one column of rows and **496 px** with three, and **12 px** of one row's
-height on this bench, **9 px** on the runner, is what one such row of buttons adds -
-three rows of them, measured 2026-11-11 - while the grid's own ask does not move at all,
-because the grid of rows did not change.
+scrollbar, so at a 1280×1024 desktop the three columns' floors are **328 / 376 / 373
+px** on this bench, where the code's lower bounds are 200, 300 and 320. A pane that
+cannot be dragged under what it holds cannot grow a horizontal scrollbar inside itself,
+so the 0.4 failure mode is unreachable rather than merely avoided. The controls floor is
+the editor's own footprint, so it moves twice over: one column of editor rows asks for
+**376 px** of controls on this bench, two columns for **400**, three for **568** - a
+closed drop-down that has to show the longest entry it holds is part of what those
+columns carry, and the window's own minimum rises with them. Those are the figures the
+sizing pass prints, on whatever machine runs it:
+
+    python3 -m unittest tests.test_window_sizing
+
+which reports its three widths, the floors, the split's sizes, how many columns of rows
+the field grid laid itself out into and what that grid asked for in height, and the
+bounds `app.py` names. Run it before quoting a floor anywhere: the numbers follow the
+faces installed, and this page's copy went stale once already when a column gained a
+row of buttons it had never carried. What does not move is the rule, and it is held in
+both directions - no column under what it holds, and no column so wide that a pinned
+narrow one starts travelling sideways.
+
+That last sentence is what the two doors under the layout menu (`reload the list`, `open a
+file…`) were measured against on 2026-11-12: they sit in the menu's own field column, the menu
+is what sets that column's floor, and hiding the buttons moves the floor by **0 px** - which
+`tests/test_window_sizing.py` now asserts rather than leaves to this sentence. The rows of
+controls *under* the fields are the ones that cost height and never a column's width: on this
+bench the arc form stands **562 px** tall with one column of rows, **281 px** with two and
+**186 px** with three, figures that print from the same command, while the grid's own ask does
+not move when a row of buttons is added above it, because the grid of rows did not change.
 
 ### The preview plays, or shows one frame
 
@@ -727,6 +737,41 @@ commonly gets wrong:
   `gauge` - measured, pixel for pixel - which is why the note says to re-point the loop over
   the socket, whose `theme` command takes the same names `--theme` does. A *fresh* `--theme`
   of that dead name exits 2 with `themes.why_not`'s sentence instead.
+* **Two doors decide *which file* the box holds.** Added on 2026-11-12 for the report *"I
+  discovered a bug where I have no way of opening & loading a previously saved layout in
+  xigmaui"* - inside which were two separate faults, and both have a door now.
+  * **`reload the list`** re-reads the roots the menu is built from - the same `themes.scan()`
+    `--list-themes` speaks - and rebuilds it. The menu used to be a snapshot taken when the
+    window opened, rebuilt only after a rename, a save-as or a revert **in that window**, so a
+    copy that appeared by any other route (the CLI, a second window, a file dropped into
+    `~/.config/xigmalcd/themes` by hand) stayed invisible until a restart. The line it prints
+    counts what the roots answer at that moment, out of `themes.scan()` and
+    `themes.user_copies()`; a remembered count would have gone stale the day two more layouts
+    landed. What is open stays open, unsaved edits and all: the rebuild blocks the menu's
+    signals, and the check proves it with an `x` the buffer holds and the file does not.
+  * **`open a file…`** reaches a layout file no root holds - one copied off another machine,
+    the `<name>.json.bak` a save leaves beside a copy, the stdout of `--export-theme` pointed
+    at a file. A path one of the roots *does* answer opens by its **name** instead, because the
+    origin words ("your copy", "the vendor's file in this checkout") have to stay the true ones.
+    Every refusal quotes the path it refused: nothing there, a directory, not JSON, JSON that
+    parses but carries no `osd`/`widget` (a metrics body, a clip's sidecar, somebody's
+    `config.json`), and a layout at a ratio this canvas will not draw, in `themes.RATIO_WHY`'s
+    own sentence. A failed open leaves the layout that was open exactly where it was, because a
+    door that trips on a typo must not also be the act that loses an edit.
+  * **One thing a path cannot do: name itself to a display.** `apply to the panel` sends
+    `("theme", <name>)`, and the display resolves that name in the roots *it* can see - so a
+    layout that only a path answers is refused before anything goes, and the line under the
+    menu says which of the three cases you are in: no root answers the name, your own copy
+    does, or somebody else's file answers that name and it is **not** the one on screen.
+    `save as your copy` is the answer, and the check walks the whole way: refuse, save, apply,
+    and the display's own status then says the new name.
+  Both buttons sit in the layout menu's own field column, which that menu already makes wider
+  than the two of them together, so they cost the column no width - measured, not assumed, by
+  `tests/test_window_sizing.py` - and neither folds away with the advanced knobs, because both
+  are how a layout gets *into* the box in the first place (`tests/test_window.py` names them in
+  the always-visible list and in the editor's own control census). Thirteen checks in
+  `tests/test_open_layouts.py`; the ten ways this cycle broke the code on purpose, and what each
+  one cost, are written up in [theme-editor.md](theme-editor.md).
 * **The field list comes out of the code.** A kind offers the intersection of the keys
   `layout.py` is *proven* to read (`themes.keys_read()` parses the painter's own source)
   and what that kind draws - 25 names across 6 kinds today, counted by `tests/test_row_resize.py`. The keys

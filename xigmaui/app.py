@@ -76,7 +76,7 @@ from PyQt6.QtCore import QEvent, QSize, Qt, QTimer        # noqa: E402
 from PyQt6.QtGui import (QAction, QBrush, QColor, QIcon, QImage, QKeySequence,
                          QPalette, QPainter, QPen, QPixmap)        # noqa: E402
 from PyQt6.QtWidgets import (QApplication, QCheckBox, QColorDialog, QComboBox,
-                             QDoubleSpinBox, QFormLayout, QGridLayout, QGroupBox,
+                             QDoubleSpinBox, QFileDialog, QFormLayout, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QLineEdit, QListWidget,
                              QListWidgetItem, QMainWindow, QMenu, QMessageBox,
                              QProgressBar, QPushButton, QScrollArea,
@@ -1244,12 +1244,55 @@ class Window(QMainWindow):
         self.ed_name.setToolTip(self._ed_combo_tip())
         self.ed_name.currentTextChanged.connect(self._editor_open)
         _readable(self.ed_name)
+        # The two doors that decide **which file this box holds** - as opposed to the three
+        # below, which act on the file it already holds.  They are here because a report said
+        # "I have no way of opening & loading a previously saved layout", and both halves of
+        # that were true.  The menu was built once at startup and rebuilt only after a rename,
+        # a save-as or a revert *in this window*, so a copy written by the CLI, by a second
+        # window, or by hand into `~/.config/xigmalcd/themes` stayed invisible until a
+        # restart.  And a layout file outside the roots the library reads - one copied off
+        # another machine, the `<name>.json.bak` a save leaves behind, an `--export-theme`
+        # printout - could not be opened at all.
+        self.ed_reload = QPushButton("reload the list")
+        self.ed_reload.setToolTip(
+            "re-read the roots this window lists layouts from - yours first, then this "
+            "checkout's, then the installed package - and rebuild the menu.  What is open "
+            "stays open, unsaved edits and all: the menu is rebuilt with its signals "
+            "blocked, so the layout in memory is never read back off disk.  The line under "
+            "the menu says what the re-read found.")
+        self.ed_reload.clicked.connect(self._ed_reload_layouts)
+        self.ed_open = QPushButton("open a file…")
+        self.ed_open.setToolTip(
+            "open one layout file by path, wherever it is.  **Opening writes nothing**, here "
+            "or in the file.  A file the roots do not hold previews and edits normally, and "
+            "`save as your copy` is what puts it under ~/.config/xigmalcd/themes - which is "
+            "also what lets `apply to the panel` name it: applying sends a *name*, and the "
+            "display reads whatever file that name answers in the roots *it* can see.  The "
+            "line under the menu says which file a layout came from.")
+        self.ed_open.clicked.connect(self._ed_open_file)
+        self._ed_paths: dict = {}       # name -> the path this window opened it from
         self.ed_state = QLabel("not editing: the pane shows the theme above, drawn from "
                                "this machine's readings")
         self.ed_state.setStyleSheet("color:#888;font-style:italic;")
         self.ed_state.setWordWrap(True)
         head.addRow("layout", self.ed_name)
         head.addRow("", self.ed_state)
+        # under the menu they act on, and in the form's field column, which that menu already
+        # makes wider than both buttons together - so this costs the column no floor
+        orow = QHBoxLayout()
+        orow.addWidget(self.ed_reload)
+        orow.addWidget(self.ed_open)
+        orow.addStretch(1)
+        head.addRow("", orow)
+        # The two doors that choose *which file this box holds* go under the menu they
+        # affect, not down with the three that act on the file it already holds.  They are
+        # in the form's field column, which the menu already makes wider than both of them
+        # together, so they cost the column no floor.
+        orow = QHBoxLayout()
+        orow.addWidget(self.ed_reload)
+        orow.addWidget(self.ed_open)
+        orow.addStretch(1)
+        head.addRow("", orow)
 
         self.ed_widget = QComboBox()
         self.ed_widget.setToolTip("one widget of this layout: its kind, what it shows, "
@@ -1266,14 +1309,15 @@ class Window(QMainWindow):
         #
         # The rows live in a grid that reflows between one, two and three columns
         # depending on the width this splitter happens to give the box (see
-        # `EditorBox`), so the 18 rows of an `arc` widget make this box 889 px tall in
-        # one column at a 1280x1024 window and 496 px in three at 1919x1055 - this
-        # bench's reading, CI's runner reading 807 and 462.  Each row of controls
-        # under the fields is 31 px of height here and 28 px there, against the
-        # 796/403 and 723/378 that 0.5 measured in the same pass - measured in
-        # the window, printed by `tests/test_window_sizing.py`, and held to whichever half of
-        # the labelled pair the machine running it is.  It buys height rather than pushing
-        # a scrollbar under the column, which is the failure mode 0.5 was written to catch.
+        # `EditorBox`), so the 18 rows of an `arc` widget stand a different height in
+        # every one of those layouts.  No figure for that height is kept here on
+        # purpose: it follows the faces installed, and the pair this comment used to
+        # carry - one bench's and one runner's - went stale the day the pane grew a
+        # row of buttons.  `python3 -m unittest tests/test_window_sizing.py` prints
+        # what this machine measures, at three window widths, and the same gate holds
+        # the rule that does not move: the reflow buys height rather than pushing a
+        # scrollbar under the column, which is the failure mode 0.5 was written to
+        # catch.
         self._ed_host = QWidget()
         self.ed_grid = QGridLayout(self._ed_host)
         self.ed_grid.setContentsMargins(0, 0, 0, 0)
@@ -2694,9 +2738,14 @@ class Window(QMainWindow):
             f"`--export-theme NAME`) and every layout file this canvas can select - "
             f"{len(pick)} of the {len(pick) + len(reject)} today, the other {len(reject)} "
             "are 4:3 and refused on a 480x480 panel (docs/themes.md). A name you have "
-            "already edited opens your copy. No layout file is ever sent to the panel and "
-            "nothing is read back from it (PROTOCOL.md \u00a711): what a save changes is "
-            "what *this machine's* daemon draws next time it names that theme")
+            "already edited opens your copy.  That is the whole list this menu can hold: it "
+            "is built from the roots this program reads, so `reload the list` re-reads them "
+            "when a copy appeared by some other door - the CLI, another window, a file you "
+            "dropped in yourself - and `open a file…` reaches a layout file no root holds at "
+            "all, which is not something a display can be told to draw until you save it as "
+            "your copy.  No layout file is ever sent to the panel and nothing is read back "
+            "from it (PROTOCOL.md \u00a711): what a save changes is what *this machine's* "
+            "daemon draws next time it names that theme")
 
     def _ed_name_tip(self) -> str:
         """What the name box will accept, said by the doors that enforce each rule."""
@@ -2755,6 +2804,16 @@ class Window(QMainWindow):
         self.ed_name.addItem(NO_EDITOR)
         self.ed_name.addItems(sorted(themes.EXPORTS))
         self.ed_name.addItems([r["name"] for r in themes.scan()[0]])
+        # a layout opened **by path** this session is not in any root, so the rebuild would
+        # drop the entry the reader can see on screen - and with it the only way back to that
+        # file.  It is put back after the roots, and its tooltip keeps saying where it came
+        # from, because a menu entry that lies about which file it opens is worse than no entry
+        for name in sorted(self._ed_paths):
+            if self.ed_name.findText(name) < 0:
+                at = self.ed_name.count()
+                self.ed_name.addItem(name)
+                self.ed_name.setItemData(at, f"opened from {self._ed_paths[name]}",
+                                         Qt.ItemDataRole.ToolTipRole)
         at = self.ed_name.findText(want)
         if at >= 0:
             self.ed_name.setCurrentIndex(at)
@@ -2934,8 +2993,15 @@ class Window(QMainWindow):
             self._apply_pair(self.theme.currentText())
             self._repaint()
             return
+        if name in self._ed_paths:
+            # a layout this window opened **by path** earlier in the session: picking its
+            # entry re-reads that file, which is the whole point of the door - an external
+            # edit of the file becomes visible without restarting the window.  Refused in
+            # the model's words if the file has since moved or gone.
+            self._editor_open_path(self._ed_paths[name])
+            return
         try:
-            self.ed = edit.Editor.open_theme(name)
+            self._editor_take(edit.Editor.open_theme(name))
         except (KeyError, ValueError) as exc:
             # `themes.why_not`'s own sentence: a name that is not a layout, or a file
             # that will not parse.  Nothing here guesses at a repair.
@@ -2944,10 +3010,102 @@ class Window(QMainWindow):
             self.ed_note.setText(str(exc))
             self._repaint()
             return
+
+    def _ed_open_file(self) -> None:
+        """The `open a file…` button: ask for a path, then hand it to the door below.
+
+        The asking is one small method of its own (`_ed_ask_path`) rather than a call inline
+        here, for the reason every other un-clickable control in this suite has: a native file
+        dialog cannot be driven headless, and a door whose prompt cannot be replaced is a door
+        no check can reach.  An empty answer - cancel, or an empty line - changes nothing at
+        all: the layout that was open stays open, with its unsaved edits, and no note is
+        written, because cancelling is not an error.
+        """
+        path = self._ed_ask_path()
+        if not path:
+            return
+        self._editor_open_path(path)
+
+    def _ed_start_dir(self) -> str:
+        """Where the open dialog begins: the one directory this program's copies live in.
+
+        A separate method rather than an argument, because a native dialog cannot be driven
+        headless and this is the part of the step a check can still ask about.  It falls back to
+        the home directory only when the user root has never been created - a dialog pointing at
+        a directory that does not exist opens wherever Qt feels like, which is how a reader ends
+        up hunting through `/` for a file two doors would have listed for them.
+        """
+        root = themes.user_root()
+        return root if os.path.isdir(root) else os.path.expanduser("~")
+
+    def _ed_ask_path(self) -> str:
+        """The dialog itself, opening where layouts actually live."""
+        path, _chosen = QFileDialog.getOpenFileName(
+            self, "open a layout file", self._ed_start_dir(),
+            "layout files (*.json);;any file (*)")
+        return str(path or "")
+
+    def _editor_open_path(self, path: str) -> None:
+        """Open one layout file **by path**, at the model's door.  Writes nothing.
+
+        The path is remembered against the name the file's stem gives, so the menu can hold
+        the entry and re-picking it re-reads the file.  A refusal leaves every other part of
+        the window exactly as it was: the layout that was open stays open, because a door
+        that failed on a typo should not also be the act that loses somebody's unsaved edit.
+        """
+        try:
+            ed = edit.Editor.open_path(path)
+        except ValueError as exc:
+            self.ed_note.setText(str(exc))
+            return
+        if ed.origin != edit.PATH_ORIGIN:
+            # the path was one of the library's own files, so the name door's words - "your
+            # copy", "the vendor's file in this checkout" - are the true ones, and no
+            # by-path entry is needed for it
+            self._ed_paths.pop(ed.name, None)
+        else:
+            self._ed_paths[ed.name] = os.path.abspath(path)
+            if self.ed_name.findText(ed.name) < 0:
+                at = self.ed_name.count()
+                self.ed_name.addItem(ed.name)
+                self.ed_name.setItemData(at, f"opened from {os.path.abspath(path)}",
+                                         Qt.ItemDataRole.ToolTipRole)
+                self._ed_box_readable(self.ed_name)
+                self._pane_floors()
+            self.ed_name.blockSignals(True)
+            self.ed_name.setCurrentText(ed.name)      # the signal would re-open, i.e. discard
+            self.ed_name.blockSignals(False)
+        self._editor_take(ed)
+
+    def _ed_reload_layouts(self) -> None:
+        """Re-read the roots and rebuild the menu, keeping what is open.
+
+        The counts come out of the doors the menu is built from, in the same breath as the
+        rebuild, because a sentence about how many layouts there are has to be re-measured to
+        be true - this window used to carry one written by hand, and it went stale the day two
+        more exports landed (docs/theme-editor.md).  It says what the roots hold *now*, which
+        is the fact a reader pressed the button to find out.
+        """
+        before = self.ed_name.count()
+        self._ed_refresh_layouts()
+        now = self.ed_name.count()
+        copies = themes.user_copies()
+        self.ed_note.setText(
+            f"the menu was re-read: {now - 1} layouts in it now "
+            f"({before - 1} before), of which {len(copies)} "
+            f"{'is' if len(copies) == 1 else 'are'} your copy under {themes.user_root()}"
+            + (f": {', '.join(copies)}" if copies else "")
+            + (f", plus {len(self._ed_paths)} opened from a path this session"
+               if self._ed_paths else "")
+            + ". Nothing was written, and what is open was not re-read.")
+
+    def _editor_take(self, ed: "edit.Editor") -> None:
+        """Put a freshly-read editor into the window: the rows, the pairing, the pane."""
+        self.ed = ed
         # A vendor layout carries its own background; follow it while the background has
         # not been chosen by hand.  This is the only place the pairing is *driven*: the
         # theme combo above lists the five drawn themes, which declare none.
-        self._apply_pair(name)
+        self._apply_pair(ed.name)
         self._ed_set_enabled(True)
         self.ed_undo.setEnabled(False)
         self.ed_undo.setText("undo")
@@ -2986,6 +3144,28 @@ class Window(QMainWindow):
                  "no file at all": "no file answers this name - it is yours alone, and "
                                    "your copy of it is gone"}.get(
                      self.ed.where, self.ed.where)
+        if self.ed.origin == edit.PATH_ORIGIN:
+            # The other half of the sentence `where` gives everybody else.  A layout that
+            # arrived as a path is not, yet, a thing any display can be told to draw, and
+            # there are three cases here that read differently - so what the name resolves to
+            # is asked of the resolver rather than assumed: nothing answers it (this window's
+            # alone), this window's own copy answers it (saved since, so a loop can draw it),
+            # or somebody else's file answers the same name (and that is the file the panel
+            # would draw, not the one on screen).
+            answered = themes.resolve(self.ed.name)
+            if answered is None:
+                where = (f"opened from the file you named, {self.ed.opened}; no root this "
+                         f"program reads answers `{self.ed.name}`, so this layout is this "
+                         "window's alone until you save it as your copy")
+            elif os.path.abspath(answered["path"]) == os.path.abspath(self.ed.path or ""):
+                where = (f"opened from {self.ed.opened}, saved as your copy at "
+                         f"{answered['path']}"
+                         + (": that file is what a loop draws" if not self.ed.dirty
+                            else " - but the pane holds edits that file does not: save again"))
+            else:
+                where = (f"opened from {self.ed.opened}; the name `{self.ed.name}` answers "
+                         f"from {answered['path']} - a **different file** from the one this "
+                         "window holds, and the file `apply to the panel` would draw")
         state = "edit not saved yet" if self.ed.dirty else "nothing outstanding"
         self.ed_state.setText(f"{where}; {state}")
         self.ed_save.setEnabled(self.ed.dirty)
@@ -3196,13 +3376,15 @@ class Window(QMainWindow):
         """One, two or three columns of rows, by the width the *pane* has.
 
         This is the responsive half, and it is here because the alternative is a
-        scrollbar: the 18 rows of an `arc` widget make this box **889 px** tall in one
-        column at a 1280x1024 window and **496 px** in three at 1919x1055 - this bench's
-        digits, where CI's runner reads 807 and 462 (a row of controls under the fields is
-        31 px of height here and 28 px there) - measured in the window and printed by the
-        suite's sizing gate with the grid's own ask of 171 / 344 / 512 px, and a controls
-        column that cannot hold what it is shown is exactly the 0.4 defect the
-        fresh-window gate now fails on.  The box asks for it through
+        scrollbar: the 18 rows of an `arc` widget stand a different height in each of
+        the three layouts, and this window is the thing that measures it - so no
+        figure for that height is repeated here, because the pair of machine-labelled
+        readings this comment used to carry went stale the day the pane grew a row of
+        buttons.  `python3 -m unittest tests/test_window_sizing.py` prints this
+        machine's numbers - the floors, the split, the number of columns the grid laid
+        itself out into, and the grid's own ask - and the gate beside it fails a
+        controls column that cannot hold what it is shown, which is exactly the 0.4
+        defect the fresh-window gate now fails on.  The box asks for it through
         `EditorBox.resizeEvent`, because the window's own `resizeEvent` never fires when a
         splitter handle is what changed.
 
@@ -3691,6 +3873,23 @@ class Window(QMainWindow):
                       "frame at a time (`Send one frame`)")
             return
         name = str(self.ed.name)
+        if self.ed.origin == edit.PATH_ORIGIN and not themes.is_copy(name):
+            # The one press here that cannot be answered by sending a name.  `apply` sends
+            # `("theme", <name>)`, and the display resolves that name in the roots **it** can
+            # see - so a layout opened from a path outside them would be answered by another
+            # file (a vendor's, at a colliding name) or refused, and either way the panel
+            # would end up drawing something other than the picture this window is showing.
+            # Refusing costs nothing and says what to do instead.
+            answered = themes.resolve(name)
+            self._log(
+                f"nothing sent: `{name}` is the file you opened at {self.ed.opened}, and a "
+                f"display is told a *name*, not a path. "
+                + (themes.why_not(name) if answered is None else
+                   f"that name answers from {answered['path']}, which is not the file in "
+                   f"this window")
+                + ".  `save as your copy` puts it in "
+                + f"{themes.user_root()}, and this same picture is what the panel draws then.")
+            return
         # what the two frames this window sits between actually hold, counted by the painter -
         # and by the painter that will do the drawing, which is `themes.paint` for anything
         # resolving to a file.  One variable, not two: the body.  The instant stays

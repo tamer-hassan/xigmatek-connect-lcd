@@ -32,6 +32,12 @@ What it checks rather than hopes:
   that moves it;
 * `resume` renews (that is the pause repair, PROTOCOL.md §9) and the loop carries
   on drawing afterwards;
+* a layout that exists **only as a saved file** is drawn by the loop, and every
+  `special` row that file declares comes back with a box.  A row the loop's own
+  painter cannot fill fails the phase.  That is the shape of the 2026-11-12 report:
+  a released loop painted a saved copy of `alpha` with no `temp-values` and no
+  `fan-figures` row, at any colour, while every counter kept moving - because the
+  row was not drawn wrong, it was not drawn;
 * a queued `upload` is carried out by the loop thread and judged by the panel's
   file notice.  The answer may be no - it was, twice on 2026-11-06, once taken on
   the retry and once refused twice - and a refusal is written down as what the
@@ -50,6 +56,7 @@ Keep the artifact: run it with the output going to the ledger, e.g.
     python3 tools/display_glass.py 2>&1 | tee data/glass/$(date +%F-%H%M%S)-socket-run.txt
 """
 import argparse
+import datetime
 import os
 import subprocess
 import sys
@@ -59,6 +66,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from xigmalcd import control                                        # noqa: E402
 from xigmalcd import render                                         # noqa: E402
+from xigmalcd import sensors, themes                                # noqa: E402
 from xigmalcd.main import DEFAULT_MP4                               # noqa: E402
 from xigmaui.panel import port_busy                                 # noqa: E402
 
@@ -66,6 +74,7 @@ PHASES = (("status", "BASELINE", "what the display reports about itself"),
           ("live", "LIVE alpha", "the loop drawing on its own"),
           ("cli", "CLI --status", "the command-line client, port untouched"),
           ("theme", "APPLY gauge", "the window's Apply, sent as commands"),
+          ("file", "APPLY a layout file", "a name only a saved JSON answers, drawn by the loop"),
           ("pause", "PAUSED", "silence on the wire; the last picture stays"),
           ("frame", "PAUSED frame", "one frame, asked for while paused"),
           ("resume", "RESUMED", "resume renews and the loop carries on"),
@@ -245,6 +254,63 @@ def main(argv=None) -> int:
             f"{after.get('text_color') or 'theme default'}")
         until(a.applied, "applied")
 
+    def apply_file() -> None:
+        """A layout that only a **saved file** answers, named over the socket.
+
+        `apply` above sends one of the five names this repo draws out of `render.py`.  This
+        sends a name that exists nowhere except as JSON in the one writable theme directory -
+        the state a person reaches with `save as your copy` in the window, or `themes.save`
+        from a script.  The loop reads it back through `themes.resolve` and `themes.paint`,
+        the same two doors that put the picture on this panel, and the phase prints what that
+        painter found: the file it answered, and one line per `special` row with its box.
+
+        A `special` row with **no box** is the fault this phase was written for.  Reported on
+        2026-11-12: a released loop's `themes.paint` filled no value table, so a saved copy of
+        `alpha` showed no `temp-values` and no `fan-figures` on the glass while its file said
+        nothing wrong - and every counter kept moving, because the row was simply never drawn.
+        Nothing in a suite that only asks the pane could see it, so here the missing rows are a
+        failed phase, not a sentence.  `notes["missing"]` is what `themes.paint` reports for a
+        registered row it could not fill (`xigmalcd/themes.py:_overlay`), and the window prints
+        the same list under `--check-theme`.
+
+        Written with the library's own writer and removed again at the end: the theme the
+        display held before is put back first, so the glass is never left pointing at a file
+        this phase deleted.  A `^C` inside this phase does leave the copy behind - say so in
+        the log, because `--list-themes` and the window's `revert` are how you find and drop
+        it.  Nothing is read back off the panel (PROTOCOL.md §11): the census is this machine
+        counting what its own painter sees, and the glass is what you are looking at.
+        """
+        name = "xigma-glass-file"
+        prev = str((d.ask({"cmd": "status"}).get("status") or {}).get("theme") or a.theme)
+        path, soft = themes.save(themes.export("alpha"), name)
+        say(f"    the file this phase writes: {path}"
+            + (f"; the library's own note: {soft[0]}" if soft else ""))
+        got = d.ask({"cmd": "theme", "value": name})
+        say(f"    named it over the socket: ok={got.get('ok')}, the display now holds "
+            f"theme={((got.get('status') or {}).get('theme'))!r}")
+        until(a.applied, "file layout applied")
+        rec = themes.resolve(name)
+        if rec is None:
+            problems.append(f"nothing resolves {name!r}, the file this run wrote")
+            return
+        say(f"    this machine's resolver answers: {rec['path']}")
+        img, notes = themes.paint(rec, sensors.collect(), datetime.datetime.now())
+        rows = [(w, b) for kind, w, b, _i in (notes.get("boxes") or []) if kind == "special"]
+        alpha = img.getchannel("A")
+        for what, box in rows:
+            x0, y0, x1, y1 = (max(0, int(v)) for v in box)
+            lit = sum(1 for y in range(y0, min(img.height, y1))
+                      for x in range(x0, min(img.width, x1)) if alpha[x, y] > 8)
+            say(f"      row {what:14s} box={box} ink={lit} px")
+        gone = sorted(notes.get("missing") or [])
+        say(f"    {len(rows)} special row(s) drawn; rows the painter could not fill: "
+            f"{gone or 'none'}")
+        if gone:
+            problems.append(f"the loop's painter drew no box for {', '.join(gone)}")
+        d.ask({"cmd": "theme", "value": prev})
+        say(f"    back to {prev!r}, and the copy is removed: "
+            f"{themes.delete_user_theme(name) or 'nothing was removed'}")
+
     def pause() -> None:
         d.ask({"cmd": "pause"})
         before = d.counters()
@@ -390,6 +456,7 @@ def main(argv=None) -> int:
         f"(display --duration {a.duration:.0f} s)")
     bodies = {"status": lambda: say(f"    {d.line()}"),
               "live": live_base, "cli": cli_status, "theme": apply,
+              "file": apply_file,
               "pause": pause, "frame": frame_now, "resume": resume,
               "upload": upload, "gate": gate, "renewal": renewal}
     # the phase a ^C lands in, so the summary can say which claims this log

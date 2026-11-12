@@ -14,7 +14,13 @@ invented here:
 * **The vendor's files are never what changes.**  `open_theme` only reads; the single
   writer is `themes.save`, which puts the layout under `~/.config/xigmalcd/themes`
   and refuses both vendor trees and the five drawn-from-code names.  `themes.resolve`
-  is user-first, so from that moment `--theme` means your copy.
+  is user-first, so from that moment `--theme` means your copy.  `open_path` opens a
+  layout file at a path no root answers - and keeps both rules: it writes nothing, and
+  a save from that buffer still goes to the one writable directory, never to the file
+  that was opened.  What it cannot do is be *named* to a display: applying a layout
+  sends a name, and the display reads that name out of its own roots, so the window
+  refuses the press until the copy is saved (`edit.PATH_ORIGIN` is the one wording that
+  marks that case, and `Editor.opened` carries the file the buffer came from).
 * **The picture is the loop's picture.**  `paint` calls `themes.draw`; the frame loop paints
   a layout file with `themes.paint`.  Those are two doors over one painter - `themes._overlay`
   in `xigmalcd/themes.py` - and `--check-theme` asks the loop's door when the name resolves to
@@ -32,6 +38,7 @@ from __future__ import annotations
 
 import copy
 import datetime
+import json
 import os
 import re
 import uuid
@@ -156,6 +163,13 @@ def choices(field: str) -> tuple:
 #: The five colour fields a widget can carry, and the one spelling the library uses for
 #: all of them: CSS `rgba(r, g, b, a)` with `a` a 0..1 fraction (measured across the 152
 #: shipped widgets - `layout.rgba`'s docstring is where that census lives).
+#: What an editor says about itself when the layout arrived as a **path** rather than as a
+#: name one of the library's roots answers.  Module level, and one wording only: the window's
+#: state line, the refusal of `apply to the panel` and the checks all quote it, and a layout
+#: that came from a path is the one thing in this model a running display cannot be told to
+#: draw - so the word is load-bearing, not decoration.
+PATH_ORIGIN = "a file you named"
+
 COLOUR_FIELDS = ("textColor", "bgColor", "startColor", "endColor", "lineColor")
 
 #: The one menu field whose value the painter folds before looking it up.
@@ -293,10 +307,17 @@ class Editor:
     """One layout being edited: its widgets, the selected one, and an undo stack."""
 
     def __init__(self, obj: dict, origin: str = "", path: str = "", name: str = "",
-                 theme: str | None = None):
+                 theme: str | None = None, opened: str = ""):
         self.obj = obj
         self.origin = origin                    # "your copy", "checkout", "package"
         self.path = path                        # where a save would go, "" if new
+        # The file this buffer was **read from**, when a person named a path instead of a
+        # library name - "" for every layout that came out of a root the loop can read.  It is
+        # not the same question as `path`: `path` is where a save would go, and a save goes to
+        # the one writable directory whatever happened to be opened.  The window needs the two
+        # kept apart, because "the panel draws this" is only true of a file in a root the
+        # display reads, and a by-path buffer is the one thing in this model that is not.
+        self.opened = opened
         # Which drawn theme this layout was generated from, or None if it came from a
         # file.  It is what decides whether the window's text colour may move the
         # preview at all: a layout's colours are its own (`layout.py` says so at the top
@@ -361,6 +382,85 @@ class Editor:
         # preview of it.
         return cls(copy.deepcopy(themes.load(rec["path"])), origin=themes.origin(rec),
                    path=themes.user_theme_path(rec["name"]), name=rec["name"])
+
+    @classmethod
+    def open_path(cls, path: str) -> "Editor":
+        """One layout file, read straight from a path.  **Opening writes nothing.**
+
+        `open_theme` can only reach a file the library's roots hold, because
+        `--theme <name>` and the socket's `theme` command both go through `themes.resolve`,
+        which reads `$XDG_CONFIG_HOME/xigmalcd/themes`, the checkout and the installed package
+        and nothing else.  A layout sitting anywhere else - one copied off another machine, an
+        `--export-theme` printout, the `<name>.json.bak` a save left behind - is perfectly
+        readable and worth looking at, and there was no door for it: a reader who had saved a
+        copy could not get it back into the editor.
+
+        Two sentences have to survive this door, and the window prints both:
+
+        * **a save never writes here.**  Where this editor's copy would go is
+          `themes.user_theme_path(<stem>)`, exactly as for a library layout: one writable
+          directory is a rule of the file model, not a preference (docs/limits.md), and the
+          file you pointed at may be a vendor's, a package manager's, or somebody's backup.
+        * **the panel cannot be told to draw it yet.**  Applying a layout sends a *name*, and
+          the display reads that name out of *its* roots.  Until the copy is in a root that
+          display reads, `apply to the panel` refuses - it does not send a name the display
+          would answer with a different file, or with none.
+
+        A path the library already answers opens by its **name** instead (`open_theme`), so the
+        origin words stay the true ones: opening `~/.config/xigmalcd/themes/alpha_new.json` by
+        path is opening the layout called `alpha_new`, and saying "a file you named" about it
+        would hide the fact that the loop already draws it.
+
+        Refused in words, every refusal quoting the path: nothing there, a directory, a file
+        that will not parse, and a JSON that parses but is not a layout.  That last one is the
+        refusal worth spelling out, because a `STATE all 1` metrics body, a clip's sidecar and
+        somebody's `config.json` all load as dictionaries, and an editor holding one is a pane
+        that paints nothing under a title that says a layout is open.  A layout at a ratio this
+        program cannot draw is refused with `themes.RATIO_WHY` - the same sentence the library
+        prints for its four 320x240 pages, for the same reason: the anchor convention every text
+        row uses was measured at 480 only.
+        """
+        here = os.path.abspath(str(path or ""))
+        if not here:
+            raise ValueError("no file was named")
+        if not os.path.exists(here):
+            raise ValueError(f"there is nothing at {here}")
+        if not os.path.isdir(here) and not os.path.isfile(here):
+            raise ValueError(f"{here} is neither a file nor a directory: a layout has to be "
+                             "a readable file")
+        if os.path.isdir(here):
+            raise ValueError(f"{here} is a directory: name one layout file inside it")
+        # `themes.load` keeps one (path, mtime) object so a layout the loop paints is read once
+        # per change; borrowing it for a file outside the library would drop the library's
+        # cached object on the floor and re-read it next frame, so this door parses on its own.
+        try:
+            with open(here, encoding="utf-8") as fh:
+                obj = json.load(fh)
+        except (OSError, UnicodeDecodeError) as exc:
+            raise ValueError(f"{here} could not be read: {exc}") from exc
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{here} is not JSON: {exc}") from exc
+        if not isinstance(obj, dict) or not (obj.get("osd") or {}).get("widget"):
+            raise ValueError(
+                f"{here} is JSON but not a layout: it carries no `osd` with a `widget` list, "
+                f"which is the one thing every layout file in this library has "
+                f"(a `STATE all 1` metrics body, a clip's sidecar or a config file all look "
+                f"like this from here)")
+        stem = os.path.splitext(os.path.basename(here))[0]
+        rec = themes.resolve(stem)
+        if rec is not None and os.path.abspath(rec["path"]) == here:
+            # the library's own file, named: the name door says where it came from
+            return cls.open_theme(stem)
+        if str(obj.get("ratio")) != themes.NEED_RATIO:
+            raise ValueError(f"{here} is a layout this program cannot draw: "
+                             + themes.RATIO_WHY.format(ratio=obj.get("ratio"),
+                                                       w=obj.get("width"),
+                                                       h=obj.get("height")))
+        hard, _soft = themes.validate(obj)
+        if hard:
+            raise ValueError(f"{here} will not draw: " + "; ".join(hard))
+        return cls(copy.deepcopy(obj), origin=PATH_ORIGIN,
+                   path=themes.user_theme_path(stem), name=stem, opened=here)
 
     # --------------------------------------------------------------- saving --
     def save(self) -> tuple:

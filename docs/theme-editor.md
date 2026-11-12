@@ -873,7 +873,78 @@ see the temperature figures and the fan figures on the panel, at the same rows t
 Until that transcript exists, docs/limits.md's stage-6 ledger carries it as owed, and the
 offline parity above is what makes it worth looking at rather than a guess that the fix worked.
 
+### The two doors that decide *which file* the box holds (2026-11-12)
+
+The second half of the same report, and a smaller one on its own: *"I discovered a bug where I
+have no way of opening & loading a previously saved layout in xigmaui."*  Probing it on the
+owner's own configuration root found two faults, not one, and they had different causes:
+
+| what was asked for | what was actually missing | the door |
+| --- | --- | --- |
+| a copy saved after the window opened should appear | the layout menu is built once, at startup, and was rebuilt only after a rename, a save-as or a revert **in that window** - so a copy written by the CLI, by a second window, or by hand into `~/.config/xigmalcd/themes` stayed invisible until a restart | `reload the list` |
+| a layout file should open from wherever it is | `themes.resolve` reads three roots and nothing else, so a file outside them - one copied off another machine, the `<name>.json.bak` a save leaves behind, an `--export-theme` printout - could not be opened at all | `open a file…`, `edit.Editor.open_path` |
+
+Both are named in the menu's own field column, not down with the three buttons that act on the
+file the box already holds; both stay up when `advanced controls` comes off, because they are how
+a layout gets into the box rather than what the box does to it.  Neither writes: opening is a read,
+and the file that was open stays open through a reload, unsaved edits and all, because the rebuild
+blocks the menu's signals on purpose.
+
+The model door is where the honesty lives, and it had to answer three questions `open_theme` never
+had to:
+
+* **where does a save from this buffer go?** To `themes.user_theme_path(<stem>)`, the one writable
+  directory - *not* to the file that was opened. The file you pointed at may be dpkg's, or the
+  checkout's evidence, or a backup; one writable root is a rule of the file model, not a
+  preference (docs/limits.md).
+* **which file was this buffer read from?** `Editor.opened` carries that, and it is a different
+  question from `Editor.path`, which is where a save would go. Keeping them apart is the only way
+  the window can say the true sentence, and `edit.PATH_ORIGIN` - one wording, at module level,
+  quoted by the state line, by the refusal below and by the checks - is what marks the case.
+* **can a display be told to draw it?** No, and this is the one thing the new door cannot do.
+  `apply to the panel` sends `("theme", <name>)`; the display resolves the name in the roots *it*
+  can see. So the press refuses a by-path buffer and sends nothing, and the state line says which
+  of three cases applies: nothing answers the name, your own copy answers it (saved since), or
+  somebody else's file answers the same stem - **a different file**, and the one the panel would
+  have drawn. `save as your copy` is the whole answer, and a check walks it: refuse, save, apply,
+  and the display's own status then names the copy.
+
+A path one of the roots already answers is delegated to `open_theme`, because the origin words have
+to stay the true ones: `~/.config/xigmalcd/themes/alpha_new.json` *is* the layout called
+`alpha_new`, and calling it "a file you named" would hide the fact that a loop already draws it.
+
+`open_path` refuses in five shapes, each quoting the path: nothing there, a directory, a file that
+is not JSON, JSON that parses but carries no `osd`/`widget` - which is the refusal most worth
+spelling out, because a `STATE all 1` metrics body, a clip's sidecar and somebody's `config.json`
+all load as dictionaries and would leave a pane painting nothing under a title claiming a layout is
+open - and a layout at a ratio this canvas refuses, in `themes.RATIO_WHY`'s own sentence, the same
+one the library prints for its four 320x240 pages. A refusal leaves the layout that was open
+exactly where it was.
+
+The file dialog is a step of its own (`_ed_ask_path`, with `_ed_start_dir` beside it) for the reason
+every un-clickable control in this suite has: a native dialog cannot be driven headless, and a door
+whose prompt cannot be replaced is a door no check can reach.  So the checks drive the button,
+replace that one step, and separately ask the shipped step where it *would* have opened the dialog -
+the user's own copies, falling back to the home directory only where no copy has ever been written,
+because a dialog pointed at a directory that does not exist opens wherever Qt feels like.
+
+Shown non-vacuous, one mutation at a time on `tests/test_open_layouts.py` (13 checks as shipped, 0
+failures): the menu rebuild stops re-adding the entries this window opened by path → 1; the by-path
+open stops remembering its file → 2, the reopen and the menu entry; `apply to the panel` stops
+refusing a by-path layout → 2, one per refusal, and both also assert nothing reached the stub
+control; the path door stops refusing a 4:3 layout → 1; stops refusing a JSON that is not a layout →
+1; stops delegating a library file to the name door → 1; the two buttons fold away with the knobs →
+5; the state line stops saying which file the buffer came from → 4; the dialog stops opening where
+the copies live → 1; the model stops recording the file it read → 3.  Back as shipped: 0.
+
+What is **not** added, on purpose: remembering which layout was open across restarts.  The owner
+asked for the two doors above and not for that, and `layout` is not a session key - so a new window
+starts at `(nobody: preview the theme above)` and `reload the list` is how the names come back.
+
+
 ## The surface, and the geometry it must not break
+
+
 
 - The preview pane today is a `QLabel` in the left column, capped at `render.W +
   PANE_CHROME` = 532 px (`xigmaui/app.py`), showing a 480×480 frame that `_fit()`

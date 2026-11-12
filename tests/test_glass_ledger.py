@@ -65,6 +65,45 @@ class DriverMatchesItsOwnList(unittest.TestCase):
         labels = {p[:2] for p in self.phases}
         self.assertEqual(len(labels), len(self.phases), "two phases labelled alike")
 
+    def test_the_layout_file_phase_fails_on_a_row_the_loop_cannot_fill(self):
+        """The one phase that reads a layout back the way the loop does.
+
+        Added for the 2026-11-12 report: a saved copy of `alpha` showed no `temp-values` row
+        on the glass, while every counter in this log kept moving.  Nothing in that transcript
+        could tell the difference between *drawn wrong* and *not drawn at all*, because the
+        panel has no readback and the phases above all send one of the five names drawn from
+        `render.py`.  So this phase writes a layout file, names it over the socket, and asks
+        the loop's own painter (`themes.paint`, the door the frame loop goes through) for the
+        rows it found - and a registered row with no box is a **problem**, not a footnote.
+
+        Static, like the rest of this file: the phase needs a panel on a port, and this check
+        is about whether the phase asks the question at all.  The numbers it prints come from
+        a bench run, and `docs/limits.md` names the command that prints them.
+        """
+        bodies = {f.name: f for f in ast.walk(self.tree) if isinstance(f, ast.FunctionDef)}
+        self.assertIn("apply_file", bodies,
+                      "no phase applies a layout that only a saved file answers, which is the "
+                      "state `save as your copy` in the window leaves a reader in")
+        src = ast.get_source_segment(self.src, bodies["apply_file"]) or ""
+        body_names = {n.func.attr for n in ast.walk(bodies["apply_file"])
+                      if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)}
+        self.assertIn("paint", body_names,
+                      f"{sorted(body_names)}: the phase never asks the loop's painter what it "
+                      f"finds in the file, so it cannot notice a missing row")
+        self.assertIn("themes.save", src, "the phase does not write the file with the "
+                                          "library's own writer, so it tests a shape no "
+                                          "window produces")
+        self.assertIn('get("missing")', src,
+                      "the phase ignores the notes' `missing` list, which is how `paint` says "
+                      "a registered row got no box - the exact fault this phase exists for")
+        missing = src.split('get("missing")')[1]
+        self.assertIn("problems.append", missing,
+                      "a row the painter could not fill is printed but not failed: this log "
+                      "would still end `every phase checked out`")
+        self.assertIn("delete_user_theme", src,
+                      "the phase leaves its copy in the user root, so a later run's "
+                      "`--list-themes` shows a layout nobody asked for")
+
     def test_a_run_cut_short_records_that_it_was_cut_short(self):
         handlers = [n for n in ast.walk(self.tree)
                     if isinstance(n, ast.ExceptHandler)

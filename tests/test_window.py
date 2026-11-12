@@ -84,11 +84,13 @@ class WindowWithoutPanel(fixtures.FreshConfigRoot):
                 elif item.layout() is not None:
                     stack.append(item.layout())
         self.assertTrue(held, f"{box.__class__.__name__} owns no widgets at all")
-        for name in ("ed_name", "ed_state", "ed_widget"):
+        for name in ("ed_name", "ed_state", "ed_widget", "ed_open", "ed_reload"):
             widget = getattr(self.win, name)
             self.assertTrue(any(widget == found for found in held),
                             f"{name} is not in any layout the editor's box owns: the form it "
-                            f"was added to was never installed, and it died with that form")
+                            f"was added to was never installed, and it died with that form.  "
+                            f"The two `open`/`reload` buttons sit in a QHBoxLayout addRow'd into "
+                            f"the form, which is exactly the shape that used to vanish")
             owner, steps = widget.parentWidget(), 0
             while owner is not None and owner is not box and steps < 12:
                 owner, steps = owner.parentWidget(), steps + 1
@@ -171,7 +173,7 @@ class TheAdvancedSwitch(fixtures.FreshConfigRoot):
                 self.assertFalse(widget.isVisible(), f"{name} stayed shown when folded")
         for name in ("clips", "theme", "btn_upload", "btn_apply", "log_view", "ed_group",
                      "ed_name", "preview", "clock_size", "ink_choice", "ed_peek",
-                     "ed_peek_file"):
+                     "ed_peek_file", "ed_open", "ed_reload"):
             with self.subTest(kept=name):
                 self.assertTrue(getattr(self.win, name).isVisible(),
                                 f"the compact view lost {name}, which a first run needs")

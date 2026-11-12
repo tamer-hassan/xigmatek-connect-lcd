@@ -872,12 +872,16 @@ section that runs the tool, and it asserts the words above against the run.  And
 of this has been looked at on glass yet**: the frame byte counts in docs/usage.md (3 558
 B for `Theme_29` up to 8 115 B for `Theme_35`, one pinned fixture, one pinned instant)
 are offline figures from `--dry-run`, and the glass pass is stage 6 of
-[theme-editor.md](theme-editor.md).  Stage 6 also owes one phase it does not have yet, added to
-the list on 2026-11-12 and **not run**: `tools/display_glass.py`'s `theme` phase applies
-`gauge`, one of the five this repo draws from code, and nothing in its table applies a **layout
-file** - which is the only way to see on a panel what the 2026-11-12 door fix claims, that a
-saved copy of `alpha` keeps its `temp-values` and `fan-figures` rows once the loop, rather than
-the editor, is the one drawing it.  The offline half is measured
+[theme-editor.md](theme-editor.md).  Stage 6 also owes one phase it did not have, added on
+2026-11-12 and **still not run**: `tools/display_glass.py`'s `theme` phase applied `gauge`, one
+of the five this repo draws from code, and nothing in its table applied a **layout file** - which
+is the only way to see on a panel what the 2026-11-12 door fix claims, that a saved copy of
+`alpha` keeps its `temp-values` and `fan-figures` rows once the loop, rather than the editor, is
+the one drawing it.  The driver has that phase now (`APPLY a layout file`: write a copy with
+`themes.save`, name it over the socket, and ask the loop's own painter what it found, with a row
+that comes back with no box recorded as a failed phase rather than a line in a log), and the
+phase itself is gated statically by `tests/test_glass_ledger.py` - which is all that can be
+gated without a panel.  The offline half is measured
 (`tests/test_specials.py`, `tests/test_apply_layout.py`); the panel half waits for somebody to
 point the driver at a display.
 
@@ -897,6 +901,19 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   installed one is dpkg-owned and re-hashed 125/125 by `debian/tests/smoke` on every
   install, and the checkout's is the file every number in these docs was read from - an
   edit there would be an edit that breaks the evidence.
+* **A path is not a name, and a display is only ever told a name.** Since 2026-11-12 the
+  window opens a layout file at any path at all (`open a file…`, `edit.Editor.open_path`),
+  which is what a person needs for a copy that came off another machine or for the
+  `<name>.json.bak` a save leaves beside a layout: `themes.resolve` reads three roots and
+  nothing else, and before that door a layout outside them could not be opened. What did not
+  change is where anything may be written or sent: the buffer a path produced saves to
+  `~/.config/xigmalcd/themes/<stem>.json` like every other copy, the file it was read from is
+  never written, and `apply to the panel` **refuses** such a buffer until it has been saved,
+  because the command it sends is `("theme", <name>)` and the display resolves that name in the
+  roots *it* can see - which may be a different file with the same stem, or none. The state line
+  under the layout menu prints which of those three cases a name is in, by asking
+  `themes.resolve()` rather than remembering what it said when the file was opened
+  (`tests/test_open_layouts.py`, thirteen checks).
 * **The five drawn-from-code names cannot be saved as files.** A `gauge.json` would be a
   second source of truth for `render.theme_gauge`, which is exactly the drift the export
   design exists to avoid; a save that tried it is refused, and `--check-theme gauge` says

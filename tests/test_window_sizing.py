@@ -162,6 +162,57 @@ class ColumnsHoldWhatTheyShow(SizedWindow):
         area.setMaximumWidth(ceiling)
         self.settle()
 
+    def test_the_two_buttons_under_the_layout_menu_cost_the_column_no_width(self):
+        """`reload the list` and `open a file…` sit in the menu's own field column.
+
+        Added because the page says the rows of controls under the fields cost **height** and
+        never a column's width, and a new row of buttons is exactly the change that could make
+        that sentence false.  Measured two ways: the two buttons together are narrower than the
+        widest entry the layout menu has to stay readable for (which is what sets this column's
+        floor), and hiding them does not move the floor by a pixel.
+
+        The floors themselves are this machine's, so they are printed rather than asserted:
+        `docs/gui.md` points at this command for the figures instead of carrying them.
+        """
+        self.settle()
+        area = self.panes()[1]
+        entry, menu = self.widest_entry(self.win.ed_name)
+        buttons = sum(b.sizeHint().width() for b in (self.win.ed_open, self.win.ed_reload))
+        self.assertLess(buttons, menu,
+                        f"the two buttons ask {buttons} px, more than the {menu} px the "
+                        f"{entry!r} entry needs: this row, not the menu, now sets the "
+                        f"column's floor")
+        before = area.minimumWidth()
+        for box in (self.win.ed_open, self.win.ed_reload):
+            box.setVisible(False)
+        self.win._pane_floors()
+        self.settle(14)
+        self.assertEqual(area.minimumWidth(), before,
+                         f"hiding the two buttons moved the column's floor from {before} to "
+                         f"{area.minimumWidth()} px, so they are what it is measuring")
+        for box in (self.win.ed_open, self.win.ed_reload):
+            box.setVisible(True)
+        self.settle(8)
+
+    def test_the_census_of_floors_and_row_heights_prints_for_the_machine_running_it(self):
+        """The figures docs/gui.md names this command for, on whatever box runs it.
+
+        Nothing here asserts a pixel count: what the page promises is the *rule* - no column
+        narrower than what it holds - and the figures are this machine's fonts and rows.  They
+        print here so a reader with a different desktop can compare their own window against
+        the same three widths instead of against a bench that is not theirs.
+        """
+        self.settle()
+        for width in (1280, 1440, 1919):
+            self.win.resize(width, 1024)
+            self.settle(16)
+            floors = [a.minimumWidth() for a in self.panes()]
+            print(f"  {width} px wide: columns' floors {floors} px, split "
+                  f"{self.win.split.sizes()}, the field grid laid out in {self.win._ed_cols} "
+                  f"column(s) of rows, its own ask {self.win._ed_host.sizeHint().height()} px "
+                  f"tall")
+        print(f"  app.py's own lower bounds: {self.win.PANE_FLOORS}")
+
     def offered_layout_names(self) -> set:
         return {rec["name"] for rec in themes.scan()[0]} | set(themes.EXPORTS)
 
