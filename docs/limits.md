@@ -1,15 +1,16 @@
 # Notes and known limits
 
-What has been measured on glass, by whom, with how many frames - and what has not. Every number here names the run it came from; the gaps are named too.
+What has been measured on glass, by whom, with how many frames - and what has not. Every
+  number here names the run it came from; the gaps are named too.
 
-* **A chosen text colour reaches the upload, not the panel, and it survives the
-  palette encoding.** `--text-color` and the window's `text colour` row change the ink of
-  the glyphs this program draws; the frame is then uploaded as pixels, which is the only
+* **A chosen text colour reaches the upload, not the panel, and it survives the palette
+  encoding.** `--text-color` and the window's `text colour` row change the ink of the
+  glyphs this program draws; the frame is then uploaded as pixels, which is the only
   reason the option exists on a device that answers nothing (§11). Measured off-glass by
-  `tests/test_ink.py`: painting `gauge` in red leaves its painted area at exactly 6 087 px as with
-  the theme's own white, moves 1 509 solid white glyph pixels to 1 830 red ones with none
-  left white, and holds for all five themes; and after the default 256-colour palette
-  encoding (§12) the ink returns within **1/255 per channel**.
+  `tests/test_ink.py`: painting `gauge` in red leaves its painted area at exactly 6 087
+  px as with the theme's own white, moves 1 509 solid white glyph pixels to 1 830 red
+  ones with none left white, and holds for all five themes; and after the default
+  256-colour palette encoding (§12) the ink returns within **1/255 per channel**.
 
   And on glass, 2026-11-07 at 10:20-10:22
   (`data/glass/2026-11-07-102041-ink-on-glass-watch.txt`): five inks sent over the control
@@ -471,12 +472,12 @@ What has been measured on glass, by whom, with how many frames - and what has no
   | `alpha-Theme_25-amber.mp4` | 240 | 10.00 s | 24 fps | 927 752 | *(the ink figure: see below)* | | |
 
   **5 039 178 B** for all six, the largest 1.93 MB, and 13 916 B of series JSON beside
-  them - that file grew 220 B when it gained one field, the zone it was sampled in; see the
-  clock-zone bullet below. Every file stays under 2 MB: GitHub's own browser upload limit is a thing of
-  GitHub's and has not been measured here. The ceiling the deleted suite held every run was
-  9 MB per file, comfortably below where that limit is reported to be; nothing re-measures the
-  published files now, so `du -b docs/videos/*` re-reads the sizes and this sentence names it
-  as a gap rather than a gate (docs/tools.md).
+  them - that file grew 220 B when it gained one field, the zone it was sampled in; see
+  the clock-zone bullet below. Every file stays under 2 MB: GitHub's own browser upload
+  limit is a thing of GitHub's and has not been measured here. The ceiling the deleted
+  suite held every run was 9 MB per file, comfortably below where that limit is reported
+  to be; nothing re-measures the published files now, so `du -b docs/videos/*` re-reads
+  the sizes and this sentence names it as a gap rather than a gate (docs/tools.md).
 
   * **What the digits in them are.** One recorded series drives all six files:
     `docs/videos/readings-2026-11-08.json`, 12 `sensors.collect()` calls at a 1 s cadence
@@ -795,25 +796,27 @@ colours `render.SKIN` declares, so the pane's two doors agree at that ink. A ven
 saved layout is never touched by it - measured at 0 px - and neither is the file a save would
 write.
 
-**Why the five drawn themes are still drawn from code.**  All five also exist as generated
-layout files (`themes.export`, printed by `--export-theme NAME`), so the file door could draw
-them, and `main.paint` already prefers a file for any other name.  Whether that is free is a
-measurement per option, not per theme, and `tools/knobmap.py` makes it: one pinned reading
-dict at one pinned instant, every option each `theme_*` signature accepts (read with
-`inspect`), the best row-level edit of that theme's own export for each, and the pixels
-between the two doors.  On this run 28 of the 37 (theme, option) pairs land at zero differing
-pixels with a worst channel of 0 - the reader's text colour (through `themes.with_ink`), a
-clock or fan row switched off by deleting it, `--clock-size` as the Time row's `fontSize`,
-`--cold`/`--hot` as `minValue`/`maxValue`, `--label` and `--title` as a text row's `content`,
-and the default transparent canvas.  9 of them are far from 0 rather than near it, and the
-smallest non-zero gap in the whole map is above 900 px, so the split is a line a machine can
-check rather than a judgement: nothing sits between 0 and the floor.  5 of them are the black canvas alone: compositing a plate under a finished layer is a different frame from opening one
-on a black canvas before the supersampled draw and the resample, and it is the *more* opaque
-of the two (see the `--bg` row in docs/usage.md - a layout seals every pixel at alpha 255,
-while three of our five keep their own translucent fills).  The rest are structural, not
+**Why the five drawn themes are still drawn from code.**  All five also exist as
+generated layout files (`themes.export`, printed by `--export-theme NAME`), so the file
+door could draw them, and `main.paint` already prefers a file for any other name.
+Whether that is free is a measurement per option, not per theme, and `tools/knobmap.py`
+makes it: one pinned reading dict at one pinned instant, every option each `theme_*`
+signature accepts (read with `inspect`), the best row-level edit of that theme's own
+export for each, and the pixels between the two doors.  On this run 28 of the 37 (theme,
+option) pairs land at zero differing pixels with a worst channel of 0 - the reader's
+text colour (through `themes.with_ink`), a clock or fan row switched off by deleting it,
+`--clock-size` as the Time row's `fontSize`, `--cold`/`--hot` as `minValue`/`maxValue`,
+`--label` and `--title` as a text row's `content`, and the default transparent canvas.
+9 of them are far from 0 rather than near it, and the smallest non-zero gap in the whole
+map is above 900 px, so the split is a line a machine can check rather than a judgement:
+nothing sits between 0 and the floor.  5 of them are the black canvas alone: compositing
+a plate under a finished layer is a different frame from opening one on a black canvas
+before the supersampled draw and the resample, and it is the *more* opaque of the two
+(see the `--bg` row in docs/usage.md - a layout seals every pixel at alpha 255, while
+three of our five keep their own translucent fills).  The rest are structural, not
 antialiasing: `alpha`'s heading is not a text row a `content` edit can reach, `gauge`'s
-`source` moves the arc's ramp and ticks as well as its reading, and `gauge`'s `gradient` has
-no key in the file model at all.
+`source` moves the arc's ramp and ticks as well as its reading, and `gauge`'s `gradient`
+has no key in the file model at all.
 
 One option was in a signature and nowhere in a body until 0.4: `clock` took `clock` and
 never read it, while `main._theme_kwargs` routed `--no-clock` straight to it - so that flag
@@ -829,14 +832,14 @@ the body but have no entry in `_theme_kwargs` at all, so no flag or socket messa
 them; `big` is a *size* (`theme_clock(big=140)`), not a flag, and the first version of this
 map mistook it for one and asked with `True`.
 
-What belongs to the machine: the non-zero pixel counts walk glyph edges and installed faces,
-so `tests/test_knobmap.py` reports them beside the machine and this page carries only the counts, the sets
-and the floor.  What does not: which pairs are exactly 0, and that no option in a
-signature is left unread - both are re-derived on every run by the section that runs the
-tool, and it asserts the words above against the run.  And **none of this has
-been looked at on glass yet**: the frame byte counts in docs/usage.md (3 558 B for
-`Theme_29` up to 8 115 B for `Theme_35`, one pinned fixture, one pinned instant) are
-offline figures from `--dry-run`, and the glass pass is stage 6 of
+What belongs to the machine: the non-zero pixel counts walk glyph edges and installed
+faces, so `tests/test_knobmap.py` reports them beside the machine and this page carries
+only the counts, the sets and the floor.  What does not: which pairs are exactly 0, and
+that no option in a signature is left unread - both are re-derived on every run by the
+section that runs the tool, and it asserts the words above against the run.  And **none
+of this has been looked at on glass yet**: the frame byte counts in docs/usage.md (3 558
+B for `Theme_29` up to 8 115 B for `Theme_35`, one pinned fixture, one pinned instant)
+are offline figures from `--dry-run`, and the glass pass is stage 6 of
 [theme-editor.md](theme-editor.md).
 
 **The file model's limits: where a theme may live, and what a save refuses.** Reading your
@@ -1072,20 +1075,21 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   new structure in a file whose whole point is being a fixed list of rows.
 
   What the change costs, stated rather than left to be noticed: on the glass a missing
-  reading now leaves a gap where the rows used to close up, and the `bars` preview clip had
-  to be re-rendered from the recorded series in the same change - not for tidiness, because
-  the deleted suite re-drew the layer from `docs/videos/readings-2026-11-08.json` and scored
-  the tracked file against it, so a stale clip failed. Nothing does that now: the six video
-  files are 0.7's deliberate gap, and `ffprobe` plus `du -b` are the doors to re-measure them
-  at (docs/tools.md). The sources followed on
-  2026-11-09, and so did the file: `themes.BARS_ROWS` names the ten rows, four of them
-  per-sensor fan slots (`Fan N Speed`, `Fan N Name`) - which the vendor's own vocabulary has
-  no word for, since it offers the aggregates `cpuFansSpeed` "CPU Fans Speed" and
-  `gpuFansSpeed` and never a row per tachometer (PROTOCOL.md 10) - while `RAM Rate` and
-  `Used RAM` come out of that record's `RAMRate` and `UsedRAM`; and `themes.bars_recipe()`
-  generates the 32 widgets out of that table and the `BARS_*` constants. It is pixel-identical
-  to `render.py` at every reading `tests/test_bars_rows.py` and `tests/test_export_parity.py` give it, answered and unanswered alike. Two
-  things that took were not in the plan:
+  reading now leaves a gap where the rows used to close up, and the `bars` preview clip
+  had to be re-rendered from the recorded series in the same change - not for tidiness,
+  because the deleted suite re-drew the layer from
+  `docs/videos/readings-2026-11-08.json` and scored the tracked file against it, so a
+  stale clip failed. Nothing does that now: the six video files are 0.7's deliberate
+  gap, and `ffprobe` plus `du -b` are the doors to re-measure them at (docs/tools.md).
+  The sources followed on 2026-11-09, and so did the file: `themes.BARS_ROWS` names the
+  ten rows, four of them per-sensor fan slots (`Fan N Speed`, `Fan N Name`) - which the
+  vendor's own vocabulary has no word for, since it offers the aggregates `cpuFansSpeed`
+  "CPU Fans Speed" and `gpuFansSpeed` and never a row per tachometer (PROTOCOL.md 10) -
+  while `RAM Rate` and `Used RAM` come out of that record's `RAMRate` and `UsedRAM`; and
+  `themes.bars_recipe()` generates the 32 widgets out of that table and the `BARS_*`
+  constants. It is pixel-identical to `render.py` at every reading
+  `tests/test_bars_rows.py` and `tests/test_export_parity.py` give it, answered and
+  unanswered alike. Two things that took were not in the plan:
 
   * **`xigma.showIf`, a new extension key.** `bars`'s memory rows divide a percentage for the
     meter and print gigabytes for the number, so the number row's drawing depends on a reading
@@ -1110,24 +1114,24 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
     or absent denominator is not a pair. `bars` was the only theme that could have found
     either, because it is the only one that reads those fields.
 
-  What the export did *not* cost is worth recording too: `docs/videos/bars-theme_52.mp4` did
-  not have to be re-rendered for these changes, and that is measured rather than assumed - the
-  preview section runs `themes.BARS_ROWS` against all twelve samples of the recorded series
-  and finds every row this box can have answered at every one - the six fixed rows plus the
-  fan slots inside the count its sensors reported, the slots beyond that being empty in the
-  old drawing and the new one alike. The rows these changes move are exactly the rows with no
-  subject, no reading, or no pair to divide. What is left open for `bars` is on
-  the panel, not in the file: the same rows at 1 and 2 fps on the glass (stage 6). Nothing about the wire changes either way
-  (docs/theme-editor.md carries the decision and the order it is built in, in the plan's own
-  table).
-  A related fact came out of the same work: the one colour pair with a measured ramp is
-  ALPHA's *declared* pair, (0,247,255) to (0,255,113), and the plateau that curve ends at
-  is (0,251,184) - which is what `render.ALPHA_HOT` is. Our theme took the far end of
-  ALPHA's curve and drew a straight line to it, so for our pair the two conventions differ
-  by stepping alone and neither has a profile to use.
-* **Sizes outside the ten the library ships are allowed and said, not repaired.** Those
-  ten are 12 14 16 20 24 32 40 70 100 140, counted out of the 27 files; our own generated
-  `clock` export uses 22 and 26, and `--check-theme clock` warns about both. That is
-  honest rather than wrong: the drawing is this repo's code, and its pixel-parity against
-  `render.py` is measured at a zero diff - but it is also a shape no vendor file has ever
-  been seen to use, and the warning says so.
+  What the export did *not* cost is worth recording too: `docs/videos/bars-theme_52.mp4`
+    did not have to be re-rendered for these changes, and that is measured rather than
+    assumed - the preview section runs `themes.BARS_ROWS` against all twelve samples of
+    the recorded series and finds every row this box can have answered at every one -
+    the six fixed rows plus the fan slots inside the count its sensors reported, the
+    slots beyond that being empty in the old drawing and the new one alike. The rows
+    these changes move are exactly the rows with no subject, no reading, or no pair to
+    divide. What is left open for `bars` is on the panel, not in the file: the same rows
+    at 1 and 2 fps on the glass (stage 6). Nothing about the wire changes either way
+    (docs/theme-editor.md carries the decision and the order it is built in, in the
+    plan's own table). A related fact came out of the same work: the one colour pair
+    with a measured ramp is ALPHA's *declared* pair, (0,247,255) to (0,255,113), and the
+    plateau that curve ends at is (0,251,184) - which is what `render.ALPHA_HOT` is. Our
+    theme took the far end of ALPHA's curve and drew a straight line to it, so for our
+    pair the two conventions differ by stepping alone and neither has a profile to use.
+    * **Sizes outside the ten the library ships are allowed and said, not repaired.**
+    Those ten are 12 14 16 20 24 32 40 70 100 140, counted out of the 27 files; our own
+    generated `clock` export uses 22 and 26, and `--check-theme clock` warns about both.
+    That is honest rather than wrong: the drawing is this repo's code, and its
+    pixel-parity against `render.py` is measured at a zero diff - but it is also a shape
+    no vendor file has ever been seen to use, and the warning says so.
