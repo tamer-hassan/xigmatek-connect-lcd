@@ -1913,9 +1913,16 @@ class Window(QMainWindow):
         self._last = m
         theme = self.theme.currentText()
         if self.ed is not None:
-            # The pane shows *the file being edited*, drawn by `themes.draw` - the same
-            # door `--check-theme` uses and the frame loop uses for a layout theme - at
-            # the pinned fixture.  Not a detail: a preview that moved with this
+            # The pane shows *the layout being edited, as this window holds it* - the file's
+            # object, saved or not - at the pinned fixture, through `themes.draw`.  The frame
+            # loop paints that same layout from disk with `themes.paint`, and the two are one
+            # painter, `themes._overlay`, which is what makes this pane's picture the glass's
+            # picture rather than a resemblance of it.  It used to be a resemblance and not a
+            # fact: the two doors each built their own value table, one filled the keys the
+            # `special` rows read and the other did not, and a layout saved here and applied
+            # lost two rows on the panel while every picture in this window still showed them.
+            # `tests/test_specials.py` now paints a saved layout through both doors and asks for
+            # zero differing px.  Not a detail either way: a preview that moved with this
             # machine's readings would make it impossible to tell an edit from a
             # temperature, and the whole claim of the editor is that a field change is
             # the only thing that can move a pixel.
@@ -2046,9 +2053,10 @@ class Window(QMainWindow):
         if self.ed is not None:
             # The pane is showing a file, not this machine: said in the same place the
             # live preview says what it is, because the two pictures look alike and mean
-            # different things.  `themes.draw` is the door `--check-theme` uses and the
-            # frame loop uses for a layout theme, so the pane and the glass can only
-            # disagree about the readings, and those are pinned on purpose.
+            # different things.  This pane paints with `themes.draw`; the frame loop paints
+            # the same file with `themes.paint`; both are one function - `themes._overlay` -
+            # and `--check-theme` asks the loop's door for a file, so the pane and the glass
+            # can only disagree about the readings, and those are pinned on purpose.
             miss = ", ".join(sorted(set((self._ed_notes or {}).get("missing") or [])))
             # Which body the pixels came from, in one of three sentences: a live pane that
             # follows this machine and takes its marks from the frame it is showing, a held
@@ -2073,8 +2081,8 @@ class Window(QMainWindow):
                              "`the fixture` under *pane readings*.")
             self.caption.setText(
                 f"Layout `{self.ed.name}` ({self.ed.origin}), drawn through "
-                "`themes.draw` - the door `--check-theme` uses, and the frame loop uses "
-                "for a layout theme. "
+                "`themes.draw` - the painter the frame loop also uses, through "
+                "`themes.paint`, and the one `--check-theme` asks about a layout file. "
                 + body_line
                 + (f" No reading for: {miss}." if miss else "")
                 + (f" {self.ed.ink_note} - a preview of a theme this repo draws from "
@@ -3655,10 +3663,21 @@ class Window(QMainWindow):
 
         What gets said after the press is read, not remembered.  The display's own reply
         carries `status["theme"]` (PROTOCOL.md §11: no readback of pixels, but settings come
-        back), and the box counts come from `themes.draw` at this machine's readings against
-        the same file at the pinned fixture - the two frames this window is standing between.
-        Drawn first, before the command goes: a count that failed should not be able to leave
-        the panel changed and the window silent.
+        back), and the box counts come from the **loop's own door** for a name that resolves to
+        a file - `themes.paint`, the function that will draw the next frame on that panel - and
+        from `Editor.paint` for one of the five names this repo draws from code, which has no
+        file to resolve.  Against the same file at the pinned fixture: the two frames this
+        window is standing between.  Drawn first, before the command goes: a count that failed
+        should not be able to leave the panel changed and the window silent.
+
+        That door choice is the whole lesson of a defect fixed on 2026-11-12.  The counts used
+        to come from the pane's door while the panel was handed the loop's, and the two filled
+        different value tables: a saved copy of `alpha` lost its `temp-values` and
+        `fan-figures` rows on the glass and this line still reported a complete picture.  It
+        also says why a **count** is not a picture - a `special` row that draws nothing is still
+        in `notes["boxes"]`, with no box beside it, so `len()` cannot see the loss.  The figure
+        that can is `--check-theme`'s lit pixels, and the caption under the pane names the door
+        the count came from.
         """
         if self.ed is None:
             self._log("nothing to apply: the layout box holds nobody. Pick one above, or "
@@ -3672,15 +3691,24 @@ class Window(QMainWindow):
                       "frame at a time (`Send one frame`)")
             return
         name = str(self.ed.name)
-        # what the two frames this window sits between actually hold, counted by the painter.
-        # One variable, not two: the body.  The instant stays `edit.FIXTURE_WHEN`, the same
-        # rule feature G set for a peek - `Date`, `Time` and `Week` come from the instant
-        # rather than from any reading, so a moving instant would rewrite those rows every
-        # second and the count would stop being about readings at all.  Drawn before the
-        # command goes: a count that failed should not be able to leave the panel changed and
-        # the window silent.
-        _live, live_notes = self.ed.paint(sensors.collect(), edit.FIXTURE_WHEN)
-        _pin, pin_notes = self.ed.paint(*self.ed.fixture())
+        # what the two frames this window sits between actually hold, counted by the painter -
+        # and by the painter that will do the drawing, which is `themes.paint` for anything
+        # resolving to a file.  One variable, not two: the body.  The instant stays
+        # `edit.FIXTURE_WHEN`, the same rule feature G set for a peek - `Date`, `Time` and
+        # `Week` come from the instant rather than from any reading, so a moving instant would
+        # rewrite those rows every second and the count would stop being about readings at all.
+        # Drawn before the command goes: a count that failed should not be able to leave the
+        # panel changed and the window silent.
+        pinned, at = self.ed.fixture()
+        rec = themes.resolve(name)
+        if rec is not None:
+            _live, live_notes = themes.paint(rec, sensors.collect(), at)
+            _pin, pin_notes = themes.paint(rec, pinned, at)
+        else:
+            # one of the five names this repo draws from code: there is no file to resolve, so
+            # the editor's object is the thing and `Editor.paint` is its door
+            _live, live_notes = self.ed.paint(sensors.collect(), at)
+            _pin, pin_notes = self.ed.paint(pinned, at)
         n_live = len(live_notes.get("boxes") or [])
         n_pin = len(pin_notes.get("boxes") or [])
         rep = self.daemon.send("theme", value=name)
@@ -3688,7 +3716,7 @@ class Window(QMainWindow):
             self._refused_layout(name, rep)
             return
         shown = str((rep.get("status") or {}).get("theme") or name)
-        if themes.resolve(name) is None:
+        if rec is None:
             # one of the five this program draws from code: the theme box names the same
             # thing, and two controls that disagree about what the panel draws are worse
             # than either one, so make them agree instead of leaving the reader to notice

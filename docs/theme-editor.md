@@ -778,6 +778,101 @@ same dict with those answers taken back out, alternating in one process, 60 draw
 **+0.02 to +0.47 ms** a frame - `bars` the largest, with its 12 extra rows.  The absolute
 per-theme milliseconds in docs/gui.md stay labelled as owed a quiet-box re-measurement.
 
+### What the two doors' *tables* had to agree about (2026-11-12)
+
+A report from the owner: an `alpha` edited in the pane, saved as `alpha_new`, and put on the
+panel came up **missing the `special temp-values` row** - the two temperature figures between
+the rings - while the same layout in the pane still drew it.  Nothing had gone wrong with the
+save.  The file on disk was right, the pane was right, and the frame the loop uploaded was
+missing two rows, quietly.
+
+The cause was two doors that looked like one door and were not.  The pane paints a layout
+file with `themes.draw`; the frame loop paints it with `themes.paint`.  Each built its own
+value table, and only the pane's called `fill_lines`, which is where the six composite keys a
+`special` row reads come from: `temp-cpu`, `temp-gpu`, `fan-cpu`, `fan-gpu`, `readings`,
+`status`.  Those names are not `source` strings a file may spell - no vendor file spells them,
+and `validate` has nothing to say about them - so the loop's table simply did not have them,
+and each registered drawing that found its pair empty returned **no box at all**.  Two rows
+left the picture and nothing in the notes, the log, or `--check-theme` said so: the
+`special` rows were in the file, were counted by the file, and drew nothing.
+
+`temp-labels` survived, and that is what makes the loss look selective rather than total: its
+two strings are the constants `render.A26_TLBL_TEXT`, not readings, so it never asked the
+table for anything.  The same fault was dropping two more rows nobody had reported yet, on
+two other layouts: `clock`'s `clock-readings` line and `dual`'s `dual-status` line.  Of the
+five layouts this repository generates, **three** declare rows that read those six keys -
+`alpha` three rows, `clock` one, `dual` one - and **four** of its **five** `special` rows drew
+nothing on the glass, because only `temp-labels` asks the table for nothing.
+
+Three things follow, and all three are in the code rather than in this sentence:
+
+* **One painter, two doors.**  `themes.paint` and `themes.draw` both go through
+  `themes._overlay`: one value table, `fill_lines` included, one call to
+  `layout.draw_theme`, one scrim plate.  The canvas stays an explicit argument, because it is
+  the one place the two doors genuinely differ - a record's declared size against the size the
+  object declares - and the four 320x240 pages that would tell them apart are refused by
+  `themes.scan()` for the reason written there.
+* **A door that stops filling has to say which rows it lost.**  `layout.draw_theme` records a
+  `special` with no box, and until now that note was indistinguishable from a machine with a
+  missing sensor - which is a legitimate reason for a row to have nothing to say, and why a
+  box with no tachometers still draws `CPU FAN -- RPM`.  So `_overlay` compares the lost rows
+  against the keys its own table carries and writes both into the notes, and the loop's report
+  and `--check-theme` print them.  Reproduced by checking out the old door: the same fault
+  that used to print nothing now prints
+  `skipped special:temp-values (this door's value table carries no temp-cpu, temp-gpu: ...)`.
+* **The registry and its fill table are one list, checked from the source.**  `fill_lines`
+  fills exactly what `SPECIAL_LINES` lists, and every registered drawing reads its keys out of
+  the value table by name.  `tests/test_specials.py` takes those names out of each drawing's
+  own source with `ast` - the door `themes.keys_read()` uses for `layout.py`, aimed at a
+  smaller module - and requires the two lists to match in both directions: a drawing that
+  reads a key nobody fills loses its row from the glass, and a name listed but never read
+  puts a string into every frame that no row will draw.
+
+And the claim the report actually needs, held as pixels: `ALoopAndAPanePaintOnePicture`
+generates each of the five layouts, **saves** it as a layout file the way the editor does,
+resolves it by name, and paints it through both doors at one body and one instant.  Zero
+differing px for all five - the three that declare rows reading those keys, and `bars` and
+`gauge` which declare no `special` row at all, because a shared door should not agree only when
+the layout is interesting - the same box for every `special` row, a box for each of them, and
+ink inside every box on both frames, so neither door can pass by drawing nothing.
+
+The figures print on every run and are not rules: they follow the faces installed.  This bench,
+at that one body and instant - read them out with
+`python3 -m unittest tests.test_specials.ALoopAndAPanePaintOnePicture`:
+
+| layout | the two doors | ink inside each reported `special` box | the same file, table without the composites |
+| --- | --- | --- | --- |
+| `alpha` | 0 px | `temp-values` 7 251, `temp-labels` 2 899, `fan-figures` 2 234 | 11 167 px lighter, no box for `temp-values`/`fan-figures` |
+| `clock` | 0 px | `clock-readings` 3 202 | 4 687 px lighter, no box for `clock-readings` |
+| `dual` | 0 px | `dual-status` 1 293 | 1 851 px lighter, no box for `dual-status` |
+| `bars`, `gauge` | 0 px | none declared | nothing to lose |
+
+Note the last two columns are not the same measurement, and the difference between them is a
+fact about the painter rather than a rounding error: a row's **box** is the ink it declared,
+while the whole-frame figure also carries the supersampling tail - every special is drawn at
+`layout.SS` and downscaled with LANCZOS, so a few pixels land outside the box the row reports.
+
+Shown non-vacuous, one mutation at a time on `tests/test_specials.py` (15 checks as shipped,
+0 failures): the shared door stops filling → 4 failures, one per layout that can lose a row plus
+the guard below it; the notes stop naming a lost row → 1; one drawing reads a key `fill_lines`
+never writes → 48, the new static check and every temperature-row check in the file;
+`SPECIAL_LINES` loses one of the two figure keys → 47; the pane's door ignores the size its
+object declares → 1, and the same for the loop's door ignoring the record's → 1.  Back as
+shipped: 0.
+
+The route through the window is held the same way: putting `apply to the panel`'s two box counts
+back through the pane's painter - which paints the buffer, not the file the display will draw -
+fails `tests/test_apply_layout.py` with `(11, 11) != (12, 12)`, the buffer's row count against
+the file's.
+
+What is **not** claimed: that this was watched happening on a panel.  The two doors painting one
+picture, the words a door leaves when it loses a row, and the box counts the apply route reports
+are all measured offline.  The glass half belongs to stage 6 of this plan, and the row it owes
+there is specific: apply `alpha_new` - or any saved copy of `alpha` - to a running display and
+see the temperature figures and the fan figures on the panel, at the same rows the pane shows.
+Until that transcript exists, docs/limits.md's stage-6 ledger carries it as owed, and the
+offline parity above is what makes it worth looking at rather than a guess that the fix worked.
+
 ## The surface, and the geometry it must not break
 
 - The preview pane today is a `QLabel` in the left column, capped at `render.W +
@@ -910,7 +1005,8 @@ delete doors (`tests/test_theme_files.py`); the editor's model and the doors ove
 (`tests/test_editor.py`); pointing, dragging and the marks (`tests/test_canvas.py`,
 `tests/test_pane_chrome.py`); the row acts and the reorder census
 (`tests/test_row_acts.py`); the peek's two frames and what may differ between them
-(`tests/test_peek_readings.py`); and the library and field counts
+(`tests/test_peek_readings.py`); the five `special` rows, the value table they read and the
+two doors painting one saved file the same (`tests/test_specials.py`); and the library and field counts
 (`tests/test_theme_library.py`, `tests/test_field_census.py`).
 
 The census rows are no longer a one-off `python3 -` pass: the library counts, the field

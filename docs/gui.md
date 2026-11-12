@@ -758,8 +758,8 @@ commonly gets wrong:
   half the difference inboard.
 #### Pinned readings, and looking at another body's
 
-* **The pane shows the file, at pinned readings.** `themes.draw` - the door
-  `--check-theme` uses and the frame loop uses for a layout theme - with the fixture every
+* **The pane shows the file, at pinned readings.** `themes.draw` - one of the two doors over
+  the painter the frame loop uses, the other being its `themes.paint` - with the fixture every
   documented figure in this repo was read at (CPU 57.0 °C, GPU 47.0 °C, 2026-02-17
   09:30:12), and that fixture is shaped like a machine: it answers **15** of the **19** sources the
   five generated layouts ask, the **4** it leaves being the `Fan 3`/`Fan 4` slots past its two
@@ -873,8 +873,11 @@ commonly gets wrong:
   says after the press is read rather than remembered: the display's own
   `status()["theme"]`, because §11 gives no readback of pixels but settings come back,
   and a count of the boxes that file paints at this machine's readings against the
-  pinned fixture the pane is showing - `tests/test_apply_layout.py` counts that pair on whichever box ran
-  it, since it is a drawing and not a rule. Two things the command deliberately does
+  pinned fixture the pane is showing - counted by `themes.paint`, the door the display draws
+  through, and never by the pane's painter: that one paints the buffer under the cursor, and an
+  act nobody has saved is a picture that panel will never be given.
+  `tests/test_apply_layout.py` counts that pair on whichever box ran
+  it, since it is a drawing and not a rule, and holds the two doors against each other. Two things the command deliberately does
   not reach: the panel's stored background, which is a separate upload and the clips
   box's act, and the colours written in the layout's own file, because the theme box's
   colour row paints only what *this program* draws. And it is one display's business

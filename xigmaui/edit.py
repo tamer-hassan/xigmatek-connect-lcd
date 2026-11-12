@@ -15,9 +15,14 @@ invented here:
   writer is `themes.save`, which puts the layout under `~/.config/xigmalcd/themes`
   and refuses both vendor trees and the five drawn-from-code names.  `themes.resolve`
   is user-first, so from that moment `--theme` means your copy.
-* **The picture is the loop's picture.**  `paint` calls `themes.draw`, which is what
-  `--check-theme` uses and what the frame loop uses for a layout theme.  There is no
-  second renderer for the editor, because a second renderer is a second truth.
+* **The picture is the loop's picture.**  `paint` calls `themes.draw`; the frame loop paints
+  a layout file with `themes.paint`.  Those are two doors over one painter - `themes._overlay`
+  in `xigmalcd/themes.py` - and `--check-theme` asks the loop's door when the name resolves to
+  a file and this one when it is a generated export.  There is no second renderer for the
+  editor, because a second renderer is a second truth: until 2026-11-12 the two doors *did*
+  hold different truth about one thing, the composite strings a `special` row reads, and a
+  layout saved from this pane lost its temperature and fan figures on the glass while the pane
+  kept showing them.
 * **The fixture is pinned.**  Editing a field while the readings change underneath
   you makes the picture jump for reasons that are not your edit.  The metrics and the
   instant are fixed until you ask for live readings; `fixture_line` says what they are
@@ -1814,7 +1819,17 @@ class Editor:
 
     def paint(self, metrics: dict | None = None, when: datetime.datetime | None = None,
               scrim: int = 0, ink=None) -> tuple:
-        """The layout as the loop would draw it.  Same door as `--check-theme`.
+        """The layout as the loop would draw it, through the same painter.
+
+        `themes.draw` is this door; the frame loop's is `themes.paint`, and both are one
+        function, `themes._overlay` - one value table, one call to the painter, one scrim
+        plate.  `--check-theme` uses `themes.paint` for a name that resolves to a file and
+        this one for a generated export, which is the whole reason the pane can claim to be
+        the glass's picture: since 2026-11-12 the two doors cannot hold different tables, and
+        `tests/test_specials.py` paints a **saved** layout through both and asks for zero
+        differing px.  Before that they each built their own table and only one filled the
+        composite keys a `special` row reads, so a saved `alpha` lost `temp-values` and
+        `fan-figures` on the panel while this pane went on drawing them.
 
         `ink` is the window's text colour, and it is honoured **only while this editor
         holds a generated layout** - one of the five names this repo draws from code.  It

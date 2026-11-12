@@ -19,6 +19,9 @@ So this file drives the narrow door and holds the window to what it owes a reade
 * the answer is **read**, not remembered - the window shows the theme the display reports, which
   is the only kind of confirmation this panel can give (PROTOCOL.md §11: settings come back,
   pixels do not);
+* the two box counts the log prints are the **file's**, counted through the loop's own door
+  (`themes.paint`) at this machine's readings and at the pinned fixture - not the editor's buffer,
+  which holds acts nobody saved, and not the pane's door, which is a different function;
 * when the display refuses, the window quotes the display's own words **before** offering its own
   reason, because the two possible reasons - an old build whose door has no layout half, or a new
   build whose roots do not hold this file - live inside those words, and a paraphrase throws the
@@ -38,8 +41,8 @@ from tests import fixtures
 
 from tests.test_display_remote import DisplayHarness
 
-from xigmalcd import control, render, themes
-from xigmaui import app
+from xigmalcd import control, render, sensors, themes
+from xigmaui import app, edit
 
 #: What the five-only door answers, spelled as `git show v0.3:xigmalcd/control.py` spells it -
 #: which is also what the installed 0.3 service on this bench said when the owner's report came in.
@@ -136,11 +139,84 @@ class ApplyingALayoutToADisplay(DisplayHarness):
             self.assertIn(phrase, said, f"the press did not say one of the things a reader cannot "
                                         f"see from the picture: {phrase}")
 
+    def test_the_two_counts_are_the_files_and_not_the_buffer_under_the_cursor(self):
+        """The pair the press prints is what the panel can draw, which an unsaved edit is not.
+
+        Two doors sit between this window and that glass, and the log line has to read them the
+        right way round.  The numbers used to come from the pane's painter (`Editor.paint`), which
+        paints the **buffer**: every act typed since the last save.  The display can only ever
+        draw the **file**, so a count taken from the buffer is a count of a picture nobody is
+        going to see - and the same wrong door is how a saved copy of `alpha` reached the panel
+        without its `temp-values` or `fan-figures` rows on 2026-11-12 while every number this
+        window printed said the picture was complete.  A count cannot see that loss at all: a
+        `special` row whose keys are missing from the value table stays in `notes["boxes"]` with
+        **no box** beside it, so `len()` counts it either way.  That is why the checks in
+        `tests/test_specials.py` ask for boxes and ink, and why this one asks which door the
+        count came out of.
+
+        So: save a copy of a generated layout, delete a row that draws without saving it, press
+        the button, and read the pair back out of the log.  The two numbers have to be the file's.
+        `sensors.collect()` is pinned for the length of the check, because the live half of the
+        pair is otherwise this machine's temperature at two different instants and a difference
+        here would mean nothing.
+        """
+        name = "alpha_press_copy"
+        path, _soft = themes.save(themes.export("alpha"), name)
+        self.win._ed_refresh_layouts()          # the shipped door a save-as goes through
+        self.open_in_editor(name)
+        rec = themes.resolve(name)
+        self.assertIsNotNone(rec, f"{path} was saved and does not resolve, so the press below "
+                                  "would take the generated-name branch by accident")
+
+        body = {"cpu": {"temperature": 61.0, "load": 62.0, "frequency": 3400, "power": 18.0},
+                "gpu": {"temperature": 36.0, "fan": 35.0, "load": 22.0, "memory": 2048,
+                        "power": 90.0, "frequency": 1200, "memoryRate": 30.0},
+                "memory": {"total": 16384, "used": 8192},
+                "fans": [{"name": "Fan CPU", "value": 1180}]}
+        pinned, at = self.win.ed.fixture()
+        drawn = [wi for _kind, _what, box, wi in ((self.win.ed.paint(pinned, at)[1].get("boxes")
+                                                  or [])) if box]
+        self.assertTrue(drawn, "the saved copy paints no row with a box, so deleting one below "
+                               "changes nothing and the pair means nothing")
+
+        real = sensors.collect
+        sensors.collect = lambda: dict(body)
+        try:
+            ok, note = self.win.ed.delete_widget(drawn[0])
+            self.assertTrue(ok, note)
+            self.assertTrue(self.win.ed.dirty,
+                            "the row was removed and the model is not dirty, so the buffer and "
+                            "the file below are the same thing and the pair cannot be told apart")
+            said = self.press()
+            file_live = len(themes.paint(rec, dict(body), at)[1].get("boxes") or [])
+            file_pinned = len(themes.paint(rec, dict(pinned), at)[1].get("boxes") or [])
+            buffer_live = len(self.win.ed.paint(dict(body), at)[1].get("boxes") or [])
+            self.assertNotEqual(file_live, buffer_live,
+                                f"the file paints {file_live} boxes and the edited buffer paints "
+                                f"{buffer_live}: the two are not different pictures, so nothing "
+                                f"below can say which one the log counted")
+            found = re.search(r"paints (\d+) boxes, against (\d+) at the pinned fixture", said)
+            self.assertIsNotNone(found, said[-400:])
+            self.assertEqual((int(found.group(1)), int(found.group(2))),
+                             (file_live, file_pinned),
+                             f"the log counted {found.group(1)} and {found.group(2)} boxes, "
+                             f"while the file the display was just told to draw paints "
+                             f"{file_live} at this machine's readings and {file_pinned} at the "
+                             f"pinned fixture: the pair is describing the buffer under the "
+                             f"cursor, which is a picture that panel will never be given")
+        finally:
+            sensors.collect = real
+
     def test_the_pinned_half_of_the_two_counts_is_the_painters_own_answer(self):
         """The log prints a pair: boxes at this machine's readings, against boxes at the pinned
-        fixture.  The pinned half is deterministic - that body, that instant - so it is asserted
-        against what `edit.Editor.paint` reports for that same fixture; the live half belongs to
-        this machine's sensors and is only checked to be a number."""
+        fixture.  The pinned half is deterministic - that body, that instant - and it is now
+        counted across doors: the log takes its number from `themes.paint`, the loop's door, and
+        the expectation here comes from `edit.Editor.paint`, the pane's.  The two agreeing is not
+        a courtesy: it is the parity `themes._overlay` exists to keep, and the pair of doors that
+        filled different value tables is what let a saved `alpha` lose its `temp-values` and
+        `fan-figures` rows on the glass on 2026-11-12.  The live half belongs to this machine's
+        sensors and is only checked to be a number.
+        """
         name = self.vendor_layout()
         self.open_in_editor(name)
         pinned = len(self.win.ed.paint(*self.win.ed.fixture())[1].get("boxes") or [])

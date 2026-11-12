@@ -872,7 +872,14 @@ section that runs the tool, and it asserts the words above against the run.  And
 of this has been looked at on glass yet**: the frame byte counts in docs/usage.md (3 558
 B for `Theme_29` up to 8 115 B for `Theme_35`, one pinned fixture, one pinned instant)
 are offline figures from `--dry-run`, and the glass pass is stage 6 of
-[theme-editor.md](theme-editor.md).
+[theme-editor.md](theme-editor.md).  Stage 6 also owes one phase it does not have yet, added to
+the list on 2026-11-12 and **not run**: `tools/display_glass.py`'s `theme` phase applies
+`gauge`, one of the five this repo draws from code, and nothing in its table applies a **layout
+file** - which is the only way to see on a panel what the 2026-11-12 door fix claims, that a
+saved copy of `alpha` keeps its `temp-values` and `fan-figures` rows once the loop, rather than
+the editor, is the one drawing it.  The offline half is measured
+(`tests/test_specials.py`, `tests/test_apply_layout.py`); the panel half waits for somebody to
+point the driver at a display.
 
 **The file model's limits: where a theme may live, and what a save refuses.** Reading your
 own copy is stage 3 there, and the window that writes one landed in 0.4: its `save as your

@@ -940,10 +940,25 @@ def main(argv=None) -> int:
             print(f"  will not draw: {note}")
         for note in soft:
             print(f"  warning: {note}")
-        img, notes = themes.draw(obj, metrics)
+        if rec is not None:
+            # **The loop's own door, not the pane's.**  A file layout reaches the glass through
+            # `themes.paint` - `paint()` in this very file, one function above - and this line
+            # claims to answer "what does this file draw", so it has to ask the same door.  The
+            # two doors built their own value tables until 2026-11-12 and one of them filled
+            # the keys a `special` row reads while the other did not: a layout could print a
+            # complete picture here, and in the editor's pane, while the loop sent a frame
+            # missing two rows.  `themes._overlay` is one function both call now, and
+            # `tests/test_specials.py` asks for zero differing pixels between them.
+            img, notes = themes.paint(rec, metrics)
+        else:
+            # no record: a generated export (`alpha`, `bars`, ...), painted from the object the
+            # code builds, which is the same half of `_overlay` the editor's pane uses
+            img, notes = themes.draw(obj, metrics)
         lit = sum(1 for v in img.getchannel("A").get_flattened_data() if v)
-        print(f"  drawn from this machine's readings: {len(notes['boxes'])} boxes, "
-              f"{lit} lit px, skipped: "
+        door = ("`themes.paint`, the door the frame loop uses for a layout file"
+                if rec is not None else "the same painter, from the generated object")
+        print(f"  drawn from this machine's readings through {door}: "
+              f"{len(notes['boxes'])} boxes, {lit} lit px, skipped: "
               + (", ".join(notes["missing"]) if notes["missing"] else "nothing"))
         if notes["gaps"]:
             print("  shaped by this repo rather than measured off the vendor's "

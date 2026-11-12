@@ -94,7 +94,7 @@ Put the module in `/etc/modules-load.d/` if you want it at every boot.
 | `--status` | ask the display that is already running what it is showing, print it, exit. One line on the control socket: the serial port is never opened, so this works while the loop runs. Exit 1 with "no display answering" when nothing is listening |
 | `--list` | list candidate ports with their USB descriptions |
 | `--export-theme NAME` | print the generated layout for one of the five drawn-from-code themes as JSON on stdout - sorted keys, byte-identical between runs. Four have a generator today (`alpha`, `clock`, `dual`, `gauge`); asking for one that does not prints which are in and what the others still need. Nothing is written to disk, and what it prints is a layout this program draws, never something sent to the panel |
-| `--check-theme NAME` | report one theme exactly as the loop will meet it: which root answered the name (ALPHA's file, or your copy of it), the file's own accounting, then what this machine's readings actually draw - boxes, lit pixels, which widgets were skipped and why, which shapes are this repo's choice rather than measured off the vendor's picture, and the sources *that theme* asks for split into answered and not. Plus the warnings worth hearing before an edit: a metric name with no entry, a font family `layout.FONTS` does not know, a `fontSize` outside the ten the shipped library uses, a colour outside `rgba()`, a widget off the canvas, an `id` repeated inside one theme, a `property` that is not the one-element list every vendor file uses. Exit 2 if the name resolves to nothing, or if the file cannot be walked at all |
+| `--check-theme NAME` | report one theme exactly as the loop will meet it - for a name that resolves to a file, through the loop's own door, `themes.paint`: which root answered the name (ALPHA's file, or your copy of it), the file's own accounting, then what this machine's readings actually draw - boxes, lit pixels, which widgets were skipped and why, which shapes are this repo's choice rather than measured off the vendor's picture, and the sources *that theme* asks for split into answered and not. Plus the warnings worth hearing before an edit: a metric name with no entry, a font family `layout.FONTS` does not know, a `fontSize` outside the ten the shipped library uses, a colour outside `rgba()`, a widget off the canvas, an `id` repeated inside one theme, a `property` that is not the one-element list every vendor file uses. Exit 2 if the name resolves to nothing, or if the file cannot be walked at all |
 | `--print-theme-fields` | print the field census an inspector is built from: all 152 widgets of ALPHA's 27 layouts answered key by key, per kind, and for each key whether `xigmalcd/layout.py` reads it, carries it without reading it (with the reason, and how many values it is ever set to), or reads it with no vendor file to show. Counted over the vendor's own trees, so an edit of yours cannot move the numbers. No port is opened |
 | `--list-specials` | print the names a `special` widget may carry, each with the door its drawing goes through and the shape that door gives the row: `[line]` one line of code-built text, `[pair]` a **pair** of figures at one size fitted to a width, `[values]` a pair at one size fitted to a ring's hole - in both pair doors `x` is the pair's centre and `width` the distance between the two figures' centres; the parts of our own themes that stay code-drawn and take position, size and colour from a layout |
 | `--list-themes` | print everything `--theme` accepts: the five drawn from `render.py`, then ALPHA's 23 `1:1` layouts with their widget counts and which tree the file came from, then the four refused and the reason. No port is opened
@@ -157,8 +157,9 @@ claim:
   because one name should mean one thing in all three doors. The **window** now offers both
   halves of the vocabulary: its theme picker is the five this repo draws, and its layout
   editor opens any layout the canvas can select - the vendor's 27 minus the four refused at
-  480x480 - and paints each through `themes.draw`, the same door `--check-theme` and the
-  frame loop use (docs/gui.md, [theme-editor.md](theme-editor.md)).  What is still not built
+  480x480 - and paints each through `themes.draw`, one of the two doors over the painter the
+  frame loop uses: the loop's is `themes.paint`, and both are `themes._overlay`
+  (docs/gui.md, [theme-editor.md](theme-editor.md)).  What is still not built
   is sending one: no layout file goes to the panel, and the glass keeps taking an overlay
   from our drawings or a `.thm` from the vendor's own app.
 * **The field census behind that plan is printed, not remembered**: `--print-theme-fields`.
@@ -167,9 +168,14 @@ claim:
   of its findings is worth knowing before anyone asks why a theme looks the same here as in
   the vendor app: the two keys that would change how text looks, `italic` and `underline`,
   are set on none of the 132 widgets that carry them.
-* **`--check-theme NAME` is how you read one of these files before touching it.** It runs
-  the same code path the loop runs (`themes.draw`, which is also what an editor's preview
-  pane would use), and its lines are the accounting rather than a pretty print:
+* **`--check-theme NAME` is how you read one of these files before touching it.** For a name
+  that resolves to a file it asks the **loop's own door**, `themes.paint`; for one of the
+  layouts this repo generates from code it asks `themes.draw`, the door an editor's preview
+  pane uses.  The two are one function - `themes._overlay` - and that is the point of asking
+  one of them: a value table filled by one door and not the other is how a layout saved from
+  the editor reached the panel missing its temperature and fan figures on 2026-11-12 while
+  every picture on screen still showed them.  Its lines are the accounting rather than a
+  pretty print:
 
   ```
   Theme_28 (1757491588618): 480x480 ratio 1:1, 7 widgets, from checkout

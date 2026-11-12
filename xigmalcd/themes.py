@@ -358,6 +358,74 @@ def values(metrics: dict, when=None) -> tuple:
     return out, absent
 
 
+def _overlay(obj: dict, canvas: tuple, metrics: dict, when=None, scrim: int = 0) -> tuple:
+    """One layout object, one value table, one painter: the way pixels actually get made.
+
+    **Both** public doors below go through here, and sharing the door is the point of this
+    function.  `paint` used to build its own value table and `draw` built its own **plus**
+    `fill_lines`, so the two doors answered the same file with two different tables.  The keys
+    `fill_lines` adds - `temp-cpu`, `temp-gpu`, `fan-cpu`, `fan-gpu`, `readings`, `status` -
+    are not `source` names any vendor file spells: they are the strings the registered
+    `special` drawings read, and each of them returns `None` when its strings come back empty.
+    A `special` row is then skipped, and `layout.draw_theme` reports it with **no box at all**.
+    That is the whole of the defect this function closes: the editor's pane drew
+    `temp-values` and `fan-figures` in full, the loop sent a frame without them, and a layout
+    saved from the pane and applied to the panel came up on the glass missing two rows.  The
+    rows that do *not* read the table survived it - `temp-labels` takes its words from
+    `render.A26_TLBL_TEXT` - which is why the loss looked selective rather than total.
+
+    Three of the five layouts this repository generates declare rows that read those keys -
+    `alpha` three (`fan-figures`, `temp-values`, `temp-labels`), `clock` one
+    (`clock-readings`) and `dual` one (`dual-status`) - and the vendor's 27 files declare no
+    `special` kind at all, which is why nothing that compared a vendor file pixel for pixel
+    could have seen it: `clock`'s readings line and `dual`'s status line were going missing on
+    the glass beside `alpha`'s figures, and no reported case had named them yet.
+    `tests/test_specials.py`'s `ALoopAndAPanePaintOnePicture` now saves **each** generated
+    layout and asks the two doors for zero differing pixels, the same box per `special` row and
+    ink inside every one of those boxes, and prints what each row was worth on the machine that
+    ran it.
+
+    `canvas` is a deliberate argument rather than something read off `obj`: `paint` passes the
+    size the **record** carries (a library file's own `width`/`height`, which is what the
+    panel is told to expect), `draw` passes the size the **object** declares.  A call that
+    conflated them would be a picture cropped or padded at a size nobody declared, and the
+    two are *not* the same number for the four 320x240 pages in the library - which
+    `themes.scan()` refuses to select, for the reason written above that refusal: a 320x240
+    layout drawn at 480 multiplies an unmeasured convention by 1.5.  So the split is held
+    today by refusal and by `tests/test_specials.py`, not by the library's contents.
+    """
+    vals, absent = values(metrics, when)
+    fill_lines(vals, metrics)
+    img, notes = layout.draw_theme(obj, vals, canvas=canvas, specials=SPECIALS)
+    # **A `special` row that comes back with no box is said out loud, with its reason.**
+    # `layout.draw_theme` records such a row with `box=None`, and its own comment explains why:
+    # the drawing had nothing to say.  That is true of a reading this machine lacks - a box with
+    # no tachs still draws `CPU FAN -- RPM`, because `fill_lines` builds the figure - but it is
+    # *not* true of a key the table never carried, which is a fault in this module rather than in
+    # the machine.  Six names - `temp-cpu`, `temp-gpu`, `fan-cpu`, `fan-gpu`, `readings`,
+    # `status` - exist nowhere but in `fill_lines`, so a door that skips that call loses those
+    # rows from the glass without one word of warning: exactly what the owner saw.  Both doors
+    # fill now, and `tests/test_specials.py` holds the two halves apart - the parity of the
+    # picture, and the sentence a door that stops filling has to leave in the notes.
+    for kind, what, box, _i in (notes.get("boxes") or []):
+        if kind != "special" or box is not None:
+            continue
+        want = sorted(key for key, _fn in (SPECIAL_LINES.get(str(what)) or ())
+                      if key not in vals)
+        if want:
+            notes["missing"].append(f"special:{what}")
+            absent[f"special:{what}"] = (
+                "this door's value table carries no " + ", ".join(want)
+                + ": a registered `special` draws nothing when the keys it reads are absent, "
+                "so the frame this loop sends has no such row")
+    # `draw_theme` says which widgets it skipped; this says why, in the words this module
+    # chose when it refused to invent a reading.  Both belong in the notes.
+    notes["absent"] = absent
+    if scrim:
+        img = render.scrim(img, max(1, min(255, int(scrim))))
+    return img, notes
+
+
 def paint(record: dict, metrics: dict, when=None, scrim: int = 0, base=None) -> tuple:
     """One 480x480 RGBA overlay for a library theme, plus the notes that explain it.
 
@@ -366,20 +434,18 @@ def paint(record: dict, metrics: dict, when=None, scrim: int = 0, base=None) -> 
     only: like our own themes it carries transparency, and the background underneath it
     is the panel's business (or the loop's, for a preview).
 
+    This is the door the **frame loop** uses: a name resolves to a record, the record's file
+    is loaded and painted at the canvas the record declares.  `draw` is the door for an object
+    that never arrived as a file - a generated export, an editor's buffer, the preview pane -
+    and both go through `_overlay`, which is what makes "the pane shows what the glass will
+    show" a property of the code rather than a hope.
+
     `scrim` is the same plate rule our own five get (`render.scrim`): it is built from the
     layer's own alpha, so it needs no per-theme geometry, and a library theme over a
     bright clip needs it for the same reason `alpha` does - docs/limits.md keeps the luma
     figures, and `theme_48.mp4` at 227.3 of 255 is the case that decided it.
     """
-    vals, absent = values(metrics, when)
-    img, notes = layout.draw_theme(load(record["path"]), vals,
-                                   canvas=(record["w"], record["h"]),
-                                   specials=SPECIALS)
-    # `draw_theme` says which widgets it skipped; this says why, in the words this module
-    # chose when it refused to invent a reading.  Both belong in the notes.
-    notes["absent"] = absent
-    if scrim:
-        img = render.scrim(img, max(1, min(255, int(scrim))))
+    img, notes = _overlay(load(record["path"]), (record["w"], record["h"]), metrics, when, scrim)
     if base is not None and base[3] == 255:
         # `--bg black` is *stronger* here than for our own five: a layout's plate goes
         # under the finished layer, so every pixel of the frame comes out at alpha 255
@@ -404,19 +470,20 @@ def draw(obj: dict, metrics: dict, when=None, scrim: int = 0) -> tuple:
     """Paint a layout object that did not arrive as a file: a generated export, an edited
     buffer on its way to disk, the thing a preview pane needs.
 
-    Same doors as `paint` - same source table, one instant, the specials registry - so
-    what an editor shows and what the loop uploads cannot be two different pictures.
+    The same door as `paint` in every part that decides a pixel - `_overlay` is one function
+    both call, so the source table, the `fill_lines` composites a `special` row reads, the
+    painter and the plate are shared rather than duplicated twice with different arguments.
+    What differs is only where the canvas comes from: this one takes the `width` and `height`
+    the **object** declares, `paint` takes the record's.
+
+    Before that sharing, the two tables were not the same table and the claim in this
+    docstring was the honest one to make about the code: an editor's pane painted rows the
+    loop's frame did not contain.  `tests/test_specials.py`'s `ALoopAndAPanePaintOnePicture`
+    saves one of the generated layouts and demands zero differing pixels from the two doors,
+    so this sentence cannot become false again without a check failing.
     """
-    vals, absent = values(metrics, when)
-    fill_lines(vals, metrics)
-    img, notes = layout.draw_theme(obj, vals,
-                                   canvas=(obj.get("width") or render.W,
-                                           obj.get("height") or render.H),
-                                   specials=SPECIALS)
-    if scrim:
-        img = render.scrim(img, max(1, min(255, int(scrim))))
-    notes["absent"] = absent
-    return img, notes
+    return _overlay(obj, (obj.get("width") or render.W, obj.get("height") or render.H),
+                    metrics, when, scrim)
 
 
 #: Which background each of the five themes drawn from `render.py` is shown against.
@@ -1265,10 +1332,14 @@ SPECIALS = {"clock-readings": _sp_clock_readings, "dual-status": _sp_dual_status
             "temp-labels": _sp_temp_labels}
 
 #: A `special` that draws text this repo builds in code: name -> the (key, builder) pairs
-#: it needs.  `draw` and `parity` fill those keys from the same metrics the widgets' own
-#: `source`s come from, so the line the code theme writes and the line the layout paints
-#: are one string built once - the composite cannot drift into two versions of what the
-#: theme says.  A row that draws a pair lists both of its strings.
+#: it needs.  Every door that paints fills those keys - `_overlay` calls `fill_lines` for
+#: both `paint` and `draw`, and `parity` fills the same table for its own comparison - from
+#: the same metrics the widgets' own `source`s come from, so the line the code theme writes
+#: and the line the layout paints are one string built once: the composite cannot drift into
+#: two versions of what the theme says.  A row that draws a pair lists both of its strings.
+#: The keys are **not** `source` names a file may spell, which is the trap: a door that skips
+#: this call still validates, still reports its rows, and paints the `special` ones as
+#: nothing at all.
 SPECIAL_LINES = {"clock-readings": (("readings", render.clock_readings_line),),
                  "dual-status": (("status", render.dual_status_line),),
                  "fan-figures": (("fan-cpu", render.cpu_fan_figure),
