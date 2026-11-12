@@ -236,11 +236,15 @@ sizing pass prints, on whatever machine runs it:
 
 which reports its three widths, the floors, the split's sizes, how many columns of rows
 the field grid laid itself out into and what that grid asked for in height, and the
-bounds `app.py` names. Run it before quoting a floor anywhere: the numbers follow the
-faces installed, and this page's copy went stale once already when a column gained a
-row of buttons it had never carried. What does not move is the rule, and it is held in
-both directions - no column under what it holds, and no column so wide that a pinned
-narrow one starts travelling sideways.
+bounds `app.py` names. CI's runner, the same command on the same day: **331 / 394 /
+390 px** at 1280 px wide, its controls column going **417** and **589** as the grid
+takes two and three columns of rows. Run it before quoting a floor anywhere: the
+numbers follow the faces installed, and this page's copy went stale once already -
+the first of those three figures had moved on *both* boxes between the day it was
+written down and the day it was re-read, and nothing in the tree could reprint it.
+What does not move is the rule, and it is held in both directions - no column under
+what it holds, and no column so wide that a pinned narrow one starts travelling
+sideways.
 
 That last sentence is what the two doors under the layout menu (`reload the list`, `open a
 file…`) were measured against on 2026-11-12: they sit in the menu's own field column, the menu
