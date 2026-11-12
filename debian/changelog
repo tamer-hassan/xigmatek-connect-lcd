@@ -2,13 +2,17 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
 
   * The offline checks move out of one shell file and into ordinary test files.
     `tools/selftest.sh` - 13,869 lines in 22 sections, grown over six cycles -
-    is deleted, and what it checked is now 414 checks across 45 files in
+    is deleted, and what it checked is now 435 checks across 46 files in
     `tests/`, run by the standard library: `python3 -m unittest discover -s
-    tests`.  Measured on this bench in one sitting, the same tree both ways:
-    124.240 s for the 278 checks as they stood at the deletion, 287.827 s for
-    the 414 once the sections that had not come across were ported - and on
-    CI's runner the `tests/` step measures 323 s for the 414, against the
-    497 s the same runner spent on the suite's single step for `v0.6`.
+    tests`.  Every timing is the runner's own and says which box it ran on.
+    The author's bench, one sitting, the same tree both ways: 124.240 s for
+    the 278 checks as they stood at the deletion, 353.945 s for the 435 they
+    are now.  CI's runner, the `tests/` step alone: 323 s for the 414 at
+    0afc2cc and 440 s for the 435 at 65cef63, run 43169813952, against the
+    497 s the same runner spent on the suite's single step for `v0.6`.  The
+    step's own neighbours on that run - 33 s to import what the checks touch,
+    0 s for the manifest pass, 0 s for shellcheck, 83 s to build the two
+    .deb files, 19 s to install them and 2 s for the packaged smoke test.
     Nothing that examined code was dropped in the end - the wire, the
     encoder's loss budget, the copied library's painting, the export parity,
     the substitutions a layout names, `alpha`'s special rows, the window, the
@@ -70,6 +74,59 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     the opposite on purpose - a box that stops at the limit drops characters
     and then presses the button with a name nobody typed - so the refusal is
     now gated at the edge and one past it, in words that quote the constant.
+
+  * Re-pointing the last three pages at their owners turned up five claims no
+    check held.  They are gated rather than downgraded.  `test_pane_chrome.py`:
+    the selection chrome never reaches the frame - the pane grabbed with a mark
+    up and without one has to differ, which is what proves the chrome is painted
+    at all, while the pixmap the label is handed and the image the model painted
+    are the same either way, and a repaint brings the mark back for the row that
+    is still selected; a value menu shows the value the row holds, walked
+    through the pane's own widget picker over the fields whose stored answer is
+    not the vocabulary's first, because the old bug hid in a case where it was;
+    the tray's theme list is the window's list, which skips out loud under
+    `QT_QPA_PLATFORM=offscreen` instead of passing quietly; and the upload chord
+    stays the window's while a field holds focus and moves no text.
+    `test_bars_rows.py` gained the generated file's own structure, derived from
+    `BARS_ROWS` and the `BARS_*` constants rather than remembered: the widget
+    count and the kind tally that follows from them, the label, number and meter
+    answering for one place on the glass with the meter `BARS_BAR_DY` under its
+    row, one convention pair on every meter, and `showIf` on exactly the rows
+    whose number prints one field while its meter divides two.  Its two memory
+    rules are measured at the five readings that found them - a total with no
+    used figure keeps the row's label and draws no number, where it once raised
+    `KeyError` inside the frame loop, and a GPU reporting exactly 0 used keeps
+    its row and reads `0 GB`, where its test used to require a truthy numerator
+    - and the key's worth is measured by taking it away at an integrated GPU's
+    readings and requiring the picture to change.  The review door's two lists
+    are held to each other, which is the shape a runner with no GPU hits: a row
+    silenced by its dependency leaves its source in `cannot:` with no skip
+    behind it, and a box that answers everything skips that relation out loud.
+    `test_export_parity.py` put the deleted suite's worst near-miss back under a
+    check: a reading is an input, not a scratch pad.  Neither `themes.parity`,
+    `render.draw` nor `themes.values` writes to the body it is handed, over all
+    five themes and all five shared readings, and a check that wants a hole asks
+    for one on a copy - the mistake a gate once made in the shared fixture, and
+    paid for with every later draw in the process.
+    And the naming rule holds itself: `test_docs_links.py` re-reads every
+    `tests/<file>` pointer in the published prose - 78 mentions over 43 files -
+    and in the shipped comments, against the tracked file list, requires a named
+    `test_*.py` to hold at least one `def test_`, and asserts how many pointers
+    it read, so a scan that found nothing is a failure rather than a pass.  Each
+    of these was shown non-vacuous by breaking the shipped code it examines: an
+    exported meter moved 3 px off the drawing's -> 10 subtests; `pct_pair` made
+    to raise again for a missing numerator, and made to treat a 0 reading as no
+    reading -> 1 each; an export with `showIf` already stripped, so stripping
+    has nothing left to show -> 1; `themes.parity` made to pop a key out of the
+    caller's dict -> 25; `themes.values` made to tidy its argument -> 5; a
+    repaint that stops re-applying the selection's chrome -> 1; a menu landed on
+    index 0 -> 1; the chord moved back to a bare Ctrl+U -> 1; and a page pointed
+    at a test file that is not in the tree, or at a tracked module holding no
+    check -> 1 each.  Two claims the pages made that no check ever held are
+    stated as gaps where they stand, with the door to re-measure each named: the
+    six published `docs/videos` files, whose staleness nothing scores any more
+    (`ffprobe`, `du -b`), and the display loop's rename race
+    (`xigmalcd --theme <copy>`).
 
   * `tests/fixtures.py` holds the isolation and the pinning once, which the
     suite rebuilt inside each of its 22 sections: the repo root taken from this
