@@ -399,6 +399,13 @@ reader.
   **133.2 ms** a move and the drags after it **44.8 / 40.8 ms** (worst **242.5 ms**) before,
   **11.6 / 11.5 / 10.8 ms** (worst **13.6 ms**) after, with reads of `layout.py`'s source
   going from **5.72 per move to 0.00** and media/sensor subprocesses from **0.71 to 0.01**.
+  And the same command with `--on-display`, on this bench's own Wayland desktop at the saved
+  3072x1646 window, which is where the complaint was felt: **131.2 ms** for the first drag
+  and **41.0 ms** for the next, worst **230.5 ms**, at `ba92167`; **12.2 ms** and a worst of
+  **16.6 ms** now.  The offscreen and on-display figures agree to within a millisecond and a
+  half after the fixes (**11.3** against **12.2**), which is what lets this page say the
+  compositor was never part of it - and the tool prints which platform it measured, because
+  those two numbers answer different questions.
 * `tools/asar_extract.py ASAR` — read an Electron `.asar` without node: list, unpack,
   `--cat` one file, or `--find TEXT` to grep file *contents*, which is how the string
   constants in the app's compiled main process (`out/main/index.jsc`) get mined.

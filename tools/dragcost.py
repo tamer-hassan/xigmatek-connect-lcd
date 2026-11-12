@@ -31,6 +31,12 @@ Two safety doors, both of them the same reasoning as `tools/screenshot.py`:
   run with - into a temp `XDG_CONFIG_HOME` and restores *that*, so the measurement sees a
   real session and cannot write to the real settings file.
 
+By default the window is built offscreen, the way `tests/test_window.py` builds one.  The
+complaint this tool exists for is about *feel* on a desktop, and offscreen Qt never hands
+a pixel to a compositor, so `--on-display` measures the real thing instead: a window
+appears on the reader's screen for the few seconds the drags take, and the two numbers
+belong to different questions, which is why the tool prints which one it is answering.
+
 Durations belong to a box, so every number here is printed with the box beside it and
 nothing is written into a page by this tool.
 """
@@ -75,6 +81,11 @@ def main() -> int:
     ap.add_argument("--playing", choices=("on", "off"), default="off",
                     help="whether `playing` is on (default off: the complaint that "
                          "brought this tool was about a drag with nothing animating)")
+    ap.add_argument("--on-display", action="store_true",
+                    help="draw on the real desktop instead of offscreen.  This is the "
+                         "number a reader feels - Qt handing pixels to a compositor is a "
+                         "cost the offscreen platform does not have - and a window will "
+                         "appear on screen for the few seconds the drags take")
     ap.add_argument("--timer", choices=("on", "off"), default="on",
                     help="whether the `--preview-fps` timer runs (default on, as in a "
                          "session: a tick that lands mid-drag is part of the feel)")
@@ -111,7 +122,18 @@ def main() -> int:
               f"or pass --allow-port if you mean it.", file=sys.stderr)
         return 2
 
-    os.environ["QT_QPA_PLATFORM"] = "offscreen"
+    platform_note = "offscreen (no display server, nothing appears on anyone's screen)"
+    if a.on_display:
+        if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+            print("--on-display asks for the real desktop and this shell has neither "
+                  "DISPLAY nor WAYLAND_DISPLAY; drop the switch to measure offscreen",
+                  file=sys.stderr)
+            return 2
+        platform_note = ("the real desktop (a window will appear while this runs: "
+                         f"DISPLAY={os.environ.get('DISPLAY', '-')} "
+                         f"WAYLAND={os.environ.get('WAYLAND_DISPLAY', '-')})")
+    else:
+        os.environ["QT_QPA_PLATFORM"] = "offscreen"
     real_root = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
     tmp = tempfile.mkdtemp(prefix="xigma-drag-")
     os.environ["XDG_CONFIG_HOME"] = os.path.join(tmp, "config")
@@ -157,6 +179,7 @@ def main() -> int:
           f"{sys.version.split()[0]}, PyQt {PYQT_VERSION_STR}, Qt {QT_VERSION_STR}, Pillow "
           f"{__import__('PIL').__version__}")
     print(f"  code            {os.path.dirname(gui.__file__)}")
+    print(f"  platform        {platform_note}")
     print(f"  device          {device}{port_note}")
     print(f"  settings        {os.environ['XDG_CONFIG_HOME']}{root_note}")
 

@@ -338,6 +338,11 @@ canvas and `preview_fps`): first drag **133.2 ms** a move and the drags after it
 the one the complaint was about: a drag you start before the clip library has finished is
 not the drag you start afterwards, and nothing about the pane looked different between them.
 
+Measured on the desktop rather than offscreen (`tools/dragcost.py --session --on-display`,
+this bench's Wayland session, the same 3072×1646 window), the pair is **131.2 ms** a move
+before and **12.2 ms** after, worst **230.5 ms** becoming **16.6 ms** - and the after figure
+is within 1 ms of the offscreen one, so the compositor is not a part of this.
+
 The rate is capped at 30 fps and floored at 5 (`_set_player`), because past 30 the
 difference is not something an eye separates and every extra frame is a composite and a
 paint; a file whose rate ffprobe will not give is played at 24 and the line says so. A
