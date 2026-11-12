@@ -357,7 +357,23 @@ PY
     python3 - "$lib" <<'PY'
 import datetime, json, os, subprocess, sys
 
+import xigmalcd
 from xigmalcd import themes
+
+# This script ships *inside* the source tree and runs against whatever `xigmalcd` the
+# interpreter finds - the installed one, since it deliberately does not import the copy
+# sitting in the directory it was called from.  That is a feature until the two drift: a
+# check written for the reader rule below cannot ask an older install about that rule, and
+# the assertion it then fails says "not all accounted for" about somebody's healthy system.
+# So the mismatch is named, in both directions, before anything is measured.
+if not (hasattr(themes, "NEED_OSD_WHY") and hasattr(themes, "WHY_LABEL")):
+    raise SystemExit(
+        "this check is written against a tree whose layout reader also refuses a file with "
+        "nothing to draw (`themes.NEED_OSD_WHY`); the xigmalcd it is about to interrogate is "
+        f"{getattr(xigmalcd, '__version__', '?')} at {xigmalcd.__file__} and has no such "
+        "rule, so this checkout and this install are not the same code.  Build and install "
+        "from this tree - `dpkg-buildpackage -us -uc -b`, then `apt install` the two .deb "
+        "files it writes - and run this script against that install.")
 
 PIN = {"cpu": {"temperature": 61, "load": 42, "power": 88.5, "speedAverage": 4338},
        "gpu": {"temperature": 55, "load": 63, "power": 37.0, "speed": 1500},

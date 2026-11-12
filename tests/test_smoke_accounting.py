@@ -202,6 +202,15 @@ class TheShippedAccountingRuns(fixtures.FreshConfigRoot):
         used, which is the only kind of box this packaging check ever runs on.
         """
         block = accounting_block()
+        # The script ships in the source tree and runs against the *installed* code, so the
+        # two can be different versions on a development box - which is exactly how the owner
+        # of one met a confusing AssertionError instead of a named mismatch.
+        for needle in ("NEED_OSD_WHY", "are not the same code"):
+            self.assertIn(needle, block,
+                          f"the accounting no longer says what it needs out of the installed "
+                          f"xigmalcd (missing {needle!r}): a check written for a newer reader "
+                          "fails an older install with an arithmetic message and sends the "
+                          "reader off to look at their own themes directory")
         for needle in ('r["root"]', "hidden", "manifest lists", "copies in front"):
             self.assertIn(needle, block,
                           f"the installed-library accounting no longer mentions {needle!r}: "
