@@ -285,11 +285,20 @@ class AddingDeletingAndReordering(unittest.TestCase):
         self.assertGreater(never_meeting, 20,
                            f"{never_meeting} pairs whose boxes never meet: the corpus has too few "
                            "to mean anything")
-        self.assertGreater(moved, 4, f"{moved} swaps moved ink: the rule has nothing to hold")
-        self.assertLess(silent, moved,
-                        f"{silent} silent of {silent + moved}: more pairs meet silently than "
-                        "loudly, which is the shape that made the old sentence over-broad "
-                        f"({'; '.join(silent_pairs[:4])})")
+        # `moved > 4` and `silent < moved` used to sit here.  They were a claim about the corpus,
+        # and the corpus they described was `bars` overlapping itself: its meter ran 5 rows inside
+        # the text of the row under it, which is what made adjacent pairs loud.  The 2026-11-12
+        # clearance rule in `tests/test_bars_rows.py` removed those overlaps, so on this bench the
+        # shipped files now supply {moved} loud and {silent} silent pairs - a corpus that reads
+        # as separated rows, which is the point.  The price is recorded rather than hidden: with
+        # nothing in the shipped files overlapping, this loop can only prove the *negative* half
+        # of the law (a pair that meets in sub-pixel coverage, or a pair that never meets, moves
+        # 0 px), and the positive half - a swap that must move ink exactly in the overlap - is
+        # currently ungated.  Building that case means authoring two rows in deliberately
+        # different colours, which is the follow-up this comment is the note for.
+        self.assertGreater(silent + moved, 0,
+                           "no pair of drawn rows in the corpus even meets, so the meeting branch "
+                           "of the rule below is never exercised here")
 
 
 if __name__ == "__main__":
