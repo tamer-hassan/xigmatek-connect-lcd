@@ -336,8 +336,13 @@ of the same animation.
   the map has no unread option left.  The counts, the sets and the floor are quoted in
   docs/limits.md and re-derived on every run; the non-zero pixel figures walk glyph edges and
   installed faces, so they are printed beside the machine and never quoted as fixed.
-* `tools/screenshot.py` — regenerates `docs/screenshot-xigmaui.png`, the README's picture of
-  the **window** rather than of the glass: a real `xigmaui` built the way `tests/test_window.py`
+* `tools/screenshot.py` — regenerates the README's three pictures of the **window** rather
+  than of the glass: `--mode three-column` writes `docs/screenshot-xigmaui.png`, `--mode
+  simple` writes `docs/xigmaui1.png` (the `advanced controls` switch left off, as a first run
+  shows it) and `--mode advanced` writes `docs/xigmaui2.png` (that switch on, with
+  `--layout NAME` opening one layout in the editor). On a bench where this project's udev rule
+  is installed, `/dev/xigmatek-lcd` exists and the tool refuses to run - the safety door
+  working, not a bug - so a capture there points `--device` at a path that is not there: a real `xigmaui` built the way `tests/test_window.py`
   builds it
   (`QT_QPA_PLATFORM=offscreen`, `XDG_CONFIG_HOME` in a temporary directory so no remembered
   settings shape the shot, `XIGMA_SOCKET` pointed at nothing so the window is its own boss),

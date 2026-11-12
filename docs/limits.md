@@ -782,7 +782,10 @@ What has been measured on glass, by whom, with how many frames - and what has no
   stay on the bench and the serial is redacted wherever prose quotes one of their fields.
   **The same rule, in pixels:** on 2026-11-10 an OCR pass found the serial, whole and
   legible, inside `docs/xigmaui2.png` - a live capture published on 2026-11-08, where the
-  `conn 1` reply the window shows happens to name it.  What had been holding the rule was
+  `conn 1` reply the window shows happens to name it. That file was replaced on 2026-11-12
+  by a render of the same window, made by `tools/screenshot.py` offscreen against a port path
+  that does not exist, so the status box holds a refusal and there is no serial in the
+  picture to paint out; the published history still carries the old bytes.  What had been holding the rule was
   grepping the staged diff, and a staged diff is bytes: it cannot see a picture.  The field
   is painted out now (`docs/packaging.md` keeps the account and the byte cost), and
   `tests/test_no_serial.py` searches both halves of the serial through every published text

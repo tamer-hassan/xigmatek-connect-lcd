@@ -118,16 +118,27 @@ factory reset - the theme picker, the text-colour row and the layout editor in t
 middle, and the background clip library on the right, one row per distinct file:
 40 rows from the 46 mp4 files this repository tracks](docs/screenshot-xigmaui.png)
 
-And these are real captures from live system (simple vs advanced mode), taken before
-0.5 moved the panel's report and the guarded reset to the foot of the left column — and
-with this bench's panel serial painted out of the status box: the `conn 1` reply names
-it, a screenshot keeps that as pixels rather than bytes, and the serial is the one fact
-that stays on the bench (docs/limits.md and docs/packaging.md keep the account, and the
-`tests/test_no_serial.py` OCRs every published PNG to keep it that way):
+These two are the same window at the two settings of its `advanced controls` switch, and
+all three pictures here come from one command: `tools/screenshot.py`, which builds the real
+`xigmaui` offscreen — a temporary `XDG_CONFIG_HOME`, so no remembered window size or clip
+choice is in the frame, and a port path that **does not exist**, because in that mode the
+window's own status action opens the serial port and a screenshot must not take over
+somebody's panel. So the status box holds the refusal line rather than a reply, and there is
+no serial in these pixels to paint out. The captures that ran here until 2026-11-12 were live
+ones, and `docs/limits.md` and `docs/packaging.md` keep that account - including the OCR pass
+that found a serial in a published PNG, and the `tests/test_no_serial.py` guard that came out
+of it.
 
-![xigmaui, simple mode](docs/xigmaui1.png)
+![xigmaui, simple mode: the `advanced controls` switch left off, which is what a first run
+shows - the playing preview and the log on the left, the theme and text-colour pickers in the
+middle, and the background clip library on the right](docs/xigmaui1.png)
 
-![xigmaui, advanced mode, its status box with the serial field painted out](docs/xigmaui2.png)
+![xigmaui, advanced mode: the same switch on, with one layout open in the editor. The pane
+draws *that file* rather than the live theme - here the `bars` layout, whose ten rows it is
+holding four fan slots for - and beside it are the widget's own field rows (this one is the
+heading line, `text` kind, at x 30 y 30 with its font, its colour, and the `autoFit` width its
+drawing reads), under the log the panel's own report and the guarded reset, and on the right
+the clip library with the size and loop length each row measured](docs/xigmaui2.png)
 
 It talks to a display loop that is already running when one is running, and drives the
 port itself when nothing is — which is the part that needs care, because the panel

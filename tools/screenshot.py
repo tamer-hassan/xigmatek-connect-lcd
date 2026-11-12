@@ -63,13 +63,33 @@ import time
 DEFAULT_DEVICE = "/dev/xigmatek-lcd"
 DEFAULT_OUT = os.path.join("docs", "screenshot-xigmaui.png")
 
+#: The three pictures README carries, and what each is a picture *of*: `three-column` is the
+#: wide framing - the preview and the log on the left, the controls and the clip library
+#: beside them; `simple` is the window as a reader meets it on first run, its advanced switch
+#: left off; `advanced` is the same window with that switch on and one layout open in the
+#: editor, which is where the field rows, the canvas and the row list live. All three are
+#: captured the same way - offscreen, a temporary `XDG_CONFIG_HOME`, and a port path that
+#: does not exist - so a capture can neither take over somebody's panel nor put this bench's
+#: serial into a published pixel: the status box in these pictures holds the refusal line, and
+#: there is nothing to paint out.
+MODE_OUT = {"three-column": DEFAULT_OUT,
+            "simple": os.path.join("docs", "xigmaui1.png"),
+            "advanced": os.path.join("docs", "xigmaui2.png")}
+
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--device", default=DEFAULT_DEVICE,
                     help=f"port path the window names (default {DEFAULT_DEVICE}); it "
                          "must not exist, because in this mode the window would open it")
-    ap.add_argument("-o", "--out", default=DEFAULT_OUT, help="where to write the PNG")
+    ap.add_argument("--mode", choices=tuple(MODE_OUT), default="three-column",
+                    help="which of README's three window pictures this is: "
+                         "`three-column` (the default, %s), `simple` (%s, the advanced "
+                         "switch off) or `advanced` (%s, the switch on and a layout open). "
+                         "Picks the output file unless -o says otherwise."
+                         % (MODE_OUT["three-column"], MODE_OUT["simple"], MODE_OUT["advanced"]))
+    ap.add_argument("-o", "--out", default=None,
+                    help="where to write the PNG (default: the file for --mode)")
     ap.add_argument("--layout", default="", metavar="NAME",
                     help="open this layout in the editor before grabbing, so the "
                          "picture shows the field rows a widget carries (default "
@@ -92,6 +112,8 @@ def main() -> int:
     ap.add_argument("--allow-port", action="store_true",
                     help="run even if --device exists (draws on real glass; say so)")
     a = ap.parse_args()
+    if a.out is None:
+        a.out = MODE_OUT[a.mode]
 
     if os.path.exists(a.device) and not a.allow_port:
         print(f"{a.device} exists: this window would open it for its own status read, "
@@ -138,6 +160,13 @@ def main() -> int:
         return 2
     win.resize(wide, tall)
     win.show()
+    if a.mode == "advanced" or a.layout:
+        # the advanced switch is the window's own door: on it the layout editor, the
+        # field rows and the row list appear, which is what the README's third picture
+        # is for.  Toggled through the control rather than by reaching past it, so the
+        # picture shows what pressing the switch does.
+        win.adv_toggle.setChecked(True)
+        app.processEvents()
     if a.layout:
         # the picture with a layout open: what the field rows of one widget look like,
         # and the pane drawing *that file* rather than the live theme
