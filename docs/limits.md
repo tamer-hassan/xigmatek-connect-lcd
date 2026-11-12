@@ -3,6 +3,8 @@
 What has been measured on glass, by whom, with how many frames - and what has not. Every
   number here names the run it came from; the gaps are named too.
 
+## What the panel answers, with the panel attached
+
 * **A chosen text colour reaches the upload, not the panel, and it survives the palette
   encoding.** `--text-color` and the window's `text colour` row change the ink of the
   glyphs this program draws; the frame is then uploaded as pixels, which is the only
@@ -147,6 +149,8 @@ What has been measured on glass, by whom, with how many frames - and what has no
   `send_media()` raises instead of calling that success. Reading that notice is the
   only reliable check: `transported` answers `{"state":"success"}` even for a refused
   file, and `space` does not move for accepted uploads either.
+## Refusals, and what the unattended run left unexplained
+
 * **Seven refusals in fifty-six unattended minutes, and no explanation for them.** The
   packaged unit, left drawing `alpha` at 2 fps after the 0.2 upgrade, logged
   `! frame 1029 / 1097 / 1167 / 2268 / 3162 / 3266 / 6471: device refused the file: 400 b''` -
@@ -205,6 +209,8 @@ What has been measured on glass, by whom, with how many frames - and what has no
   project states the numbers instead of the effect: `xigmaui` puts the measured size on
   every clip row and, for a file that is not 480×480, says under the list that its
   preview is a guess.
+## The themes package: media and reference material, not a theme list
+
 * **The themes package is media and reference material, not a theme list.**
   `xigmatek-connect-lcd-themes` installs the vendor's own 100 files - 27 layouts, 27
   background and 27 foreground images, 43 clips, a manifest and a README - under
@@ -261,6 +267,8 @@ What has been measured on glass, by whom, with how many frames - and what has no
   `1 200`, ack-first → `1 400`, same bytes. Baud rate, DTR/RTS, chunk size, payload
   content, file-name patterns and power/theme state were each swept live and changed
   nothing.
+## What the sensors report, and what the five drawn themes show
+
 * **Fan readings come from the motherboard, and `alpha` shows only what it can really read.**
   The vendor app gets RPM from the machine, never from the panel. Its Windows logs name the chip
   outright - `MSI X870 GAMING PLUS WIFI (MS-7E47) (Nuvoton NCT6687D)`, with `Fan CPU`
@@ -344,6 +352,8 @@ What has been measured on glass, by whom, with how many frames - and what has no
   gauge. The older sighting (60 s at 5 fps,
   300/300 frames, 2026-11-06) belongs to the earlier single-line fan layout and does not
   vouch for this one.
+## Driving the loop from a file, and who owns the port
+
 * **Pinning the numbers to put a case on glass: `--metrics-file`.** Some layouts only arrive
   with numbers the machine will not produce - the far end of the gauge ramp, a three-digit
   temperature, a sensor that is not there. The flag draws the picture from the sections of a
@@ -438,6 +448,8 @@ What has been measured on glass, by whom, with how many frames - and what has no
   2026-11-07 the themes themselves are readable too, keys and all - the whole library is in
   `themes/alpha/`, see that directory's README. Re-derive it
   any time with `python3 tools/theme.py` and `python3 tools/vendor_log.py`.
+## The published previews, and the digits that come out of them
+
 * **The README's previews are 10-12 s MP4s now, and their digits move.** Six files in
   `docs/videos/`: one per theme, plus the amber-ink figure [docs/gui.md](gui.md) carries.
   Each runs over a different clip from the vendor's library, at the panel's own 480 px and
@@ -708,6 +720,8 @@ What has been measured on glass, by whom, with how many frames - and what has no
   [--ink COLOUR] [--scrim N] [--no-gif]`: it prints the bytes, the frame count and length as
   the written file reports them, how many passes of the clip that is, and - with a series in
   play - the min→max of every reading the picture drew.
+## What an install carries, and what it leaves out
+
 * **`pip install .` carries no clips, and that is a hole rather than a design.** The three
   MP4s this repo vendors live in `media/`, which is not a Python package, and
   `pyproject.toml` declares no package data for them — so an installed `xigmalcd` finds them
@@ -729,6 +743,8 @@ What has been measured on glass, by whom, with how many frames - and what has no
   which puts all three in `/usr/share/xigmalcd/media` ([packaging.md](packaging.md)), or point
   `XIGMA_MEDIA` at a directory of clips from the unit's own environment. `--no-mp4` skips the
   question entirely.
+## How this repository keeps its own record
+
 * **Version control: local `git` since 2026-11-06, published 2026-11-07** as
   `tamer-hassan/xigmatek-connect-lcd`, public, `main` only. Tracked: the three vendored
   clips in `media/`, the vendor's theme library in `themes/alpha/` (100 files, 84 926 540
@@ -849,6 +865,8 @@ writes a theme - `--export-theme NAME` prints a generated layout on stdout and w
 nothing, because a committed `gauge.json` goes stale the first time anyone edits
 `theme_gauge`. What the model does and does not allow, all of it gated:
 
+## The file model: one directory, one round trip, one stamp not written
+
 * **One directory is written to: `~/.config/xigmalcd/themes`** (`$XDG_CONFIG_HOME`), and
   it is also scanned first - before the checkout and before `/usr/share/xigmalcd/themes/alpha`.
   `--list-themes` and `--check-theme` print which root answered: "your copy", "checkout"
@@ -904,6 +922,8 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   code theme skips a widget too - a `dual` with no load reading draws no bar and no status
   line - the two doors agree to the pixel anyway, and `tests/test_export_parity.py` counts those cases
   separately rather than folding them into the pass.
+## Conventions a layout names, measured against the function it names
+
 * **A ramp can be written as data, and this was measured rather than assumed.**
   `xigma.colourStops` holds `[fraction, rgba()]` pairs interpolated piecewise-linearly,
   and at every position a ring actually steps through (3 degrees along a 300-degree sweep,
@@ -984,6 +1004,8 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   parity checks as they then stood never stepped in that band, so nothing caught it until
   `tests/test_conventions.py` did; `corner_floor` is a key of its own now, and that file's load
   list walks 1.5 % and 2 % - the two values that found it.
+## Joint sizing, and the construct `bars` needed in the end
+
 * **Two widgets can share one text size, and the schema has no way to say so.** `alpha`
   draws its two fan figures at one size, and its two temperature values at one size, each
   chosen from *both* readings at once. Measured, then decided (owner, 2026-11-08): each
