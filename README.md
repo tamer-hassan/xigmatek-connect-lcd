@@ -85,11 +85,13 @@ the machine can find, watch the preview, put one frame or the whole loop on the 
 And because this panel cannot be asked what it is showing, the window says what it
 *knows*: the background the running display reported putting there, and the last six
 things it did on the port. Three columns — preview, controls, clip library — with an
-`advanced controls` switch that folds twelve secondary controls - two boxes of them at the
-foot of the preview column, and one, the pane-readings box, in the controls column - away
+`advanced controls` switch that folds nine secondary controls - two boxes of them at the
+foot of the preview column, five rows in the controls column - away
 without changing their values, a `playing` box that
 decodes the background in sequence so the preview moves under our layer instead of showing
-one still frame of it, and one row that is always in sight, for the colour of the text it
+one still frame of it, a `pane readings` knob on the row between the two, which picks what
+body the picture is painted from and never folds away, and one row that is always in sight,
+for the colour of the text it
 draws. This is a capture of the real program (`tools/screenshot.py`, no panel attached),
 with this machine's live readings in the preview:
 
@@ -105,18 +107,22 @@ yours to rename, and one layout can be saved as a second copy under a new name �
 nothing in the library answers, by name, by spelling, or by the id inside the file. And a
 drag can stick, within two pixels, to a number that same layout already uses: another row's
 edge, its centre on the glass, its mirror. There is no grid, because the vendor's files
-carry none. And the picture it edits can be peeked at through this machine's own readings, or a
-metrics file you name — held, at the pinned instant, and looked at only: press, drag and arrow
-keys stay with the pinned frame, so an edit is never judged against a number that changes. The
-panel is never handed a layout file, so what that editor changes is what a
+carry none. And the picture it edits can be painted from another body of readings than the
+pinned fixture: **this machine's own, live** — re-read on each preview tick, with the box, the
+handles and the hit test taken from that same paint, so the row you point at is the row whose
+ink you pointed at — or a metrics file you name, which is held, at the pinned instant, and a
+look only: press, drag and arrow keys stay with the pinned frame there, because a number
+written from a sample that has already gone stale belongs to a reading that no longer answers.
+The panel is never handed a layout file, so what that editor changes is what a
 loop on *this* machine draws the next time it names that theme
 ([docs/gui.md](docs/gui.md) has the row and its limits).
 
 ![xigmaui, the window in three columns: the playing preview and the log on the left -
-under the log, behind `advanced controls`, the panel's own report and the guarded
-factory reset - the theme picker, the text-colour row and the layout editor in the
-middle, and the background clip library on the right, one row per distinct file:
-40 rows from the 46 mp4 files this repository tracks](docs/screenshot-xigmaui.png)
+`playing` and the `pane readings` knob on the rows above the picture, and under the log,
+behind `advanced controls`, the panel's own report and the guarded factory reset - the
+theme picker, the text-colour row and the layout editor in the middle, and the background
+clip library on the right, one row per distinct file: 40 rows from the 46 mp4 files this
+repository tracks](docs/screenshot-xigmaui.png)
 
 These two are the same window at the two settings of its `advanced controls` switch, and
 all three pictures here come from one command: `tools/screenshot.py`, which builds the real
@@ -130,12 +136,14 @@ that found a serial in a published PNG, and the `tests/test_no_serial.py` guard 
 of it.
 
 ![xigmaui, simple mode: the `advanced controls` switch left off, which is what a first run
-shows - the playing preview and the log on the left, the theme and text-colour pickers in the
-middle, and the background clip library on the right](docs/xigmaui1.png)
+shows - the playing preview and the log on the left, with the `pane readings` knob shut on
+the row above it because there is no layout open to peek at, the theme and text-colour
+pickers in the middle, and the background clip library on the right](docs/xigmaui1.png)
 
 ![xigmaui, advanced mode: the same switch on, with one layout open in the editor. The pane
 draws *that file* rather than the live theme - here the `bars` layout, whose ten rows it is
-holding four fan slots for - and beside it are the widget's own field rows (this one is the
+holding four fan slots for - `the fixture` on the pane-readings row above it, and beside the
+picture the widget's own field rows (this one is the
 heading line, `text` kind, at x 30 y 30 with its font, its colour, and the `autoFit` width its
 drawing reads), under the log the panel's own report and the guarded reset, and on the right
 the clip library with the size and loop length each row measured](docs/xigmaui2.png)

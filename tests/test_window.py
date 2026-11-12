@@ -29,9 +29,12 @@ from xigmaui import app, settings
 
 MISSING_PORT = "/dev/xigma-no-such-port"
 
-#: The twelve controls behind the advanced switch: five loose rows and three whole boxes.
+#: The nine controls behind the advanced switch: five loose rows and two whole boxes.  The
+#: pane-readings drop-down used to be the third box; it lives above the preview pane now,
+#: where the picture it chooses belongs, and it does not fold - `tests/test_peek_readings.py`
+#: holds both halves of that.
 FOLDED = ("canvas", "scrim", "fanline", "d_events", "btn_live", "status_box", "reset_box",
-          "confirm", "btn_reset", "peek_box", "ed_peek", "ed_peek_file")
+          "confirm", "btn_reset")
 
 
 class WindowWithoutPanel(fixtures.FreshConfigRoot):
@@ -157,7 +160,7 @@ class TheAdvancedSwitch(fixtures.FreshConfigRoot):
         return [getattr(self.win, name) for name in FOLDED]
 
     def test_exactly_the_named_controls_fold_and_the_editor_does_not(self):
-        self.assertEqual(len(FOLDED), 12)
+        self.assertEqual(len(FOLDED), 9)
         self.assertNotIn(self.win.ed_group, self.win._adv_hide,
                          "the layout editor folded away again, and it is the window's only "
                          "layout browser")
@@ -167,7 +170,8 @@ class TheAdvancedSwitch(fixtures.FreshConfigRoot):
             with self.subTest(control=name):
                 self.assertFalse(widget.isVisible(), f"{name} stayed shown when folded")
         for name in ("clips", "theme", "btn_upload", "btn_apply", "log_view", "ed_group",
-                     "ed_name", "preview", "clock_size", "ink_choice"):
+                     "ed_name", "preview", "clock_size", "ink_choice", "ed_peek",
+                     "ed_peek_file"):
             with self.subTest(kept=name):
                 self.assertTrue(getattr(self.win, name).isVisible(),
                                 f"the compact view lost {name}, which a first run needs")

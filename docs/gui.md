@@ -95,8 +95,8 @@ one of them (see "How the three columns get their sizes", after the table):
 | `Send frames for 30 s` | library, advanced | the picture loop, so you can watch the real glass | `STATE all 1` twice, then 60 uploads at 2 fps |
 | status | preview, under the log, advanced | the panel's `conn 1` reply: sn, versions, `space`, `brightness`, `mode`, `logo`, `osdState`, `timeout`, each annotated only where PROTOCOL.md records what it means | `conn 1`, `power resume`, `timeout 60` - and no metrics blob, because it puts no picture on the glass. With a display running there is no fresh `conn 1` to ask for, so the box shows the one that display read at its own session start, labelled as such |
 | log | preview, under the picture | the window's own last 200 lines (`LOG_KEEP`): what it sent, what the panel answered, what failed and why. Scrollable, selectable, newest at the bottom; the display's full record is its journal, `journalctl --user -u xigmalcd -f` (docs/usage.md) | nothing: it is a readout |
-| `advanced controls` | controls, top row | folds away the twelve secondary controls named further down - two boxes at the foot of the preview column, and the pane-readings box in the controls column; it hides pixels and never values | nothing |
-| pane readings | controls, advanced, folded | what body the editor's picture is painted from: the pinned fixture, this machine's held readings, or a JSON `STATE all 1` file you name (the same shape `--metrics-file` takes) | nothing - a peek is not a setting, and no key for it goes near the session file |
+| `advanced controls` | controls, top row | folds away the nine secondary controls named further down - two boxes at the foot of the preview column and five rows in the controls column; it hides pixels and never values. The pane-readings knob is **not** among them: it picks the picture above the preview pane, so it stays put and is only ever shut when no layout is open | nothing |
+| pane readings | preview, under `playing`, above the picture; never folds | what body the editor's picture is painted from: the pinned fixture, **this machine's readings - live**, or a JSON `STATE all 1` file you name (the same shape `--metrics-file` takes), which is read once and held. The live entry re-reads on each preview tick and takes its marks, handles and hit test from that paint; the file entry hides them and refuses a press | nothing - neither knob position nor a body is a setting, and no key for it goes near the session file |
 | reset | preview, under the log, advanced | the vendor's `recovery` | needs the word `reset` typed in, then a confirm dialog. With a display running it goes over the socket, which refuses it unless that display was started `--allow-reset`, and the refusal is quoted in the daemon's words |
 
 ### How the three columns get their sizes, and why the preview is never bigger than the glass
@@ -371,11 +371,12 @@ comparison itself - stated as a gap, because a gate over it would only re-quote 
 A checkbox at the top of the controls column, default **off**, folds away twelve
 secondary controls: the `canvas` and `scrim` pickers, the fan-figures switch, the
 display's last six port actions, the "send frames for 30 s" run, the panel-status
-box - the `conn 1` report and its `Refresh` button go with their box - the factory
-reset's whole box, its word field and its button with it, three controls in one, and
-the **pane-readings box** feature G added: the combo that chooses what body the
-editor's picture is painted from, and the file field that comes with it.  Two of the
-three boxes fold at the foot
+box - the `conn 1` report and its `Refresh` button go with their box - and the
+factory reset's whole box, its word field and its button with it, three controls in
+one.  The **pane-readings knob** feature G added does *not* fold: it chooses the body
+the picture on the row beneath it is painted from, so it sits under `playing` above the
+preview pane and stays on screen, shut (not hidden) while no layout is open.  Two of the
+two boxes fold at the foot
 of the preview column, under the log, rather than as loose rows in the controls
 column: `conn 1` answers with fourteen fields that wrapped to about ten lines in a
 300 px column, and the picture's column is the one with height spare below a 480 px
@@ -775,53 +776,74 @@ commonly gets wrong:
   reaches a generated layout - by `themes.with_ink`, into a copy, so what Save writes keeps
   the file's own colours - and does not reach anybody else's: open `Theme_28` and an ink moves
   it 0 px (docs/theme-editor.md).
-* **The pane can also look at another body's readings, without editing in them.** Under the
-  advanced switch, a folded box called **Pane readings** offers three entries: `the fixture`
-  (what a fresh window opens at, and what every act that writes a number is drawn and judged
-  at), `this machine's readings`, and `a metrics file` taking the path of a JSON `STATE all 1`
-  body - **the same shape and the same loader `--metrics-file` uses**, `main.read_metrics_file`,
-  because one file shape has to mean one thing in one program: its sections replace whole
-  sections of what this machine answers, `_`-prefixed keys are comments in the file rather than
-  sections, and a file that cannot be read or is not a JSON object is refused in words instead
-  of painting half a body. Nothing about a peek is remembered, and nothing in it is sent:
-  the peek paints, it never uploads.
-* **The instant stays pinned, and the readings stay held - both are what make a peek one
-  picture rather than a slideshow.** The instant is the file-fact half of that: the painter takes
-  `Date`, `Time` and `Week` from the instant it is handed rather than from any reading, the
-  library's rows ask for **2** of those **3** names, and **17** rows read them - so a peek drawn
-  at the wall clock rewrites those rows every second and the same look twice would not be the
-  same picture. Held means the numbers are read once, when the reader chooses the entry, and
-  again only when they choose the entry they are already on: choosing it a second time *is* the
-  re-read. What following the sensors instead would cost belongs to the machine and the moment,
-  so `tests/test_peek_readings.py` times one read, one draw and one second of following, and keeps
-  and the moved pixels it measured rather than this page quoting any of them. What moves between
-  the pinned frame and a live one is measured the same way, never assumed: `tests/test_peek_readings.py` draws the
-  layouts it can open twice, at the fixture and at this box's own readings, and counts how many
-  row boxes land elsewhere and how many of the points it probes on the glass answer a
-  **different row** in one frame than the other - asserting both counts are non-zero before
-  printing them, because the whole rule below rests on those frames disagreeing.
-* **A press on a peek is refused, in the model's words, and the marks go away.**
-  `edit.Editor.peek_refusal` owns that sentence, and the window quotes it instead of
-  paraphrasing: *"A press on the glass
-  moves nothing while the pane is peeking at readings"* - then the one knob that puts the
-  editable frame back. An arrow key gets the same answer in its own words. The dashed box, the
-  eight resize squares and any snap guide are all hidden while a peek is up, because every one
-  of them is drawn from the pinned row's edges while the ink you are looking at sits elsewhere,
-  and a handle drawn over nothing is a lie; the pane's tooltip says so before a press is wasted.
-  The reason the geometry doors stay shut, rather than working off the live boxes, is that any
-  number a drag wrote there would belong to a sample that is gone a second later - and feature
-  F derives a centre-anchored row's `x` from the width of its ink, which follows the reading.
-  Feature D's squares are the same hazard from the other end, and the distinction matters:
-  `size_edges` **never consults a reading** - it pushes each of the eight through
+* **The pane can also be painted from another body of readings.** On the row between `playing`
+  and the picture, a knob called **pane readings** offers three entries: `the fixture` (what a
+  fresh window opens at, and what every act that writes a number is drawn and judged at), `this
+  machine's readings`, and `a metrics file` taking the path of a JSON `STATE all 1` body - **the
+  same shape and the same loader `--metrics-file` uses**, `main.read_metrics_file`, because one
+  file shape has to mean one thing in one program: its sections replace whole sections of what this
+  machine answers, `_`-prefixed keys are comments in the file rather than sections, and a file that
+  cannot be read or is not a JSON object is refused in words instead of painting half a body.
+  Neither choice is remembered and neither is sent: the pane paints, it never uploads.  It does not
+  fold with the advanced switch - it is a choice about the picture, and a control that chooses the
+  picture belongs above it - and while no layout is open it is **shut**, not hidden, and the note
+  line says what there is nothing to peek at.
+* **Two bodies, two rules, and the difference between them is a press.** `this machine's readings`
+  is **live**: the preview tick re-reads this box at `--preview-fps`, and the dashed box, the eight
+  squares, the hit test and the snap guides are taken from *that* paint, so the row you point at is
+  the row whose ink you pointed at and the doors stay open.  `a metrics file` is **held**: read once
+  when the path is named, so the same file named twice paints the same pixels, and on that frame a
+  press, a drag, an arrow key and a handle are refused and the marks go away.
+* **A live pane reads on its tick and nowhere else, and the checks count that rather than timing
+  it.** A pointer event that samples this machine is the cost the drag section above spent a whole
+  cycle removing, and `tests/test_canvas.py` holds the count at zero for a drag; live peeking does
+  not put it back.  The counts, from `tests/test_peek_readings.py`: pressing the knob samples twice
+  (the body it names, and the repaint that press triggers); one preview tick samples once, and the
+  layer comes out **byte-identical to that sample drawn through a second editor object over the
+  same file**, which is what keeps "the pane shows what it read" from being a tautology; an arrow
+  key plus a `readings=False` repaint - the two halves of a drag - sample **not at all**, while the
+  row still moves 3 px.  The **drawings** are counted the same way, and it turned out to matter: a
+  live pane that painted the pinned fixture first and the live body second cost **19.9 ms a drag
+  move against 11.6 ms** on this bench, and in live mode nothing reads the fixture's boxes any
+  more, so that first drawing was a whole picture nobody looks at.  One drawing per live repaint,
+  two per held one - a held frame genuinely has two frames in use, its pixels from the file and its
+  doors at the pinned fixture - and `tests/test_peek_readings.py` holds both counts, so neither
+  half can quietly fall to zero.  The bodies in that check are authored here (the fixture's own,
+  and that body with `cpu.temperature` at **104.0**), so which of the two a pixel came from answers
+  the same on this bench and on CI's runner; what a real second of this box's sensors is worth is a
+  figure for `tools/dragcost.py` to print, not one for this page.  The instant stays pinned even while the
+  numbers do not, and that half is a file fact: the painter takes `Date`, `Time` and `Week` from the
+  instant it is handed rather than from any reading, the library's rows ask for **2** of those
+  **3** names, and **17** rows read them - so a live *clock* would rewrite those rows every second
+  and two looks at one body would not be the same picture.  (Until this cycle this page said
+  `tests/test_peek_readings.py` *timed* a read, a draw and a second of following.  Nothing in that
+  file times anything: the sentence had outlived the check, and it is dropped here rather than
+  carried forward.)
+* **On a held frame the geometry doors stay shut, in the model's words.** `edit.Editor.peek_refusal`
+  owns the sentence and the window quotes it instead of paraphrasing: *"A press on the glass moves
+  nothing while the pane is peeking at readings"* - then the one knob that puts the editable frame
+  back.  An arrow key gets the same answer in its own words.  The dashed box, the eight resize
+  squares and any snap guide are all hidden, because every one of them would be drawn from the
+  pinned row's edges while the ink on screen came from another body, and a handle drawn over nothing
+  is a lie; the pane's tooltip says so before a press is wasted.  The measurement under that rule is
+  in `tests/test_peek_readings.py`: the same layout drawn at the fixture and at a pinned body that
+  sets `cpu.temperature` to **104.0**, probed on a 6 px grid, counting the points that answer a
+  **different row** in one frame than in the other - and both that count and the number of moved row
+  boxes are asserted non-zero before they are printed, because the whole rule rests on those frames
+  disagreeing.  Why the *held* frame keeps the doors shut while the live one opens them: a number
+  written at a body that is not this machine's current one belongs to a sample that is gone a second
+  later, and feature F derives a centre-anchored row's `x` from the width of its ink, which follows
+  the reading.  Feature D's squares are the same hazard from the other end, and the distinction
+  matters: `size_edges` **never consults a reading** - it pushes each of the eight through
   `_resize_plan` with the box it is handed and nothing else, so the rule is **one box, one
-  answer** - but that box is what the painter drew, so a different body can change which
-  squares exist to be grabbed at all. The census asserts the rule and prints the consequence:
-  no row is ever offered two answers at one box, every row whose offer moved had its box move
-  with it, and `tests/test_snapping.py` names that row, its two boxes and both offers in its own failure message rather than
-  putting the count on this page, because which box a face draws belongs to the machine
-  drawing it.
-  Only the picture changes: the model is untouched, and `tests/test_canvas.py` proves it by comparing the
-  file's bytes, the undo count and the `dirty` flag after a refused press and a refused key.
+  answer** - but that box is what the painter drew, so a different body can change which squares
+  exist to be grabbed at all.  The census asserts the rule and prints the consequence: no row is
+  ever offered two answers at one box, every row whose offer moved had its box move with it, and
+  `tests/test_snapping.py` names that row, its two boxes and both offers in its own failure message
+  rather than putting the count on this page, because which box a face draws belongs to the machine
+  drawing it.  Only the picture changes: the model is untouched, and `tests/test_peek_readings.py`
+  proves it by comparing the file's bytes, the undo count and the `dirty` flag after a refused press
+  and a refused key.
 * **What a peek shows, the note lines say.** The lines under the field rows are re-computed
   against the frame on screen - at a file body that pins `cpu.temperature` to **104.0** a
   temperature row reads `104°C`, where the same row reads `57°C` at the fixture - because the
@@ -830,9 +852,13 @@ commonly gets wrong:
   frames, **every** difference is a *value*, with the reason strings (`no reading for …`, an
   unanswered `source`, a `format` the value cannot be dressed in) left alone. The two halves
   keep their own rules - the note describes the picture, the doors write the file - and the
-  badge under the picture names the body the picture came from: `pane: PEEK - this machine's
-  own sensors, held | this machine: …`, with the pane's caption saying the same in a sentence
-  and the model's `peek_sentence` carrying the numbers behind the frame.
+  badge under the picture names the body the picture came from and whether it is still
+  current: `pane: LIVE - this machine's own sensors, live at each preview tick | this machine:
+  …` for the frame that follows the box, `pane: PEEK - /path/pin-104.json (cpu) over this
+  machine's reading | this machine: …` for one held from a file.  The pane's caption says the
+  same in a sentence - `last read HH:MM:SS` for a live frame, `held since HH:MM:SS` for a held
+  one, which is the difference a reader needs when the two lines disagree - and the model's
+  `peek_sentence` carries the numbers behind the frame.
 * The layout this box has open can be put on the glass, from this box.** `apply to the
   panel` sends one socket command - `("theme", <the name this box holds>)` - and
   nothing else. The theme box's `Apply these settings` is where clock size, canvas,
@@ -972,8 +998,11 @@ pulled onto a number this same file already uses, never onto a grid: the gcd of 
 declared `x` and of every declared `y` in the corpus is **1**, and only **27** of its
 **185** declared `x` values are multiples of 16, so these files have no grid to snap to
 and this program does not invent one and call it the vendor's.  Nothing about a row's
-*position* is guessed at either; the editor draws from the pinned fixture, never from a
-live sample - what a peek offers is a look, not an editing surface (the bullet above).
+*position* is guessed at either: the editor draws from the pinned fixture unless the reader
+chooses another body on the knob above the picture, and the marks always belong to the frame
+that is on screen.  `this machine's readings` makes the live frame the one a press answers at;
+`a metrics file` is a look, not an editing surface, and its doors stay shut (both in the
+bullet above).
 The theme combo lists the five names this program draws from code, because those are the
 five whose options the row under it edits - a title, a label, a `cold`/`hot` band, a
 gauge source; a file layout brings its own geometry and its own colours. A layout

@@ -12,9 +12,13 @@ no Qt in it, and the window's layout-editor row and the canvas in the preview pa
 shells over it: press a row's ink box to select it, drag it, nudge it with the arrow keys,
 add a row as a copy of one that already draws, remove and reorder down to but never past
 the last row, resize it through the size keys its kind owns. Since 2026-11-11 the pane can
-also *look* at another body's readings without writing to any: the peek puts
-`main.read_metrics_file` and `sensors.collect()` through `Editor.paint`, while
-`Editor.fixture()` stays the only pair a door that changes a number goes through.
+also paint from another body's readings without writing any of them to the panel: the knob
+above the picture puts `main.read_metrics_file` and `sensors.collect()` through
+`Editor.paint`.  On 2026-11-12 that split in two: `this machine's readings` is **live** - the
+preview tick re-reads, and the marks, the handles and the hit test come from that paint, so the
+frame on screen is the frame a press answers at - while `a metrics file` stays a **held** look,
+at the pinned instant, with the geometry doors shut and `Editor.fixture()` the only pair a door
+that changes a number goes through.
 
 What did not happen is the plan's last stage: **the glass pass**, the panel attached and
 the owner watching. No canvas claim on this page is measured on glass, and the rows that
@@ -294,7 +298,11 @@ Not built, and not claimed, as of the 0.5 tree this section describes: drawing t
 editor from live readings, and snapping to a grid - the files carry none. What landed on
 2026-11-10 (0.6), in place of the first of those, is the **peek**: the pane paints a held body -
 this machine's sensors, or a JSON `STATE all 1` file read through the same door `--metrics-file`
-uses - at the pinned instant, hides the marks, and refuses any act that writes a number.  The
+uses - at the pinned instant, hides the marks, and refuses any act that writes a number.  **The
+first of those is built as of 2026-11-12**: `this machine's readings` is live, the frame it paints
+is the one the geometry doors answer at, and it is still the file's numbers that are written - only
+the readings behind the pixels change, at `--preview-fps`.  A file body keeps the 0.6 rule: held,
+marks hidden, writes refused.  The
 rows themselves landed that same day: added as a copy of a real row, removed, reordered, and
 resized by dragging the squares on their box - each kind through the size keys the
 painter actually reads for it, which is a sentence per kind rather than one handle. And
@@ -371,12 +379,16 @@ the rounding above, said out loud rather than hidden behind a mode.
 
 Not built, and not claimed: a snap to a grid (the corpus has none: the gcd of every
   declared placement is 1), and anything at all to the panel. Live readings came in on
-  2026-11-11 as the peek, and its shape is the measured half of this section: the pane
-  can *look* at another body, held and at the pinned instant, while every act that
-  writes a number stays drawn and judged at the pinned fixture - because at another
-  body's readings the row boxes move and the same point on the glass answers a different
-  row, counts `tests/test_peek_readings.py` makes on the machine it runs on rather than
-  quoting here. What landed on 2026-11-10 is the structural edit - a row added is a copy
+  2026-11-11 as the peek, and its shape is the measured half of this section; it split
+  in two on 2026-11-12.  A **file** body is held and at the pinned instant, a look only, and
+  every act that writes a number stays drawn and judged at the pinned fixture - because at
+  another body's readings the row boxes move and the same point on the glass answers a
+  different row, counts `tests/test_peek_readings.py` makes on the machine it runs on rather
+  than quoting here (the same probe is what says a *handle taken from the wrong frame* is a
+  real hazard and not a story).  **This machine's readings** answers at its own frame
+  instead: the marks come from the paint that is up, so the same probe finds no lie to
+  refuse, and the count that file holds instead is what the live pane must not do - read the
+  box on a pointer event, which is one sample per preview tick and none per mouse-move. What landed on 2026-11-10 is the structural edit - a row added is a copy
   of a row that already draws, its position chosen by the painter's boxes rather than
   guessed, its order the list's order, its removal refused at the last row in the
   library's own words - and the edges: eight squares on the selected row's box, only the
@@ -822,7 +834,7 @@ What the stages turned into, in the order they landed: the resolver and `--list-
 the export machinery and the file model on 2026-11-08, then the editor's model with the
 window's row over it and the canvas in that pane the same day; `bars` as a generated file
 and a changed drawing on 2026-11-09; rows added, removed, reordered and resized on
-2026-11-10; the peek on 2026-11-11. The census half of stage 5 is `tests/test_field_census.py`
+2026-11-10; the peek on 2026-11-11; and on 2026-11-12 the peek split into a live body and a held one, with its knob moved onto the row above the picture it chooses. The census half of stage 5 is `tests/test_field_census.py`
 and `tests/test_editor.py` rather than a page of queries, and stage 6 - on glass - has not
 run.
 

@@ -1891,23 +1891,39 @@ class Editor:
                 + (f"  (no reading for {', '.join(sorted(absent))})" if absent else ""))
 
     def peek_sentence(self, source: str, metrics: dict, when: datetime.datetime,
-                      held: str = "") -> str:
-        """What the pane says about a frame it is only looking at.
+                      held: str = "", live: bool = False) -> str:
+        """What the pane says about a frame painted from a body that is not the fixture.
 
-        Four things in one sentence, because a reader could get each of them wrong
-        without it: which body the picture came from, that the instant is still the
-        pinned one, that nothing on this frame can be grabbed or sent anywhere, and
-        which knob puts the editable frame back.  The instant is
+        Four things in one sentence, because a reader could get each of them wrong without
+        it: which body the picture came from, that the instant is still the pinned one, what
+        a press on this frame does, and which knob puts the fixture back.  The instant is
         pinned on purpose, and that part is a file fact: the painter takes `Date`, `Time`
         and `Week` from the instant rather than from any reading, the layouts ask for two
-        of those three names, and **17** rows read them - so a live clock rewrites those
-        rows every second and the same peek twice would not be the same picture.  Held
-        means the numbers are re-read only when the reader asks again: a frame that
-        followed this machine's sensors moved a lot of pixels with no edit involved.  What
-        `tests/test_peek_readings.py` holds is the rule - a body is sampled once per press and
-        left alone by a repaint; how much a second of this box's load is worth belongs to the
-        box.
+        of those three names, and **17** rows read them - so a live clock would rewrite
+        those rows every second and two looks at one body would not be the same picture.
+        Only those three come from the instant; every number comes from the body, which is
+        what lets a live frame move at all.
+
+        `live` splits the sentence in two, because the two bodies answer a press
+        differently and one sentence would have to lie about one of them:
+
+        * **held** (`a metrics file`): read once, and the same file named twice gives the
+          same pixels, which is the whole use of looking at a saved sample.  Nothing on that
+          frame can be grabbed, because a number written at a body that is not this
+          machine's current one belongs to a sample that is gone.
+        * **live** (`this machine's readings`): re-read at each preview tick, with the marks,
+          the hit test and the handles taken from the paint on screen, so the row you point
+          at is the row you move.  What a read costs belongs to the machine, so
+          `tests/test_peek_readings.py` counts the reads an act makes - a preview tick reads
+          once, a pointer act reads not at all - rather than timing anything.
         """
+        if live:
+            return (f"live: the picture is {source}, at the pinned instant "
+                    f"{when:%Y-%m-%d %H:%M:%S}" + (f", last read {held}" if held else "")
+                    + ".  This is the frame your edits move: press, drag, arrow key and "
+                    "handle answer at these readings, and the next preview tick paints the "
+                    "next sample.  Nothing is sent to the panel either way: the pane paints, "
+                    "it does not upload.  " + self.values_line(metrics, when))
         return (f"peeking: the picture is {source}, at the pinned instant "
                 f"{when:%Y-%m-%d %H:%M:%S}" + (f", held since {held}" if held else "")
                 + ".  Nothing here is written or sent; the frame your edits move is the "
