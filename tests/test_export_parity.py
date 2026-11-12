@@ -163,5 +163,51 @@ class Parity(unittest.TestCase):
                                    "more pixels, not fewer")
 
 
+class TheBodyIsInputNotScratch(unittest.TestCase):
+    """Neither door may write to the readings it is handed.
+
+    Ported from the hole-in-the-readings block of the deleted suite, which was guarding its own
+    harness rather than shipped code - and had been breached: a gate that punched `memory.total`
+    out of the body it was handed, to ask what happens when a reading is missing, punched it out
+    of `fixtures.PARITY_CASES`' own inner dict.  Every check that ran after it drew a `bars`
+    frame with no RAM row, and the failures printed were about the themes, not about the gate
+    that caused them.  The same trap exists in the shipped program: the frame loop hands one
+    `sensors.collect()` body to `render.draw` once per frame, and a theme that popped a key out
+    of it would corrupt the next frame as well as the last.
+
+    So both directions are asserted: the doors leave the dict they are given exactly as they
+    found it, and a check that wants a hole asks for one on a copy.
+    """
+
+    def shape(self, index: int) -> str:
+        return json.dumps(fixtures.PARITY_CASES[index], sort_keys=True)
+
+    def test_both_doors_leave_their_body_as_they_found_it(self):
+        for name in sorted(render.THEMES):
+            for index, body in enumerate(fixtures.PARITY_CASES):
+                was = self.shape(index)
+                with self.subTest(theme=name, case=index):
+                    themes.parity(name, body, fixtures.SESSION_WHEN)
+                    render.draw(body, name, scrim=40)
+                    values, _gone = themes.values(body, fixtures.SESSION_WHEN)
+                    themes.fill_lines(values, body)
+                    self.assertEqual(self.shape(index), was,
+                                     f"{name} wrote to the readings it was handed: "
+                                     f"{was} became {self.shape(index)}")
+
+    def test_a_hole_asked_of_a_shared_body_leaves_the_shared_body_alone(self):
+        """The mistake itself, made here on a copy and undone by the assertion."""
+        was = {index: self.shape(index) for index in range(len(fixtures.PARITY_CASES))}
+        for index, body in enumerate(fixtures.PARITY_CASES):
+            mem = dict(body.get("memory") or {})
+            mem.pop("total", None)
+            with self.subTest(case=index):
+                themes.parity("bars", dict(body, memory=mem), fixtures.SESSION_WHEN)
+        for index in range(len(fixtures.PARITY_CASES)):
+            self.assertEqual(self.shape(index), was[index],
+                             "the probe reached into the shared fixture: later checks in this "
+                             "run would now be drawing a frame with no RAM row")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
