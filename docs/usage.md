@@ -65,8 +65,10 @@ tach spans, because a tach that stays flat while its own header's duty sweeps is
 identified, and that pairing had to be re-runnable by a reader.
 The same tool prints which channel answers the two fields that had been answering from the wrong
 place: the three tiers behind `motherboard.temperature` — Super-IO, then the DIMM SPD
-thermistors, then a network die as a last resort, with the driver's own `diode` label preferred
-inside a tier and labels naming a CPU or GPU excluded — and for `disk.temperature` the drive that
+thermistors, then on-board silicon that is not the board's sensor set — the NIC die and
+the X870's hub die — as a last resort, with the driver's own `diode` label preferred inside a
+tier, whole chips refused by name (`nvme`, `ath12k_hwmon`, `k10temp`, `amdgpu`) and labels naming
+a CPU or GPU refused too — and for `disk.temperature` the drive that
 holds `/`, its composite beside its raw probes, and every drive's slot number.  Both rules, the
 before-and-after numbers and the reason for each tier are in
 [limits](limits.md).  A layout reaches them through the source names `Disk Temperature` (the

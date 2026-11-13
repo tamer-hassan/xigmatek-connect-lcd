@@ -215,8 +215,9 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   `sensors.FAN_CHANNELS`, and the two fan figures `alpha` would draw from them.  It also
   prints **which channel answered each of the two fields that had been answering from the
   wrong place**: the three tiers behind `motherboard.temperature` (Super-IO / DIMM SPD
-  thermistors / network die as last resort), the one that won, its driver label and the labels
-  that were refused; and for storage, `sensors.drives()` itself — the list the `Disk N` slots
+  thermistors / on-board non-board-sensor silicon as last resort - the NIC die and the X870
+  hub die), the one that won, its driver label, the labels refused, and the chips refused by
+  name; and for storage, `sensors.drives()` itself — the list the `Disk N` slots
   index into, with each slot's number — followed by every drive's composite against its hottest
   and coolest raw probe.
   That makes it the command to run before believing any of the figures quoted for those fields
