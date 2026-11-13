@@ -788,17 +788,62 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     body, so nothing shows whether the panel reads the section, only that it
     does not refuse it.
 
+  * A sixth machine-dependence, found because the runner contradicted itself
+    rather than because this bench did.  `tests/test_blob_probe.py` had a check
+    asserting its per-drive list was non-empty - a fact about the host, not
+    the code.  CI #193 ran 526 checks green in 431.661 s; CI #194 ran the
+    **same 526 checks** to one failure in 460.878 s (`[] is not true : this
+    machine publishes no disk temperatures at all`), and the whole difference
+    between those two commits is eight lines of this file's prose (`git diff
+    --stat e69c5d7 61b1d6a`: one file).  So the green run had proved nothing
+    and the red run had proved nothing, in both directions: some runner images
+    publish a disk temperature chip and some do not.  The check now runs
+    against the built sysfs in `tests/test_sensor_rules.py`, whose three
+    drives are deliberately ordered one way by walk number and another way by
+    controller, so a list re-derived from the walk still fails there.
+
+    `tools/audit_bare_runner.py` turns that class of fault into a one-minute
+    measurement instead of a review: it points `sensors.HWMON_GLOB` at a
+    pattern matching no directory - a box with no hardware-monitoring chips at
+    all, stricter than any runner - and re-runs every test module that names a
+    live sensor door.  The list is **derived from each file's AST**, not grep:
+    a docstring quoting `sensors.collect()` is not a reader, while
+    `sensors.collect = lambda: body` is one, because that assignment is a
+    module admitting it would otherwise touch the machine.  Only the case the
+    AST cannot see - a test that runs a shipped CLI in a subprocess - is kept
+    by hand.  Here that reports 95 checks over 6 modules, 0 failures, 0 errors,
+    with `0 chips visible, 0 fan rows, motherboard() -> {}, drives() -> []`.
+
+    Ten checks in `tests/test_bare_audit.py` hold the tool's two promises, and
+    the census after them: the substitution pointed back at the real tree ->
+    2; the derivation finding nothing -> 4; the finder degraded to a text grep
+    -> 2; the `finally`-restore made a no-op -> 1; a derived module also
+    listed by hand -> 1; the tool not reporting what it substituted -> 1.  The
+    fourth of those read `0 failures` the first time it was run, and that
+    reading was its own trap: the mutation did not parse, so the test module
+    failed to import and the driver counted a run that had not happened.  The
+    driver now parses before it trusts a number and prints NOT MEASURED if it
+    cannot, and the mutation was rewritten to be valid.  A census that cannot
+    tell you it measured nothing is not a census - which is the same lesson as
+    a green CI run that never reaches the failing shape, arriving in the tool
+    built to look for it.
+
+
+
   * The suite's figures, re-read rather than inherited.  This bench,
     `python3 -W error::ResourceWarning -m unittest discover -s tests`, one
-    run of this tree with nothing else in flight: 536 checks in 51 files in
-    458.679 s, 3 skipped, one of them the tray check naming the host it needs,
+    run of this tree with nothing else in flight - the only edits made after
+    it are prose in this entry, re-gated by `tests/test_debian_changelog` in
+    0.02 s: 546 checks in 52 files in
+    463.635 s, 3 skipped, one of them the tray check naming the host it needs,
     and no `ResourceWarning` printed at all now that `setUp` closes its own
     file.  The count is read off the tree as well as off the runner: `grep -c
-    "^    def test_" tests/*.py` answers 536 over 51 files and
-    `unittest.TestLoader().discover("tests")` answers 536 over 51 modules - the
-    same numbers the runner prints.  The runner's sample for these 536 arrives
-    with the commit that reads it, as every cycle's has; #193's 431.661 s over
-    526 checks is the sample for the tree before the disk slots.
+    "^    def test_" tests/*.py` answers 546 over 52 files and
+    `unittest.TestLoader().discover("tests")` answers 546 over 52 modules - the
+    same numbers the runner prints.  #195's 405.906 s over 536 checks is the
+    runner's sample for the drives commit, and #193's 431.661 s over 526 the
+    sample for the tree before it; the sample for this fix lands with the run
+    that reads it, as every cycle's has.
 
     Three other whole-suite logs from today name nothing, and saying which is
     part of what this entry is for.  Two ran while a mutation sweep was
@@ -814,10 +859,11 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     timer mid-run, and `test_zz_isolation.py` named the process and said to
     close it - the guard that exists for "a test wrote your settings", meeting
     a person instead.  Earlier readings of this same sentence, each the tree at
-    that step: 526 over 51 (before the disk slots), 511 and 510 over 50 (the
-    sensor rules, and the fix to a check that read the wrong mount table), 496
-    over 49 (the pump rule) and 485 over 48 (before it).  They are kept because
-    the deltas are the checks each step added, not a drift.
+    that step: 536 over 51 (the disk slots and the probe's shipped-payload
+    binding), 526 over 51 (the probe tool's boundaries), 525 over 51, 511 and
+    510 over 50 (the sensor rules, and the fix to a check that read the wrong
+    mount table), 496 over 49 (the pump rule) and 485 over 48 (before it).  They
+    are kept because the deltas are the checks each step added, not a drift.
 
     CI's runner, the `tests/` step alone, over the cycles that added those
     checks: 337 s with 440 checks (#165), 387 with 441 (#168), 319 with 442
@@ -826,12 +872,14 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     (#178), 442.333 with 481 (#180), 336.831 with 485 (#184), 451.632 with 495
     (#186), 457.469 with 496 (#187), 453.508 with 496 (#188), 342.664 with 496
     (#189), 351.145 with 510 (#190, one failure), 460.228 with 511 (#191, one
-    error), 339.250 with 525 (#192, green and powerless) and 431.661 with 526
-    (#193) - the last several runs skipping 4 rather than 3, the extra one
-    being the glass ledger naming transcripts a runner with no panel has never
-    made, and the 9 s between #178 and #180 being what the six new checks cost:
-    five of them run a shipped script as a subprocess, and the interpreter
-    start-up that belongs to that is measured, not assumed.  #187, #188 and
+    error), 339.250 with 525 (#192, green and powerless), 431.661 with 526
+    (#193), 460.878 with 526 (#194, one failure) and 405.906 with 536 (#195,
+    green and lucky) - the last several runs skipping 4 rather than 3, the
+    extra one being the glass ledger naming transcripts a runner with no
+    panel has never made, and the 9 s between #178 and #180 being what the
+    six new checks cost: five of them run a shipped script as a subprocess,
+    and the interpreter start-up that belongs to that is measured, not
+    assumed.  #187, #188 and
     #189 are the honest trio: the same 496 checks, on the same YAML, in
     457.469 s, 453.508 s and 342.664 s - a 114.805 s spread across runs whose
     trees differed only in prose.  So a pair of these numbers can bound a count

@@ -332,12 +332,37 @@ class TheBodies(unittest.TestCase):
                          f"the value under test appears {both.count('Pump')} times: {both[:200]}")
 
     def test_a_drive_row_says_what_the_scalar_says(self):
-        """Per-drive rows exist to be compared against the single number already in the blob."""
-        rows = blob_probe.drive_rows()
-        self.assertTrue(rows, "this machine publishes no disk temperatures at all")
+        """The row's shape, on a **built** tree - because on the host it was a coin flip.
+
+        This check used to read this machine and assert the list was not empty, and the runner
+        proved that wrong in both directions with identical code: #193 ran 526 checks green in
+        431.661 s, #194 ran the same 526 to **one failure** in 460.878 s, and the whole diff
+        between those two commits is 8 lines of `debian/changelog` prose
+        (`git diff --stat e69c5d7 61b1d6a`).  Some runner images expose a disk temperature chip
+        and some do not, so the pass meant nothing either time - `AssertionError: [] is not
+        true : this machine publishes no disk temperatures at all`.  The built tree answers the
+        same question about the payload without depending on whose VM it is.
+        """
+        tmp = tempfile.TemporaryDirectory(prefix="xigma-probe-rows-")
+        pattern = make_tree(tmp.name)
+        real_glob = sensors.HWMON_GLOB
+        sensors.HWMON_GLOB = pattern
+        try:
+            rows = blob_probe.drive_rows()
+        finally:
+            sensors.HWMON_GLOB = real_glob
+            tmp.cleanup()
+        self.assertEqual([r["name"] for r in rows], list(DRIVE_SLOTS),
+                         f"the payload is not the shipped list: {rows}")
+        self.assertEqual([r["temperature"] for r in rows], list(DRIVE_TEMPS),
+                         f"a row's number is not the composite-or-hottest rule: {rows}")
         for r in rows:
-            self.assertIn("temperature", r)
-            self.assertTrue(0 < r["temperature"] < 120, r)
+            self.assertEqual(sorted(r), list(DRIVE_KEYS),
+                             f"a key appeared in the certified payload: {r}")
+            self.assertTrue(0 < r["temperature"] < 120,
+                            f"not degrees: {r} - a millidegree leak would print 41850")
+        self.assertGreater(max(rows[0]["sensors"]), rows[0]["temperature"],
+                           f"the row hides the hotter raw probe it exists to show: {rows[0]}")
 
 
 class TheShippedDoor(unittest.TestCase):

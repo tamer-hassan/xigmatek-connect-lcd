@@ -1359,11 +1359,13 @@ default in the inspector is the vendor's own constant instead of our census. No 
 from the vendor app is tracked here - only their file names, in PROTOCOL.md section 10 -
 so it needs the installed app off the Windows machine again.
 
-### Five harness rules, each found the expensive way
+### Six harness rules, each found the expensive way
 
 Four of them failed in the check rather than in the program, which is why they are in `tests/`
-and not in a cautionary note; the fifth is about the sitting itself, and it cost two bogus
-suite logs before it was understood.
+and not in a cautionary note.  The fifth is about the sitting itself, and it cost two bogus
+suite logs before it was understood.  The sixth is about the machine under the check, and it
+cost a CI run that went the other way: the same check, the same 526 checks, green on one runner
+image and red on the next.  That one ships with a command.
 
 * **A shared body is an input, not a scratch pad.** `Editor.fixture()` once returned
   `dict(FIXTURE)`: one level deep, so every inner dict was the module's own object. A check
@@ -1418,6 +1420,46 @@ page* is running - `tests/test_bars_rows.py`, `test_ink.py`, `test_knobmap.py`,
 `test_specials.py` and `test_glass_ledger.py` all quote these documents - so the suite figure
 a changelog entry carries names one run taken with nothing else in flight, and the two
 contaminated logs from that afternoon are worth nothing except the rule above.
+
+
+And a sixth, from the same afternoon, which comes with a command rather than a caution: **a
+check may not assert what the host happens to expose.**  Six of this session's faults were
+that shape - a mount table that names `nvme0` (#190), a `disk` section implying a
+`temperature` key (#191), a drive whose temperature holds still across a function call
+(`38 != 39`), the same drift re-committed in a new check an hour later (`[44, 58, 68]` against
+`[44, 59, 68]`), a call named in a file being a call that runs, and a probe check asserting
+its drive list was non-empty.  That last one is the proof, because **the check was identical in
+two runs with opposite outcomes**: #193 ran 526 checks green in 431.661 s, #194 ran the same
+526 to one failure in 460.878 s, and `git diff --stat e69c5d7 61b1d6a` is eight lines of
+`debian/changelog` prose.  Some runner images publish a disk temperature chip and some do not,
+so both of those runs were luck.
+
+So the audit for this class is not reading the tests and hoping, it is
+`tools/audit_bare_runner.py`: it points `sensors.HWMON_GLOB` at a pattern that matches no
+directory - a box with no hardware-monitoring chips at all, stricter than any runner - and
+re-runs every test module that names a live sensor door.  Which modules those are gets
+**derived from each file's AST**, not from a hand-kept list and not from grep: a prose mention
+of `sensors.collect()` is not a reader, while `sensors.collect = lambda: body` is one (that
+assignment is a module admitting it would otherwise touch the machine).  The one hand-kept part
+is `EXTRA_MODULES`, for the case the AST cannot see - a test that runs a shipped CLI in a
+subprocess, where the live call happens in the child - and `tests/test_bare_audit.py` requires
+those entries to be genuinely invisible to the derivation, so the two lists cannot overlap into
+a second copy of a rule.
+
+On this box the whole audit reports **95 checks over 6 modules, 0 failures, 0 errors** in
+about a minute, with `0 chips visible, 0 fan rows, motherboard() -> {}, drives() -> []`.  A
+module that goes red there is asserting what the host exposes, and the repair is the same two
+moves every time: construct the inputs, or assert a relation instead of a reading.
+
+One more thing that audit taught, about censuses rather than code.  Breaking the tool's
+`finally`-restore the first time produced a mutation that **did not parse**, so the test module
+failed to import and the driver counted "0 failures" - a free pass in a census whose entire
+purpose is to notice a missing guard.  The driver now parses the mutated file before trusting
+the number and prints `NOT MEASURED` when it cannot, and the mutation was rewritten to be
+syntactically valid (`finally:` kept, its body made a no-op).  Six mutations, each counted
+after that fix: the substitution pointed at the real tree -> 2; the derivation finding nothing
+-> 4; the finder degraded to a text grep -> 2; the walk never restored -> 1; a derived module
+also listed by hand -> 1; the tool not reporting what it substituted -> 1.
 
 ## What this document does not claim
 

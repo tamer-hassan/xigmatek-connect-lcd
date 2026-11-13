@@ -178,6 +178,21 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   what the write costs first.
 * `tools/state.py` — read-only snapshot of what `conn` reports (`--watch N` to repeat).
   The first thing to run after any boot or reset; it writes nothing.
+* `tools/audit_bare_runner.py` — the suite's own machine-independence check, run against the
+  suite rather than against a device.  It points `sensors.HWMON_GLOB` at a pattern that matches
+  no directory - a box with no hardware-monitoring chips at all, which is stricter than any CI
+  runner - and re-runs every test module that names a live sensor door, a set **derived from
+  each file's AST** so it cannot go stale and cannot be padded by prose that merely mentions
+  `sensors.collect()`.  This exists because a check asserting the host has a disk temperature
+  chip passed CI #193 and failed CI #194 on code eight lines of changelog prose apart: both
+  outcomes were luck.  On this bench it reports 95 checks over 6 modules with no failures and
+  no errors, about a minute; the failures it is meant to surface are the class this repository
+  has hit six times in one session - a mount table naming `nvme0`, a `disk` section implying a
+  `temperature` key, two live reads of a warming drive compared against each other, a call
+  named in a file taken for a call that runs.  `tests/test_bare_audit.py` gates the tool's two
+  promises: that the derivation still finds a module it should (it writes one that calls
+  `sensors.disk()`, and one that only talks about it) and that the substituted walk is restored
+  in a `finally`.
 * `tools/blob_probe.py` — **the one tool here that sends a body the vendor never sent**, written
   to settle two questions the documents could only have marked unmeasured: does the panel answer
   a `STATE all 1` frame carrying an extra top-level section (`drives`, which is what per-drive
