@@ -167,7 +167,8 @@ class RenamingACopy(fixtures.FreshConfigRoot):
         super().setUp()
         _rec, self.src, _soft = themes.copy_for_edit(SOURCE)
         self.obj = themes.load(self.src)
-        self.raw0 = open(self.src, "rb").read()
+        with open(self.src, "rb") as fh:
+            self.raw0 = fh.read()
         self.pixels0 = themes.draw(self.obj, {}, WHEN)[0].tobytes()
 
     def test_a_rename_changes_the_id_and_nothing_else_in_the_file(self):

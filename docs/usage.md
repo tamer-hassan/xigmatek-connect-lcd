@@ -283,14 +283,25 @@ claim:
   element - no separator, no leading dot, at most 64 characters, never one of the five
   names drawn from `render.py`, and never ending in `.json`, `.bak` or `.tmp`, the
   suffixes this program writes beside a layout. The two acts that *invent* a name (a
-  rename, and the window's `save as`, both of which ask `themes.new_name` before they
-  write) also require it to be clear of all 27 layout names - folded, because
+  rename, and the window's copy door - `save as` until 2026-11-13, `copy to a new name`
+  since - both of which ask `themes.new_name` before they write) also require it to be
+  clear of all 27 layout names - folded, because
   `resolve()` folds case - and of all 27 ids, because `resolve()` matches those too; and
   a copy taking a new name takes a fresh id with it, so no two files ever answer one
   `--theme <id>`. Writing an edited copy *at* a vendor's name is a different act - it
   is what shadows that layout, and docs/gui.md's `Opening writes nothing` bullet says
   why that is the file model's point rather than a hole in it. Stage 4 of
   [theme-editor.md](theme-editor.md) is the window that drives all of it.
+* **A save and an apply are not opposites, and neither one is a no-op.** Three reports on
+  2026-11-13 all came back to one rule: a layout reaches the glass as a **name**, and the
+  display draws the file that name answers in the roots *it* can read. So `save as your
+  copy` on its own can change what the panel is painting - a loop already naming that
+  layout re-resolves the file on every frame, and never waits for an apply. And `apply to
+  the panel` on its own changes *which* layout the panel draws, and carries none of the
+  keystrokes still sitting in the editor's buffer, so at a name the panel already holds it
+  looks exactly like nothing happened. The window now says which of the two it is about to
+  change, in differing pixels, before the command goes; `docs/gui.md` carries the
+  sentences and `docs/theme-editor.md` the two figures this bench measured.
 
 ## Two processes, one port
 

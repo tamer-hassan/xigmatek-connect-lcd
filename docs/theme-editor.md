@@ -403,7 +403,8 @@ Not built, and not claimed: a snap to a grid (the corpus has none: the gcd of ev
   13-digit id for any copy that takes a new name, and a menu, a state line and a revert
   sentence that all ask `themes.resolve()` what answers the name now instead of
   remembering what answered it when the layout was opened. docs/gui.md carries the
-  bullets and the digits they hold.
+  bullets and the digits they hold.  (That button was relabelled `copy to a new name` on
+  2026-11-13, for a reason written up under "What a press carries", below.)
 
 ## What generating an export actually found
 
@@ -1031,6 +1032,84 @@ more thing worth recording: replacing the unit file under a running unit makes s
 the reload it names before a restart draws with the new code.
 
 
+### What a press carries, and what a save does by itself (2026-11-13)
+
+Three reports the same morning, all about one workflow, and none of them about a colour:
+
+| what was reported | what had actually happened |
+| --- | --- |
+| "`save as your copy` immediately applies the textColor change of the special `temp-values` in `alpha_new`" | the design, working - and it worked because of an earlier press. `save` writes `~/.config/xigmalcd/themes/alpha_new.json`; a loop that already **names** `alpha_new` re-resolves that name every frame, so its next frame reads the new bytes. This owner's unit line says `--theme alpha`, so the name can only have got there over the socket - one `apply to the panel` they had pressed. That is the same press the next report calls useless, which is what made the pair look contradictory |
+| "`apply to the panel` has no effect, if pressed before `save as your copy`" | half true, and the true half had been reported as success. Measured against a stub display: the press moved one setting - `args.theme`, the *name* the panel draws - and no pixels, because the picture comes from a file and the edit had never left this window's buffer |
+| "making changes to `alpha_new` and pressing `save as` doesn't seem to have any effect, even if followed by pressing `apply to the panel`" | nothing written, twice. The button labelled `save as` was pressed with `alpha_new` typed into the box beside it, and `themes.new_name` refuses a name something already answers - `'alpha_new' is not a free name: your copy 'alpha_new' answers name 'alpha_new' today, at …`. `save as` reads as an in-place save, so the refusal looked like a silent success; the `apply` that followed sent the name the panel already held, which moves no pixel |
+
+One sentence sits under all three, and it was already in PROTOCOL.md §11 and in the
+state line - **a display is only ever told a name**.  `("theme", <name>)` is a whole
+command; what the panel then paints is whatever that display's own `themes.resolve()`
+answers, in the roots *that* process can read, or `render.theme_<name>` for one of the
+five names drawn from code.  A layout file never goes over the wire.  So a save can
+move the glass on its own, and an apply cannot carry a keystroke: they are not two
+opposite buttons, they are two different objects - a file and a setting.
+
+What was wrong is that the window reported the second case as a plain success.  It now
+compares the two pictures before the command goes, and says the difference out loud:
+
+* `xigmaui/app.py`'s `_frame_diff` counts pixels where two frames disagree, and the
+  press paints both of them: the buffer through `Editor.paint`, and what the press will
+  put on the glass through the door the display uses - `themes.paint` for the record
+  `themes.resolve()` answers, `themes.draw(themes.export(name))` for a generated name,
+  which `themes.parity` holds at **0** differing px against `render.theme_<name>`.
+* One body and one instant - `Editor.fixture()` - for both frames, so the only thing
+  the number can be about is the two pictures.
+* Measured on this bench, with a `textColor` typed into the `temp-values` row and
+  nothing saved: **6812 px between what is on screen here and the file
+  …/alpha_new.json** - and **1914 px** for the same edit on the generated `gauge`, where
+  the sentence names `render.py` instead of quoting a path that does not exist, and
+  points at `copy to a new name` because `themes.save` refuses `gauge.json`.  Both
+  figures are this machine's: a px count over glyph pixels is a face metric like every
+  other one in these pages, which is why the press prints it rather than the page.
+* The clean case is held too, so the sentence stays a difference rather than a
+  disclaimer: after `save as your copy` the same press says nothing about pictures,
+  because the pane and the file agree.
+* A third branch, refused rather than painted: this window reads a file for that name
+  and *that* display may not see the root it lives in.  No px figure is claimable
+  there - the comparison would need the other process's roots - so the line says what
+  the display will draw instead, and the display's own refusal still lands in the log
+  in its own words.
+
+The button in the third report is renamed `copy to a new name`, and its tooltip states
+the refusal before the press (`'<name>' is not a free name`), points at `save as your
+copy` for the layout already open, and says no file changes.  Nothing was loosened: a
+second file at a live name is still refused, for the reasons the 2026-11-11 name-rule
+section measured.  The apply button's tooltip gained the same fact, and the state line
+under the rows says `edits in this buffer only: no file has them, so no display can
+draw them` instead of `edit not saved yet`.
+
+Twelve checks in `tests/test_apply_layout.py`, four of them new: the dirty press that
+says the two pictures differ and changes no file; the clean press after a save that
+must *not* warn; a generated name, which must name `render.py` and not quote a path;
+and the whole reported copy sequence - re-ink, press the copy door at the open name,
+count the user's root twice, press `apply to the panel`, compare the inks in buffer and
+file again.
+
+Shown non-vacuous the same way as every other cycle, one mutation at a time (twelve
+checks as shipped, 0 failures): the comparison never spoken at all → **3**; the same
+sentence spoken but only **after** the display has answered → **1**, which is what makes
+the ordering in the first check a gate and not a flourish; the buffer clause dropped →
+**3**; the pixel comparison made to answer **0** whatever the frames are → **3**; the
+comparison taken against the pane's own frame, so it always agrees → **3**; the
+generated-name branch dropped, so a code-drawn name is reported with a file it has
+never had → **1**; the button relabelled back to `save as` → **1**; the state line back
+to `edit not saved yet` → **1**; the apply button's tooltip clause dropped → **1**; the
+copy button's refusal sentence dropped → **1**.  Back as shipped: 0.
+
+What is **not** claimed: that the number is the same on another machine.  It counts
+glyph pixels on the faces this box has installed, and the checks assert it is non-zero
+for a changed row and absent for a saved one, never a value.  Nor is anything new sent:
+no auto-save, no "apply writes your buffer" door, because the wire has no layout half
+(§11) and a press that quietly wrote a file would be the second source of truth this
+file model exists to avoid.
+
+
 ## The surface, and the geometry it must not break
 
 
@@ -1095,7 +1174,9 @@ drawing on 2026-11-09; rows added, removed, reordered and resized on 2026-11-10;
 moved above the picture, the two painters' value tables made into one, and the two doors that
 decide *which file* the editor's box holds.  On 2026-11-13 the check that runs against a real
 install met a machine that had been used, and the layout **reader** learned the rule the
-layout writer has always had.  What has not run is stage 6 - on glass.
+layout writer has always had; later the same day three reports about the save-and-apply
+workflow turned into a pixel comparison between the pane and the picture a press will make,
+and one button renamed for what it actually does.  What has not run is stage 6 - on glass.
 
 Optional, half a sitting: re-read the vendor's renderer bundles with
 `tools/asar_extract.py --cat out/renderer/assets/themeUtil-*.js` so every spin range and

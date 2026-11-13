@@ -22,6 +22,12 @@ So this file drives the narrow door and holds the window to what it owes a reade
 * the two box counts the log prints are the **file's**, counted through the loop's own door
   (`themes.paint`) at this machine's readings and at the pinned fixture - not the editor's buffer,
   which holds acts nobody saved, and not the pane's door, which is a different function;
+* the press says, before it sends, when the picture in this pane and the picture the display
+  will make are not the same - counted in pixels, both painted at one body and one instant -
+  because `apply` sends a *name* and the display reads a file: reported 2026-11-13 as "apply
+  to the panel has no effect, if pressed before save as your copy", and true, since the edit
+  had never left the window.  The clean case is held too, so the sentence is a difference and
+  not a disclaimer, and a generated name says what `render.py` draws instead of quoting a path;
 * when the display refuses, the window quotes the display's own words **before** offering its own
   reason, because the two possible reasons - an old build whose door has no layout half, or a new
   build whose roots do not hold this file - live inside those words, and a paraphrase throws the
@@ -112,6 +118,176 @@ class ApplyingALayoutToADisplay(DisplayHarness):
         self.assertEqual(self._other_settings(), self.other,
                          "the refusal still reached the display's settings")
         self.assertIsNone(self.ctl.take(), "a refusal queued an action on the port's behalf")
+
+    # ---- what a press cannot carry: the pane's picture vs the file's -----------------------
+    def row_with_a_colour(self) -> int:
+        """The first row this window can re-ink, from the layout it has open."""
+        for i, w in enumerate(self.win.ed.widgets()):
+            if str((w.get("property") or [{}])[0].get("textColor") or ""):
+                return i
+        raise AssertionError("no row of this layout carries a `textColor` to change")
+
+    def ink_of(self, index: int) -> tuple:
+        """That row's ink in the buffer and in the file, in the order a reader can compare."""
+        name = str(self.win.ed.name)
+        prop = self.win.ed.widgets()[index]["property"][0]
+        buffer = str(prop.get("textColor") or "")
+        rec = themes.resolve(name)
+        if rec is None:
+            return buffer, ""
+        twin = themes.load(rec["path"])["osd"]["widget"][index]
+        self.assertEqual(str((twin.get("property") or [{}])[0].get("id") or ""),
+                         str(prop.get("id") or ""),
+                         f"row {index} of the buffer is not row {index} of {rec['path']}, so "
+                         "comparing the two by position is reading the wrong pair")
+        return buffer, str((twin.get("property") or [{}])[0].get("textColor") or "")
+
+    def reink(self, index: int, colour: str) -> None:
+        """Type an ink into the window's own row control, and commit it as a keystroke would."""
+        self.win.ed_widget.setCurrentIndex(index)
+        fixtures.pump(0.3)
+        box = self.win.ed_rows["textColor"][2]
+        box.setText(colour)
+        self.win._ed_apply_row("textColor", commit=True)
+        fixtures.pump(0.3)
+
+    def test_an_unsaved_edit_is_said_before_the_press_that_cannot_carry_it(self):
+        """Reported 2026-11-13: "apply to the panel has no effect, if pressed before save as
+        your copy".  It had an effect - the name the panel draws moved - and the picture stayed
+        the picture of the file, because nothing had been written.  The window used to report
+        that press as a plain success.
+        """
+        self.open_in_editor(self.vendor_layout())
+        row = self.row_with_a_colour()
+        self.reink(row, "rgba(106, 106, 106, 1)")
+        buffer, on_disk = self.ink_of(row)
+        self.assertNotEqual(buffer, on_disk,
+                            "the edit did not separate this buffer from that file, so nothing "
+                            "below can show that a press cannot carry an edit")
+        self.assertTrue(self.win.ed.dirty, "the window does not even know the edit is unsaved")
+        said = self.press()
+        for needle in ("not the same picture", "save as your copy"):
+            self.assertIn(needle, said, said[-500:])
+        figures = re.findall(r"(\d+) px between", said)
+        self.assertEqual(len(figures), 1, f"no single pixel figure in: {said[-400:]}")
+        px = int(figures[0])
+        self.assertGreater(px, 0, "the pane and the file disagree and the window said 0 px")
+        # the order is the fix, not just the sentence: a warning printed after the command has
+        # gone is a post-mortem, and the whole point is that the reader learns it at the press
+        where_said = said.index("not the same picture")
+        where_sent = said.index("panel draws")
+        self.assertLess(where_said, where_sent,
+                        f"the press spoke after the command went out: {said[-400:]}")
+        self.assertEqual(self.args.theme, str(self.win.ed.name),
+                         "the press did not do the one thing it can do: name the layout")
+        self.assertEqual(self.ink_of(row)[1], on_disk,
+                         "the press wrote something: applying a layout is not a save")
+        self.assertIn("no file has them", self.win.ed_state.text(), self.win.ed_state.text())
+        self.assertIn("the glass will not change", self.win.ed_apply_panel.toolTip(),
+                      "the button itself never said that a press carries a name, not the "
+                      "keystrokes under the cursor")
+
+    def test_the_same_press_after_a_save_says_nothing_about_the_pictures(self):
+        """The clean case, held too: the sentence is a difference, not a disclaimer."""
+        self.open_in_editor(self.vendor_layout())
+        row = self.row_with_a_colour()
+        self.reink(row, "rgba(106, 106, 106, 1)")
+        self.win.ed_save.click()
+        fixtures.pump(0.4)
+        buffer, on_disk = self.ink_of(row)
+        self.assertEqual(buffer, on_disk, "the save did not reach the file the display reads")
+        self.assertFalse(self.win.ed.dirty, "the buffer is still dirty after a save")
+        said = self.press()
+        self.assertNotIn("not the same picture", said,
+                         f"a clean press was warned about anyway: {said[-400:]}")
+        self.assertIn("nothing outstanding", self.win.ed_state.text(), self.win.ed_state.text())
+
+    def test_a_generated_layout_edit_names_the_picture_the_code_draws(self):
+        """No file, no save, and a picture the display takes from `render.py`.
+
+        One of the five drawn-from-code names can be edited in this pane and cannot be saved at
+        its own name (`themes.save` refuses a `gauge.json`), so the pane and the display are
+        allowed to differ here in a way that is not a typo - which is exactly why the sentence
+        has to say what the display draws instead of quoting a path that does not exist.
+        """
+        self.open_in_editor("gauge")
+        self.assertIsNone(themes.resolve("gauge"), "the library has grown a `gauge.json`, and "
+                                                 "this check is about the branch that has none")
+        row = self.row_with_a_colour()
+        self.reink(row, "rgba(106, 106, 106, 1)")
+        said = self.press()
+        self.assertIn("not the same picture", said, said[-500:])
+        self.assertIn("`render.py` draws for that name", said, said[-500:])
+        for needle in ("copy to a new name", "a second `theme_gauge`"):
+            self.assertIn(needle, said,
+                          f"the advice at a generated name is not the door that works there "
+                          f"({needle!r}): {said[-500:]}")
+        self.assertNotIn("/xigmalcd/themes/", said,
+                         f"a generated name was reported with a file to save into, which "
+                         f"`themes.save` refuses: {said[-400:]}")
+        px = int(re.findall(r"(\d+) px between", said)[0])
+        self.assertGreater(px, 0, "an edited colour changed no pixel of the picture")
+
+    def test_the_copy_door_says_it_copies_before_it_refuses_the_name_already_open(self):
+        """Reported 2026-11-13: "making changes to alpha_new and pressing `save as` button
+        doesn't seem to have any effect, even if followed by pressing `apply to the panel`".
+
+        Nothing was written, twice over.  The button labelled `save as` was pressed with the open
+        layout's own name in the box next to it, and `themes.new_name` refuses a name something
+        already answers - but `save as` reads like an in-place save, so a refusal looked like a
+        silent success and the file kept the ink it had.  The `apply` that followed then sent the
+        name that very panel already held, which moves no pixel on the glass.  Three things carry
+        the fix: the label names the door, the tooltip states the refusal before the press, and
+        the press that follows says what the pane and the file disagree about, in pixels.
+        """
+        name = self.vendor_layout()
+        self.open_in_editor(name)
+        root = themes.user_root()
+
+        def listing() -> list:
+            return sorted(os.listdir(root)) if os.path.isdir(root) else []
+
+        before = listing()
+        row = self.row_with_a_colour()
+        untouched = self.ink_of(row)[1]
+        self.reink(row, "rgba(106, 106, 106, 1)")
+
+        self.assertNotEqual(self.win.ed_copy.text(), "save as",
+                            "the button is called `save as` again: that is the label that made a "
+                            "refusal read as a save of the layout already open")
+        self.assertEqual(self.win.ed_copy.text(), "copy to a new name",
+                         f"the copy door is labelled {self.win.ed_copy.text()!r}")
+        tip = self.win.ed_copy.toolTip()
+        for needle in ("not a free name", "save as your copy"):
+            self.assertIn(needle, tip,
+                          f"nothing above the press says {needle!r}, which is the other half of "
+                          f"this report: {tip[:400]}")
+
+        self.win.ed_newname.setText(name)
+        self.win.ed_copy.click()
+        fixtures.pump(0.4)
+        self.assertIn(f"{name!r} is not a free name", self.win.ed_note.text(),
+                      f"the press that changes no file was not refused in the line that carries "
+                      f"its refusals: {self.win.ed_note.text()[:300]}")
+        self.assertEqual(listing(), before,
+                         "a refused copy still wrote something into the user's root")
+        self.assertEqual(self.ink_of(row)[1], untouched,
+                         "the refused copy reached the file the display reads")
+        self.assertEqual(str(self.win.ed.name), name,
+                         "a refused copy moved the window off the layout it had open")
+        self.assertTrue(self.win.ed.dirty,
+                        "the refusal threw away the edit that was typed before it")
+
+        said = self.press()
+        for needle in ("not the same picture", "save as your copy"):
+            self.assertIn(needle, said,
+                          f"the press that follows a refused copy still reports a plain success: "
+                          f"{said[-500:]}")
+        self.assertGreater(int(re.findall(r"(\d+) px between", said)[0]), 0,
+                           "the pane and that file disagree and the window said 0 px")
+        self.assertEqual(self.ink_of(row)[1], untouched,
+                         "the file on the display's side of the wire still has none of the edit, "
+                         "which is the whole report")
 
     # ---- the file case: one command, one setting changed, the display's answer read back ----
     def test_the_layout_the_editor_holds_reaches_the_display_by_one_command(self):

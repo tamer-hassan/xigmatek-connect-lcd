@@ -88,7 +88,7 @@ one of them (see "How the three columns get their sizes", after the table):
 | the running display | controls | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. It also spells out the settings that display is running with - canvas, clock size, scrim, fans, and **the text colour it holds, as the hex it will answer again** (`text #ffc400`), which is the only place in the window you can see a colour you did not pick yourself. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Sent in about 1 ms: six settings on the 0.2 bench ledgers below, seven in today's tree, and `tests/test_display_remote.py` holds the whole line under 0.5 s |
 | preview | preview | the background with `render.draw`'s OSD layer composited on top - playing, via one streaming ffmpeg, or as one mid-loop frame (`playing` box, see "The preview plays" below), refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How the three columns get their sizes" below | nothing |
 | theme | controls | the five themes, clock size, **the colour of the text it draws**, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
-| layout editor | controls, always on | opens one of the layouts this machine can select (or one of the 5 generated ones), shows its widgets, and lays out every field that widget carries as a row of its own (8 to 18 rows by kind, from the model's list); the pane under the picture then shows *that file* rather than the live theme | nothing, ever: the panel is never handed a layout file (PROTOCOL.md §11). What `save` changes is what this machine's own daemon draws next time it names that theme |
+| layout editor | controls, always on | opens one of the layouts this machine can select (or one of the 5 generated ones), shows its widgets, and lays out every field that widget carries as a row of its own (8 to 18 rows by kind, from the model's list); the pane under the picture then shows *that file* rather than the live theme | nothing on `save`, and one setting on `apply to the panel`: the panel is never handed a layout file (PROTOCOL.md §11), only `("theme", <name>)`, which the display resolves to a file in the roots *it* can read. So a save alone can move the glass - a loop already naming that layout re-resolves the file every frame - and an apply alone cannot carry an unsaved edit: it changes *which* layout the panel draws. Pressing `apply` says, before it sends, how many px separate the pane from the picture that press will make (`docs/gui.md`, "Files, names and the field list a kind is offered") |
 | `reload the list`, `open a file…` | layout editor, under the menu; never fold | the two doors that decide **which file the box holds**: the first re-reads the roots the menu is built from, the second opens one layout file by path, wherever it is | nothing. Opening reads, never writes - and a layout that only a path answers is **refused** by `apply to the panel` until `save as your copy` puts it in a root the display can read |
 | clips | library | every MP4 the roots hold, listed once per **distinct file** - **40 rows out of the 46 mp4 files this repository tracks** (204 files on the author's bench, where the installed package and a mounted Windows partition add themselves; still 40 rows): 3 rows from the clips vendored here and 37 from the vendor's library on any of those boxes, the rest of the files being copies that collapse by content - 6 among the 46 tracked here (3 of them under another name), 164 on the bench, and the dated audit of all of it is written out under "Cost, measured on this box" below. This checkout's own `themes/alpha/clips` is one of the roots the list walks: 43 clip files, byte-identical to what `xigmatek-connect-lcd-themes` installs - `tools/verify_manifest.py` re-hashes every one against that package's own manifest, on this bench and on the runner - which is what lets a clone pair all 23 layouts `--list-themes` prints and why the same 40 rows turn up on a CI runner with nothing installed. `tools/preview_gif.py --clip themes/alpha/clips/Theme_30.mp4` reaches those files by path, which is how all five README previews are made. Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
 | background state | library | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the socket's own `check_media_file` door refuses says so, in that door's words, before the button is pressed | nothing: it is a readout |
@@ -698,7 +698,7 @@ commonly gets wrong:
   opens 3 library layouts and 5 generated ones and then counts the user directory:
   empty.
 * **A copy can be renamed, and the new name has to be one nothing answers.** The box beside
-  the `rename` and `save as` buttons holds the name to *give*, not the name that is, and it
+  the `rename` and `copy to a new name` buttons holds the name to *give*, not the name that is, and it
   keeps what you typed: it has no length cap, because a box that stopped at the writer's
   **64**-character limit would drop the characters under a reader's fingers and then act on
   a name nobody typed - the door answers `longer than 64 characters` instead. A new name has
@@ -720,13 +720,51 @@ commonly gets wrong:
   a layout, so a layout named `x.json` would live at `x.json.json` while the `x.json` in the
   same listing is the layout named `x`. None of the **27** names here does, so that rule
   refuses nothing that exists.
-* **`save as` writes a second copy and leaves the first one alone.** The file the layout came
-  from keeps every byte it had and the id it had; the new copy takes a fresh id, so the two
-  never answer the same `--theme <id>`, and the window goes on editing the new one. This is
-  also how a layout drawn from `render.py` gets its first file: `save as your copy` still
+* **`copy to a new name` writes a second copy and leaves the first one alone.** The file the
+  layout came from keeps every byte it had and the id it had; the new copy takes a fresh id, so
+  the two never answer the same `--theme <id>`, and the window goes on editing the new one. This
+  is also how a layout drawn from `render.py` gets its first file: `save as your copy` still
   refuses `gauge.json`, because that would be a second `theme_gauge` free to disagree with
   `render.py`, while `my-own-gauge.json` is a layout of yours and `--theme gauge` keeps
   drawing the code's picture.
+  * **The name in that box has to be a free one, and that button was relabelled because the
+    old label hid it.** Reported on 2026-11-13 as *"making changes to alpha_new and pressing
+    `save as` doesn't seem to have any effect, even if followed by `apply to the panel`"*.
+    Measured in a stub display the same day: with `alpha_new` typed in the box next to a button
+    called `save as`, the press was refused - `'alpha_new' is not a free name: your copy
+    'alpha_new' answers name 'alpha_new' today, at ….  A copy has to be reachable by a name
+    nothing already answers` - no file changed, and `apply` then sent the same name the panel
+    already held, which is a no-op on the glass. Two labels carried the blame: `save as` reads
+    like an in-place save at a name that is already open, and the door it covers only ever
+    *copies*. It is now spelled `copy to a new name`, its tooltip names the refusal and points
+    at `save as your copy` for the layout already open, and the check in
+    `tests/test_apply_layout.py` walks the whole reported sequence: re-ink, press the copy door
+    at the open name, count the user's root, press `apply to the panel`, and compare the
+    pixels.  Nothing was loosened: a second file at a vendor's or your own live name is still
+    refused, because the two answers are a name space with a hole in it (the bullet above).
+* **`apply to the panel` sends a *name*, and the display draws the file that name answers.**
+  Which is the rule behind the third report of 2026-11-13 (*"`apply to the panel` has no
+  effect, if pressed before `save as your copy`"*) and behind the first one (*"`save as your
+  copy` immediately applies the textColor change…")*: those two presses are not opposites.
+  A save writes `~/.config/xigmalcd/themes/<name>.json`; a loop that already names that
+  layout re-resolves it every frame, so the glass changes with no apply at all - and an apply
+  that goes out before a save moves the *name* and draws the file, which still has none of
+  what is under the cursor.  On the reporting machine the service line says
+  `--theme alpha` - `systemctl --user cat xigmalcd.service` prints it, and the
+  window's running-display box prints what that loop holds right now - so the name
+  can only have arrived over the socket: the earlier apply that report 1 credits
+  with nothing is the same press report 2 calls ineffective.  The window used to
+  report that second press as a plain success.
+  It now says, **before** the command is sent, when the pane and the display are not the same
+  picture, counted in pixels: both frames are painted at one body and one instant, so the only
+  thing the number can be about is the two pictures. Measured on this bench: an unsaved
+  `textColor` on `alpha_new` prints **6812 px between what is on screen here and the file
+  …/alpha_new.json**, and an edit to a generated name prints **1914 px between … and the
+  picture `render.py` draws for that name** - with the advice that matches the layout type,
+  because a generated name has no file to save into at its own name. Three checks in
+  `tests/test_apply_layout.py` hold it: the dirty case, the clean case after a save (which
+  must *not* warn, so the sentence stays a difference rather than a disclaimer), and the
+  generated-name case that must not quote a path.
 * **Which file answers a name is asked, never remembered.** The line under the layout menu
   reads `themes.resolve()` on the current name - the same door `--list-themes`, the loop's
   own log line and the socket's `theme` command go through - because the three moments that

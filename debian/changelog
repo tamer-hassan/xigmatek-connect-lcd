@@ -412,21 +412,60 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     already does all three.  docs/packaging.md records it beside the 0.2
     observation that an upgrade can start the display on its own.
 
+  * Three reports about the editor's save-and-apply workflow, and the one rule
+    all three sit on: a display is only ever told a *name*, never a layout
+    file (PROTOCOL.md §11).  "save as your copy immediately applies the
+    textColor change … in alpha_new" was the design working: the loop an
+    earlier apply had moved to that name re-resolves it every frame, so the
+    save alone put new bytes in front of it.  "apply to the panel has no
+    effect, if pressed before save as your copy" was true in effect, and the
+    window had been reporting that press as a success: against a stub display
+    it moved one setting - the name the panel draws - and no pixels, because
+    the picture comes from a file and the edit had never left the buffer.
+    "making changes to alpha_new and pressing save as doesn't seem to have any
+    effect" was a refusal read as a save: `themes.new_name` answered
+    `'alpha_new' is not a free name`, no file changed, and the apply that
+    followed sent the name that panel already held.  The press now paints both
+    frames - the buffer's, and the one that name will produce - at one body and
+    one instant, and says how many px apart they are **before** the command
+    goes; a generated name is described as the picture `render.py` draws, not
+    as a path that does not exist.  The button is labelled `copy to a new name`
+    and its tooltip states the refusal, and the state line reads `edits in this
+    buffer only: no file has them, so no display can draw them`.  Twelve
+    checks in `tests/test_apply_layout.py`, four of them new; ten ways to break
+    it, each counted, in docs/theme-editor.md.
+
+  * The README's advanced-mode picture is remade, because the row that changed
+    is one a reader looks for: `tools/screenshot.py --mode advanced --layout
+    bars`, with `--device` at a path nothing is behind.  Its caption names the
+    buttons the picture now holds, and the OCR half of
+    `tests/test_no_serial.py` keeps the panel's serial out of the pixels.  One
+    leaked handle, in `tests/test_names_and_renames.py`'s `setUp`, was printing
+    six `ResourceWarning: unclosed file` blocks under the suite's own
+    `-W error::ResourceWarning` - noise, not failure, and a `with` now.
+
   * The suite's figures, re-read rather than inherited.  This bench, one
     sitting, the same tree both ways, `python3 -W error::ResourceWarning -m
-    unittest discover -s tests`: 481 checks in 48 files in 397.077 s, 3 skipped,
-    one of them the tray check naming the host it needs.  CI's runner, the
-    `tests/` step alone, over the cycles that added those checks: 337 s with
-    440 checks (#165), 387 with 441 (#168), 319 with 442 (#169), 413 with 446
-    (#171), 416 with 447 (#172), 383 with 447 (#174), 358 with 453 (#175), 387
-    with 453 (#176), 364 with 459 (#177), 433.423 with 475 (#178) and 442.333
-    with 481 (#180) - those last two runs skipping 4 rather than 3, the extra
-    one being the glass ledger naming transcripts a runner with no panel has
-    never made, and the 9 s between them being what the six new checks cost:
-    five of them run a shipped script as a subprocess, and the interpreter
-    start-up that belongs to that is measured, not assumed.  The spread is
-    the runner's; the 435 in this entry's first bullet is what the port landed
-    at, not what the tree holds.
+    unittest discover -s tests`: 485 checks in 48 files in 410.280 s, 3
+    skipped, one of them the tray check naming the host it needs.  The count
+    is read off the tree as well as off the runner: `grep -c "^    def test_"
+    tests/*.py` and `unittest.TestLoader().discover("tests")` both answer 485
+    here.  The first run of that figure did not come out green, and what
+    stopped it was the suite's own isolation check - a real `xigmaui` was open
+    on this machine and wrote the session file through its 500 ms save timer
+    mid-run, so `test_zz_isolation.py` named the process and said to close it:
+    the guard that exists for "a test wrote your settings", meeting a person
+    instead.  CI's runner, the `tests/` step alone, over the cycles that added
+    those checks: 337 s with 440 checks (#165), 387 with 441 (#168), 319 with
+    442 (#169), 413 with 446 (#171), 416 with 447 (#172), 383 with 447 (#174),
+    358 with 453 (#175), 387 with 453 (#176), 364 with 459 (#177), 433.423
+    with 475 (#178) and 442.333 with 481 (#180) - those last two runs skipping
+    4 rather than 3, the extra one being the glass ledger naming transcripts a
+    runner with no panel has never made, and the 9 s between them being what
+    the six new checks cost: five of them run a shipped script as a subprocess,
+    and the interpreter start-up that belongs to that is measured, not
+    assumed.  The spread is the runner's; the 435 in this entry's first bullet
+    is what the port landed at, not what the tree holds.
 
 
  -- Tamer Hassan <thameruddin@gmail.com>  Wed, 11 Nov 2026 22:05:00 +0200

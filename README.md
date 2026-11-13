@@ -141,11 +141,15 @@ the row above it because there is no layout open to peek at, the theme and text-
 pickers in the middle, and the background clip library on the right](docs/xigmaui1.png)
 
 ![xigmaui, advanced mode: the same switch on, with one layout open in the editor. The pane
-draws *that file* rather than the live theme - here the `bars` layout, whose ten rows it is
-holding four fan slots for - `the fixture` on the pane-readings row above it, and beside the
-picture the widget's own field rows (this one is the
-heading line, `text` kind, at x 30 y 30 with its font, its colour, and the `autoFit` width its
-drawing reads), under the log the panel's own report and the guarded reset, and on the right
+draws *that file* rather than the live theme - here the exported `bars` layout, the one that
+reserves four fan slots so a row with no reading keeps its place - `the fixture` on the
+pane-readings row above it, and beside the picture that widget's own field rows (this one is
+the heading line, `text` kind, at x 240 y 30, with its font, its colour, and the `autoFit`
+width its drawing reads). Under the layout menu sit the two doors that decide *which file*
+the box holds, `reload the list` and `open a file…`; under the field rows, the doors that
+act on it: `undo`, `save as your copy`, `revert`, and `apply to the panel` - which sends the
+layout's *name* and nothing else - then `rename` and `copy to a new name` beside the box for
+the name to give. Under the log, the panel's own report and the guarded reset; on the right,
 the clip library with the size and loop length each row measured](docs/xigmaui2.png)
 
 It talks to a display loop that is already running when one is running, and drives the

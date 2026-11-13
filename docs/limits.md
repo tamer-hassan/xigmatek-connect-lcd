@@ -914,6 +914,22 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   under the layout menu prints which of those three cases a name is in, by asking
   `themes.resolve()` rather than remembering what it said when the file was opened
   (`tests/test_open_layouts.py`, thirteen checks).
+* **A press carries a name, not a buffer - and a save carries no press.** The same rule seen
+  from the other side, for the three reports of 2026-11-13: the panel is never handed a layout
+  file (§11), so what `("theme", <name>)` changes is *which* file the display draws, and what
+  `save as your copy` changes is *what is in* one. A loop already naming that layout
+  re-resolves it every frame, so a save alone moves the glass with no apply at all; an apply
+  alone reaches none of the keystrokes still in the editor's buffer, so at a name the panel
+  already holds it changes nothing on the glass. Since 2026-11-13 the press says so before it
+  sends, and prints the distance - differing pixels between the frame this pane paints and the
+  frame the display will make, both through `themes.paint`/`themes.draw` at the editor's own
+  pinned pair, so the number is about the two pictures and nothing else. It is printed by the
+  press itself, in the line under the rows and in the log, and it belongs to the machine that
+  prints it: the pixels it counts are mostly glyphs, and a glyph's pixels are a face metric -
+  the same reason the pixel figures elsewhere in these pages are quoted beside the box that
+  printed them. `tests/test_apply_layout.py` asserts the figure is non-zero when a row's ink
+  was changed and absent when it was not, and prints nothing about it - the digits for this
+  bench are dated in [theme-editor.md](theme-editor.md).
 * **A file with nothing to draw is refused at the reader as well as at the writer.**
   `themes.save` has refused an empty `osd.widget` list since 0.6, but until 2026-11-13
   `scan()` and `resolve()` selected on the `ratio` field alone: a JSON with no `osd` key at

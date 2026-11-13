@@ -71,7 +71,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from PIL import Image, ImageDraw, ImageFont                      # noqa: E402
+from PIL import Image, ImageChops, ImageDraw, ImageFont          # noqa: E402
 from PyQt6.QtCore import QEvent, QSize, Qt, QTimer        # noqa: E402
 from PyQt6.QtGui import (QAction, QBrush, QColor, QIcon, QImage, QKeySequence,
                          QPalette, QPainter, QPen, QPixmap)        # noqa: E402
@@ -1388,7 +1388,7 @@ class Window(QMainWindow):
         self.ed_rename = QPushButton("rename")
         self.ed_rename.setToolTip(self._ed_rename_tip())
         self.ed_rename.clicked.connect(self._editor_rename)
-        self.ed_copy = QPushButton("save as")
+        self.ed_copy = QPushButton("copy to a new name")
         self.ed_copy.setToolTip(self._ed_copy_tip())
         self.ed_copy.clicked.connect(self._editor_copy)
         nrow.addWidget(self.ed_newname)
@@ -2779,7 +2779,7 @@ class Window(QMainWindow):
                 "name you have never saved is not yours to move.")
 
     def _ed_copy_tip(self) -> str:
-        """What `save as` does, and how it differs from the save button above it."""
+        """What `copy to a new name` does, and how it differs from the save button above it."""
         return ("write what is on screen to the name in the box as a second copy, and keep "
                 "the file where it is with every byte it has.  The copy in front of you "
                 "then takes a fresh id, so the two layouts never answer the same "
@@ -2787,7 +2787,11 @@ class Window(QMainWindow):
                 "what `save as your copy` refuses: that refusal is about a `gauge.json` "
                 "that would be a second `theme_gauge` to disagree with `render.py`.  A "
                 "layout drawn from code gets its first file this way, and `--theme gauge` "
-                "still draws the code's picture.")
+                "still draws the code's picture.  To change the layout you already have "
+                "open, press `save as your copy` above instead: the name in this box has to "
+                "be a free one, so typing the name that is already on screen here is "
+                "refused - `'<name>' is not a free name`, in the line under the rows - and "
+                "no file changes.")
 
     def _ed_refresh_layouts(self) -> None:
         """Re-list the layout menu from the library, keeping the layout that is open.
@@ -3167,7 +3171,8 @@ class Window(QMainWindow):
                 where = (f"opened from {self.ed.opened}; the name `{self.ed.name}` answers "
                          f"from {answered['path']} - a **different file** from the one this "
                          "window holds, and the file `apply to the panel` would draw")
-        state = "edit not saved yet" if self.ed.dirty else "nothing outstanding"
+        state = ("edits in this buffer only: no file has them, so no display can draw them"
+                 if self.ed.dirty else "nothing outstanding")
         self.ed_state.setText(f"{where}; {state}")
         self.ed_save.setEnabled(self.ed.dirty)
         self.ed_revert.setEnabled(themes.is_copy(self.ed.name))
@@ -3825,7 +3830,21 @@ class Window(QMainWindow):
                 "fans and fps live. What this does not touch: the panel's stored "
                 "background (the clips box sends that, Ctrl+Shift+U), the colours written "
                 "in the layout file, and what a fresh display starts with, which is its "
-                "own `--theme`.")
+                "own `--theme`.  And it sends a *name*: the display draws the file that name "
+                "answers, so an edit that has not been saved with `save as your copy` is in "
+                "this window only, and the glass will not change for it.")
+
+    @staticmethod
+    def _frame_diff(a, b) -> int:
+        """Pixels where two frames disagree - same body, same instant, same painter.
+
+        A number, not a boolean, because the answer a reader needs is *how much* of the
+        picture they are looking at is not the picture going out.  Zero is the honest case:
+        the pane and the display agree, and the press changes only the name.  Same spelling
+        of the pixel walk as `themes.parity` and `tools/knobmap.py`: one entry per pixel.
+        """
+        flat = ImageChops.difference(a.convert("RGBA"), b.convert("RGBA")).get_flattened_data()
+        return sum(1 for px in flat if px != (0, 0, 0, 0))
 
     def _apply_layout_to_display(self) -> None:
         """Tell a running display to draw the layout this editor has open.  One command.
@@ -3891,26 +3910,72 @@ class Window(QMainWindow):
                 + ".  `save as your copy` puts it in "
                 + f"{themes.user_root()}, and this same picture is what the panel draws then.")
             return
-        # what the two frames this window sits between actually hold, counted by the painter -
-        # and by the painter that will do the drawing, which is `themes.paint` for anything
-        # resolving to a file.  One variable, not two: the body.  The instant stays
-        # `edit.FIXTURE_WHEN`, the same rule feature G set for a peek - `Date`, `Time` and
-        # `Week` come from the instant rather than from any reading, so a moving instant would
-        # rewrite those rows every second and the count would stop being about readings at all.
-        # Drawn before the command goes: a count that failed should not be able to leave the
-        # panel changed and the window silent.
+        # What the two frames this window sits between actually hold, counted by the painter
+        # that will do the drawing - `themes.paint` for anything resolving to a file.  One
+        # variable, not two: the body.  The instant stays `edit.FIXTURE_WHEN`, the same rule
+        # feature G set for a peek - `Date`, `Time` and `Week` come from the instant rather
+        # than from any reading, so a moving instant would rewrite those rows every second and
+        # the count would stop being about readings at all.  Drawn before the command goes: a
+        # count that failed should not be able to leave the panel changed and the window
+        # silent.
+        #
+        # The px figure that comparison yields is the answer to a report of 2026-11-13 -
+        # "`apply to the panel` has no effect, if pressed before `save as your copy`".  It was
+        # measured in a stub display the same day: the press did move a setting, the *name* the
+        # panel draws, and no pixels, because the picture comes from a file and the edit had
+        # never left this buffer.  A display is only ever told a name (PROTOCOL.md §11), so the
+        # pane and the glass are two different pictures until a save puts the buffer into one -
+        # and the window used to report that press as a plain success.
         pinned, at = self.ed.fixture()
         rec = themes.resolve(name)
+        pane_img, _pn = self.ed.paint(pinned, at)
         if rec is not None:
             _live, live_notes = themes.paint(rec, sensors.collect(), at)
             _pin, pin_notes = themes.paint(rec, pinned, at)
-        else:
-            # one of the five names this repo draws from code: there is no file to resolve, so
-            # the editor's object is the thing and `Editor.paint` is its door
+            disp_img, source = _pin, f"the file {rec['path']}"
+        elif name in themes.EXPORTS:
+            # a name drawn from code, edited here or not: `render.theme_<name>` is what that
+            # display will make, and the export painted through the layout door is its measured
+            # equivalent - `themes.parity` holds those two at 0 differing px for all five.  No
+            # path is quoted, because this name has none to save into at itself
             _live, live_notes = self.ed.paint(sensors.collect(), at)
             _pin, pin_notes = self.ed.paint(pinned, at)
+            disp_img, _dn = themes.draw(themes.export(name), pinned, at)
+            source = ("the picture `render.py` draws for that name, which no edit in this pane "
+                      "can reach until it is written out as a layout of its own")
+        else:
+            # this window reads a file for that name and *that* display may not: which of the
+            # two it is, only the command below can say, in the display's own words
+            _live, live_notes = self.ed.paint(sensors.collect(), at)
+            _pin, pin_notes = self.ed.paint(pinned, at)
+            disp_img, source = None, (f"whatever the display's own roots answer for {name!r} "
+                                      f"(this window reads {self.ed.where})")
+        diff = None if disp_img is None else self._frame_diff(pane_img, disp_img)
         n_live = len(live_notes.get("boxes") or [])
         n_pin = len(pin_notes.get("boxes") or [])
+        if diff or self.ed.dirty:
+            # Said before the command goes, because this is the one press where the window
+            # used to report success about a picture the panel would never be given.
+            said = (f"the pane and the display are not the same picture: {diff} px between "
+                    f"what is on screen here and {source}" if diff else
+                    f"`apply` sends a *name*, and the display will draw {source}")
+            if self.ed.dirty:
+                said += ", while this buffer holds edits no file has yet.  "
+                if rec is None and name in themes.EXPORTS:
+                    # a name drawn from code has no file to save into at that name, so the way
+                    # to give this picture a file is a copy under a name of its own - the same
+                    # rule `docs/gui.md` states for the save button, stated where it bites
+                    said += (f"`copy to a new name` is what writes one (`save as your copy` "
+                             f"refuses `{name}.json`, because that would be a second "
+                             f"`theme_{name}` free to disagree with `render.py`), and the panel "
+                             f"draws that new name once it has one")
+                else:
+                    said += (f"the press changes which layout the panel draws, not what this "
+                             f"window has typed: `save as your copy` writes them to "
+                             f"{themes.user_theme_path(name)}, and a loop already drawing that "
+                             f"name picks the file up on its next read")
+            self.ed_note.setText(said)
+            self._log(said)
         rep = self.daemon.send("theme", value=name)
         if not rep.get("ok"):
             self._refused_layout(name, rep)

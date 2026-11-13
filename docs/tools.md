@@ -353,7 +353,10 @@ of the same animation.
   than of the glass: `--mode three-column` writes `docs/screenshot-xigmaui.png`, `--mode
   simple` writes `docs/xigmaui1.png` (the `advanced controls` switch left off, as a first run
   shows it) and `--mode advanced` writes `docs/xigmaui2.png` (that switch on, with
-  `--layout NAME` opening one layout in the editor). On a bench where this project's udev rule
+  `--layout NAME` opening one layout in the editor).  The picture was remade on 2026-11-13,
+  when the copy button's label changed and that row is the thing a reader is being shown:
+  `tools/screenshot.py --mode advanced --layout bars --device PATH`, the path a nonexistent
+  one on this bench, whose `/dev/xigmatek-lcd` is a real panel.  On a bench where this project's udev rule
   is installed, `/dev/xigmatek-lcd` exists and the tool refuses to run - the safety door
   working, not a bug - so a capture there points `--device` at a path that is not there: a real `xigmaui` built the way `tests/test_window.py`
   builds it
