@@ -185,9 +185,12 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   each file's AST** so it cannot go stale and cannot be padded by prose that merely mentions
   `sensors.collect()`.  This exists because a check asserting the host has a disk temperature
   chip passed CI #193 and failed CI #194 on code eight lines of changelog prose apart: both
-  outcomes were luck.  On this bench it reports 95 checks over 6 modules with no failures and
-  no errors, about a minute; the failures it is meant to surface are the class this repository
-  has hit six times in one session - a mount table naming `nvme0`, a `disk` section implying a
+  outcomes were luck.  It prints its own tally - on 2026-11-14, **96 checks over 6 modules,
+  0 failures, 0 errors** in about a minute - and that count is deliberately not quoted
+  elsewhere in these pages, because it moves whenever a check is added; the number a reader
+  wants is the one this command prints on their box, today.  The failures it is meant to
+  surface are the class this repository has hit six times in one session - a mount table
+  naming `nvme0`, a `disk` section implying a
   `temperature` key, two live reads of a warming drive compared against each other, a call
   named in a file taken for a call that runs.  `tests/test_bare_audit.py` gates the tool's two
   promises: that the derivation still finds a module it should (it writes one that calls

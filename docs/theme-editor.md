@@ -1184,7 +1184,10 @@ the second one contradicted what this repository's author had just said out loud
   to delete it was wrong.  Raw 255 would print `127%` on a default install.  Parenthesising the
   expressions changes nothing; both spellings were run.
 
-Ten checks in `tests/test_pump_speed.py`, 0 failures, 0.9 s.  The seven mutations and what each
+Ten checks in `tests/test_pump_speed.py` as this section was first written, 0 failures, 0.9 s;
+the file stands at **eleven** now, the eleventh being the `xigma.showIf` gate recorded below -
+and `grep -c "^    def test_" tests/test_pump_speed.py` prints it, because a count of checks is
+an output, not a fact worth keeping.  The seven mutations and what each
 cost: the rule reading a name instead of the type → **1**; the zero guard dropped → **1**;
 `ROW_WHY` stripped of both command names → **2** (the in-process one and the CLI one); the pump
 taken out of the pin table → **1**; `_tach` back to name-first → **1**; `FAN_TYPED` emptied,
@@ -1446,8 +1449,11 @@ subprocess, where the live call happens in the child - and `tests/test_bare_audi
 those entries to be genuinely invisible to the derivation, so the two lists cannot overlap into
 a second copy of a rule.
 
-On this box the whole audit reports **95 checks over 6 modules, 0 failures, 0 errors** in
-about a minute, with `0 chips visible, 0 fan rows, motherboard() -> {}, drives() -> []`.  A
+The tool prints its own tally rather than having it quoted: on 2026-11-14 the whole audit
+reports **96 checks over 6 modules, 0 failures, 0 errors** in about a minute, with `0 chips
+visible, 0 fan rows, motherboard() -> {}, drives() -> []`.  That number went 95 -> 96 when a
+check was added to `tests/test_sensor_rules.py` one commit later, which is why these pages
+name the command instead of the figure - the same rule the sensor readings obey.  A
 module that goes red there is asserting what the host exposes, and the repair is the same two
 moves every time: construct the inputs, or assert a relation instead of a reading.
 

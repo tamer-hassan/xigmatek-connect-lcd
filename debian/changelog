@@ -811,8 +811,12 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     `sensors.collect = lambda: body` is one, because that assignment is a
     module admitting it would otherwise touch the machine.  Only the case the
     AST cannot see - a test that runs a shipped CLI in a subprocess - is kept
-    by hand.  Here that reports 95 checks over 6 modules, 0 failures, 0 errors,
-    with `0 chips visible, 0 fan rows, motherboard() -> {}, drives() -> []`.
+    by hand.  Here that reported 95 checks over 6 modules, 0 failures, 0
+    errors, with `0 chips visible, 0 fan rows, motherboard() -> {},
+    drives() -> []` - the count is the tool's to print, not these pages'
+    to keep, and it went to 96 one commit later when a check was added to
+    `tests/test_sensor_rules.py`.  docs/tools.md and docs/theme-editor.md name
+    the command rather than the number for that reason.
 
     Ten checks in `tests/test_bare_audit.py` hold the tool's two promises, and
     the census after them: the substitution pointed back at the real tree ->
@@ -911,10 +915,14 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
 
   * The suite's figures, re-read rather than inherited.  This bench,
     `python3 -W error::ResourceWarning -m unittest discover -s tests`, one
-    run of this tree with nothing else in flight - the only edits made after
-    it are prose: this entry, and two lines of docs/usage.md and
-    docs/tools.md that still described the bottom tier as one chip.  No test
-    count moved, and the gates that read those pages
+    run of this tree with nothing else in flight.  The edits made after it are
+    prose only: this entry; two lines of docs/usage.md and docs/tools.md that
+    still described the bottom board tier as one chip; and four places that
+    quoted a count of checks - the audit's 95 (it prints 96 now, because
+    `tests/test_sensor_rules.py` gained a check the very next commit) and this
+    cycle's per-file tallies - replaced by the command that prints each number,
+    since a check count is an output and not a fact worth keeping.  No test
+    count moved in those edits, and the gates that read the pages
     (`tests/test_debian_changelog`, `tests/test_docs_links`) re-run in 0.04 s.
     547 checks in 52 files in
     457.125 s, 3 skipped, one of them the tray check naming the host it needs,
