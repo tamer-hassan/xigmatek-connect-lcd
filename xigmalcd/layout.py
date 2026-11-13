@@ -148,6 +148,9 @@ VENDOR_FORMAT = {
     "Used RAM": lambda v: f"{int(v) // 1024} GB",
     "Used GPU Memory": lambda v: f"{int(v) // 1024} GB",
     "Motherboard Temperature": _deg,
+    # the drive that owns `/`, in the same shape the other two temperatures use; ours, not
+    # measured off the vendor's picture, and no shipped layout asks for it
+    "Disk Temperature": _deg,
     "Fan 1 Speed": lambda v: f"{int(round(v))}",
     "Fan 2 Speed": lambda v: f"{int(round(v))}",
     "Fan 3 Speed": lambda v: f"{int(round(v))}",

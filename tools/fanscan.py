@@ -264,6 +264,34 @@ def main() -> int:
     print("what the alpha theme's two fan figures draw: "
           + " | ".join(fan_figures(sensors.collect())))
 
+    # The two doors that were wrong before 2026-11-13, printed rather than promised:
+    # `motherboard.temperature` was answering from a network controller because it was the
+    # hottest thing in a flat list, and `disk.temperature` was answering from whichever drive
+    # happened to be coolest - not the drive whose `total` and `used` are reported beside it.
+    won = sensors.motherboard_answer()
+    print("\nwhat answers `motherboard.temperature`, tier by tier:")
+    for tier, chips in (("Super-IO", sensors.BOARD_CHIPS), ("SPD thermistors",
+                                                           sensors.DIMM_CHIPS),
+                        ("last resort", sensors.BOARD_LAST_RESORT_CHIPS)):
+        chans = sensors.board_channels(*chips)
+        print(f"  {tier:16} " + (", ".join(f"{c} [{l}] {v / 1000:.1f}" for c, l, v in chans)
+                                 or "-"))
+    if won:
+        print(f"  -> {sensors.motherboard()['temperature']} °C from {won[0]} [{won[1]}]  "
+              f"(labels naming a CPU or GPU are never candidates: {sensors.NOT_THE_BOARD.pattern})")
+    else:
+        print("  -> nothing answered: no board channel on this machine")
+
+    deg, whence = sensors.disk_temperature()
+    print(f"\nwhat answers `disk.temperature`: {deg} °C - {whence}")
+    print(f"  the mount point says the root disk is controller {sensors._root_controller()!r}")
+    for _chip, dev, rows in sensors._disk_channels():
+        comp = [v for label, v in rows if label.lower() == "composite"]
+        print(f"  {dev:10} composite {(max(comp) / 1000) if comp else '-':>6} | "
+              f"hottest sensor {max(v for _l, v in rows) / 1000:>6.1f} | "
+              f"coldest {min(v for _l, v in rows) / 1000:>6.1f} | "
+              + ", ".join(f"{l} {v / 1000:.1f}" for l, v in rows))
+
     if not readings:
         print("\nwhy that is empty: the board's Super-IO is not enumerated by "
               "ACPI on this BIOS (no NCT/ITE device in /sys/bus/acpi/devices, "

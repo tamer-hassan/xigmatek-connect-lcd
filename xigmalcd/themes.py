@@ -236,6 +236,15 @@ SOURCES = {
     "Used RAM": ("memory", "used"),
     "Used GPU Memory": ("gpu", "memoryUsage"),
     "Motherboard Temperature": ("motherboard", "temperature"),
+    # The drive temperature, from the drive that owns `/` - the same drive `disk.total` and
+    # `disk.used` describe, and the reason this name exists at all: measured on this box the
+    # old rule reported 31 °C, which was the *coolest* of six sensors on the machine and came
+    # from a different drive than the capacity numbers beside it (docs/limits.md keeps both
+    # readings and the composite-vs-NAND-sensor difference).  The vendor's metric vocabulary
+    # records "disk entries" without spelling this one (PROTOCOL.md §10), so the name is ours,
+    # shaped like `CPU Temperature` and `Motherboard Temperature`; no shipped layout asks for
+    # it, and `draw_theme` reports its shape as one of this repo's choices.
+    "Disk Temperature": ("disk", "temperature"),
 }
 
 #: Sources whose number comes out of two reported fields rather than one, spelled as a pair

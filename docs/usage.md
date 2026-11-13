@@ -61,6 +61,13 @@ lm-sensors **halves** a `pwmN` input before printing it, so a header at full dut
 `compute pwmN @/1.275, @*1.275` (the divisor is 255/200, undoing that half-scale).  None of it
 touches this program: `xigmalcd` never reads a `pwm*` file, and `tools/fanscan.py` lists the
 four outputs without values, which is why the pump's steadiness had to be read off its tach.
+The same tool now prints which channel answers the two fields that had been answering from the
+wrong place - the three tiers behind `motherboard.temperature`, and for `disk.temperature` the
+drive that holds `/` with its composite beside its raw probes.  Both rules, the before-and-after
+numbers and the reason for each tier are in
+[limits](limits.md); a layout reaches the drive temperature through the source name
+`Disk Temperature`, which no shipped layout asks for because the vendor's library names no
+storage metric at all.
 
 ## Options
 

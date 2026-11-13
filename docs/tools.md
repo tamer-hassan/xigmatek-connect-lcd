@@ -180,7 +180,15 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   The first thing to run after any boot or reset; it writes nothing.
 * `tools/fanscan.py` — every tachometer channel Linux can see, the candidate Super-IO
   drivers with their real `modinfo` descriptions, what each channel is named by
-  `sensors.FAN_CHANNELS`, and the two fan figures `alpha` would draw from them. `--watch 90`
+  `sensors.FAN_CHANNELS`, and the two fan figures `alpha` would draw from them.  It also
+  prints **which channel answered each of the two fields that had been answering from the
+  wrong place**: the three tiers behind `motherboard.temperature` (Super-IO / DIMM SPD
+  thermistors / network die as last resort), the one that won and the labels that were
+  refused, and for `disk.temperature` the root drive the mount point names, every drive's
+  composite against its hottest and coolest raw probe, and which of those the row prints.
+  That makes it the command to run before believing any of the figures quoted for those two
+  fields in these pages - they are bench numbers, and this tool reprints them on yours.
+  `--watch 90`
   samples the tach channels across a warm-up and says which one moves with the CPU, which is
   how the CPU fan gets identified without guessing; it only reads sysfs, never a PWM. Since
   2026-11-13 it samples the `pwm*` **outputs** in the same window and prints their spans beside

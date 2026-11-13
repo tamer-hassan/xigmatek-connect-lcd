@@ -272,6 +272,56 @@ What has been measured on glass, by whom, with how many frames - and what has no
   nothing.
 ## What the sensors report, and what the five drawn themes show
 
+* **Which channel answers `Motherboard` is a selection rule, and it was selecting a network
+   controller.** Measured on this box on 2026-11-13, before anything was changed:
+   `sensors.motherboard()` returned **45-49 °C from `r8169`** - the Realtek NIC's die - because
+   `temps()` walked a flat list of chip prefixes and the code took the `max()` of everything it
+   found.  The board's own sensors were in that list only as the DDR5 SPD hubs
+   (`spd5118`, 41.0-48.2 °C); the Super-IO was **not in it at all**, although the same chip that
+   supplies the tachometers publishes a thermal diode and three thermistors there
+   (`Diode 0 (curr)` 40.5-44.5, `Thermistor 1` 44.0, `Thermistor 15` 48.5-49.0) - and its
+   hottest channel is `AMD TSI Addr 98h` at **62-70 °C**, which is the CPU read by the
+   Super-IO, so adding that chip naively would have made the row worse in a different direction.
+   The rule now walks three tiers and takes the first that answers -
+   **Super-IO → SPD thermistors → network die as a last resort** - with a channel excluded when
+   its own driver label names a processor or a card (`TSI|Tctl|Tccd|CPU|GPU|edge|hotspot`); the
+   same driver that publishes no `fan*_label` does label its temperatures, and that label is
+   the whole discriminator.  Today that answers **49 °C from `nct6687 [Thermistor 15]`** while
+   the NIC sits at 50.5 - so the row is now the coolest of the candidates, which is the point:
+   it is the board's number, not the box's maximum.  The vendor's own captured body agrees with
+   that shape - `motherboard:{"temperature":38}` printed beside `cpu:{"temperature":57}`.
+   `tools/fanscan.py` prints all three tiers, names the channel that won, and says which labels
+   were refused; `tests/test_sensor_rules.py` gates the rule on a **built** tree (a runner has
+   no NCT6687D), including the two faults this replaces: a flat max, and the NIC in the first
+   tier.
+* **`disk.temperature` was reporting the wrong drive, because it was reporting the coolest
+   number on the machine.** `sensors.disk()` describes one drive with `total` and `used` -
+   `shutil.disk_usage("/")`, which on this box is `nvme0n1p6`, a Kingston SNV3S2000G - while
+   its temperature came from `min()` over **every** `temp*_input` of **every** disk chip: on
+   2026-11-13 that was **31-33 °C**, the composite of `nvme1`, an MSI M461 that holds nothing
+   the reader is being told about.  The rule is now: the drive the mount point names, and
+   within that drive its **`Composite`** channel - the aggregate the drive declares about
+   itself, which is what `sensors -j` and `smartctl` show - falling back to that drive's
+   hottest sensor only when it publishes no Composite (an `nvme2`-shaped case in the built
+   tree answers 55 °C that way), and to the **hottest** reading across all matched drives when
+   the mount point cannot be read at all (an overlay, a mapper name, a btrfs pool).  Measured
+   here: **46 °C from `nvme0`'s composite**, and the same drive carries raw probes at **61.9
+   and 67.8 °C** that its own aggregate excludes - which is why the composite is the number
+   printed and the NAND probe is not: quoting 68 as "the disk temperature" would attribute to
+   the drive a reading the drive itself does not treat as its temperature, and the row has no
+   room to say which is which.  A new `source` name, **`Disk Temperature`** (→ `disk.temperature`),
+   is what lets a layout draw it at all: no shipped file asks for a disk reading - the 30
+   distinct `source`/`content` names across the 28 layouts include no storage metric
+   whatsoever - so the name is ours, spelled like `CPU Temperature` and `Motherboard
+   Temperature`, and `layout.FORMATS_MEASURED` stays at four, which is what
+   `--list-themes` means when it says which shapes are this repo's choice.
+* **`hwmon()` walked the device directories as text, so `hwmon10` came before `hwmon2`.** On
+   this boot: nvme, nvme, ath12k, amdgpu, r8169, nct6687, prom21_xhci, k10temp, spd5118 ×4 -
+   the Super-IO last-but-two because of a digit count.  Nothing on the glass depended on that
+   yet (one chip publishes tachometers), but it decides which row becomes `Fan 1` the day a
+   second one does, and a slot order a reader cannot predict is an order no page can describe.
+   The walk is numeric now, and `tests/test_sensor_rules.py` asserts the property (every
+   consecutive pair in ascending index) rather than this box's chip names.
 * **Fan readings come from the motherboard, and `alpha` shows only what it can really read.**
   The vendor app gets RPM from the machine, never from the panel. Its Windows logs name the chip
   outright - `MSI X870 GAMING PLUS WIFI (MS-7E47) (Nuvoton NCT6687D)`, with `Fan CPU`

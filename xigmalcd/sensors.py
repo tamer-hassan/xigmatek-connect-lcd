@@ -75,10 +75,56 @@ def _int(text: str) -> int | None:
         return None
 
 
+#: Where the hwmon devices live.  A module-level name so the selection rules below can be
+#: gated against a constructed tree rather than against whatever this box happens to expose.
+HWMON_GLOB = "/sys/class/hwmon/hw*"
+
+#: The board's own sensor set, in tiers - `motherboard()` takes the first tier that answers.
+#: Super-IO controllers first: this board's NCT6687D (bound by `nct6683`, published as
+#: `nct6687`) carries a thermal diode and three thermistors, which is what a row labelled
+#: `Motherboard` means.
+BOARD_CHIPS = ("it87", "nct6775", "nct6779", "nct67xx", "nct6687", "nct6683",
+               "f71882fg", "emc2305", "tmp75", "tcn75", "lm75")
+
+#: DDR5 SPD hubs (the `spd5118` chips).  They are on the board, and they are also what answers
+#: `memory.temperature` - so they are a second tier rather than a co-equal candidate, and a box
+#: with a Super-IO never has its DIMM thermistors printed twice.
+DIMM_CHIPS = ("spd5118",)
+
+#: A network controller's die.  It is a real temperature and it is on the board, but it is not
+#: what a row labelled `Motherboard` means, so it is a last resort rather than a candidate:
+#: measured on this box it is the hottest of the lot (45.0-48.5 °C) and it was winning the
+#: `max()` below, which is how the glass came to print a Realtek NIC under the word
+#: "motherboard" (docs/limits.md).
+BOARD_LAST_RESORT_CHIPS = ("r8169",)
+
+#: A channel whose own driver label names a processor rather than the board.  `nct6683` labels
+#: its temperatures even though it labels no tachometers, and on this board one of them is
+#: `AMD TSI Addr 98h` - the CPU's thermal sensor read by the Super-IO, 62-70 °C here, against
+#: the diode and thermistors at 40.5-42.8.  Without this, adding the Super-IO would have made
+#: the "motherboard" reading *worse* than the NIC it already was.
+NOT_THE_BOARD = re.compile(r"TSI|Tctl|Tccd|CPU|GPU|edge|hotspot", re.I)
+
+
+def _hwmon_sort_key(path: str) -> tuple:
+    """Order the hwmon directories by their index as a number.
+
+    A plain text sort of `/sys/class/hwmon/hw*` puts `hwmon10` and `hwmon11` **before**
+    `hwmon2` - measured on this boot: hwmon0(nvme), hwmon1(nvme), hwmon10(ath12k),
+    hwmon11(amdgpu), hwmon2(r8169), hwmon3(nct6687), hwmon4(prom21_xhci), hwmon5(k10temp),
+    hwmon6-9(spd5118).  Today that only decides which chip answers `Fan 1` when two chips
+    publish tachometers, and here only one does, so nothing is wrong on the glass yet - but it
+    is an accident of the digit count, and an order a reader cannot predict is an order no
+    document can describe.
+    """
+    digits = re.findall(r"\d+", os.path.basename(path))
+    return (int(digits[0]) if digits else 1 << 30, path)
+
+
 def hwmon(*prefixes: str) -> list[tuple[str, str]]:
     """[(chip name, /sys/class/hwmon/hwN)] whose chip name starts with a prefix."""
     out = []
-    for path in sorted(glob.glob("/sys/class/hwmon/hw*")):
+    for path in sorted(glob.glob(HWMON_GLOB), key=_hwmon_sort_key):
         chip = _read(os.path.join(path, "name"))
         if chip and (not prefixes or chip.startswith(prefixes)):
             out.append((chip, path))
@@ -201,7 +247,7 @@ def memory() -> dict:
     mem["total"] = total
     mem["used"] = total - avail
     mem["load"] = round(100.0 * mem["used"] / total, 1)
-    dimm = temps("spd5118")
+    dimm = temps(*DIMM_CHIPS)
     if dimm:
         mem["temperature"] = _round_temp(max(v for _c, v in dimm))
     speed = _read("/sys/devices/system/memory/physical_memory_speed") \
@@ -212,6 +258,119 @@ def memory() -> dict:
 
 
 # ------------------------------------------------------------------ disk ---
+def controller_of(dev: str) -> str:
+    """A block device name to the controller that owns it: `nvme0n1p6` -> `nvme0`.
+
+    A pure function on purpose.  The mount point is read from `/proc/mounts`, which is not a
+    thing a check can hand it - and the mapping is where an NVMe namespace, a partition number
+    and an MMC block all look different while naming the one chip whose hwmon dir carries the
+    temperature.
+
+    A name that is not a disk at all - an `overlay`, a bind mount, a `mapper` label - answers
+    **''**, because the caller's fallback ("report the hottest composite I can see") is the
+    right answer for a mount this function cannot read, and a made-up controller name would
+    match nothing while looking like a fact.
+    """
+    name = os.path.basename(dev or "")
+    m = re.match(r"(nvme\d+)n\d+(p\d+)?$", name)
+    if m:
+        return m.group(1)
+    m = re.match(r"(mmcblk\d+)p\d+$", name)
+    if m:
+        return m.group(1)
+    m = re.match(r"([a-z]+d[a-z]?)(\d*)$", name)             # sda3, vdb1, xvda1, hda
+    if m and m.group(1):
+        return m.group(1)
+    return ""
+
+
+def _root_controller() -> str:
+    """The disk controller that holds `/`, or '' when the mount point cannot say.
+
+    This is the same drive `disk()` already describes with `total` and `used`, which come from
+    `shutil.disk_usage("/")` - and reporting a capacity from one drive while reporting a
+    temperature from another is exactly the mistake this fixes.  An `overlay`, a `mapper` name
+    or a btrfs pool simply will not match a chip, and `disk_temperature()` falls back to the
+    hottest composite in that case rather than guessing at a drive.
+    """
+    for line in _read("/proc/mounts").splitlines():
+        parts = line.split()
+        if len(parts) > 2 and parts[1] == "/":
+            return controller_of(parts[0])
+    return ""
+
+
+def _disk_channels() -> list[tuple[str, str, list[tuple[str, int]]]]:
+    """(chip, controller-instance, [(label, millidegrees)]) for every disk chip.
+
+    The controller name comes from the hwmon device's own link, not from the directory: an nvme
+    hwmon lives at `/sys/class/hwmon/hwmonN` and its `device` points at
+    `/sys/devices/.../nvme/nvme0`, so `nvme0` is what has to be compared against the mount
+    point.  Taking the parent directory instead answers `hwmon` for every drive and matches
+    nothing - measured while writing this, and the reason the fallback fired on a box whose
+    root disk is plainly named `nvme0`.
+    """
+    out = []
+    for chip, path in hwmon(*DISK_CHIPS):
+        link = os.path.join(path, "device")
+        dev = os.path.basename(os.path.realpath(link)) if os.path.exists(link) else ""
+        rows = [(label, val) for _chan, label, val in _chan_attrs(path, "temp")
+                if 0 < val < 150_000]
+        if rows:
+            out.append((chip, dev, rows))
+    return out
+
+
+def disk_temperature(root: str | None = None) -> tuple[int | None, str]:
+    """The **whole degrees** to answer `disk.temperature` with, and the sentence saying where.
+
+    `root` is the controller whose drive should answer; by default the one `/` is mounted on.
+    It is a parameter rather than something read inside, so the three rules below can be gated
+    against a constructed tree on any machine - including one with no second drive to disagree.
+
+    Three rules, in order, and the reason for each:
+
+    * the drive that owns `/` - the same drive `total` and `used` describe.  A second drive can
+      sit at a different temperature for perfectly ordinary reasons (a cached drive in a
+      bracket runs cooler than the boot drive under a workload), and a glass row that says
+      "disk" while naming neither is answering a question about a drive nobody asked about.
+      Measured here on 2026-11-13: `/` is on `nvme0` (Kingston SNV3S2000G, composite 41.85,
+      hottest sensor 67.85) while the previous rule reported **31.85** - the composite of
+      `nvme1` (MSI M461 2TB), because the old rule took the **minimum** of every sensor of
+      every drive.  That is not a conservative reading of a disk temperature; it is the
+      coolest number on the machine.
+    * within one drive: its `Composite` channel when it publishes one.  That is NVMe's own
+      aggregate, the number the drive reports about itself, and what `sensors -j` and
+      `smartctl` show.  A drive can carry sensors the aggregate deliberately excludes:
+      `nvme0` here reads `Sensor 2` at **67.85 °C** while its composite is 41.85, and printing
+      68 would be quoting a NAND probe the drive itself does not treat as its temperature.
+      If no channel is labelled `Composite`, the hottest sensor of that drive is used and the
+      note says so - an unlabelled drive should not be invisible.
+    * when the root drive cannot be matched to a chip (`_root_controller()` answering empty,
+      or a mapper/btrfs pool), the **hottest** composite across the drives that do match.
+      Falling back to the max is the one direction that cannot under-report.
+    """
+    chans = _disk_channels()
+    if not chans:
+        return None, "no disk temperature chip (nvme/drivetemp/aacs) published a temp*_input"
+    want = _root_controller() if root is None else root
+    asked = "the drive that holds /" if root is None else "the drive the caller asked for"
+    per_drive = []
+    for _chip, dev, rows in chans:
+        comp = [v for label, v in rows if label.lower() == "composite"]
+        per_drive.append((dev, (max(comp) if comp else max(v for _l, v in rows)), bool(comp)))
+    if want:
+        for dev, mdeg, was_comp in per_drive:
+            if dev == want:
+                where = (f"the composite published by {dev} ({asked})" if was_comp else
+                         f"the hottest sensor of {dev} ({asked}; it publishes no Composite "
+                         f"channel)")
+                return _round_temp(mdeg), where
+    hottest = max(v for _d, v, _c in per_drive)
+    return _round_temp(hottest), (f"the hottest reading across {len(per_drive)} drive(s); none "
+                                  f"matched the mount point")
+
+
 def disk() -> dict:
     out: dict = {}
     try:
@@ -248,9 +407,9 @@ def disk() -> dict:
             d = _rate.get("iowait", (sum(parts), parts[5]))
             if d and d[0] > 0:
                 out["load"] = round(100.0 * d[1] / d[0], 1)
-    t = temps(*DISK_CHIPS)
-    if t:
-        out["temperature"] = _round_temp(min(t, key=lambda cv: cv[1])[1])
+    val, _whence = disk_temperature()
+    if val is not None:
+        out["temperature"] = val
     return out
 
 
@@ -440,11 +599,62 @@ def fans() -> list[dict]:
     return out
 
 
+def board_channels(*chips: str) -> list[tuple[str, str, int]]:
+    """(chip, driver label, millidegrees) for every channel that can stand for the board.
+
+    Channels whose own label names a processor are dropped by `NOT_THE_BOARD`, which is the
+    whole reason the Super-IO can be added at all: on this board its hottest temperature is
+    `AMD TSI Addr 98h` (62-70 °C measured), and taking the max of everything would print that
+    under a row that says `Motherboard`.
+    """
+    out = []
+    for chip, path in hwmon(*(chips or BOARD_CHIPS)):
+        for chan, label, val in _chan_attrs(path, "temp"):
+            if 0 < val < 150_000 and not NOT_THE_BOARD.search(label or ""):
+                out.append((chip, label, val))
+    return out
+
+
+def motherboard_answer() -> tuple[str, str, int] | None:
+    """The (chip, driver label, millidegrees) that answered `motherboard`, or None.
+
+    Three tiers, first one that answers wins, and each is there for a measured reason:
+
+    1. **the Super-IO's own channels** - a thermal diode and thermistors wired to the board.
+       Here that is `nct6687`: `Diode 0 (curr)` 40.5-44.5 °C and `Thermistor 1`/`Thermistor 15`
+       40.5-48.0 across the readings taken on 2026-11-13, against `AMD TSI Addr 98h` at 62-70
+       (excluded by `NOT_THE_BOARD`).
+    2. **the DDR5 SPD thermistors** (`spd5118`, 41.0-47.0 here) - on the board, but the same
+       chips also answer `memory.temperature`, so they are a second tier rather than a
+       co-equal candidate: a machine with a Super-IO never prints its DIMM numbers twice.
+    3. **a network controller's die** (`r8169`, 45.0-50.0 here) - the last resort, because a
+       box with no bound Super-IO and no SPD hubs should report the warmest thing it can
+       rather than nothing.  It was the *only* rule this file had, which is how `Motherboard`
+       on the glass came to read 45-49 °C from a Realtek chip while the board's own diode sat
+       unread at 40 (docs/limits.md keeps both readings).
+
+    The vendor's captured body has `motherboard: {"temperature": 38}` beside
+    `cpu: {"temperature": 57}` - a board number well below the CPU's, which is the shape tier 1
+    reproduces and the NIC never did.  Which channel won matters enough to print: on this box
+    the Super-IO thermistors and the NIC die sit a few degrees apart, so the number alone cannot
+    show the tier rule working, and `tools/fanscan.py` names the chip and label it chose.  The
+    blob has no field for that, and inventing one is a wire change this file does not make from
+    a hunch.
+    """
+    for chips in (BOARD_CHIPS, DIMM_CHIPS, BOARD_LAST_RESORT_CHIPS):
+        chans = board_channels(*chips)
+        if chans:
+            return max(chans, key=lambda clv: clv[2])
+    return None
+
+
 def motherboard() -> dict:
-    t = temps(*BOARD_CHIPS)
-    if not t:
+    """One whole degree, the way ALPHA's `motherboard` section spells it.  The rule and its
+    three tiers are in `motherboard_answer()`; the tiers are what this door walks."""
+    won = motherboard_answer()
+    if won is None:
         return {}
-    return {"temperature": _round_temp(max(v for _c, v in t))}
+    return {"temperature": _round_temp(won[2])}
 
 
 # ----------------------------------------------------------------- main ----
