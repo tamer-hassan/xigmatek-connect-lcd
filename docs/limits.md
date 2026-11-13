@@ -315,6 +315,24 @@ What has been measured on glass, by whom, with how many frames - and what has no
    whatsoever - so the name is ours, spelled like `CPU Temperature` and `Motherboard
    Temperature`, and `layout.FORMATS_MEASURED` stays at four, which is what
    `--list-themes` means when it says which shapes are this repo's choice.
+ * **The blob tolerates what the vendor never sent, asked directly on 2026-11-13.** One
+   session, five `STATE all 1` bodies - the control in the vendor's shape; the control plus
+   a fan row typed `"Pump"`; the control plus a new top-level `drives` key; both changes
+   together; the control again - each answered `<Message 1 200 {AckNumber, CkOK:True} b''>`,
+   and an ordinary 11 405 B `.osd` frame uploaded afterwards was accepted with `space`
+   `68464 -> 68464` and `osdState`/`mode` unchanged
+   (`data/glass/2026-11-13-184215-blob-probe.txt`; `tools/blob_probe.py`, run with the
+   display service stopped).  The run eleven minutes earlier,
+   `data/glass/2026-11-13-183954-blob-probe.txt`, is kept as the record of the flawed
+   pairing: its control body already carried a `Pump` row, because `sensors.collect()` on
+   this box reports the pinned pump channel, so the control and the experiment contained
+   the same value and the comparison could not have distinguished anything.  The acks it
+   printed are the same `200`s; the *question* it asked was not the one it claimed.  So per-drive disk rows are not blocked by the protocol:
+   whether to add them is a layout-design question.  What the same experiment cannot
+   measure is whether the panel *reads* those fields - a `STATE` reply carries no body,
+   `space` does not move for accepted uploads, and the only topic that would make the panel
+   draw the numbers itself is `realtimeDisplay`, which ALPHA sends only to an
+   `OS === "RTOS"` unit (PROTOCOL.md §5, §8).
 * **`hwmon()` walked the device directories as text, so `hwmon10` came before `hwmon2`.** On
    this boot: nvme, nvme, ath12k, amdgpu, r8169, nct6687, prom21_xhci, k10temp, spd5118 ×4 -
    the Super-IO last-but-two because of a digit count.  Nothing on the glass depended on that

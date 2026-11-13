@@ -570,20 +570,36 @@ fact about the wiring, not about the chip. `FAN_CHANNELS` carries a third entry 
 (`("nct6687", "fan2")` pinned as `("CPU PUMP", "Pump")`), and that pinned type is what answers
 the vendor's `Pump Speed` source - `themes.FAN_TYPED`, nine of the 23 selectable layouts.
 
-**A `type` value the vendor never sent.** Every captured body spells `"Fan"` or `"Chassis"`; the
-pump row is this program writing `"Pump"` into that field. The authority for it is a
-measurement recorded in `FAN_CHANNELS`, not a label - `nct6683` publishes no `fan*_label` at all
-- and the string travels down exactly as the other two do. What the firmware makes of it is
-**unmeasured**, and the honest statement of how hard that is to measure: the panel's own
-`Fan`/`Pump` OSD pages (`attribute:["Status","Fan","Pump"]`) are content the host sends, the
-`STATE all 1` frame answers a bare `200` whatever its body says, and the only switch that would
-make the panel draw those numbers itself is `realtimeDisplay` - which ALPHA sends only when
-`deviceConfig.OS === "RTOS"`, while this unit reports `"OS":"Linux"` (§5, and
-`tools/realtime.py`). So there is no read-back that could report a verdict on the string, and
-the alternative - putting eyes on the panel's own pages - would mean writing `mode` or `logo`,
-which this project refuses to touch (§5). It is kept because it is the only field in the blob
-that says which channel is which, and because the number a reader sees was painted here from
-the same reading either way.
+**A `type` value the vendor never sent - now asked, and answered.** Every captured body spells
+`"Fan"` or `"Chassis"`; the pump row is this program writing `"Pump"` into that field. The
+authority for it is a measurement recorded in `FAN_CHANNELS`, not a label - `nct6683` publishes
+no `fan*_label` at all.
+
+On 2026-11-13 the panel was asked directly (`tools/blob_probe.py`, transcripts
+`data/glass/2026-11-13-183954-blob-probe.txt` and `-184215-blob-probe.txt`, serial not printed):
+five `STATE all 1` bodies in the same session - the vendor-shaped control, the same rows with one
+extra row typed `Pump`, a body with a new top-level `drives` key, both changes together, and the
+control again - each answered `<Message 1 200 {AckNumber, CkOK:True} b''>`, and an ordinary
+11 405 B `.osd` frame uploaded after them was accepted, with `space` `68464 -> 68464` and
+`osdState`/`mode` unchanged.
+
+What that measures, and what it does not:
+
+* **measured:** the panel does not reject a metrics body for a value or a key it has never seen.
+  No `400`, no silence, no change in what follows.
+* **not measured, and not measurable from here:** whether it *reads* those fields. The reply to a
+  `STATE` frame is a bare ack with no body, `space` does not move for accepted uploads (§9), and
+  the only switch that would make the panel draw the numbers itself is `realtimeDisplay`, which
+  ALPHA sends only when `deviceConfig.OS === "RTOS"` while this unit reports `"Linux"` (§5).
+  Seeing the panel's own `Fan`/`Pump` pages would mean writing `mode` or `logo`, which this
+  project refuses to touch (§5).
+* **a side effect worth stating:** the first probe ran, the display service was restarted, and its
+  session-start background upload was refused once (`background Theme_25.mp4 refused … retrying
+  once`, 18:40:07) before the retry landed. That is the same single-refusal class this file
+  already records as unexplained - 7 in 56 minutes in one log, 43 unconfirmed in the 34 173
+  frames of another - but it followed a probe closely, and that is written down rather than
+  smoothed over. It has not been reproduced deliberately, because doing so means taking the port
+  again.
 
 **Send it twice at startup, then stop.** That is what ALPHA really does: in the 51-frame
 init session, `STATE all 1` is TX frames 3 and 4 and nowhere else, and the 63-upload

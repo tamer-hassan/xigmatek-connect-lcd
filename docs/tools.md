@@ -178,6 +178,18 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   what the write costs first.
 * `tools/state.py` — read-only snapshot of what `conn` reports (`--watch N` to repeat).
   The first thing to run after any boot or reset; it writes nothing.
+* `tools/blob_probe.py` — **the one tool here that sends a body the vendor never sent**, and
+  the only way to settle two questions the documents currently mark unmeasured: does the panel
+  answer a `STATE all 1` frame that carries an extra top-level section (`drives`, which is what
+  per-drive disk rows would need), and does it answer one whose `fans[]` carries
+  `"type":"Pump"`?  It sends the current body as a control, the two experiments, the control
+  again, then uploads one ordinary frame - because five `200`s mean nothing if the next picture
+  is refused.  Without `--yes` it prints the plan and opens nothing; it refuses outright while
+  the display service holds the port (one opener, PROTOCOL.md §1); it never sends a destructive
+  or firmware topic and never prints the panel's serial.  All four of those boundaries are
+  asserted by `tests/test_blob_probe.py` against the tool's own source and its dry run, without
+  touching a port.  Its transcript belongs in `data/glass/`, unpublished, with the verdict it
+  reaches written into PROTOCOL.md §8.
 * `tools/fanscan.py` — every tachometer channel Linux can see, the candidate Super-IO
   drivers with their real `modinfo` descriptions, what each channel is named by
   `sensors.FAN_CHANNELS`, and the two fan figures `alpha` would draw from them.  It also

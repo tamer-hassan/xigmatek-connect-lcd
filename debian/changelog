@@ -578,19 +578,83 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     fifteen checks; the first version did not, and the runner's own log stands
     as that experiment's record rather than something I re-ran by hand.
 
+  * A tool to ask the panel the two questions the last cycles left unmeasured,
+    and thirteen checks that gate it without touching a port.  Since the pump
+    rule the tree sends `"type":"Pump"` in the metrics blob - a value none of
+    the 34 captured `fans[]` entries spells - and per-drive disk rows would
+    need a `drives` section, a key the vendor's schema does not have.
+    PROTOCOL.md §8 records that the panel answers a bare `200` to
+    `STATE all 1`, which is not the same statement as "it answers `200` to a
+    body with a key it has never seen".  `tools/blob_probe.py` sends the
+    current body as a control, then the Pump-typed one, then the extra-section
+    one, then both, then the control again, and uploads one ordinary frame at
+    the end, because five `200`s mean nothing if the next picture is refused.
+    Without `--yes` it prints the plan - bodies, deltas and the frame control -
+    and opens nothing; it refuses outright while the display service holds the
+    port (one opener, §1), gated by stubbing that answer so the check means
+    the same on a runner with no panel; it never prints the panel's serial
+    (`PRINTED_KEYS` has no `sn`); and an AST walk over the tool's own source
+    asserts that no string reaching a `request`/`post` call is a destructive
+    or firmware topic and that the only verbs used are `STATE all 1`, `conn`,
+    `hello`.  The five bodies are checked as data too: the pump body differs
+    from the control by exactly one row and one value with no new top-level
+    key, the `drives` body by exactly one key, and the second control equals
+    the first - so the two questions cannot be answered at once and mean
+    nothing.  Seven mutations, each counted: the `--yes` guard
+    removed -> 3; the service check removed -> 1; the serial admitted -> 1; a
+    `recovery` post inserted -> 2; the pump body grown with a top-level key ->
+    1; the control normalisation dropped, which would stop the Pump question
+    isolating anything -> 1; the end frame control switched off -> 1.  That
+    last one was not caught by the first version of the check, which only asked
+    whether `upload_a_frame` appeared somewhere in the file - and turning
+    `if not a.skip_frame:` into `if False:` keeps the name and never runs it.
+    Binding the check to the guard fixed that, and the fix then failed against
+    the unmutated tool, because the
+    guard names `skip_frame` as an attribute of `a`, not as a bare name: the
+    baseline run caught my own AST walk being wrong, which is the same lesson
+    as the last entry, arriving twelve minutes later.  Also: the new test file
+    leaked two handles through `io.open(...).read()` - the noise this cycle
+    removed elsewhere - now `with`-guarded, and the module runs clean under
+    `-W error::ResourceWarning`.
+
+    It then ran on this box - display service stopped, probe, service
+    restarted - and the answers came back uniform: five `STATE all 1` bodies
+    (the control in the vendor's shape; the control plus a fan row typed
+    `Pump`; the control plus a new top-level `drives` key; both changes
+    together; the control again) each answered `1 200` with `CkOK True`, and
+    an ordinary 11 405 B `.osd` frame uploaded after them was accepted, with
+    `space` `68464 -> 68464` and `osdState`/`mode` unchanged.  The panel does
+    not reject a metrics body for a value or a key it has never seen, so
+    per-drive disk rows are a layout question rather than a protocol one.
+    Recorded as narrowly as it was measured: nothing in that run shows the
+    panel *reads* those fields - a `STATE` reply carries no body, `space` does
+    not move for accepted uploads, and the only topic that would make the
+    panel draw the numbers itself is `realtimeDisplay`, which ALPHA sends only
+    when `deviceConfig.OS` is `RTOS` while this unit reports Linux.  One side
+    effect written down instead of dropped: after the first probe the
+    restarted loop's session-start background upload was refused once and
+    retried (18:40:07) - the same unexplained single-`400` class this tree
+    logs elsewhere, arriving immediately after a probe, and not reproduced on
+    purpose because that would mean taking the port again.  Transcripts:
+    `data/glass/2026-11-13-183954-blob-probe.txt` and
+    `data/glass/2026-11-13-184215-blob-probe.txt`, unpublished, and neither
+    carries the panel's serial.
+
   * The suite's figures, re-read rather than inherited.  This bench,
     `python3 -W error::ResourceWarning -m unittest discover -s tests`, one run
-    of the committed tree with nothing else in flight: 511 checks in 50 files
-    in 400.139 s, 3 skipped, one of them the tray check naming the host it
+    of the committed tree with nothing else in flight: 525 checks in 51 files
+    in 396.182 s, 3 skipped, one of them the tray check naming the host it
     needs, and no `ResourceWarning` printed at all now that `setUp` closes its
     own file.  The count is read off the tree as well as off the runner:
-    `grep -c "^    def test_" tests/*.py` answers 511 over 50 files and
-    `unittest.TestLoader().discover("tests")` answers 511 over 50 modules, the
+    `grep -c "^    def test_" tests/*.py` answers 525 over 51 files and
+    `unittest.TestLoader().discover("tests")` answers 525 over 51 modules, the
     same numbers the runner prints.  The earlier readings of this same sentence
-    in this entry - 510 over 50, 496 over 49 and 485 over 48 - are what the
-    tree held before the check fix, before the sensor rules and before the pump
-    rule, and they are kept because the deltas are the counts of the checks
-    each cycle added, not a drift.  Every other whole-suite log taken in a
+    in this entry - 524, 511 over 50, 510 over 50, 496 over 49 and 485 over 48
+    - are what the tree held before the probe's boundaries were gated, before
+    the probe tool, before the check fix, before the sensor rules and before
+    the pump rule, and they are kept because the deltas are the counts of the
+    checks each step added, not a drift.  Every
+    other whole-suite log taken in a
     sitting where something else
     was in flight is worth nothing and is kept here only as the lesson: two
     reported failures because a mutation sweep was rewriting
