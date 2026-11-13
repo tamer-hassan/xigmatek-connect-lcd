@@ -119,7 +119,11 @@ asserted here:
   came alive when the AIO's block cable went into `PUMP_SYS1`, steady at 2459-2469 RPM while its
   own header's duty swept (PROTOCOL.md §8).  On a body with no tachometer at all the nine
   layouts skip that widget instead, with the reason naming the command that would settle it
-  (`tools/fanscan.py`), and `tests/test_pump_speed.py` holds both halves.  Either way a widget
+  (`tools/fanscan.py`), and `tests/test_pump_speed.py` holds both halves.  Because the name is
+  in the vocabulary now, it is also a legal `xigma.showIf` dependency: a row can be gated on a
+  pump being sensed at all, and on a box that reports no such row it is silenced and *reported*
+  (`showIf:Pump Speed`) rather than drawing a hole - measured on this bench as 13 boxes against
+  12, the gated line 1 376 px.  Either way a widget
   with no reading draws **without that widget** and prints why - a hole that says what it is,
   rather than a zero that reads as a measurement. Faces are substituted the same way and
   said out loud (`arial` -> Liberation Sans, `simsun` -> Noto Sans CJK), because no

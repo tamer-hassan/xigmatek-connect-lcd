@@ -488,29 +488,37 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     docs/usage.md: `nct6683` publishes no `fan*_label`, so a label written
     there never reaches sysfs and cannot reach this program; and lm-sensors
     halves a `pwmN` before printing it, so raw 174 reads `87%` and the true
-    68% needs `compute pwmN @/1.275`.  Ten checks in
-    `tests/test_pump_speed.py`, seven mutations counted in
-    docs/theme-editor.md; `--watch` now samples the `pwm*` outputs in the
-    same window so the pairing is on the record.
+    68% needs `compute pwmN @/1.275`.  Eleven checks in
+    `tests/test_pump_speed.py`, seven mutations counted in docs/theme-editor.md
+    (restoring the blanket refusal costs six of them); `--watch` now samples the
+    `pwm*` outputs in the same window so the pairing is on the record.  And the
+    name being in the vocabulary makes it a legal `xigma.showIf` dependency, so
+    a row can be gated on a pump being sensed at all: 13 boxes against 12 on
+    this bench, the silenced row reported as `showIf:Pump Speed` rather than
+    drawn as a hole.
 
   * The suite's figures, re-read rather than inherited.  This bench,
     `python3 -W error::ResourceWarning -m unittest discover -s tests`, one run
-    of the committed tree with nothing else in flight: 495 checks in 49 files
-    in 398.239 s, 3 skipped, one of them the tray check naming the host it
+    taken with the tree frozen and nothing else in flight - the only edits made
+    after it are prose in this entry, re-gated by `tests/test_debian_changelog`
+    in 0.02 s: 496 checks in 49 files
+    in 400.211 s, 3 skipped, one of them the tray check naming the host it
     needs, and no `ResourceWarning` printed at all now that `setUp` closes its
     own file.  The count is read off the tree as well as off the runner:
-    `grep -c "^    def test_" tests/*.py` answers 495 over 49 files and
-    `unittest.TestLoader().discover("tests")` answers 495 over 49 modules, the
-    same numbers the runner prints.  Four other whole-suite logs from that
-    sitting are worth nothing and are kept here only as the lesson: two
+    `grep -c "^    def test_" tests/*.py` answers 496 over 49 files and
+    `unittest.TestLoader().discover("tests")` answers 496 over 49 modules, the
+    same numbers the runner prints.  Every other whole-suite log taken in that
+    sitting is worth nothing and is kept here only as the lesson: two
     reported failures because a mutation sweep was rewriting
     `xigmalcd/themes.py` underneath them while
     `tests/test_specials.py`'s door-marker check reads the file on disk, and
-    two more passed against trees that were still being edited.  A whole-suite
-    number means a frozen tree, which is also why `docs/theme-editor.md` now
-    carries that as its fifth harness rule.  An earlier cycle's run also came
-    back red for a real reason: the suite's own isolation check caught a live
-    `xigmaui` on this machine writing the session file through its 500 ms save
+    the rest came back green against trees that were still being edited - one
+    of them a changelog carrying a 104-column line for a minute.  A
+    whole-suite number means a frozen tree, which is also why
+    `docs/theme-editor.md` now carries that as its fifth harness rule.  An
+    earlier cycle's run also came back red for a real reason: the suite's own
+    isolation check caught a live `xigmaui` on this machine writing the
+    session file through its 500 ms save
     timer mid-run, and `test_zz_isolation.py` named the process and said to
     close it - the guard that exists for "a test wrote your settings", meeting
     a person instead.  CI's runner, the `tests/` step alone, over the cycles
@@ -518,7 +526,8 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     440 checks (#165), 387 with 441 (#168), 319 with 442 (#169), 413 with 446
     (#171), 416 with 447 (#172), 383 with 447 (#174), 358 with 453 (#175),
     387 with 453 (#176), 364 with 459 (#177), 433.423 with 475 (#178),
-    442.333 with 481 (#180) and 336.831 with 485 (#184) - those last three
+    442.333 with 481 (#180), 336.831 with 485 (#184) and 451.632 with 495
+    (#186) - those last four
     runs skipping 4 rather than 3, the extra one being the glass ledger
     naming transcripts a runner with no panel has never made, and the 9 s
     between #178 and #180 being what the six new checks cost: five of them
@@ -527,8 +536,9 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     checks larger and 105 s quicker than #180 on the same YAML, which is why
     these numbers are printed as a list and never used as a gate: the spread
     is the runner's, and the only honest assertion over two of them is about
-    a count.  The runner's sample for these 495 checks is added by the commit
-    that reads it, as every cycle before this one has done.  The 435 in this
+    a count.  #186 is that runner's sample for the 495 checks of the commit
+    before this one; the sample for these 496 arrives with the commit that
+    reads it, as every cycle before this one has done.  The 435 in this
     entry's first bullet is what the port landed at, not what the tree holds.
 
 

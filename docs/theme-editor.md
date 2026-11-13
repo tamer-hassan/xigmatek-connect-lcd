@@ -1188,8 +1188,14 @@ Ten checks in `tests/test_pump_speed.py`, 0 failures, 0.9 s.  The seven mutation
 cost: the rule reading a name instead of the type → **1**; the zero guard dropped → **1**;
 `ROW_WHY` stripped of both command names → **2** (the in-process one and the CLI one); the pump
 taken out of the pin table → **1**; `_tach` back to name-first → **1**; `FAN_TYPED` emptied,
-i.e. the blanket refusal restored → **5**; `--list-themes` back to a constant → **1**.  Back as
-shipped: 0.
+i.e. the blanket refusal restored → **6**; `--list-themes` back to a constant → **1**.  Back as
+shipped: 11 checks, 0 failures.
+
+One unlocked door that the census does not show on its own: because `Pump Speed` is in the
+vocabulary now, it is a legal `xigma.showIf` dependency.  A row gated on it draws where a pump
+is sensed and is **silenced and reported** (`showIf:Pump Speed`) where it is not - 13 boxes
+against 12, the gated line 1 376 px on this bench's faces - which is how a layout can carry a
+pump label without carrying a hole on a box that has no pump.
 
 What is **not** claimed: that the firmware has ever seen the string `"Pump"`.  All 34 captured
 bodies spell `"Fan"` or `"Chassis"` (PROTOCOL.md §8), so this program putting a third value in

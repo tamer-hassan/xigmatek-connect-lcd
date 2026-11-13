@@ -26,6 +26,7 @@ size-32 ones - so the check prints those and asserts only that the count is non-
 """
 from __future__ import annotations
 
+import copy
 import json
 import os
 import subprocess
@@ -141,6 +142,36 @@ class ThePinTable(unittest.TestCase):
         self.assertEqual(sensors.FAN_CHANNELS.get(("nct6687", "fan1")), ("Fan CPU", "Fan"))
         self.assertEqual(sensors.FAN_CHANNELS.get(("nct6687", "fan12")),
                          ("Fan System 5", "Chassis"))
+
+
+    def test_a_row_can_be_gated_on_the_pump_existing(self):
+        """`xigma.showIf` takes a source name, and until this change `Pump Speed` was not one.
+
+        The use is a layout that labels the pump where a pump is sensed and carries no hole
+        where it is not: the same object, two bodies, and the painter's own accounting says
+        which way it went - a silenced row is reported (`showIf:Pump Speed`), never drawn.
+        """
+        obj = copy.deepcopy(themes.export("alpha"))
+        obj["osd"]["widget"].append({
+            "id": "pump-gate", "type": "text",
+            "property": [{"x": 20, "y": 20, "content": "PUMP", "fontSize": 30,
+                          "fontFamily": "verdana", "textColor": "rgba(255,255,255,1)",
+                          "xigma": {"showIf": "Pump Speed"}}]})
+        hard, soft = themes.validate(obj)
+        self.assertEqual(hard, [])
+        self.assertEqual([s for s in soft if "showIf" in s], [],
+                         f"the validator does not know the name any more: {soft}")
+        with_pump = copy.deepcopy(WITH_PUMP)
+        a, na = themes.draw(obj, with_pump, fixtures.SESSION_WHEN)
+        b, nb = themes.draw(obj, NO_PUMP, fixtures.SESSION_WHEN)
+        self.assertEqual(len(na["boxes"]), len(nb["boxes"]) + 1,
+                         f"gated row drawn {len(na['boxes'])}, undrawn {len(nb['boxes'])}")
+        self.assertIn("showIf:Pump Speed", nb["missing"], nb["missing"])
+        self.assertNotIn("showIf:Pump Speed", na["missing"], na["missing"])
+        px = sum(1 for p in ImageChops.difference(a.convert("RGBA"), b.convert("RGBA"))
+                 .get_flattened_data() if p != (0, 0, 0, 0))
+        self.assertGreater(px, 0, "the gated row appeared in the notes and in no pixel")
+        print(f"  the gated pump line is {px} px on this bench's faces")
 
 
 class TheNineFiles(unittest.TestCase):
