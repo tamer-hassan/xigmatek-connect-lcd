@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """blob_probe.py - ask the panel, in one minute, what it makes of a `STATE all 1` body it has not seen.
 
-Two decisions in this tree are waiting on a fact nobody has measured, and both are about the
+Two decisions in this tree were waiting on a fact nobody had measured, and both are about the
 metrics blob:
 
 1. **May a layout carry a temperature per drive?**  `disk.temperature` is one scalar in the
@@ -12,8 +12,8 @@ metrics blob:
    and the difference is what per-drive rows hinge on.
 2. **What does it make of `"type":"Pump"`?**  Every captured `fans[]` entry spells `"Fan"` or
    `"Chassis"`.  Since 2026-11-13 this program sends a third value, for a channel pinned as a
-   pump by measurement.  The row is not new: the installed build already sends it, under the
-   name `nct6687 fan2` and typed `Fan`.  So the question is exactly as narrow as the string.
+   pump by measurement.  The row is not new: the installed build already sends it, named
+   `nct6687 fan2` and typed `Fan`.  So the question is exactly as narrow as the string.
 
 Method: open the port, read the panel's own state, send five `STATE all 1` bodies - a control,
 the pump-typed one, the extra-section one, both together, and the control again - printing the
@@ -23,20 +23,21 @@ five bodies means nothing if the next upload is refused.
 
 Safety, stated as the boundary the checks hold:
 
-* it never touches a destructive or firmware topic: `recovery`, `config`, `logo`, `mode`,
-  `presetThemeId`, `firmware`, `mediaDelete` (`FORBIDDEN_TOPICS` below);
+* it never touches a destructive or firmware topic: the names are in `FORBIDDEN_TOPICS`, and an
+  AST check over this file asserts none of them reaches a `request`/`post` call;
 * it does not open the port without `--yes`, and prints what it would send instead;
 * it refuses while the display service is running, because one process can hold the port
   (PROTOCOL.md §1) and a probe that silently takes over someone's loop is not a measurement;
-* it never prints the panel's serial: only `PRINTED_KEYS` are echoed, and that list is gated.
+* it never prints the panel's serial: only `PRINTED_KEYS` is echoed.
 
 This is a bench instrument, not a fixture: its transcript belongs in `data/glass/` (which this
-repository does not publish, for the serial's sake) and the verdict it reaches belongs in
-PROTOCOL.md §8.
+repository does not publish, for the serial's sake) and the verdict it reached is in
+PROTOCOL.md §8 - both `200`, with the frame accepted after them.
 
     tools/blob_probe.py                                  # dry run: nothing is opened
     tools/blob_probe.py --yes                            # the five bodies and one frame
     tools/blob_probe.py --yes --skip-frame               # acks only
+    tools/blob_probe.py --yes --pump-only                # control, Pump, control
     tools/blob_probe.py --yes --device /dev/ttyACM0 -v
 """
 from __future__ import annotations
@@ -52,13 +53,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from xigmalcd import protocol, render, sensors                      # noqa: E402
 
-#: Topics this tool must never send.  A check reads this name out of the source and asserts
-#: none of them appears anywhere in this file's request calls.
+#: Topics this tool must never send.  A check reads this name out of the file and asserts none
+#: of the strings reaches a call, so the boundary is gated rather than promised.
 FORBIDDEN_TOPICS = ("recovery", "config", "logo", "mode", "presetThemeId", "firmware",
                     "mediaDelete", "factory", "update")
 
 #: What is echoed from `device_info()`.  `sn` is deliberately absent: the panel's serial number
-#: does not go into a transcript, and a tool that dumps the whole dict would put it there.
+#: does not go into a published transcript, and a tool that dumped the whole dict would put it
+#: there.
 PRINTED_KEYS = ("mode", "logo", "osdState", "brightness", "timeout", "degree", "space",
                 "ver", "productID")
 
@@ -81,15 +83,14 @@ def service_active(unit: str = "xigmalcd") -> bool:
 
 
 def drive_rows() -> list:
-    """Per-drive temperatures, the section whose tolerance is being asked about."""
-    out = []
-    for _chip, dev, rows in sensors._disk_channels():
-        comp = [v for label, v in rows if label.lower() == "composite"]
-        out.append({"name": dev,
-                    "temperature": round((max(comp) if comp else max(v for _l, v in rows))
-                                         / 1000),
-                    "sensors": sorted(round(v / 1000, 1) for _l, v in rows)})
-    return out
+    """Per-drive readings: `sensors.drives()` itself, not a copy of it.
+
+    The body the probe sends and the body the loop sends have to be the same bytes, or a `200`
+    certifies a near-miss of the payload that is about to go on the wire.  The first version of
+    this function re-derived the numbers here; the shipped rule then grew a rounding change and
+    a sort, and the probe would have been asking about neither.
+    """
+    return sensors.drives()
 
 
 def bodies() -> list:
@@ -104,11 +105,11 @@ def bodies() -> list:
     version of this tool sent a control that carried the very value the experiment was meant to
     isolate, and the pair proved nothing: both bodies answered `200` because both contained it.
     The control now normalises every fan row's `type` to the two values the vendor's 34 captured
-    bodies actually spell, and the Pump body is the same rows with one `type` string changed.
-    That is the difference being asked about, and nothing else.
+    bodies actually spell, and the Pump body is the same rows with one extra row.  That is the
+    difference being asked about, and nothing else.
     """
     raw = sensors.collect()
-    base = dict(raw)
+    base = {k: v for k, v in raw.items() if k != "drives"}
     base["fans"] = [dict(f, type=("Fan" if f.get("type") == "Pump" else f.get("type")))
                     for f in (raw.get("fans") or [])]
     rows = drive_rows()
@@ -145,18 +146,19 @@ def probe(link, label: str, body: dict, verbose: bool) -> str:
     """One `STATE all 1`, with the panel's own answer read back.
 
     The verdict recorded is the **code** the panel answered with, not the whole frame: an ack
-    carries a rising `AckNumber`, so comparing the raw messages made every body look different
-    and the summary line "all bodies answered alike" came out False for a run where all five
-    answered `200`.  The frame is still printed, in full, above it.
+    carries a rising `AckNumber`, so comparing raw messages made every body look different and
+    the summary line "all bodies answered alike" came out False for a run where all five
+    answered `200`.  The frame is still printed above it, in full.
     """
     ack = link.state_all(body, wait=True)
     if ack is None:
-        verdict, full = "no answer", "None"
+        full, verdict = "None", "no answer"
     else:
         full = str(ack)
-        verdict = getattr(ack, "code", None) or (full.split(" ")[2] if len(full.split(" ")) > 2
-                                                 else full)
-    print(f"  {label}\n    keys sent: {sorted(body)}\n    answer:    {full}\n    code:      {verdict}")
+        verdict = getattr(ack, "code", None) or full.split(" ")[2:3] or full
+        verdict = str(verdict)
+    print(f"  {label}\n    keys sent: {sorted(body)}\n    answer:    {full}\n    code:      "
+          f"{verdict}")
     if verbose:
         print("    body: " + json.dumps(body, default=str)[:500])
     return verdict
@@ -166,8 +168,8 @@ def upload_a_frame(link, verbose: bool) -> str:
     """The end control: can the panel still take a picture after the odd bodies?
 
     Built and sent through the same doors the loop uses - `render.draw` for the frame,
-    `render.to_png` for the 256-colour file the panel is fed by default, `Link.send_media`
-    for the announcement-bytes-ack sequence measured in §6.
+    `render.to_png` for the 256-colour file the panel is fed by default, `Link.send_media` for
+    the announce-bytes-ack sequence measured in §6.
     """
     img = render.draw(sensors.collect(), "alpha")
     png = render.to_png(img, palette=True)
@@ -187,14 +189,14 @@ def main() -> int:
     ap.add_argument("--skip-frame", action="store_true",
                     help="send only the metrics bodies, no uploads")
     ap.add_argument("--pump-only", action="store_true",
-                    help="just the control and the Pump-typed body")
+                    help="just the control and the Pump-typed body, and the control again")
     ap.add_argument("-v", "--verbose", action="store_true")
     a = ap.parse_args()
 
     print("this tool sends `STATE all 1` bodies and reads the panel's answer to each one.")
     print("topics it will never send: " + ", ".join(FORBIDDEN_TOPICS))
-    print(f"keys it will echo from the panel's state: {', '.join(PRINTED_KEYS)}  "
-          f"(the serial is not among them)")
+    print("keys it will echo from the panel's state: " + ", ".join(PRINTED_KEYS)
+          + "  (the serial is not among them)")
 
     planned = bodies()
     if a.pump_only:
@@ -235,10 +237,9 @@ def main() -> int:
             print("\nthe frame control:")
             try:
                 answers["frame"] = upload_a_frame(link, a.verbose)
-                print("  " + answers["frame"])
             except Exception as exc:                                    # noqa: BLE001
                 answers["frame"] = f"frame refused: {exc}"
-                print("  " + answers["frame"])
+            print("  " + answers["frame"])
         after = show_state(link, "state after")
 
     print("\nsummary:")

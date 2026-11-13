@@ -178,28 +178,34 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   what the write costs first.
 * `tools/state.py` — read-only snapshot of what `conn` reports (`--watch N` to repeat).
   The first thing to run after any boot or reset; it writes nothing.
-* `tools/blob_probe.py` — **the one tool here that sends a body the vendor never sent**, and
-  the only way to settle two questions the documents currently mark unmeasured: does the panel
-  answer a `STATE all 1` frame that carries an extra top-level section (`drives`, which is what
-  per-drive disk rows would need), and does it answer one whose `fans[]` carries
-  `"type":"Pump"`?  It sends the current body as a control, the two experiments, the control
-  again, then uploads one ordinary frame - because five `200`s mean nothing if the next picture
-  is refused.  Without `--yes` it prints the plan and opens nothing; it refuses outright while
-  the display service holds the port (one opener, PROTOCOL.md §1); it never sends a destructive
-  or firmware topic and never prints the panel's serial.  All four of those boundaries are
-  asserted by `tests/test_blob_probe.py` against the tool's own source and its dry run, without
-  touching a port.  Its transcript belongs in `data/glass/`, unpublished, with the verdict it
-  reaches written into PROTOCOL.md §8.
+* `tools/blob_probe.py` — **the one tool here that sends a body the vendor never sent**, written
+  to settle two questions the documents could only have marked unmeasured: does the panel answer
+  a `STATE all 1` frame carrying an extra top-level section (`drives`, which is what per-drive
+  disk rows need), and does it answer one whose `fans[]` carries `"type":"Pump"`?  It sends the
+  vendor-shaped control — with **both** values stripped out of it, because `collect()` on this
+  box now reports a pump-typed row and a `drives` section, and a control that contains the thing
+  under test answers nothing — then the two experiments, then both together, then the control
+  again, and uploads one ordinary frame afterwards, because five `200`s mean nothing if the next
+  picture is refused.  **It has run** (2026-11-13): all five bodies answered `1 200` with
+  `CkOK True` and the frame was accepted, `space` unmoved; PROTOCOL.md §8 carries that verdict,
+  its limits, and the two earlier transcripts that got the control wrong.  Without `--yes` it
+  prints the plan and opens nothing; it refuses outright while the display service holds the port
+  (one opener, PROTOCOL.md §1); it never sends a destructive or firmware topic and never prints
+  the panel's serial.  All of those boundaries are asserted by `tests/test_blob_probe.py` against
+  the tool's own source and its dry run, without touching a port.  Transcripts go in
+  `data/glass/`, unpublished, and `tests/test_glass_ledger.py` requires each kept one to be named
+  in these pages.
 * `tools/fanscan.py` — every tachometer channel Linux can see, the candidate Super-IO
   drivers with their real `modinfo` descriptions, what each channel is named by
   `sensors.FAN_CHANNELS`, and the two fan figures `alpha` would draw from them.  It also
   prints **which channel answered each of the two fields that had been answering from the
   wrong place**: the three tiers behind `motherboard.temperature` (Super-IO / DIMM SPD
-  thermistors / network die as last resort), the one that won and the labels that were
-  refused, and for `disk.temperature` the root drive the mount point names, every drive's
-  composite against its hottest and coolest raw probe, and which of those the row prints.
-  That makes it the command to run before believing any of the figures quoted for those two
-  fields in these pages - they are bench numbers, and this tool reprints them on yours.
+  thermistors / network die as last resort), the one that won, its driver label and the labels
+  that were refused; and for storage, `sensors.drives()` itself — the list the `Disk N` slots
+  index into, with each slot's number — followed by every drive's composite against its hottest
+  and coolest raw probe.
+  That makes it the command to run before believing any of the figures quoted for those fields
+  in these pages - they are bench numbers, and this tool reprints them on yours.
   `--watch 90`
   samples the tach channels across a warm-up and says which one moves with the CPU, which is
   how the CPU fan gets identified without guessing; it only reads sysfs, never a PWM. Since

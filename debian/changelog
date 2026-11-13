@@ -545,23 +545,43 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     prints the aggregate: quoting 68 would attribute to the drive a reading the
     drive does not treat as its temperature, in a row with no room to say which
     is which.  A new `source` name, `Disk Temperature`, is what lets a layout
-    draw it at all - across the 28 selectable files and their 30 distinct
-    `source`/ `content` names there is no storage metric of any kind. `hwmon()`
+    draw it at all - of the 21 distinct `source` values across the 28
+    layouts (23 selectable files + 5 generated exports) not one is
+    storage-shaped, and docs/theme-editor.md spells out the counting rule
+    behind that figure, because the "30" this entry first quoted was
+    neither count it could have been.  `hwmon()` also sorted device
+    directories as text, so `hwmon10` walked before `hwmon2`
     also sorted device directories as text, so `hwmon10` walked before `hwmon2`
     - harmless while one chip publishes tachometers, and the thing that decides
     which row becomes `Fan 1` the day two do.  `tools/fanscan.py` prints the
     tiers, the channel that won, the labels refused and each drive's composite
     against its raw probes, because every number above belongs to this bench
-    and can be reprinted on yours.  Sixteen checks in
+    and can be reprinted on yours.  Twenty-two checks in
     `tests/test_sensor_rules.py` run against a **built** tree, since a CI
     runner has no NCT6687D and no SPD hubs: the rules are about selection, not
-    about what one machine happens to expose.  Ten mutations, each counted: the
-    flat `max()` back → 4; the label filter gone → 5; the NIC promoted into the
-    first tier → 4; the coolest number back → 5; the mounted drive ignored → 4;
-    the composite rule dropped → 4; the fallback cooled to a minimum → 1; the
-    text sort back → 1; the source name removed → 2; its display shape removed
-    → 3 (the third failure is `tests/test_bars_rows.py`, which holds that every
-    answerable source has a shape).
+    about what one machine happens to expose.  The fifteen mutations aimed at
+    those doors now cost: the flat `max()` back → 5; the label filter gone → 3;
+    the NIC promoted into the first tier → 1; the coolest number back → 6; the
+    mounted drive ignored → 5; the composite rule dropped → 7; the fallback
+    cooled to a minimum → 1; the text sort back → 1; the source name removed →
+    2; its display shape removed → 3 (one of those three is
+    `tests/test_bars_rows.py`, which holds that every answerable source has a
+    shape); the diode preference dropped → 4; the drive list left in walk order
+    → 2; the per-drive list re-deriving its own number → 4; an empty disk slot
+    going unexplained → 1; the `drives` section kept off the wire while the
+    slots still read it → 1.
+
+    Two of those were measured because a mutation came back **free**.  Promoting
+    the NIC into the first tier cost nothing once the diode rule existed - the
+    diode wins the tier either way on the built tree - so the suite stayed green
+    over a rule change that would matter on any board whose Super-IO publishes
+    no diode-labelled channel.  That is a hole in the check, not a fact about
+    the code, so the check now disables `sensors.DIODE` for one assertion and
+    asks the tier again: with no diode to prefer, the Super-IO's thermistor must
+    still beat the NIC's 50. It also asserts `r8169` appears in no tier but
+    the last. The stale needle on the first mutation (found 0 times) was
+    reported out loud by the driver rather than passing silently, which is the
+    only reason either gap was visible at all.
 
     The suite then caught a fault in the new checks themselves, on a machine
     that was not this one: CI #190 came back red (`510 tests in 351.145 s`, one
@@ -599,20 +619,26 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     up.  The reads are snapshotted for the duration now: one view of sysfs, two
     doors compared.
 
-    Four checks in one session that were wrong about the machine rather than
+    Five checks in one session that were wrong about the machine rather than
     the code: a mount table that names `nvme0` (#190); a call named in a file
     being a call that runs, where `if not a.skip_frame:` -> `if False:` kept the
     name and passed the check; a `disk` section implying a `temperature` key
-    (#191); and a drive whose temperature holds still for the length of a
-    function call (`38 != 39`).  The repair was the same each time - pin or
-    construct the inputs, and assert a relation instead of a reading.  Two more
+    (#191); a drive whose temperature holds still for the length of a function
+    call (`38 != 39`); and, an hour after that one was written up, the same
+    fault re-committed in brand-new code - a check comparing two live reads of
+    `sensors.drives()`, green standalone and red in the full suite forty
+    seconds later with `[44, 59, 68]` against `[44, 58, 68]`.  The repair was
+    the same each time - pin or construct the inputs, and assert a relation
+    instead of a reading - and repeating it anyway is the reason the pattern is
+    written out here rather than left as four separate fixes.  Two more
     mutations counted: `collect()` bypassing the disk rule -> 2; the blob
-    inventing a temperature where nothing answers -> 1.  The ten sensor
-    mutations, re-run against the current file, are unchanged: 4, 5, 4, 5, 4,
-    4, 1, 1, 2, 3.
+    inventing a temperature where nothing answers -> 1.  The sensor mutations
+    were re-run twice more after that, and the second re-run is the one whose
+    counts this entry quotes: they moved because the check set grew, not because
+    the rules did.
 
   * A tool to ask the panel the two questions the last cycles left unmeasured,
-    and thirteen checks that gate it without touching a port.  Since the pump
+    and eighteen checks that gate it without touching a port.  Since the pump
     rule the tree sends `"type":"Pump"` in the metrics blob - a value none of
     the 34 captured `fans[]` entries spells - and per-drive disk rows would
     need a `drives` section, a key the vendor's schema does not have.
@@ -633,101 +659,190 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     from the control by exactly one row and one value with no new top-level
     key, the `drives` body by exactly one key, and the second control equals
     the first - so the two questions cannot be answered at once and mean
-    nothing.  Seven mutations, each counted: the `--yes` guard
-    removed -> 3; the service check removed -> 1; the serial admitted -> 1; a
-    `recovery` post inserted -> 2; the pump body grown with a top-level key ->
-    1; the control normalisation dropped, which would stop the Pump question
-    isolating anything -> 1; the end frame control switched off -> 1.  That
-    last one was not caught by the first version of the check, which only asked
-    whether `upload_a_frame` appeared somewhere in the file - and turning
-    `if not a.skip_frame:` into `if False:` keeps the name and never runs it.
-    Binding the check to the guard fixed that, and the fix then failed against
-    the unmutated tool, because the
-    guard names `skip_frame` as an attribute of `a`, not as a bare name: the
-    baseline run caught my own AST walk being wrong, which is the same lesson
-    as the last entry, arriving twelve minutes later.  Also: the new test file
-    leaked two handles through `io.open(...).read()` - the noise this cycle
-    removed elsewhere - now `with`-guarded, and the module runs clean under
+    nothing.  Nine mutations, each counted: the `--yes` guard removed -> 3;
+    the service check removed -> 1; the serial admitted -> 1; a `recovery`
+    post inserted -> 2; the pump body grown with a top-level key -> 1; the
+    control keeping the `Pump` type it is meant to isolate -> 2; the control
+    keeping the `drives` section the experiment adds -> 2; the probe building
+    its own drive rows instead of calling `sensors.drives()` -> 3; the end
+    frame control switched off -> 1.  Two of those checks exist only because
+    the mutation they now catch came back **free** the first time.  Turning
+    the frame control off (`if not a.skip_frame:` -> `if False:`) kept the
+    name `upload_a_frame` in the file and passed a check that asked only
+    whether that name appeared.  Binding the check to the guard fixed that,
+    and the fix then failed against the unmutated tool, because the guard
+    spells `skip_frame` as an attribute of `a` rather than a bare name - the
+    baseline caught my own AST walk being wrong, the same lesson as the
+    previous entry, twelve minutes later.  The other one was committed
+    against real hardware before it was caught: replacing `drive_rows()` with
+    a hand-built list passed every data check in the file, and the second
+    probe run had in fact sent such a list - whole degrees for the row,
+    `0.1` degrees in its `sensors` list, rows left in walk order - while the
+    shipped door rounds both and sorts by controller.  So the probe is now
+    bound to the thing it certifies: one check reads this tool's AST for the
+    call to `sensors.drives` and refuses the moment it reaches for
+    `_disk_channels` again, and another asserts the rows equal
+    `sensors.drives()` on whatever machine runs it and agree with what the
+    `Disk 1` slots read.  Also: the new test file leaked two handles through
+    `io.open(...).read()` - the noise this cycle removed elsewhere - now
+    `with`-guarded, and the module runs clean under `-W error::ResourceWarning`.
+
+    Binding the probe to the door took two tries, and the first attempt made
+    the mistake this session has now written down four times.  The check
+    compared `drive_rows()` with `sensors.drives()` on the machine running it,
+    passed standalone, and failed in the full suite about forty seconds later:
+    `[44, 59, 68]` against `[44, 58, 68]`.  Two reads of sysfs, a few hundred
+    milliseconds apart, and the drive warmed a degree between them - so the
+    check was measuring how fast an NVMe drive heats up, again, in code whose
+    whole point was to stop that happening.  It is rewritten around a
+    **constructed** tree now, which also makes it non-vacuous: the built
+    `nvme2` sits in `hwmon7`, first in walk order at 55 degrees, while the
+    controller order puts it third, so a `drive_rows()` that re-derived rows
+    from the walk - the payload the second probe run really sent - fails
+    there.  The live relation is kept as well, with `sensors._read` cached so
+    one snapshot answers both doors.
     `-W error::ResourceWarning`.
 
     It then ran on this box - display service stopped, probe, service
-    restarted - and the answers came back uniform: five `STATE all 1` bodies
-    (the control in the vendor's shape; the control plus a fan row typed
-    `Pump`; the control plus a new top-level `drives` key; both changes
-    together; the control again) each answered `1 200` with `CkOK True`, and
-    an ordinary 11 405 B `.osd` frame uploaded after them was accepted, with
-    `space` `68464 -> 68464` and `osdState`/`mode` unchanged.  The panel does
-    not reject a metrics body for a value or a key it has never seen, so
-    per-drive disk rows are a layout question rather than a protocol one.
-    Recorded as narrowly as it was measured: nothing in that run shows the
-    panel *reads* those fields - a `STATE` reply carries no body, `space` does
-    not move for accepted uploads, and the only topic that would make the
-    panel draw the numbers itself is `realtimeDisplay`, which ALPHA sends only
-    when `deviceConfig.OS` is `RTOS` while this unit reports Linux.  One side
+    restarted - and the answers came back uniform: five `STATE all 1`
+    bodies, each `<Message 1 200 {AckNumber, CkOK:True} b''>`, and the
+    ordinary `.osd` frame uploaded after them accepted, `space` and
+    `osdState`/`mode` unchanged.  The panel does not reject a metrics
+    body for a value or a key it has never seen, so per-drive disk rows
+    are a layout question rather than a protocol one.  Two of those runs
+    were wrong about their own payloads, and both transcripts are kept.
+    `183954` took its control straight from `sensors.collect()`, which on this
+    box already reports the pinned pump channel, so control and experiment both
+    carried the `Pump` value and that pair distinguished nothing - its `drives`
+    experiment was a genuine new key that day, because `collect()` had no such
+    section.  `184215` fixed the Pump pairing but sent a `drives` payload the
+    probe had assembled itself, `0.1` degrees and unsorted, rather than the
+    `sensors.drives()` that shipped later the same evening, so it certified a
+    near-miss of the body that goes out.  A third fault of the same family -
+    `base = dict(raw)`, a control carrying `drives` once `collect()` had grown
+    the section - was caught by `tests/test_blob_probe.py` before it ever
+    reached the panel.
+    The run that counts is `2026-11-13-223617-blob-probe.txt`: the
+    control stripped of both values, the `drives` payload produced by the
+    shipped door, an 11 668 B frame accepted afterwards and `space`
+    `68140 -> 68140`.  In the two flawed runs the acks printed were the
+    same `200`s; the *question* was not the one claimed.  What the
+    standing run still cannot show is whether the panel *reads* those
+    fields - a `STATE` reply carries no body, `space` does not move for
+    accepted uploads, and the only topic that would make the panel draw
+    the numbers itself is `realtimeDisplay`, which ALPHA sends only when
+    `deviceConfig.OS` is `RTOS` while this unit reports Linux.  One side
     effect written down instead of dropped: after the first probe the
     restarted loop's session-start background upload was refused once and
     retried (18:40:07) - the same unexplained single-`400` class this tree
-    logs elsewhere, arriving immediately after a probe, and not reproduced on
-    purpose because that would mean taking the port again.  Transcripts:
-    `data/glass/2026-11-13-183954-blob-probe.txt` and
-    `data/glass/2026-11-13-184215-blob-probe.txt`, unpublished, and neither
-    carries the panel's serial.
+    logs elsewhere, arriving immediately after a probe, and not reproduced
+    on purpose because that would mean taking the port again.  All three
+    transcripts are unpublished and none carries the panel's serial.
+
+  * The board's own label decides which Super-IO channel answers, and the
+    drives get slots of their own.  Both follow the owner's rulings of
+    2026-11-13, and both are recorded as rules rather than as numbers.
+
+    `Motherboard Temperature`: within whichever tier answers, a channel the
+    driver labels a **diode** now beats that tier's hottest candidate.  The
+    BIOS and the owner's `/etc/sensors.d` file both call `Diode 0 (curr)`
+    "Motherboard", so the row follows what the machine labels rather than the
+    maximum it could find: measured side by side here, diode 41.5 degrees,
+    thermistors 43.0, so the glass prints 42 where the previous rule printed
+    43 - a degree of headroom given up to agree with the board.  A chip that
+    publishes no diode-labelled channel, which is most Super-IOs under a driver
+    that leaves `tempN_label` unset, still falls back to its hottest candidate.
+    The built tree in `tests/test_sensor_rules.py` sets the diode deliberately
+    cooler than the thermistors so the preference cannot pass by accident, one
+    check asserts the winning label contains "diode", and a newer check
+    disables the preference to prove the tiers still matter without it.
+
+    Per-drive rows: `sensors.drives()` publishes a `drives` section in the blob
+    - `{name, temperature, sensors}` per storage controller, ordered by
+    controller so `nvme0` is slot 1 whatever the kernel numbered its hwmon
+    directory - and `themes.DISK_SLOTS` names eight more sources for layouts:
+    `Disk 1 Temperature` .. `Disk 4 Temperature` and their `Disk N Name`
+    partners, with the source vocabulary at 37 names and the editor's `source`
+    and `showIf` menus along with it.  Measured here: `nvme0` 45 degrees with
+    published sensors [45, 57, 68] and `nvme1` 33, so the boot drive goes in
+    slot 1 and the hotter raw probe stays visible in the row instead of being
+    dropped; an empty slot is reported, in words, like every other hole.  Which
+    reading of a drive is "its temperature" is now one function,
+    `_drive_choice()`, shared by the scalar and the list: three copies of that
+    rule had appeared while this was being written, which is the drift this
+    repository keeps having to hunt for.  `tools/fanscan.py` prints the list in
+    slot order next to each drive's composite and raw probes, and no shipped
+    layout asks for any of these names - the vendor's library has no storage
+    metric at all - so the `bars` parity figures and the library's drawn-box
+    counts are unchanged.  `tests/test_sensor_rules.py` is twenty-two checks and
+    `tests/test_blob_probe.py` eighteen; their censuses are below.
+
+  * These rows are on the wire because the panel was asked, and asked again
+    after the payload changed.  The first probe run that certified a `drives`
+    section had sent a list the tool assembled itself, not the shipped one, so
+    the experiment was re-run once `sensors.drives()` existed: five bodies,
+    every one answered `1 200` with `CkOK True`, an 11 668 B frame accepted
+    afterwards and `space` `68140 -> 68140`
+    (`data/glass/2026-11-13-223617-blob-probe.txt`, PROTOCOL.md §8).  What was
+    *not* won by that run is stated there too - no `STATE` reply carries a
+    body, so nothing shows whether the panel reads the section, only that it
+    does not refuse it.
 
   * The suite's figures, re-read rather than inherited.  This bench,
-    `python3 -W error::ResourceWarning -m unittest discover -s tests`, one run
-    of the committed tree with nothing else in flight - the only later edits
-    being prose in this entry: 526 checks in 51 files in 398.380 s, 3 skipped,
-    one of them the tray check naming the host it
-    needs, and no `ResourceWarning` printed at all now that `setUp` closes its
-    own file.  The count is read off the tree as well as off the runner:
-    `grep -c "^    def test_" tests/*.py` answers 526 over 51 files and
-    `unittest.TestLoader().discover("tests")` answers 526 over 51 modules, the
-    same numbers the runner prints, and the runner's own sample for these 526
-    is #193.  The earlier readings of this sentence in this entry - 525, 524,
-    511 over 50, 510 over 50, 496 over 49 and 485 over
-    48 - are what the tree held at each step of this afternoon: before the
-    constructed absent-case check, before the probe boundaries were gated,
-    before the probe tool, before the mount-table fix, before the sensor rules
-    and before the pump rule.  They are kept because the deltas are the counts
-    of the checks each step added, not a drift.  Every other whole-suite log
-    taken in a sitting where something else was in flight is worth nothing, and
-    is kept here only as the lesson: two reported failures because a mutation
-    sweep was rewriting
-    `xigmalcd/themes.py` underneath them while
-    `tests/test_specials.py`'s door-marker check reads the file on disk, and
-    the rest came back green against trees that were still being edited - one
-    of them a changelog carrying a 104-column line for a minute.  A
-    whole-suite number means a frozen tree, which is also why
-    `docs/theme-editor.md` now carries that as its fifth harness rule.  An
-    earlier cycle's run also came back red for a real reason: the suite's own
-    isolation check caught a live `xigmaui` on this machine writing the
-    session file through its 500 ms save
+    `python3 -W error::ResourceWarning -m unittest discover -s tests`, one
+    run of this tree with nothing else in flight: 536 checks in 51 files in
+    458.679 s, 3 skipped, one of them the tray check naming the host it needs,
+    and no `ResourceWarning` printed at all now that `setUp` closes its own
+    file.  The count is read off the tree as well as off the runner: `grep -c
+    "^    def test_" tests/*.py` answers 536 over 51 files and
+    `unittest.TestLoader().discover("tests")` answers 536 over 51 modules - the
+    same numbers the runner prints.  The runner's sample for these 536 arrives
+    with the commit that reads it, as every cycle's has; #193's 431.661 s over
+    526 checks is the sample for the tree before the disk slots.
+
+    Three other whole-suite logs from today name nothing, and saying which is
+    part of what this entry is for.  Two ran while a mutation sweep was
+    rewriting `xigmalcd/themes.py` underneath them, and
+    `tests/test_specials.py`'s door-marker check reads the file on disk with
+    `inspect.getsource`, so it compared a shifted line table against markers
+    nobody had touched - the failures in those logs described a race, not a
+    defect.  A third was killed mid-run on purpose: it had started before I
+    edited a test file, and a figure cannot belong to a tree that changed
+    while it was being measured.  An earlier cycle's run came back red for a
+    real reason instead: the suite's own isolation check caught a live
+    `xigmaui` on this machine writing the session file through its 500 ms save
     timer mid-run, and `test_zz_isolation.py` named the process and said to
     close it - the guard that exists for "a test wrote your settings", meeting
-    a person instead.  CI's runner, the `tests/` step alone, over the cycles
-    that added those checks: 337 s with
-    440 checks (#165), 387 with 441 (#168), 319 with 442 (#169), 413 with 446
-    (#171), 416 with 447 (#172), 383 with 447 (#174), 358 with 453 (#175),
-    387 with 453 (#176), 364 with 459 (#177), 433.423 with 475 (#178),
-    442.333 with 481 (#180), 336.831 with 485 (#184), 451.632 with 495 (#186),
-    457.469 with 496 (#187), 453.508 with 496 (#188), 342.664 with 496 (#189),
-    351.145 with 510 (#190, one failure), 460.228 with 511 (#191, one error)
-    and 339.250 with 525 (#192, green and powerless), 431.661 with 526 (#193)
-    - the last several
-    runs skipping 4 rather than 3, the extra one being the glass ledger
-    naming transcripts a runner with no panel has never made, and the 9 s
-    between #178 and #180 being what the six new checks cost: five of them
-    run a shipped script as a subprocess, and the interpreter start-up that
-    belongs to that is measured, not assumed.  #187, #188 and #189 are the
-    honest trio: the same 496 checks, on the same YAML, in 457.469 s,
-    453.508 s and 342.664 s - a 114.805 s spread across runs whose trees
-    differed only in prose.  So a pair of these numbers can bound a count and
-    nothing else, which is why the list is kept and no check reads it.  #190
+    a person instead.  Earlier readings of this same sentence, each the tree at
+    that step: 526 over 51 (before the disk slots), 511 and 510 over 50 (the
+    sensor rules, and the fix to a check that read the wrong mount table), 496
+    over 49 (the pump rule) and 485 over 48 (before it).  They are kept because
+    the deltas are the checks each step added, not a drift.
+
+    CI's runner, the `tests/` step alone, over the cycles that added those
+    checks: 337 s with 440 checks (#165), 387 with 441 (#168), 319 with 442
+    (#169), 413 with 446 (#171), 416 with 447 (#172), 383 with 447 (#174), 358
+    with 453 (#175), 387 with 453 (#176), 364 with 459 (#177), 433.423 with 475
+    (#178), 442.333 with 481 (#180), 336.831 with 485 (#184), 451.632 with 495
+    (#186), 457.469 with 496 (#187), 453.508 with 496 (#188), 342.664 with 496
+    (#189), 351.145 with 510 (#190, one failure), 460.228 with 511 (#191, one
+    error), 339.250 with 525 (#192, green and powerless) and 431.661 with 526
+    (#193) - the last several runs skipping 4 rather than 3, the extra one
+    being the glass ledger naming transcripts a runner with no panel has never
+    made, and the 9 s between #178 and #180 being what the six new checks cost:
+    five of them run a shipped script as a subprocess, and the interpreter
+    start-up that belongs to that is measured, not assumed.  #187, #188 and
+    #189 are the honest trio: the same 496 checks, on the same YAML, in
+    457.469 s, 453.508 s and 342.664 s - a 114.805 s spread across runs whose
+    trees differed only in prose.  So a pair of these numbers can bound a count
+    and nothing else, which is why the list is kept and no check reads it.  #190
     came back red rather than slow: 510 checks in 351.145 s, one failure, and
     the failure was this entry's own subject - a new check reading the host it
-    ran on.  The runner's sample for the 511 checks this tree holds arrives
-    with the commit that reads it, as every cycle's has.  The 435 in this
-    entry's first bullet is what the port landed at, not what the tree holds.
+    ran on.  #191 was red for the same reason one level down, and #192 green
+    without ever reaching the shape that broke it.  The runner's sample for
+    these 536 checks arrives with the commit that reads it, as every cycle's
+    has.  The 435 in this entry's first bullet is what the port landed at, not
+    what the tree holds.
 
 
  -- Tamer Hassan <thameruddin@gmail.com>  Wed, 11 Nov 2026 22:05:00 +0200

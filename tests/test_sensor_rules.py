@@ -32,16 +32,29 @@ from __future__ import annotations
 
 import copy
 import os
+import re
 import tempfile
 import unittest
 
+from tests import fixtures
 from xigmalcd import layout, sensors, themes
 
 #: The built tree's answers, spelled out because every one of them is a choice the code makes.
-SUPERIO_BOARD_MAX = 42      # nct6687's hottest non-CPU channel, 41.5 °C, rounded up
+SUPERIO_DIODE = 41          # `Diode 0 (curr)` 40.5 °C: the channel this board labels Motherboard
+SUPERIO_BOARD_MAX = 42      # nct6687's hottest non-CPU channel (a 41.5 °C thermistor), set
+                            # deliberately warmer than the diode so which one won is visible
 SPD_MAX = 51                # spd5118 hwmon6 at 51.0 - hotter than the NIC, and still a tier 2
 NIC = 50                    # r8169 at 50.0 - not the board, whatever its number says
 TSI = 67                    # AMD TSI Addr 98h: the CPU, in the same chip
+
+#: The three drives `make_tree` builds, in the order `sensors.drives()` must return them:
+#: **controller** order, while the walk visits `hwmon7` (`nvme2`) first.  Named rather than
+#: repeated as literals because `tests/test_blob_probe.py` asserts the same list from the other
+#: side - a probe's payload has to be the shipped one - and two files holding their own copy of
+#: the expectation is how the two would quietly stop meaning the same tree.
+DRIVE_SLOTS = ("nvme0", "nvme1", "nvme2")
+DRIVE_TEMPS = (42, 32, 55)  # nvme0's composite, nvme1's composite, nvme2 with no composite
+DRIVE_KEYS = ("name", "sensors", "temperature")
 
 
 def make_tree(root: str) -> str:
@@ -81,8 +94,12 @@ def make_tree(root: str) -> str:
                   "temp2_input": 32850, "temp2_label": "Sensor 1"},
         "nvme2": {"temp1_input": 55000, "temp1_label": "Sensor 1"},   # publishes no Composite
     }
-    for n, (hw, rows) in enumerate(drives.items(), start=7):
-        path = chip(f"hwmon{n}", dict(rows, name="nvme"))
+    # Deliberately mis-ordered against the controller names: the walk visits hwmon7 (nvme2)
+    # first, so a `drives` list built from walk order would put the 55 °C drive in slot 1.  The
+    # slot order is the controller's, not the kernel's directory number.
+    hwmon_for = {"nvme0": 8, "nvme1": 9, "nvme2": 7}
+    for hw, rows in drives.items():
+        path = chip(f"hwmon{hwmon_for[hw]}", dict(rows, name="nvme"))
         os.makedirs(os.path.join(ctrl, hw), exist_ok=True)
         os.symlink(os.path.join(ctrl, hw), os.path.join(path, "device"))
     chip("hwmon10", {"name": "amdgpu", "temp1_input": 44000, "temp1_label": "edge"})
@@ -112,10 +129,15 @@ class ABoardSensor(Built):
         self.assertEqual(chip, "nct6687",
                          f"the board number came from {chip} [{label}]: a network controller is "
                          "not what a row saying `Motherboard` means")
-        self.assertEqual(sensors.motherboard(), {"temperature": SUPERIO_BOARD_MAX},
-                         f"expected the Super-IO's hottest board channel "
-                         f"({SUPERIO_BOARD_MAX}), got {sensors.motherboard()}")
-        # and the point of the tier at all: the answer is *cooler* than the NIC it replaced
+        self.assertIn("diode", label.lower(),
+                      f"the board number came from [{chip} {label}]: the diode is the channel "
+                      "this board labels Motherboard, and the rule prefers it")
+        self.assertEqual(sensors.motherboard(), {"temperature": SUPERIO_DIODE},
+                         f"expected the diode ({SUPERIO_DIODE}) over the hotter thermistor "
+                         f"({SUPERIO_BOARD_MAX}): {sensors.motherboard()}")
+        # a preference that costs nothing is not a preference: here the hottest board channel is
+        # a degree warmer, and the NIC two degrees warmer than that
+        self.assertLess(SUPERIO_DIODE, SUPERIO_BOARD_MAX)
         self.assertLess(sensors.motherboard()["temperature"], NIC)
 
     def test_a_channel_labelling_a_processor_is_never_a_board_candidate(self):
@@ -129,6 +151,37 @@ class ABoardSensor(Built):
         hottest = max(v for _c, _l, v in sensors.board_channels())
         self.assertLess(hottest, TSI * 1000,
                         "the exclusion did not bite: a candidate is hotter than the CPU channel")
+
+    def test_the_network_die_never_competes_with_the_board_its_own_chip_is_on(self):
+        """The tiering still has to bite when no diode is present, or the tiers are decoration.
+
+        The diode preference (added after this check was first written) makes the built tree's
+        answer come from `Diode 0 (curr)` whichever tier the NIC sits in - so the earlier
+        version of this file's "NIC promoted into the first tier" mutation cost **nothing** and
+        the suite stayed green.  That is a hole in the check, not a fact about the rule: on a
+        board whose Super-IO publishes no diode-labelled channel, a NIC in the first tier wins
+        the tier by temperature (50 here against the thermistor's 42), which is exactly the
+        fault the tiers were built to fix.  So the diode is disabled for the duration and the
+        answer is asked again.
+        """
+        self.assertNotIn("r8169", sensors.BOARD_CHIPS + sensors.DIMM_CHIPS,
+                         "the network die is a first- or second-tier candidate: it belongs "
+                         "only in BOARD_LAST_RESORT_CHIPS")
+        real_diode = sensors.DIODE
+        sensors.DIODE = re.compile(r"nomatch-at-all", re.I)
+        try:
+            won = sensors.motherboard_answer()
+            self.assertEqual((won[0], won[2]), ("nct6687", 41500),
+                             f"with no diode to prefer, the Super-IO's own thermistor should "
+                             f"still answer, not {[c for c, _l, _v in sensors.board_channels()]}: "
+                             f"the winner was {won}")
+            self.assertEqual(sensors.motherboard(), {"temperature": SUPERIO_BOARD_MAX},
+                             f"the tier's hottest board channel is 41.5 °C and the answer was "
+                             f"{sensors.motherboard()} - the NIC sits at {NIC}")
+        finally:
+            sensors.DIODE = real_diode
+        self.assertIn("diode", (sensors.motherboard_answer()[1] or "").lower(),
+                      "restoring the diode rule did not restore the preference")
 
     def test_the_nic_answers_only_when_nothing_else_can(self):
         real = (sensors.BOARD_CHIPS, sensors.DIMM_CHIPS)
@@ -150,14 +203,15 @@ class ABoardSensor(Built):
         one die under two field names."""
         dimm = sensors.board_channels(*sensors.DIMM_CHIPS)
         self.assertEqual(len(dimm), 4, f"the built tree should offer four SPD channels: {dimm}")
-        self.assertEqual(sensors.motherboard()["temperature"], SUPERIO_BOARD_MAX,
+        self.assertEqual(sensors.motherboard()["temperature"], SUPERIO_DIODE,
                          "the SPD tier answered while a Super-IO was present")
         real = sensors.BOARD_CHIPS
         try:
             sensors.BOARD_CHIPS = ("nosuchchip",)
             self.assertEqual(sensors.motherboard()["temperature"], SPD_MAX,
                              "with no Super-IO the DIMM thermistors should answer before the "
-                             "NIC does")
+                             "NIC does; none of them is labelled a diode, so the tier's "
+                             "hottest channel wins")
         finally:
             sensors.BOARD_CHIPS = real
 
@@ -238,15 +292,19 @@ class ADiskSensor(Built):
         for section in ("cpu", "disk", "fans", "memory", "motherboard", "timestamp"):
             self.assertIn(section, body, f"the built tree lost the {section!r} section")
         self.assertEqual(body["disk"]["temperature"], 42, "disk() did not use the new rule")
-        self.assertEqual(body["motherboard"]["temperature"], SUPERIO_BOARD_MAX,
+        self.assertEqual(body["motherboard"]["temperature"], SUPERIO_DIODE,
                          "motherboard() did not use the tier rule")
         # `network` and `gpu` are legitimately absent on some machines (the vendor's own bodies
-        # drop whole sections), so what is gated here is that nothing *extra* appears.
-        documented = {"network", "memory", "cpu", "gpu", "disk", "fans", "motherboard",
-                      "timestamp"}
+        # drop whole sections), so what is gated here is that nothing *else* appears.  `drives`
+        # is in the allowed set only because the panel was asked about it directly and answered
+        # `1 200` for a body carrying it, then accepted the frame that followed (PROTOCOL.md §8,
+        # `tools/blob_probe.py`); a section that had not been put to the device would not belong
+        # here, and this check is what keeps that order of business from being skipped.
+        documented = {"network", "memory", "cpu", "gpu", "disk", "fans", "drives",
+                      "motherboard", "timestamp"}
         self.assertLessEqual(set(body), documented,
-                             f"the blob grew keys the vendor never documented: "
-                             f"{sorted(set(body) - documented)}")
+                             f"the blob grew keys the vendor never documented and the probe "
+                             f"never asked about: {sorted(set(body) - documented)}")
 
 class TheSameDoor(unittest.TestCase):
     """No synthetic tree: on whatever machine this runs, the blob and the rule must agree.
@@ -338,6 +396,57 @@ class TheSameDoor(unittest.TestCase):
                              "an empty tree produced a fans section in the blob")
         finally:
             sensors.HWMON_GLOB = real_glob
+
+
+class TheDriveSlots(Built):
+    """`Disk N Temperature` / `Disk N Name`: positional over `drives[]`, ordered by controller."""
+
+    def test_the_list_is_ordered_by_controller_not_by_hwmon_number(self):
+        """The built tree walks hwmon7 = `nvme2` first on purpose."""
+        rows = sensors.drives()
+        self.assertEqual([r["name"] for r in rows], list(DRIVE_SLOTS),
+                         f"`drives()` came back in walk order: {rows}")
+        self.assertEqual([r["temperature"] for r in rows], list(DRIVE_TEMPS),
+                         "a drive's number is not the composite-or-hottest rule")
+
+    def test_a_drive_publishing_no_composite_uses_its_hottest_sensor(self):
+        rows = {r["name"]: r for r in sensors.drives()}
+        self.assertEqual(rows["nvme2"]["temperature"], 55, rows["nvme2"])
+        self.assertEqual(rows["nvme2"]["sensors"], [55], rows["nvme2"])
+        # and for a drive that does publish one, the aggregate wins over the hotter raw probe
+        self.assertEqual(rows["nvme0"]["temperature"], 42, rows["nvme0"])
+        self.assertIn(68, rows["nvme0"]["sensors"],
+                      f"the raw NAND probe is missing from the row: {rows['nvme0']}")
+
+    def test_the_scalar_and_the_list_agree_about_the_same_drive(self):
+        """`disk.temperature` and `drives[0]` must never be two rules about one drive."""
+        deg, whence = sensors.disk_temperature(root="nvme0")
+        row = [r for r in sensors.drives() if r["name"] == "nvme0"][0]
+        self.assertEqual(deg, row["temperature"], f"{deg} vs {row}")
+        self.assertIn("composite", whence.lower(), whence)
+
+    def test_the_slots_answer_positionally_and_say_what_they_dont(self):
+        from xigmalcd import themes
+        body = {"drives": sensors.drives()}
+        vals, absent = themes.values(body, fixtures.SESSION_WHEN)
+        self.assertEqual(vals.get("Disk 1 Temperature"), 42, vals.get("Disk 1 Temperature"))
+        self.assertEqual(vals.get("Disk 1 Name"), "nvme0")
+        self.assertEqual(vals.get("Disk 3 Name"), "nvme2")
+        self.assertIn("Disk 4 Temperature", absent, sorted(absent))
+        self.assertIn("slot 4", absent["Disk 4 Temperature"], absent["Disk 4 Temperature"])
+        self.assertEqual(absent["Disk 4 Name"], absent["Disk 4 Temperature"].replace(
+            "temperature", "name"), "the two halves of one empty slot give different reasons")
+
+    def test_the_blob_section_is_the_list_the_slots_read(self):
+        body = sensors.collect()
+        self.assertIn("drives", body, f"collect() grew no drives section: {sorted(body)}")
+        self.assertEqual([d["name"] for d in body["drives"]],
+                         [d["name"] for d in sensors.drives()],
+                         "the section on the wire is not the list the layouts index into")
+        for row in body["drives"]:
+            self.assertEqual(sorted(row), ["name", "sensors", "temperature"],
+                             f"a key appeared in the section the panel was never asked about: "
+                             f"{row}")
 
 
 class TheNameIsOurs(unittest.TestCase):

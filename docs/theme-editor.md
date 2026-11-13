@@ -1197,17 +1197,92 @@ is sensed and is **silenced and reported** (`showIf:Pump Speed`) where it is not
 against 12, the gated line 1 376 px on this bench's faces - which is how a layout can carry a
 pump label without carrying a hole on a box that has no pump.
 
-What is **not** claimed: that the firmware has ever seen the string `"Pump"`.  All 34 captured
-bodies spell `"Fan"` or `"Chassis"` (PROTOCOL.md §8), so this program putting a third value in
-that field is a deviation that has never been asked of the panel - and it cannot be answered
-from the panel anyway, because nothing travels back up.  Also not claimed: that the pump's
-*duty* is its *speed*.  `pwm2` at 100% is a real reading of this box and `Pump Speed` filled
-from it would be a lie, which is why the source stays refused on a machine that reports no
-pump-typed row.  And the six case fans are out of reach: no new hwmon chip appeared
-(12 before, 12 after, each named), and the only non-panel oddity on the USB bus is a Jieli
-device bound to `snd-usb-audio`.  `Fan 3`/`Fan 4` will fill when something is plugged into a
-sensed header - `fan3`, `fan4`, `fan11`, `fan13-16` are waiting there with their `min` and
+What is **not** claimed by that paragraph, and was corrected later the same day: the sentence
+above says the firmware has never been *asked* about the string `"Pump"`.  It has been - see the
+next section, `tools/blob_probe.py`, and PROTOCOL.md §8.  What survives the asking is the other
+half: the panel does not reject it, and nothing about that run can show the panel **reads** it,
+because no reply to a `STATE` frame carries a body.  Also still true, and not changed by the
+probe: the pump's *duty* is not its *speed*.  `pwm2` at 100% is a real reading of this box and
+`Pump Speed` filled from it would be a lie, which is why the source stays refused on a machine
+that reports no pump-typed row.  And the six case fans are out of reach: no new hwmon chip
+appeared (12 before, 12 after, each named), and the only non-panel oddity on the USB bus is a
+Jieli device bound to `snd-usb-audio`.  `Fan 3`/`Fan 4` will fill when something is plugged into
+a sensed header - `fan3`, `fan4`, `fan11`, `fan13-16` are waiting there with their `min` and
 `pulses` files - and nothing else has to be written for them to answer.
+
+
+### Eight disk names, and the one measurement that made them possible (2026-11-13)
+
+`themes.DISK_SLOTS` is the same machinery as the fan slots: four positional pairs,
+`Disk 1 Temperature`/`Disk 1 Name` … `Disk 4`, answered by index into `sensors.drives()` and
+reported, in words, when a slot has no drive behind it (`this box reports 2 drive rows in
+`drives`; slot 3 has no name`).  The vocabulary the editor's `source` menu offers went from 29
+names to **37**; `layout.VENDOR_FORMAT` grew the same eight shapes, which is what
+`tests/test_bars_rows.py` requires of every answerable name - a source with no shape is a row
+that prints nothing at all.
+
+Two things had to be settled first, and only one of them was a design choice.
+
+* **The blob section.**  A per-drive row is not a display change, it is a wire change: the
+  vendor's `STATE all 1` body has one `disk` scalar, so `Disk 2` needs a `drives` list the
+  panel has never seen.  That was asked, on the glass, rather than argued about:
+  `tools/blob_probe.py` sends the vendor-shaped control, the control plus a fan row typed
+  `Pump`, the control plus a `drives` section, both together, then the control again, and
+  uploads one ordinary frame afterwards.  Every body answered
+  `<Message 1 200 {AckNumber, CkOK:True} b''>` and the 11 668 B frame after them was accepted,
+  `space` and `osdState` unchanged (`data/glass/2026-11-13-223617-blob-probe.txt`,
+  PROTOCOL.md §8).  What the run cannot show is whether the panel parses the section - there is
+  no read-back for a `STATE` frame, and the only topic that would make the panel draw these
+  numbers itself is `realtimeDisplay`, which ALPHA sends only to an `OS === "RTOS"` unit.
+* **Ordering, which the slots make load-bearing.**  `sensors.drives()` sorts by **controller**
+  (`nvme0` before `nvme2`), not by hwmon directory number, because a slot is a thing a layout
+  names and a reader expects to mean the same drive next boot.  The built tree in
+  `tests/test_sensor_rules.py` puts `nvme2` in `hwmon7` - first in walk order - on purpose, so a
+  regression to walk order moves the 55 °C drive into `Disk 1` and fails.
+
+Two runs asked the questions badly before a third asked them straight, and both
+transcripts are kept.  The first (`183954`) built its control from `sensors.collect()`
+as it stood, and on this box that already reports the pinned pump channel - so control
+and experiment both contained the `Pump` value and the pair could not have
+distinguished anything.  The second (`184215`) stripped the Pump type and fixed that
+half, but it sent a `drives` payload the probe had assembled itself (`0.1` degrees, no
+sort) instead of the `sensors.drives()` that shipped later the same evening, so it
+certified a near-miss of the body that goes on the wire.  A third fault of the same
+family was caught by the checks and never reached the panel: once `collect()` grew a
+`drives` section, the tool's `base = dict(raw)` control carried that key as well.  The
+tool now builds its control by removing **both** values and takes the rows from the
+shipped door, and the checks assert the control contains neither value while the
+experiment body contains the string `Pump` exactly once.
+
+The census behind that claim, and the **set** each figure counts, because this page already
+carries two of them and a bare number invites the wrong comparison.  Walking every `property` of
+every layout and taking the `source` values:
+
+* the 27 installed files (23 pickable + 4 refused) name **12** distinct sources over **82**
+  source rows - the row this page's own surface table already quotes, and it ties exactly;
+* the 23 pickable files alone name **7**, which is what `--list-themes` prints as "sources the
+  pickable set asks for";
+* the **28** layouts a reader can actually pick on a clean `$XDG_CONFIG_HOME` - those 23 files
+  plus the 5 exports this repo draws out of code - name **21** distinct sources over **106**
+  source rows, and **20** more `content` literals if the fixed texts are counted with them
+  (41 in the union; 176 rows carrying at least one).
+
+The earlier figure this page and the changelog carried said "30 `source`/`content` names across
+the 28 files", and it was neither of those counts - corrected the same evening it was written,
+and the rule is here so the next reader reproduces the number instead of trusting either.  What
+the disk slots rest on is the qualitative half, which all three sets agree on: **not one** of the
+12, the 7 or the 21 is storage-shaped.  Printed rather than recited, the 21 are: CPU Frequency,
+CPU Temperature, CPU Usage, Date, the eight `Fan 1`-`Fan 4` Name/Speed slots, GPU Memory Rate, GPU
+Temperature, GPU Usage, Motherboard Temperature, Pump Speed, RAM Rate, Time, Used GPU Memory and
+Used RAM.  The 12 differ from those by dropping the fan slots the refused files never reach and
+adding four the pickable set never names - `CPU Power`, `GPU Power`, `Upload Speed`, `Week`.
+
+The other change in this stretch is a rule the owner chose over the one I had written: within a
+board tier, `Motherboard Temperature` prefers the channel the driver labels a **diode** over the
+tier's hottest candidate.  Measured here: diode 41.5 °C, thermistors 43.0 - the row prints 42
+where the maximum printed 43.  The built tree sets the diode deliberately cooler than the
+thermistors so that preference cannot be satisfied by accident, and one check asserts the
+label that won contains "diode".
 
 
 ## The surface, and the geometry it must not break

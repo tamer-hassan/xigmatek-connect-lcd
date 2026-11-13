@@ -321,6 +321,67 @@ def _disk_channels() -> list[tuple[str, str, list[tuple[str, int]]]]:
     return out
 
 
+def _disk_sort_key(dev: str) -> tuple:
+    """Order controllers numerically: `nvme0` before `nvme2`, `sda` before `sdb`.
+
+    The walk order is not this order.  A drive list is what `Disk 1`/`Disk 2` in a layout
+    index into, and a slot that moved between boots because the kernel numbered an hwmon
+    directory differently is a row that silently changed which drive it reports.
+    """
+    digits = [int(d) for d in re.findall(r"\d+", dev)]
+    return (re.sub(r"\d+", "", dev), digits or [-1], dev)
+
+
+def _drive_choice(rows: list[tuple[str, int]]) -> tuple[int, bool]:
+    """(millidegrees, whether it came from a Composite) for one drive.
+
+    One function, because `disk.temperature` (the scalar the vendor's schema has) and the
+    per-drive list added on 2026-11-13 must never disagree about which reading of a drive
+    "its temperature" means: the composite when the drive publishes one, else its hottest
+    sensor.  Two copies of that choice is exactly the drift this repository keeps having to
+    look for.
+    """
+    comp = [v for label, v in rows if label.lower() == "composite"]
+    if comp:
+        return max(comp), True
+    return max(v for _l, v in rows), False
+
+
+def drives() -> list[dict]:
+    """Per-drive readings, the section the panel was asked about on 2026-11-13.
+
+    The shape - `{name, temperature, sensors}` - is deliberately **exactly what the probe
+    sent**, not a convenience invented afterwards: `tools/blob_probe.py` put this list under a
+    `drives` key in a live `STATE all 1` body and the panel answered `1 200` with `CkOK True`,
+    then accepted the ordinary frame that followed
+    (`data/glass/2026-11-13-184215-blob-probe.txt`, PROTOCOL.md §8).  Adding a fourth key to
+    that row, or reordering it, is a claim that has not been made to the device, so it does not
+    happen by accident.
+
+    What is measured and what is not: the panel does not **reject** the section.  Whether it
+    reads it is unanswerable from here - a `STATE` reply carries no body, and the only topic
+    that would make the panel draw these numbers itself is `realtimeDisplay`, which ALPHA sends
+    only to an `OS === "RTOS"` unit while this one reports Linux.
+
+    `name` is the controller instance (`nvme0`), not the model string: it is short enough for a
+    10-character display cut, stable across boots, and the value a reader can match against
+    `/sys/class/nvme` and `lsblk`.  `temperature` is the whole degrees the drive reports about
+    itself - its `Composite` when it publishes one, else its hottest sensor - and `sensors`
+    carries every published reading rounded, so a layout that wants the hotter raw probe can
+    name it instead of quietly substituting one.
+    """
+    out = []
+    for _chip, dev, rows in _disk_channels():
+        if not dev:
+            continue
+        chosen, _was_comp = _drive_choice(rows)
+        out.append({"name": dev,
+                    "temperature": _round_temp(chosen),
+                    "sensors": sorted({round(v / 1000) for _l, v in rows if 0 < v < 150_000})})
+    out.sort(key=lambda d: _disk_sort_key(d["name"]))
+    return out
+
+
 def disk_temperature(root: str | None = None) -> tuple[int | None, str]:
     """The **whole degrees** to answer `disk.temperature` with, and the sentence saying where.
 
@@ -357,8 +418,8 @@ def disk_temperature(root: str | None = None) -> tuple[int | None, str]:
     asked = "the drive that holds /" if root is None else "the drive the caller asked for"
     per_drive = []
     for _chip, dev, rows in chans:
-        comp = [v for label, v in rows if label.lower() == "composite"]
-        per_drive.append((dev, (max(comp) if comp else max(v for _l, v in rows)), bool(comp)))
+        chosen, was_comp = _drive_choice(rows)
+        per_drive.append((dev, chosen, was_comp))
     if want:
         for dev, mdeg, was_comp in per_drive:
             if dev == want:
@@ -615,6 +676,17 @@ def board_channels(*chips: str) -> list[tuple[str, str, int]]:
     return out
 
 
+#: A channel the driver calls a thermal **diode**.  Preferred over the thermistors for
+#: `motherboard.temperature` on the owner's decision (2026-11-13): this board's BIOS, and the
+#: `/etc/sensors.d` file written against it, name the diode channel "Motherboard"
+#: (`Diode 0 (curr)` = 42.5 °C) while the thermistors sit warmer (44.5), and a row that says
+#: `BOARD` should agree with what the board itself labels rather than with the hottest thing it
+#: can find.  Where a chip publishes no diode - the SPD hubs, most Super-IOs under a driver that
+#: leaves `tempN_label` unset - the tier's hottest channel answers instead, and `fanscan.py`
+#: prints which of the two it was.
+DIODE = re.compile(r"diode", re.I)
+
+
 def motherboard_answer() -> tuple[str, str, int] | None:
     """The (chip, driver label, millidegrees) that answered `motherboard`, or None.
 
@@ -622,8 +694,11 @@ def motherboard_answer() -> tuple[str, str, int] | None:
 
     1. **the Super-IO's own channels** - a thermal diode and thermistors wired to the board.
        Here that is `nct6687`: `Diode 0 (curr)` 40.5-44.5 °C and `Thermistor 1`/`Thermistor 15`
-       40.5-48.0 across the readings taken on 2026-11-13, against `AMD TSI Addr 98h` at 62-70
-       (excluded by `NOT_THE_BOARD`).
+       40.5-49.0 across the readings taken on 2026-11-13, against `AMD TSI Addr 98h` at 62-70
+       (excluded by `NOT_THE_BOARD`).  **Within the tier the diode wins**: the BIOS and the
+       owner's `/etc/sensors.d` file both call that channel "Motherboard", so the row follows
+       the label rather than the maximum (42.5 vs 44.5 on the day it was decided).  A chip with
+       no diode-labelled channel falls back to its hottest candidate.
     2. **the DDR5 SPD thermistors** (`spd5118`, 41.0-47.0 here) - on the board, but the same
        chips also answer `memory.temperature`, so they are a second tier rather than a
        co-equal candidate: a machine with a Super-IO never prints its DIMM numbers twice.
@@ -643,8 +718,12 @@ def motherboard_answer() -> tuple[str, str, int] | None:
     """
     for chips in (BOARD_CHIPS, DIMM_CHIPS, BOARD_LAST_RESORT_CHIPS):
         chans = board_channels(*chips)
-        if chans:
-            return max(chans, key=lambda clv: clv[2])
+        if not chans:
+            continue
+        diodes = [c for c in chans if DIODE.search(c[1] or "")]
+        # the diode the board labels "Motherboard" if there is one, else the hottest channel
+        # of that tier; several diodes are possible on a Super-IO, so `max` inside the subset.
+        return max(diodes or chans, key=lambda clv: clv[2])
     return None
 
 
@@ -677,6 +756,13 @@ def collect() -> dict:
         fl = []
     if fl:
         out["fans"] = fl
+    # The per-drive list, on the section name the panel was asked about and answered `200` for
+    # (PROTOCOL.md §8).  Absent when no drive publishes a temperature, exactly as `fans` is
+    # absent on a board with no tach signals: an empty list would be a claim about storage that
+    # the machine did not make.
+    dv = drives()
+    if dv:
+        out["drives"] = dv
     board = motherboard()
     if board:
         out["motherboard"] = board

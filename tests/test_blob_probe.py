@@ -22,6 +22,12 @@ Everything that makes that safe is asserted here, against the file, without touc
 
 The bodies themselves are checked as data: the control differs from the pump body by exactly one
 fan row, the extra-section body by exactly one key, and the second control is the first one.
+
+And the payload has to be the one that **ships**: `drive_rows()` is gated to call
+`sensors.drives()` rather than assemble rows of its own, because the second probe run answered
+`200` for a section the tool had built itself - `0.1` degrees, unsorted - while the shipped door
+rounded to whole degrees and sorted by controller.  A verdict about a body nobody sends is not a
+verdict about the body that goes out.
 """
 from __future__ import annotations
 
@@ -31,8 +37,14 @@ import io
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from contextlib import redirect_stdout
+
+from tests import fixtures
+from tests.test_sensor_rules import (DRIVE_KEYS, DRIVE_SLOTS, DRIVE_TEMPS,
+                                    make_tree)   # one built sysfs, shared by both files
+from xigmalcd import sensors, themes
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOL = os.path.join(ROOT, "tools", "blob_probe.py")
@@ -44,6 +56,32 @@ def source_calls() -> list:
     with io.open(TOOL, encoding="utf-8") as fh:
         tree = ast.parse(fh.read())
     return [(fn, lit) for fn, lit in _names_and_strings(tree) if lit is not None]
+
+
+def calls_inside(function_name: str) -> set:
+    """Every call made inside the named top-level function, as dotted names.
+
+    Used to bind `drive_rows()` to the shipped door: a function that re-derives the rows
+    passes every data check, because its rows look right - which is exactly how the flawed
+    run looked right too.
+    """
+    with io.open(TOOL, encoding="utf-8") as fh:
+        tree = ast.parse(fh.read())
+    fn = next((n for n in tree.body
+               if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+               and n.name == function_name), None)
+    if fn is None:
+        return set()
+    out = set()
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Call):
+            f = node.func
+            if isinstance(f, ast.Attribute):
+                base = f.value.id if isinstance(f.value, ast.Name) else type(f.value).__name__
+                out.add(f"{base}.{f.attr}")
+            elif isinstance(f, ast.Name):
+                out.add(f.id)
+    return out
 
 
 def source_call_names() -> set:
@@ -273,6 +311,26 @@ class TheBodies(unittest.TestCase):
                          [f for f in (self.planned[1][1].get("fans") or [])
                           if f.get("type") == "Pump"])
 
+    def test_the_control_body_carries_neither_value_under_test(self):
+        """The isolation gate for **both** questions, because I got this wrong once already.
+
+        The first version stripped the `Pump` type from the control and forgot that
+        `sensors.collect()` had, by then, grown a `drives` section of its own - so the control
+        and the extra-section experiment differed only by ordering, and the pair could not have
+        answered the question.  A control has to be built from the vendor's shape, not from
+        whatever the current build happens to send.
+        """
+        import json
+        base = self.planned[0][1]
+        self.assertNotIn("drives", base,
+                         "the control already carries the section the experiment adds")
+        self.assertNotIn("Pump", json.dumps(base, default=str),
+                         "the control already carries the Pump type the experiment adds")
+        both = json.dumps(self.planned[3][1], default=str)
+        self.assertIn("drives", both, "the combined body lost one of the two changes")
+        self.assertEqual(both.count("Pump"), 1,
+                         f"the value under test appears {both.count('Pump')} times: {both[:200]}")
+
     def test_a_drive_row_says_what_the_scalar_says(self):
         """Per-drive rows exist to be compared against the single number already in the blob."""
         rows = blob_probe.drive_rows()
@@ -281,6 +339,94 @@ class TheBodies(unittest.TestCase):
             self.assertIn("temperature", r)
             self.assertTrue(0 < r["temperature"] < 120, r)
 
+
+class TheShippedDoor(unittest.TestCase):
+    """The `drives` payload the panel answered for must be the payload that ships.
+
+    `data/glass/2026-11-13-184215-blob-probe.txt` is the record of the alternative: the tool
+    built its own rows (`0.1` degrees, in walk order) while `sensors.drives()` shipped whole
+    degrees sorted by controller.  Every data check in this file passed on that payload, so the
+    only way to catch it is to bind the probe to the door.
+    """
+
+    def test_drive_rows_is_a_call_to_the_shipped_door_not_a_copy_of_it(self):
+        made = calls_inside("drive_rows")
+        self.assertIn("sensors.drives", made,
+                      f"`drive_rows()` builds its rows from {sorted(made)}; it must call "
+                      f"`sensors.drives()`, the door the layouts and the loop both read")
+        self.assertFalse({c for c in made if c.endswith("_disk_channels")},
+                         f"the probe reaches under the door again: {sorted(made)}")
+
+    def test_the_probe_rows_are_the_shipped_rows_on_a_built_tree(self):
+        """One tree, both doors, and the tree is built so a wrong answer is **visible**.
+
+        The obvious version of this check - `drive_rows() == sensors.drives()` on the machine
+        running it - failed in the full suite forty seconds after it passed standalone, with
+        `sensors: [44, 59, 68]` against `[44, 58, 68]`: the probe read sysfs twice, a few
+        hundred milliseconds apart, and the drive warmed by a degree between the reads.  That
+        is the same fault this very session recorded as `38 != 39`, re-committed by me in new
+        code, so the comparison is done against a constructed tree instead of against a
+        drive's current temperature.
+
+        The built tree is not decorative either: its `nvme2` lives in `hwmon7`, first in walk
+        order at 55 °C, while the controller order the shipped door applies puts it third.  A
+        `drive_rows()` that re-derived rows from the walk - which is what the second probe run
+        actually sent to the panel - differs from `sensors.drives()` here and fails.
+        """
+        tmp = tempfile.TemporaryDirectory(prefix="xigma-probe-")
+        pattern = make_tree(tmp.name)
+        real_glob = sensors.HWMON_GLOB
+        sensors.HWMON_GLOB = pattern
+        try:
+            rows = blob_probe.drive_rows()
+            self.assertEqual(rows, sensors.drives(),
+                             "the probe's `drives` payload is not the shipped one, so a `200` "
+                             "answers a body nobody sends")
+            self.assertEqual([r["name"] for r in rows], list(DRIVE_SLOTS),
+                             f"rows came back in walk order: {[r['name'] for r in rows]}")
+            self.assertEqual([r["temperature"] for r in rows], list(DRIVE_TEMPS),
+                             f"the per-drive rule is not the one _drive_choice applies: {rows}")
+            self.assertEqual(sorted(rows[0]), list(DRIVE_KEYS),
+                             f"a key appeared in the certified payload: {rows[0]}")
+            # the slots and the payload are one list, not two readings of it
+            vals, _absent = themes.values({"drives": rows}, fixtures.SESSION_WHEN)
+            self.assertEqual(vals.get("Disk 1 Temperature"), DRIVE_TEMPS[0],
+                             vals.get("Disk 1 Temperature"))
+            self.assertEqual(vals.get("Disk 1 Name"), DRIVE_SLOTS[0])
+            self.assertEqual(vals.get("Disk 3 Name"), DRIVE_SLOTS[2],
+                             "slot 3 is not the third controller; the ordering above is "
+                             "cosmetic and would not survive a boot")
+        finally:
+            sensors.HWMON_GLOB = real_glob
+            tmp.cleanup()
+
+    def test_the_live_relation_holds_under_one_snapshot_of_sysfs(self):
+        """The same relation on this machine's real sensors, read **once**.
+
+        Kept because the built tree cannot show what the hardware publishes - and done with
+        `sensors._read` cached, so the answer cannot depend on what the drives are doing
+        during the check.
+        """
+        real_read = sensors._read
+        cache: dict = {}
+
+        def snapshot(path):
+            if path not in cache:
+                cache[path] = real_read(path)
+            return cache[path]
+
+        sensors._read = snapshot
+        try:
+            rows = blob_probe.drive_rows()
+            self.assertEqual(rows, sensors.drives(),
+                             "the probe and the shipped door disagree about this machine")
+            if rows:
+                vals, _absent = themes.values({"drives": rows}, fixtures.SESSION_WHEN)
+                self.assertEqual(vals.get("Disk 1 Temperature"), rows[0]["temperature"],
+                                 "the first slot does not read the first shipped row")
+                self.assertEqual(vals.get("Disk 1 Name"), rows[0]["name"])
+        finally:
+            sensors._read = real_read
 
 class redirect_stderr_holder:
     """A tiny stderr buffer that works as a context manager alongside redirect_stdout."""

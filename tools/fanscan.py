@@ -278,13 +278,21 @@ def main() -> int:
                                  or "-"))
     if won:
         print(f"  -> {sensors.motherboard()['temperature']} °C from {won[0]} [{won[1]}]  "
-              f"(labels naming a CPU or GPU are never candidates: {sensors.NOT_THE_BOARD.pattern})")
+              f"(a channel the driver labels a diode beats the tier's hottest, and labels naming "
+              f"a CPU or GPU are never candidates: {sensors.NOT_THE_BOARD.pattern})")
     else:
         print("  -> nothing answered: no board channel on this machine")
 
     deg, whence = sensors.disk_temperature()
     print(f"\nwhat answers `disk.temperature`: {deg} °C - {whence}")
     print(f"  the mount point says the root disk is controller {sensors._root_controller()!r}")
+    slots = sensors.drives()
+    print("  the list `Disk N` slots index into, in the order a layout sees it:")
+    for n, row in enumerate(slots, start=1):
+        print(f"    Disk {n}: {row['name']:8} {row['temperature']} °C   "
+              f"published sensors {row['sensors']}")
+    if not slots:
+        print("    (nothing: no storage chip on this box publishes a temperature)")
     for _chip, dev, rows in sensors._disk_channels():
         comp = [v for label, v in rows if label.lower() == "composite"]
         print(f"  {dev:10} composite {(max(comp) / 1000) if comp else '-':>6} | "

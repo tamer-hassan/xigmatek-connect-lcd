@@ -310,29 +310,51 @@ What has been measured on glass, by whom, with how many frames - and what has no
    printed and the NAND probe is not: quoting 68 as "the disk temperature" would attribute to
    the drive a reading the drive itself does not treat as its temperature, and the row has no
    room to say which is which.  A new `source` name, **`Disk Temperature`** (→ `disk.temperature`),
-   is what lets a layout draw it at all: no shipped file asks for a disk reading - the 30
-   distinct `source`/`content` names across the 28 layouts include no storage metric
-   whatsoever - so the name is ours, spelled like `CPU Temperature` and `Motherboard
+   is what lets a layout draw it at all: no shipped file asks for a disk reading - the
+   **21** distinct `source` values across the 28 layouts (23 selectable files plus the 5
+   generated exports; 41 names if the `content` literals are counted too, and that counting
+   rule is spelled out in docs/theme-editor.md) include no storage metric whatsoever - so the
+   name is ours, spelled like `CPU Temperature` and `Motherboard
    Temperature`, and `layout.FORMATS_MEASURED` stays at four, which is what
    `--list-themes` means when it says which shapes are this repo's choice.
- * **The blob tolerates what the vendor never sent, asked directly on 2026-11-13.** One
-   session, five `STATE all 1` bodies - the control in the vendor's shape; the control plus
+ * **Four per-drive slots, on a section the panel was asked about and answered.**
+   `sensors.drives()` publishes `drives[]` in the blob - one row per storage controller,
+   `{name, temperature, sensors}` - and `themes.DISK_SLOTS` names them for layouts:
+   `Disk 1 Temperature` … `Disk 4 Temperature` and `Disk 1 Name` … `Disk 4 Name`, indexed by
+   **controller** (`nvme0` before `nvme2`), not by whatever number the kernel happened to give
+   the hwmon directory.  Measured twice here on 2026-11-13, forty minutes apart: `nvme0` at
+   **41 °C** with published sensors `[41, 52, 68]`, then at **45 °C** with `[45, 57, 68]`, and
+   `nvme1` 31 °C then 33 °C - the drives warm while the box works, which is exactly why these
+   are printed by `tools/fanscan.py` rather than quoted as a figure a reader has to trust.  So a
+   layout can put the boot drive in slot 1 while the hotter raw probe stays visible in the row
+   instead of being quietly dropped.  Nothing shipped asks for any of these
+   names - none of the 21 `source` values those 28 layouts carry is storage-shaped - so they
+   exist for layouts you write, and the `bars` parity numbers are unchanged.
+ * **The blob tolerates what the vendor never sent - asked directly three times on 2026-11-13.**
+   One session, five `STATE all 1` bodies: the control in the vendor's shape; the control plus
    a fan row typed `"Pump"`; the control plus a new top-level `drives` key; both changes
-   together; the control again - each answered `<Message 1 200 {AckNumber, CkOK:True} b''>`,
-   and an ordinary 11 405 B `.osd` frame uploaded afterwards was accepted with `space`
-   `68464 -> 68464` and `osdState`/`mode` unchanged
-   (`data/glass/2026-11-13-184215-blob-probe.txt`; `tools/blob_probe.py`, run with the
-   display service stopped).  The run eleven minutes earlier,
-   `data/glass/2026-11-13-183954-blob-probe.txt`, is kept as the record of the flawed
-   pairing: its control body already carried a `Pump` row, because `sensors.collect()` on
-   this box reports the pinned pump channel, so the control and the experiment contained
-   the same value and the comparison could not have distinguished anything.  The acks it
-   printed are the same `200`s; the *question* it asked was not the one it claimed.  So per-drive disk rows are not blocked by the protocol:
-   whether to add them is a layout-design question.  What the same experiment cannot
-   measure is whether the panel *reads* those fields - a `STATE` reply carries no body,
-   `space` does not move for accepted uploads, and the only topic that would make the panel
-   draw the numbers itself is `realtimeDisplay`, which ALPHA sends only to an
-   `OS === "RTOS"` unit (PROTOCOL.md §5, §8).
+   together; the control again.  Every one answered `<Message 1 200 {AckNumber, CkOK:True} b''>`,
+   and the ordinary `.osd` frame uploaded afterwards was accepted, `space` and `osdState`/`mode`
+   unchanged.  The run that stands is `data/glass/2026-11-13-223617-blob-probe.txt` - 11 668 B
+   frame, and the `drives` payload was `sensors.drives()` itself rather than a hand-rolled
+   Two earlier runs are kept in the same directory as the record of getting the payloads
+   wrong.  `data/glass/2026-11-13-183954-blob-probe.txt` took its control straight from
+   `sensors.collect()`, which on this box already reports the pinned pump channel, so
+   control and experiment both carried the `Pump` value and that pair distinguished
+   nothing - its `drives` experiment, by contrast, was a genuine new key that day,
+   because `collect()` had no such section yet.  `data/glass/2026-11-13-184215-blob-probe.txt`
+   fixed the Pump pairing but sent a `drives` payload the probe had assembled itself -
+   `0.1` degrees, unsorted - rather than the `sensors.drives()` that shipped later the same
+   evening, so what it certified was a near-miss of the body that goes out.  A third fault
+   of the same family was caught before it ever reached the panel: once `collect()` grew
+   the section, the tool's `base = dict(raw)` control carried the key too, and
+   `tests/test_blob_probe.py` failed on exactly that.  In both flawed runs the acks printed
+   were the same `200`s; the *question* was not the one claimed.
+   What the experiment still cannot measure is whether the panel *reads* those fields: a
+   `STATE` reply carries no body, `space` does not move for accepted uploads, and the only topic
+   that would make the panel draw the numbers itself is `realtimeDisplay`, which ALPHA sends only
+   to an `OS === "RTOS"` unit (PROTOCOL.md §5, §8).
+
 * **`hwmon()` walked the device directories as text, so `hwmon10` came before `hwmon2`.** On
    this boot: nvme, nvme, ath12k, amdgpu, r8169, nct6687, prom21_xhci, k10temp, spd5118 ×4 -
    the Super-IO last-but-two because of a digit count.  Nothing on the glass depended on that

@@ -114,11 +114,15 @@ asserted here:
 * **7 metric names over those 23, in 82 widgets' worth of counts**: `CPU Temperature` 17,
   `CPU Usage` 15, `Time` 11, `Pump Speed` 9, `GPU Usage` 6, `GPU Temperature` 3,
   `CPU Frequency` 2.  The vocabulary this program answers is wider than what the library
-  asks - **29 names** through `themes.source_names()` - and one of them is asked by nothing
+  asks - **37 names** through `themes.source_names()` - and eight of them are asked by nothing
   shipped here: `Disk Temperature` (→ `disk.temperature`, the composite of the drive that
-  holds `/`).  No file of the vendor's names a storage reading at all, so that name and its
-  display shape are this repo's, and it exists so a layout of **yours** can put a drive
-  temperature on the glass at all (docs/limits.md has the rule and both numbers).  Whether any of them is missing from a given machine is a per-machine
+  holds `/`) and the four positional pairs `Disk 1 Temperature`/`Disk 1 Name` …
+  `Disk 4 Temperature`/`Disk 4 Name`, which index the `drives` list `sensors.drives()`
+  publishes - ordered by controller, so `nvme0` is slot 1 whatever the kernel numbered its
+  hwmon directory.  No file of the vendor's names a storage reading at all, so those names and
+  their display shapes are this repo's, and they exist so a layout of **yours** can put drive
+  temperatures on the glass (docs/limits.md has the rules, the measured numbers and the
+  probe that made the extra blob section permissible).  Whether any of them is missing from a given machine is a per-machine
   question, and since 2026-11-13 the only one that can be is `Pump Speed`: it is answered by a
   fan row whose `type` is `Pump` (`themes.FAN_TYPED`), and this bench has one - the channel that
   came alive when the AIO's block cable went into `PUMP_SYS1`, steady at 2459-2469 RPM while its

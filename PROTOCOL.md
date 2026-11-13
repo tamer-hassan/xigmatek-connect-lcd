@@ -513,6 +513,7 @@ Schema and units, taken from the Windows capture and matched field for field by
 | `disk` | `total`, `used` GB, `load` %, `activity` %, `temperature` °C, `readSpeed`, `writeSpeed` | |
 | `fans` | list of `{onBoard: bool, type, name, value}` | RPM. In the vendor's bodies `type` is `"Fan"` or `"Chassis"`; names are `"Fan CPU"`, `"Fan System 5"`, …. This program adds a third, `"Pump"`, for a channel pinned as one by measurement - see the re-wiring note below §8's fan table |
 | `motherboard` | `temperature` | °C, integer |
+| `drives` | list of `{name, temperature, sensors}` | **not in the vendor's bodies** - a section this program added on 2026-11-13 after the panel was asked about it directly and answered `200` (the note under this table). `name` is the controller (`nvme0`), `temperature` whole °C from the drive's own composite when it publishes one, else its hottest sensor; `sensors` the readings it publishes, rounded |
 | `timestamp` | | ms epoch |
 
 Absent sections are tolerated (Linux boards without tach signals simply omit `fans`).
@@ -575,18 +576,33 @@ the vendor's `Pump Speed` source - `themes.FAN_TYPED`, nine of the 23 selectable
 authority for it is a measurement recorded in `FAN_CHANNELS`, not a label - `nct6683` publishes
 no `fan*_label` at all.
 
-On 2026-11-13 the panel was asked directly (`tools/blob_probe.py`, transcripts
-`data/glass/2026-11-13-183954-blob-probe.txt` and `-184215-blob-probe.txt`, serial not printed):
-five `STATE all 1` bodies in the same session - the vendor-shaped control, the same rows with one
-extra row typed `Pump`, a body with a new top-level `drives` key, both changes together, and the
-control again - each answered `<Message 1 200 {AckNumber, CkOK:True} b''>`, and an ordinary
-11 405 B `.osd` frame uploaded after them was accepted, with `space` `68464 -> 68464` and
-`osdState`/`mode` unchanged.
+On 2026-11-13 the panel was asked directly (`tools/blob_probe.py`, display service stopped for
+the minute it runs and started again afterwards; serial not printed).  The run that counts is
+`data/glass/2026-11-13-223617-blob-probe.txt`: five `STATE all 1` bodies in one session - the
+control in the vendor's shape (fan rows typed `Fan`/`Chassis` only), the same rows plus one
+typed `Pump`, the control plus a `drives` section built by `sensors.drives()` itself, both
+changes together, and the control again - each answered
+`<Message 1 200 {AckNumber, CkOK:True} b''>`, and the ordinary 11 668 B `.osd` frame uploaded
+after them was accepted, with `space` `68140 -> 68140` and `osdState`/`mode` unchanged.
 
 What that measures, and what it does not:
 
 * **measured:** the panel does not reject a metrics body for a value or a key it has never seen.
-  No `400`, no silence, no change in what follows.
+  No `400`, no silence, no change in what follows - and the `drives` payload in that run was the
+  shipped `sensors.drives()` and not a hand-written stand-in, which is what makes the section
+  usable rather than merely unopposed.
+* **two flawed attempts are kept rather than deleted.**
+  `2026-11-13-183954-blob-probe.txt` printed the same `200`s against a control that was not a
+  control: it came from `sensors.collect()`, which on this box already reports the pinned pump
+  channel, so the control carried the `Pump` value the experiment added.  And
+  `2026-11-13-184215-blob-probe.txt` fixed that pairing but sent a `drives` payload the probe
+  had built itself (`0.1` degrees, unsorted) rather than `sensors.drives()`, which shipped later
+  the same day - so what it certified was a near-miss of the body that actually goes out.  A
+  third fault of the same family (`base = dict(raw)`: a control carrying `drives`, once
+  `collect()` had grown the section) was caught by `tests/test_blob_probe.py` and never reached
+  the device.  The lesson generalises: a probe certifies its payload, so the payload has to come
+  from the shipped door, and the tool now takes its rows from `sensors.drives()` while stripping
+  both values from the control.
 * **not measured, and not measurable from here:** whether it *reads* those fields. The reply to a
   `STATE` frame is a bare ack with no body, `space` does not move for accepted uploads (§9), and
   the only switch that would make the panel draw the numbers itself is `realtimeDisplay`, which

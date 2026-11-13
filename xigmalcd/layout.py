@@ -159,6 +159,18 @@ VENDOR_FORMAT = {
     "Fan 2 Name": lambda v: str(v)[:10],
     "Fan 3 Name": lambda v: str(v)[:10],
     "Fan 4 Name": lambda v: str(v)[:10],
+    # the per-drive slots, shaped like the fan rows they mirror: a temperature in the same
+    # degrees the other temperature names use, and a controller name cut to the same ten
+    # characters the vendor's own display rule cuts a fan label to.  Neither name appears in a
+    # shipped file, so both shapes are this repo's, and `formats_measured()` says so.
+    "Disk 1 Temperature": _deg,
+    "Disk 2 Temperature": _deg,
+    "Disk 3 Temperature": _deg,
+    "Disk 4 Temperature": _deg,
+    "Disk 1 Name": lambda v: str(v)[:10],
+    "Disk 2 Name": lambda v: str(v)[:10],
+    "Disk 3 Name": lambda v: str(v)[:10],
+    "Disk 4 Name": lambda v: str(v)[:10],
     "Memory Usage": _pct,
     "Upload Speed": lambda v: f"{v:.1f}",
     "Download Speed": lambda v: f"{v:.1f}",

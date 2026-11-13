@@ -270,6 +270,17 @@ DERIVED = {
 FAN_SLOTS = tuple((f"Fan {i} Speed", f"Fan {i} Name")
                   for i in range(1, render.BARS_SLOTS + 1))
 
+#: The per-drive slots, indexed the same way the fan slots are: position in the `drives` list
+#: `sensors.drives()` builds, ordered by controller (`nvme0` before `nvme2`), not by the order
+#: the kernel numbered the hwmon directories.  Four of them, because that is how many rows a
+#: `bars`-shaped layout has room for and because a fifth slot would be a number of drives this
+#: program has never seen on a panel-bound machine.  A machine with more drives still puts them
+#: all on the wire - `drives[]` is the list, the names are a window onto the first four - and a
+#: machine with fewer reports the slot unanswered, in words, like every other hole here.
+#: No shipped layout asks for any of these names; the section they read from is one the panel
+#: was measured to accept rather than one the vendor sent (PROTOCOL.md §8).
+DISK_SLOTS = tuple((f"Disk {i} Temperature", f"Disk {i} Name") for i in range(1, 5))
+
 #: `bars`'s rows in the order the drawing lays them out: the label it prints - a literal for
 #: the six fixed rows, `None` for a fan slot, whose label is its `Fan N Name` source - then
 #: the source the meter divides, the source the number beside it prints, and the scale.  One
@@ -324,6 +335,7 @@ def source_names() -> tuple:
     cannot be invisible to the check that would have to know about it."""
     return (tuple(SOURCES) + tuple(DERIVED) + CLOCKED
             + tuple(n for pair in FAN_SLOTS for n in pair)
+            + tuple(n for pair in DISK_SLOTS for n in pair)
             + tuple(FAN_TYPED))
 
 
@@ -414,6 +426,20 @@ def values(metrics: dict, when=None) -> tuple:
                                f"no {key}")
             else:
                 out[src] = val
+    disks = metrics.get("drives") or []
+    for (tkey, nkey) in DISK_SLOTS:
+        slot = int(tkey.split()[1]) - 1
+        row = disks[slot] if slot < len(disks) else None
+        out[tkey] = (row or {}).get("temperature")
+        if out[tkey] is None:
+            absent[tkey] = (f"this box reports {len(disks)} drive row"
+                            f"{'s' if len(disks) != 1 else ''} in `drives`; slot {slot + 1} "
+                            f"has no temperature")
+        out[nkey] = (row or {}).get("name")
+        if out[nkey] is None:
+            absent[nkey] = (f"this box reports {len(disks)} drive row"
+                            f"{'s' if len(disks) != 1 else ''} in `drives`; slot {slot + 1} "
+                            f"has no name")
     for src, kind in FAN_TYPED.items():
         # A row that reports 0 is no reading, the same rule `sensors.fans()` applies when it
         # drops an empty header and `render._tach` applies when it picks a figure: a stopped

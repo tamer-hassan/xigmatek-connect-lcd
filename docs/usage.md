@@ -60,14 +60,19 @@ lm-sensors **halves** a `pwmN` input before printing it, so a header at full dut
 `127%`.  Measured on this chip, raw 174 prints `87%` with no config and the true `68%` with
 `compute pwmN @/1.275, @*1.275` (the divisor is 255/200, undoing that half-scale).  None of it
 touches this program: `xigmalcd` never reads a `pwm*` file, and `tools/fanscan.py` lists the
-four outputs without values, which is why the pump's steadiness had to be read off its tach.
-The same tool now prints which channel answers the two fields that had been answering from the
-wrong place - the three tiers behind `motherboard.temperature`, and for `disk.temperature` the
-drive that holds `/` with its composite beside its raw probes.  Both rules, the before-and-after
-numbers and the reason for each tier are in
-[limits](limits.md); a layout reaches the drive temperature through the source name
-`Disk Temperature`, which no shipped layout asks for because the vendor's library names no
-storage metric at all.
+outputs only as evidence — since 2026-11-13 `--watch` prints their raw spans and duty beside the
+tach spans, because a tach that stays flat while its own header's duty sweeps is how the pump was
+identified, and that pairing had to be re-runnable by a reader.
+The same tool prints which channel answers the two fields that had been answering from the wrong
+place: the three tiers behind `motherboard.temperature` — Super-IO, then the DIMM SPD
+thermistors, then a network die as a last resort, with the driver's own `diode` label preferred
+inside a tier and labels naming a CPU or GPU excluded — and for `disk.temperature` the drive that
+holds `/`, its composite beside its raw probes, and every drive's slot number.  Both rules, the
+before-and-after numbers and the reason for each tier are in
+[limits](limits.md).  A layout reaches them through the source names `Disk Temperature` (the
+mounted drive) and `Disk 1 Temperature` … `Disk 4 Temperature` with their `Disk N Name` partners
+(positional, ordered by controller); no shipped layout asks for any of those, because the
+vendor's library names no storage metric at all.
 
 ## Options
 
