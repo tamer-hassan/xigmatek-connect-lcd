@@ -251,30 +251,93 @@ class ADiskSensor(Built):
 class TheSameDoor(unittest.TestCase):
     """No synthetic tree: on whatever machine this runs, the blob and the rule must agree.
 
-    This is the check that would have caught the one that failed on CI's runner - not by
-    pinning a number, which is what went wrong first time, but by asserting a *relation*
-    between what `collect()` puts on the wire and what `disk_temperature()` reports about it.
+    This is the check that would have caught the first fault - not by pinning a number, which
+    is what went wrong initially, but by asserting a *relation* between what `collect()` puts
+    on the wire and what the doors report about it.  Its own first version then made the same
+    mistake one level down: it wrote `body["disk"]["temperature"]` unconditionally, and CI #191
+    errored on a runner whose VM has a disk chip with no temperature at all (`KeyError:
+    'temperature'`).  A relation check has to hold in the absent case too, which is what the
+    second test below drives on purpose instead of waiting for a runner to trip over it.
     """
 
     def test_disk_and_motherboard_come_from_the_same_doors_the_pages_quote(self):
+        """One snapshot, two doors.
+
+        The first version of this check read the machine twice - once through
+        `disk_temperature()`, once through `collect()` - and failed on this bench with
+        `38 != 39`: the NVMe composite moved a whole degree between the two calls.  The check was
+        asking whether two doors use the same rule, and it was answering a question about how
+        fast a drive warms up instead.  So the reads are snapshotted for the duration: the
+        relation is gated, the temperature is not.
+        """
+        real_read = sensors._read
+        cache: dict = {}
+
+        def snapshot(path):
+            if path not in cache:
+                cache[path] = real_read(path)
+            return cache[path]
+
+        sensors._read = snapshot
+        try:
+            return self._compare_doors()
+        finally:
+            sensors._read = real_read
+
+    def _compare_doors(self):
         deg, whence = sensors.disk_temperature()
         body = sensors.collect()
         if "disk" in body:
-            self.assertEqual(body["disk"]["temperature"], deg,
-                             f"the blob says {body['disk']['temperature']} and the rule says "
-                             f"{deg} ({whence})")
+            if deg is None:
+                self.assertNotIn("temperature", body["disk"],
+                                 f"the rule found no disk temperature ({whence}) and the blob "
+                                 f"carries one anyway: {body['disk']}")
+            else:
+                self.assertEqual(body["disk"].get("temperature"), deg,
+                                 f"the blob says {body['disk'].get('temperature')!r} and the "
+                                 f"rule says {deg!r} ({whence})")
         won = sensors.motherboard_answer()
         if won is not None:
             self.assertEqual(body.get("motherboard", {}).get("temperature"),
                              sensors.motherboard()["temperature"],
                              "the wire and `motherboard()` disagree")
-            self.assertGreaterEqual(
-                sensors.motherboard()["temperature"], 0,
-                "a board answer that is not a temperature")
+        else:
+            self.assertNotIn("motherboard", body,
+                             "no board channel answered and the blob carries a motherboard "
+                             "section anyway")
         if "fans" in body:
             self.assertEqual([f["name"] for f in body["fans"]],
                              [f["name"] for f in sensors.fans()],
                              "the fans in the blob are not the fans `fans()` reports")
+
+    def test_a_box_with_no_temperature_chips_agrees_with_itself(self):
+        """The runner's shape, constructed rather than waited for.
+
+        #191 hit this by accident - one runner's VM had a disk chip with no temperature, the
+        next had neither, and both cases passed or failed depending on the image.  A case some
+        machines reach has to be built, or it stays a coin flip in the green column.
+        """
+        real_glob = sensors.HWMON_GLOB
+        sensors.HWMON_GLOB = "/no/such/hwmon*/hwmon*"
+        try:
+            deg, whence = sensors.disk_temperature()
+            self.assertIsNone(deg, whence)
+            self.assertIn("no disk temperature chip", whence.lower(), whence)
+            body = sensors.collect()
+            if "disk" in body:
+                self.assertNotIn("temperature", body["disk"],
+                                 "an empty sensor tree still produced a disk temperature: "
+                                 f"{body['disk']}")
+            self.assertIsNone(sensors.motherboard_answer(),
+                              "the board tiers answered something with nothing to walk")
+            self.assertEqual(sensors.motherboard(), {})
+            self.assertNotIn("motherboard", sensors.collect(),
+                             "the blob grew a motherboard section out of an empty tree")
+            self.assertEqual(sensors.fans(), [], "tachometers appeared out of nowhere")
+            self.assertNotIn("fans", sensors.collect(),
+                             "an empty tree produced a fans section in the blob")
+        finally:
+            sensors.HWMON_GLOB = real_glob
 
 
 class TheNameIsOurs(unittest.TestCase):
