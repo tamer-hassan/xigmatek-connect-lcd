@@ -182,7 +182,14 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   drivers with their real `modinfo` descriptions, what each channel is named by
   `sensors.FAN_CHANNELS`, and the two fan figures `alpha` would draw from them. `--watch 90`
   samples the tach channels across a warm-up and says which one moves with the CPU, which is
-  how the CPU fan gets identified without guessing; it only reads sysfs, never a PWM. It
+  how the CPU fan gets identified without guessing; it only reads sysfs, never a PWM. Since
+  2026-11-13 it samples the `pwm*` **outputs** in the same window and prints their spans beside
+  the tach spans - raw 0-255 and the same number over 255 as a duty percent - because that
+  pairing is how a pump tells itself from a case fan here: `fan2` held 2443-2469 RPM (spread
+  5-10) across 15-23 rounds while its own header's duty swept 152-231 in lockstep with
+  `pwm1`, which is the channel `FAN_CHANNELS` now pins as `CPU PUMP`/`Pump`. The watch lines
+  also say `pinned as 'CPU PUMP' (Pump)` instead of guessing at a channel the table already
+  names. It
   never opens the panel, and `--demo` draws the layout with invented RPM values (titled as
   such) to check the worst-case widths.
 * `tools/capdump.py` — parses the UTF-16 Windows IRP captures (`records`, `stream`,

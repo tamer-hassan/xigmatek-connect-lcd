@@ -1026,10 +1026,16 @@ def main(argv=None) -> int:
         print("  sources the pickable set asks for: "
               + ", ".join(f"{k} {v}" for k, v in sorted(used.items(),
                                                         key=lambda kv: (-kv[1], kv[0]))))
-        for src, why in sorted(themes.UNMAPPED.items()):
+        # What this machine cannot answer right now, out of the names the pickable set asks
+        # for.  `UNMAPPED` used to do this from a constant sentence and said "this box" about
+        # whatever box ran the build; this asks the same door the frame loop uses, so a box
+        # with a pump row stops reporting one and a box without one still says why.  One
+        # collection, not one per layout: the cost is the same one --check-theme pays.
+        _answered, absent = themes.values(sensors.collect())
+        for src, why in sorted(absent.items()):
             if src in used:
-                print(f"    {src}: {used[src]} widget(s) ask for it and there is no "
-                      f"reading for it here - {why}")
+                print(f"    {src}: {used[src]} widget(s) ask for it and this machine "
+                      f"cannot answer it - {why}")
         unmeasured = sorted(s for s in used if s not in themes.formats_measured())
         if unmeasured:
             print("    formats taken from this repo, not measured off the vendor's own "

@@ -1143,9 +1143,15 @@ def _tach(m) -> tuple:
     than from a label (`tools/fanscan.py --watch`, PROTOCOL.md §8).
     """
     tach = [f for f in (m.get("fans") or []) if f.get("value")]
-    cpu_fan = next((f for f in tach if "cpu" in str(f.get("name", "")).lower()),
-                   None)
     pump = next((f for f in tach if f.get("type") == "Pump"), None)
+    # Type first, then name.  A pinned pump channel is named `CPU PUMP` on this board, so a
+    # name-only rule would take the pump for the cooler's fan the moment the real fan row went
+    # missing, and the figure would print `CPU FAN 2459 RPM` for a pump that never speeds up.
+    # Measured as a defect before it was fixed: `{"type": "Pump", "name": "CPU PUMP"}` on its
+    # own came out `CPU FAN 2410 RPM` through the old rule.
+    cpu_fan = next((f for f in tach if f is not pump
+                    and "cpu" in str(f.get("name", "")).lower()),
+                   None)
     other = next((f for f in tach if f is not cpu_fan and f is not pump), None)
     return cpu_fan, pump, other
 

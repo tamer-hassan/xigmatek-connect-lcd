@@ -91,13 +91,20 @@ class PaintAll(unittest.TestCase):
                          "the nine themes whose only skipped widget is Pump Speed changed, "
                          "and the source census in test_theme_library.py has to change with them")
 
-    def test_the_skipped_themes_are_the_same_nine_the_source_census_names(self):
+    def test_the_skipped_themes_are_the_same_nine_the_reading_door_names(self):
+        """The painter's skips and the reading door's refusals are one list, not two.
+
+        Asking `themes.source_names()` used to be the same question, because a source with no
+        entry there had no rule and could never be answered; since 2026-11-13 `Pump Speed` has
+        a rule (`themes.FAN_TYPED`) and whether it answers depends on the body, so the census
+        has to ask the body.
+        """
         pick, _reject = themes.scan()
-        answerable = set(themes.source_names())
+        _vals, absent = themes.values(fixtures.SESSION, fixtures.SESSION_WHEN)
         needs = {rec["name"] for rec in pick
                  if {p.get("source") for w in (themes.load(rec["path"]).get("osd") or {})
                      .get("widget") or [] for p in w.get("property") or [] if p.get("source")}
-                 - answerable}
+                 & set(absent)}
         painted = []
         for rec in pick:
             _img, notes = themes.paint(rec, fixtures.SESSION,

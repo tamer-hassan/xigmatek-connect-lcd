@@ -113,9 +113,14 @@ asserted here:
   `$XDG_CONFIG_HOME`.
 * **7 metric names over those 23, in 82 widgets' worth of counts**: `CPU Temperature` 17,
   `CPU Usage` 15, `Time` 11, `Pump Speed` 9, `GPU Usage` 6, `GPU Temperature` 3,
-  `CPU Frequency` 2. 14 of the 23 need nothing this program has no reading for; 9 ask for
-  `Pump Speed`, which this box has never been scanned for. A layout whose metric has no
-  reading draws **without that widget** and prints why - a hole that says what it is,
+  `CPU Frequency` 2.  Whether any of them is missing from a given machine is a per-machine
+  question, and since 2026-11-13 the only one that can be is `Pump Speed`: it is answered by a
+  fan row whose `type` is `Pump` (`themes.FAN_TYPED`), and this bench has one - the channel that
+  came alive when the AIO's block cable went into `PUMP_SYS1`, steady at 2459-2469 RPM while its
+  own header's duty swept (PROTOCOL.md §8).  On a body with no tachometer at all the nine
+  layouts skip that widget instead, with the reason naming the command that would settle it
+  (`tools/fanscan.py`), and `tests/test_pump_speed.py` holds both halves.  Either way a widget
+  with no reading draws **without that widget** and prints why - a hole that says what it is,
   rather than a zero that reads as a measurement. Faces are substituted the same way and
   said out loud (`arial` -> Liberation Sans, `simsun` -> Noto Sans CJK), because no
   Microsoft fonts are installed here, and the three metric shapes that are this repo's

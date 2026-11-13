@@ -464,7 +464,11 @@ commonly gets wrong:
   all 131 twins come back identical.  The 13 that paint nothing here (14 there) are rows
   the painter skips too, each with the reason the model gives: `Pump Speed` in **9**
   layouts, the `Fan 3`/`Fan 4` slots this box reports no tachometer for, and on the
-  runner the rows whose family has no file to open. **23** of the painted lines are
+  runner the rows whose family has no file to open.  Those are counts at the editor's
+  pinned pair, which carries the vendor's two rows (`Fan CPU`, `Fan System 5`) and no
+  pump row on purpose: at this machine's **live** readings the same nine rows draw, since
+  2026-11-13, from the channel pinned as the pump (docs/limits.md, PROTOCOL.md §8).
+  **23** of the painted lines are
   spelled by a shape the file itself declares unmeasured (**22** there). Punch a hole in
   the readings and both doors answer the same way: `bars`' RAM row depends on `RAM Rate`,
   spelled from `memory.used` / `memory.total`; with the total gone the model says so, the

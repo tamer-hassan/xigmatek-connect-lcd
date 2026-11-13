@@ -286,23 +286,36 @@ _FAN_NAME = {speed: name for speed, name in FAN_SLOTS}
 #: different seconds in one picture).
 CLOCKED = ("Time", "Date", "Week")
 
-#: Sources a shipped layout asks for and this machine has no field for yet.  `Pump Speed`
-# (9 of the 23 selectable themes) wants the AIO pump's tachometer; `sensors.fans()`
-# answers rows with names, and no measurement has ever established which row, if any, is
-# the pump on this box.  Matching a fan row by name would be a guess wearing a rule, so
-# the widget is skipped and the reason is printed instead.
-UNMAPPED = {"Pump Speed": "no pump tachometer has been measured on this box "
-                          "(tools/fanscan.py has never looked for one)"}
+#: Sources answered by a **fan row of a given `type`**, not by a group and a field.  The
+#: vendor's own `fans[]` entries carry a `type` - `"Fan"` and `"Chassis"` are the two that
+#: appear in its captured bodies (PROTOCOL.md §8) - and `sensors.fans()` gives a row the
+#: type `"Pump"` when the channel is pinned as one.  `Pump Speed` is what 9 of the 23
+#: selectable layouts ask for; the app's editor vocabulary calls the same reading
+#: `waterPumpSpeed` (PROTOCOL.md §10), so the name is the vendor's and only the rule is
+#: ours.  It is answerable when this box reports such a row and refused, in words, when it
+#: does not.  What makes a row the pump is a measurement rather than a name:
+#: `sensors.FAN_CHANNELS` is where a channel is pinned, and `tools/fanscan.py --watch` is
+#: the command that prints the evidence for it - which is why this is keyed on the `type`
+#: the pin assigns and never on a substring of a fan's label.
+FAN_TYPED = {"Pump Speed": "Pump"}
+
+#: Why a row-typed source goes unanswered on a box that reports no such row.  The sentence
+#: names the command that finds the channel, because the missing thing is a measurement.
+ROW_WHY = ("no fan row this machine reports is typed `Pump`.  `tools/fanscan.py` lists this "
+           "box's tach channels and which of them move with the CPU, and "
+           "`xigmalcd/sensors.py` FAN_CHANNELS is where a measured one gets pinned")
 
 
 def source_names() -> tuple:
     """Every `source` name this program can put a reading behind: the flat fields, the
-    derived ratios, the clock, and the positional fan slots.  The checks that
+    derived ratios, the clock, the positional fan slots, and the sources answered by a
+    fan row of a given type.  The checks that
     count them - `tests/test_theme_library.py` and `tests/test_library_draw.py` -
     ask through this door rather than keeping a list of their own, so a new source
     cannot be invisible to the check that would have to know about it."""
     return (tuple(SOURCES) + tuple(DERIVED) + CLOCKED
-            + tuple(n for pair in FAN_SLOTS for n in pair))
+            + tuple(n for pair in FAN_SLOTS for n in pair)
+            + tuple(FAN_TYPED))
 
 
 def formats_measured() -> tuple:
@@ -352,7 +365,10 @@ def values(metrics: dict, when=None) -> tuple:
     answer and why, so a caller can print the decision rather than leave a hole that
     reads like a bug.  A sensor group that is simply not on this machine (`gpu` is often
     absent, and a CI runner once answered only `cpu`, `disk`, `memory`, `timestamp`) is
-    reported the same way as a source with no rule.
+    reported the same way as a source whose rule needs a row this box does not report:
+    `themes.FAN_TYPED` answers `Pump Speed` from a fan row carrying a `type`, and when no
+    row does, `themes.ROW_WHY` says that - naming the command that would settle it rather
+    than asserting a fact about the machine that happens to be running.
     """
     when = _clock(when)
     out, absent = {}, {}
@@ -389,8 +405,16 @@ def values(metrics: dict, when=None) -> tuple:
                                f"no {key}")
             else:
                 out[src] = val
-    for src, why in UNMAPPED.items():
-        absent[src] = why
+    for src, kind in FAN_TYPED.items():
+        # A row that reports 0 is no reading, the same rule `sensors.fans()` applies when it
+        # drops an empty header and `render._tach` applies when it picks a figure: a stopped
+        # pump and an unwired one look identical on the wire and neither should print.
+        row = next((f for f in fans if str(f.get("type") or "") == kind and f.get("value")),
+                   None)
+        if row is None:
+            absent[src] = ROW_WHY
+        else:
+            out[src] = row["value"]
     return out, absent
 
 
@@ -836,7 +860,7 @@ def validate(obj: dict) -> tuple:
         return hard + ["an `osd.widget` list with nothing in it: there is nothing to "
                        "draw, which is not the same as an empty canvas"], soft
     seen_ids = set()
-    _answerable = set(source_names()) | set(UNMAPPED)
+    _answerable = set(source_names())
     for i, wd in enumerate(widgets):
         kind = str(wd.get("type") or "")
         if kind not in layout.KINDS:
@@ -881,8 +905,8 @@ def validate(obj: dict) -> tuple:
             soft.append(f"widget {i} ({kind}): source {src!r} has no entry in the "
                         f"vocabulary this program answers ({len(source_names())} names "
                         f"from themes.source_names() - the flat fields, the derived "
-                        f"ratios, the clock and the fan slots - plus "
-                        f"{len(UNMAPPED)} it names but cannot read) - it will be "
+                        f"ratios, the clock, the fan slots and "
+                        f"{len(FAN_TYPED)} answered by a fan row's type) - it will be "
                         "reported as unanswered")
         shown_if = (pr.get("xigma") or {}).get("showIf")
         if shown_if and shown_if not in _answerable:

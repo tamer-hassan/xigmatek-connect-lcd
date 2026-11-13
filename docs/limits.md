@@ -224,7 +224,10 @@ What has been measured on glass, by whom, with how many frames - and what has no
    is font-skipped there and the test prints that skip instead of pinning a count.  What the
    test holds on both machines is the accounting identity, per layout: painted plus
    source-skipped plus font-skipped equals the manifest's widget count.  9 layouts ask for
-   `Pump Speed`, which no reading on either box answers, and no port is opened.  It also
+   `Pump Speed`, and the body that test paints them at - `fixtures.SESSION`, which carries no
+   fan rows at all - leaves that name unanswered on any machine; on this bench's own live
+   readings the same nine draw it, from a channel pinned as the pump (PROTOCOL.md §8).  No
+   port is opened.  It also
    measures the lookup a pairing cannot work without: the themes package installs the clip
    every one of those 23 layouts names (`/usr/share/xigmalcd/themes/alpha/clips`), and
    since 0.4 the loop's own rule for turning a bare name into a file searches that library
@@ -289,7 +292,19 @@ What has been measured on glass, by whom, with how many frames - and what has no
   passive (reads sysfs, never writes a PWM), so warm the CPU while it runs. Any channel that is
   **not** pinned renders as the neutral `FAN nnnn RPM` rather than a guess, and with no tach at
   all the slot still shows `CPU FAN -- RPM` instead of going quiet and looking like the cooler
-  stopped. The GPU half is a percentage: `nvidia-smi`'s `fan.speed`, labelled `%` because NVML's
+  stopped.
+  Re-measured on 2026-11-13 after the machine was re-wired, and a third channel appeared: the
+  AIO's block cable on `PUMP_SYS1` came up as `fan2` at 2443-2469 RPM - spread 10 across 23
+  rounds over 45 s with all 24 threads loaded, spread 5 across 15 rounds over 30 s at rest -
+  **flat while its own header's duty swept**: `pwm2` matched `pwm1` 1:1 (raw 152-182 in paired
+  samples, 204-231 in a later 12-round window) and the tach answered to none of it, which is how
+  a pump tells itself apart from a fan on a board that gangs the two headers. The
+  six case fans went to the cooler's own ARGB controller, which exposes no sensor interface to
+  Linux at all (12 hwmon chips before and after), so `fan12` reads 0 today and keeps its pin for
+  the next re-wiring. `FAN_CHANNELS` gained `("nct6687", "fan2") = ("CPU PUMP", "Pump")`, that
+  pinned type is what `themes.FAN_TYPED` reads to answer `Pump Speed`, and `--watch` now prints
+  the duty spans next to the tach spans because the pairing - not a name - is the evidence.
+  The GPU half is a percentage: `nvidia-smi`'s `fan.speed`, labelled `%` because NVML's
   `nvmlDeviceGetFanSpeedRPM` exists in this 580.178.04 driver but refuses with "Argument version
   mismatch", and a card that reports no fan at all reads `GPU FAN --` rather than claiming a
   stopped one. Each figure has a 200 px ink budget and the two share one size, taken from
@@ -808,10 +823,16 @@ What has been measured on glass, by whom, with how many frames - and what has no
 layouts are pickable (`--theme Theme_07`, and `--list-themes` prints the set); 4 are
 refused by a gate on each file's own `ratio` field, because they declare 320x240 and the
 em-box anchor convention that every text position in a layout depends on is measured at 480
-only. Among the 23, `Pump Speed` is asked for by 9 themes and there is no reading for it:
-no pump tachometer has ever been looked for on this box (`tools/fanscan.py` has never been
-pointed at one), so those 9 draw *without* that widget and print that they did - a hole
-that says what it is, rather than a zero that would read as a measurement. Of the metric
+only. Among the 23, `Pump Speed` is asked for by 9 themes: `Theme_28`, `Theme_29`, `Theme_34`,
+`theme_36`, `theme_37`, `theme_41`, `theme_45`, `theme_48`, `theme_49`. Until 2026-11-13 there
+was no rule for it at all - `themes.UNMAPPED` held a sentence and every one of those 9 widgets
+was skipped wherever that program ran, including on a body that reported a pump.  Then the
+machine was re-wired (PROTOCOL.md §8: block cable to `PUMP_SYS1`, radiator fans to `CPU_FAN1`,
+six case fans to the cooler's own ARGB controller, which exposes nothing to Linux), `fan2` came
+up at 2448-2469 RPM and steady through a duty sweep on its own header, and the source gained a
+rule over a fan row's `type`.  Here it draws; on a box that reports no pump row the same nine
+print why and name the command that would settle it, and `tests/test_pump_speed.py` holds both
+halves, so "here" and "there" cannot quietly become one number.  Of the metric
 names in the library, four have a display shape measured off the vendor's own baked overlay
 (`layout.FORMATS_MEASURED`); within the pickable set that leaves `Time`, `CPU Frequency`
 and `Pump Speed` shaped by this repo, and the per-frame note names them. Every face is a

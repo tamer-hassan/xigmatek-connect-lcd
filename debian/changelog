@@ -459,32 +459,77 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     cycle quotes were printed here, by this bench's press; the owner's desktop,
     which reported them, has build #2 and needs this one.
 
-  * The suite's figures, re-read rather than inherited.  This bench, one
-    sitting, the same tree both ways, `python3 -W error::ResourceWarning -m
-    unittest discover -s tests`: 485 checks in 48 files in 410.280 s, 3
-    skipped, one of them the tray check naming the host it needs.  The count
-    is read off the tree as well as off the runner: `grep -c "^    def test_"
-    tests/*.py` and `unittest.TestLoader().discover("tests")` both answer 485
-    here.  The first run of that figure did not come out green, and what
-    stopped it was the suite's own isolation check - a real `xigmaui` was open
-    on this machine and wrote the session file through its 500 ms save timer
-    mid-run, so `test_zz_isolation.py` named the process and said to close it:
-    the guard that exists for "a test wrote your settings", meeting a person
-    instead.  CI's runner, the `tests/` step alone, over the cycles that added
-    those checks: 337 s with 440 checks (#165), 387 with 441 (#168), 319 with
-    442 (#169), 413 with 446 (#171), 416 with 447 (#172), 383 with 447 (#174),
-    358 with 453 (#175), 387 with 453 (#176), 364 with 459 (#177), 433.423
-    with 475 (#178), 442.333 with 481 (#180) and 336.831 with 485 (#184) -
-    those last three runs skipping 4 rather than 3, the extra one being the
-    glass ledger naming transcripts a runner with no panel has never made, and
-    the 9 s between #178 and #180 being what the six new checks cost: five of
-    them run a shipped script as a subprocess, and the interpreter start-up
-    that belongs to that is measured, not assumed.  #184 is the same suite four
+  * `Pump Speed` went from a sentence to a rule, because the machine changed
+    and the refusal turned out to be unconditional.  On 2026-11-13 the owner
+    re-wired this box: six case fans to the cooler's own ARGB controller
+    (which exposes no sensor interface to Linux - 12 hwmon chips before, the
+    same 12 after), the AIO's block cable to `PUMP_SYS1`, its radiator fans
+    to `CPU_FAN1`.  A tach input that had read 0 in all 30 samples of an
+    earlier watch came up at 2443-2469 RPM: spread 10 across 23 rounds with
+    all 24 threads loaded and spread 5 across 15 at rest, flat while its own
+    header's duty matched `pwm1` sample for sample (204-231 in one window,
+    152-182 in another) - which is how a pump tells itself from a fan on a
+    board that gangs the two headers.  `sensors.FAN_CHANNELS` pins that
+    channel as `("CPU PUMP", "Pump")`, and `themes.FAN_TYPED` answers the
+    vendor's own `waterPumpSpeed` / `Pump Speed` name from a fan row's type:
+    nine layouts, one widget each, +1 box each and 563 px at size 20 or
+    1181 px at size 32 on this bench at the pinned 2453 RPM value (the check
+    prints those figures rather than gating them).  What was wrong was not
+    the missing sensor: `themes.UNMAPPED` was a constant applied last, so a
+    body that *did* report a pump row was refused anyway - measured.  The
+    refusal is kept for a box with no such row, and the sentence now names
+    the command that would settle it (`tools/fanscan.py`, and the pin table)
+    instead of asserting a fact about whatever box built the package.
+    `render._tach` stops taking a pump for the CPU fan (its pinned name
+    contains "cpu", and a pump-only body printed `CPU FAN 2410 RPM`), and
+    `--list-themes` asks the reading door rather than a constant, so it
+    stops claiming the gap here and keeps saying why on a machine that has
+    it.  Two things learned about `/etc/sensors.d` on the way, recorded in
+    docs/usage.md: `nct6683` publishes no `fan*_label`, so a label written
+    there never reaches sysfs and cannot reach this program; and lm-sensors
+    halves a `pwmN` before printing it, so raw 174 reads `87%` and the true
+    68% needs `compute pwmN @/1.275`.  Ten checks in
+    `tests/test_pump_speed.py`, seven mutations counted in
+    docs/theme-editor.md; `--watch` now samples the `pwm*` outputs in the
+    same window so the pairing is on the record.
+
+  * The suite's figures, re-read rather than inherited.  This bench,
+    `python3 -W error::ResourceWarning -m unittest discover -s tests`, one run
+    of the committed tree with nothing else in flight: 495 checks in 49 files
+    in 398.239 s, 3 skipped, one of them the tray check naming the host it
+    needs, and no `ResourceWarning` printed at all now that `setUp` closes its
+    own file.  The count is read off the tree as well as off the runner:
+    `grep -c "^    def test_" tests/*.py` answers 495 over 49 files and
+    `unittest.TestLoader().discover("tests")` answers 495 over 49 modules, the
+    same numbers the runner prints.  Four other whole-suite logs from that
+    sitting are worth nothing and are kept here only as the lesson: two
+    reported failures because a mutation sweep was rewriting
+    `xigmalcd/themes.py` underneath them while
+    `tests/test_specials.py`'s door-marker check reads the file on disk, and
+    two more passed against trees that were still being edited.  A whole-suite
+    number means a frozen tree, which is also why `docs/theme-editor.md` now
+    carries that as its fifth harness rule.  An earlier cycle's run also came
+    back red for a real reason: the suite's own isolation check caught a live
+    `xigmaui` on this machine writing the session file through its 500 ms save
+    timer mid-run, and `test_zz_isolation.py` named the process and said to
+    close it - the guard that exists for "a test wrote your settings", meeting
+    a person instead.  CI's runner, the `tests/` step alone, over the cycles
+    that added those checks: 337 s with
+    440 checks (#165), 387 with 441 (#168), 319 with 442 (#169), 413 with 446
+    (#171), 416 with 447 (#172), 383 with 447 (#174), 358 with 453 (#175),
+    387 with 453 (#176), 364 with 459 (#177), 433.423 with 475 (#178),
+    442.333 with 481 (#180) and 336.831 with 485 (#184) - those last three
+    runs skipping 4 rather than 3, the extra one being the glass ledger
+    naming transcripts a runner with no panel has never made, and the 9 s
+    between #178 and #180 being what the six new checks cost: five of them
+    run a shipped script as a subprocess, and the interpreter start-up that
+    belongs to that is measured, not assumed.  #184 is the same suite four
     checks larger and 105 s quicker than #180 on the same YAML, which is why
-    these numbers are printed as a list and never used as a gate: the spread is
-    the runner's, and the only honest assertion over two of them is about the
-    count.  The 435 in this entry's first bullet is what the port landed at,
-    not what the tree holds.
+    these numbers are printed as a list and never used as a gate: the spread
+    is the runner's, and the only honest assertion over two of them is about
+    a count.  The runner's sample for these 495 checks is added by the commit
+    that reads it, as every cycle before this one has done.  The 435 in this
+    entry's first bullet is what the port landed at, not what the tree holds.
 
 
  -- Tamer Hassan <thameruddin@gmail.com>  Wed, 11 Nov 2026 22:05:00 +0200

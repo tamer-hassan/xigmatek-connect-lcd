@@ -511,7 +511,7 @@ Schema and units, taken from the Windows capture and matched field for field by
 | `cpu` | `load`, `usage` %, `temperature` °C, `speedAverage` MHz, `power` W, `voltage` V | `voltage` 1.365 V matches `in0_input` of the same board's amdgpu sensor on Linux |
 | `gpu` | `load` %, `temperature` °C, `fan` %, `speed` MHz, `power` W, `voltage` V, `memoryUsage`, `dedicated`, `dedicatedTotal` MB | discrete GPU fields |
 | `disk` | `total`, `used` GB, `load` %, `activity` %, `temperature` °C, `readSpeed`, `writeSpeed` | |
-| `fans` | list of `{onBoard: bool, type, name, value}` | RPM. `type` is `"Fan"` or `"Chassis"`; names are `"Fan CPU"`, `"Fan System 5"`, … |
+| `fans` | list of `{onBoard: bool, type, name, value}` | RPM. In the vendor's bodies `type` is `"Fan"` or `"Chassis"`; names are `"Fan CPU"`, `"Fan System 5"`, …. This program adds a third, `"Pump"`, for a channel pinned as one by measurement - see the re-wiring note below §8's fan table |
 | `motherboard` | `temperature` | °C, integer |
 | `timestamp` | | ms epoch |
 
@@ -547,8 +547,43 @@ Those spans line up with the vendor's Windows pair - `Fan CPU` 1016-2448 swingin
 `Fan System 5` 1529-1582 flat - so `xigmalcd/sensors.py` `FAN_CHANNELS` pins them under the
 vendor's own names, and the theme draws two figures from them: `CPU FAN 1957 RPM` under the CPU
 temperature and `GPU FAN 34%` under the GPU one.
-`tools/fanscan.py --watch 90` reproduces the measurement on any board; there is no pump channel
-here, which agrees with the logs never having carried a pump value.
+`tools/fanscan.py --watch 90` reproduces the measurement on any board; there was no pump channel
+under that wiring, which agrees with the logs never having carried a pump value.
+
+**Re-measured 2026-11-13, after the machine was re-wired - and the pump appears.** The six case
+fans went to the cooler's own Xigmatek Mini ARGB controller (which exposes no sensor interface
+to Linux at all: 12 hwmon chips on this box afterwards, the same 12 as before), the AIO's block
+cable went to `PUMP_SYS1` and its radiator fans to `CPU_FAN1`. 23 rounds over 45 s, all 24
+threads loaded:
+
+| channel | RPM over that window | moved with |
+|---|---|---|
+| `fan1` | 1692-1957 (spread 265) | `pwm1` and k10temp 53-76 °C |
+| `fan2` | 2459-2469 (spread 10) | nothing - and `pwm2` followed `pwm1`'s duty 1:1 (raw 182, 178, 174, 167, 152 in paired samples) without moving it |
+| `fan12` | 0 | it lost its fan in the same re-wiring |
+| `fan3`, `fan4`, `fan11`, `fan13-16` | 0 in every sample | - |
+
+`fan2` is the pump: it is the channel that came alive when the block cable went into
+`PUMP_SYS1`, and it held steady through a 10x duty sweep on its own header, which is how a pump
+tells itself apart from a fan on a board that gangs the two. So "no pump channel here" was a
+fact about the wiring, not about the chip. `FAN_CHANNELS` carries a third entry now
+(`("nct6687", "fan2")` pinned as `("CPU PUMP", "Pump")`), and that pinned type is what answers
+the vendor's `Pump Speed` source - `themes.FAN_TYPED`, nine of the 23 selectable layouts.
+
+**A `type` value the vendor never sent.** Every captured body spells `"Fan"` or `"Chassis"`; the
+pump row is this program writing `"Pump"` into that field. The authority for it is a
+measurement recorded in `FAN_CHANNELS`, not a label - `nct6683` publishes no `fan*_label` at all
+- and the string travels down exactly as the other two do. What the firmware makes of it is
+**unmeasured**, and the honest statement of how hard that is to measure: the panel's own
+`Fan`/`Pump` OSD pages (`attribute:["Status","Fan","Pump"]`) are content the host sends, the
+`STATE all 1` frame answers a bare `200` whatever its body says, and the only switch that would
+make the panel draw those numbers itself is `realtimeDisplay` - which ALPHA sends only when
+`deviceConfig.OS === "RTOS"`, while this unit reports `"OS":"Linux"` (§5, and
+`tools/realtime.py`). So there is no read-back that could report a verdict on the string, and
+the alternative - putting eyes on the panel's own pages - would mean writing `mode` or `logo`,
+which this project refuses to touch (§5). It is kept because it is the only field in the blob
+that says which channel is which, and because the number a reader sees was painted here from
+the same reading either way.
 
 **Send it twice at startup, then stop.** That is what ALPHA really does: in the 51-frame
 init session, `STATE all 1` is TX frames 3 and 4 and nowhere else, and the 63-upload

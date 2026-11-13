@@ -106,11 +106,15 @@ pins the counts it finds.)
   against the groups `xigmalcd/sensors.py` documents (`network`, `memory`, `cpu`, `gpu`,
   `disk`, `fans`, `motherboard`, `timestamp`).
 - **9 of the 23 need `Pump Speed`** - `Theme_28`, `Theme_29`, `Theme_34`, `theme_36`,
-  `theme_37`, `theme_41`, `theme_45`, `theme_48`, `theme_49` - and no tachometer has ever
-  been looked for on this box: `tools/fanscan.py` has never been pointed at a pump header. Finding one is a
-  measurement with an unknown answer, budgeted at 2 h - the vendor's own vocabulary calls
-  it `waterPumpSpeed` (PROTOCOL.md §10), so the source name is settled even if the sensor
-  is not.
+  `theme_37`, `theme_41`, `theme_45`, `theme_48`, `theme_49`.  That was a hole in the reader
+  until 2026-11-13: `themes.UNMAPPED` held one sentence and no reading could clear it, so the
+  nine drew without that widget on every machine, including a body that reported a pump.  It is
+  now a rule over a fan row's `type` (`themes.FAN_TYPED`), and this box has the row: the channel
+  that came alive when the AIO's block cable went into `PUMP_SYS1`, 2448-2469 RPM and flat while
+  its own header's duty swept (PROTOCOL.md §8).  What was budgeted as "a measurement with an
+  unknown answer, 2 h" cost a `fanscan.py --watch` and a re-wiring done at the machine.
+  The source name was never in doubt: the vendor's own vocabulary calls it `waterPumpSpeed`
+  (PROTOCOL.md §10).
 - On a machine where `gpu`, `fans` and `motherboard` are absent the count drops, and that
   is not hypothetical: a CI runner's `sensors.collect()` answered only `cpu`, `disk`,
   `memory` and `timestamp` on 2026-11-07. The loop must therefore degrade by *skipping the
@@ -1110,6 +1114,96 @@ no auto-save, no "apply writes your buffer" door, because the wire has no layout
 file model exists to avoid.
 
 
+### `Pump Speed` got a rule the day the machine got a pump (2026-11-13)
+
+Nine of the 23 selectable layouts ask for `Pump Speed` - `Theme_28`, `Theme_29`, `Theme_34`,
+`theme_36`, `theme_37`, `theme_41`, `theme_45`, `theme_48`, `theme_49`, one `data` widget each,
+at 197,370 / 197,350 / 193,358 at fontSize 20 and 173,341 at fontSize 32.  The tree's answer
+was a constant: `themes.UNMAPPED` held one sentence and `values()` applied it **last**, over
+whatever the body reported.  Reading that back showed a fault that had nothing to do with
+hardware - handing `values()` a body with five fan rows, one of them
+`{"type": "Pump", "name": "CPU PUMP", "value": 2410}`, answered `Fan 3` and `Fan 4` and still
+refused `Pump Speed`.  The name had a rule-shaped hole in it.
+
+The second fault was the sentence's own claim: *"`tools/fanscan.py` has never looked for one"*
+was true, so it was run.  On the wiring of that day: 10 tach inputs, 2 turning (`fan1`
+1692-1957, spread 265, tracking `pwm1` and k10temp 53-76 °C; `fan12` 1525-1575, spread 50),
+and 8 reading 0 in all 30 samples - `fan2` among them.
+
+Then the owner re-wired the box - six case fans to the cooler's own ARGB controller, the AIO's
+block cable to `PUMP_SYS1`, its radiator fans to `CPU_FAN1` - and the same command answered
+differently on the same kernel:
+
+| channel | before the re-wiring | after | |
+| --- | --- | --- | --- |
+| `fan1` | 1692-1957, spread 265 | 1503-2010 across three windows, spread 135-306 | the cooler's fans: it follows `pwm1` and the CPU |
+| `fan2` | 0 in every sample | **2443-2469**, spread 10 under a 24-thread load and spread 5 at rest | the pump: the channel that appeared when the block cable moved |
+| `fan12` | 1525-1575, spread 50 | 0 | its fan moved to the controller |
+| `fan3`, `fan4`, `fan11`, `fan13-16` | 0 | 0 | nothing plugged in |
+
+The pump was identified by two shapes rather than by a name, and the pairing matters: its
+header's duty matched `pwm1` sample for sample (raw 204-231 in one window, 152-182 in another,
+identical spread 27) while the tach moved by 10 RPM - a fan on a ganged header follows the
+curve, a pump does not.  `FAN_CHANNELS` gained `("nct6687", "fan2") = ("CPU PUMP", "Pump")`,
+and `themes.FAN_TYPED = {"Pump Speed": "Pump"}` answers the vendor's name from a row's **type**.
+`tools/fanscan.py --watch` samples the `pwm*` outputs in the same window now, because that
+pairing is the evidence and it had to be printed somewhere a reader can re-run it.
+
+The rule deliberately reads nothing else.  `{"type": "Fan", "name": "CPU PUMP"}` answers no
+`Pump Speed`, and `{"type": "Pump", "name": "nct6687 fan2"}` answers 2410 - that pair is the
+first check in `tests/test_pump_speed.py`, and it is the line the old code's comment said it
+would not cross ("matching a fan row by name would be a guess wearing a rule").  A row reading
+0 is no reading, as it already is for the empty headers `sensors.fans()` drops.  And a bug found
+while writing it: `render._tach` chose the CPU fan by a substring of the name, so a pump-only
+body printed `CPU FAN 2410 RPM`; the type is read first now and the same body prints
+`PUMP 2410 RPM`.
+
+What that buys, printed by the check and not gated as a value: the nine files gain exactly
+**one box each** and nothing else changes anywhere in the library - 563 px at size 20 for seven
+of them, 1181 px at size 32 for `theme_37` and `theme_41`, on this bench's faces at a pinned
+2453 RPM.  (A what-if probe the day before, painting 2410 RPM instead, printed 555 and 1123 for
+the same nine rows: the digits are what changed, which is exactly why these are printed and not
+asserted.)  Through the CLI: `--check-theme Theme_28` here reads `7 boxes, 20 036 lit px,
+skipped: nothing`, where at the suite's pinned body (`fixtures.SESSION`, which carries no fan
+rows at all) it is still `6 boxes … skipped: Pump Speed`, and 23 layouts land at 114 painted
+boxes with exactly nine reporting one missing source.  `--list-themes` stopped printing the gap
+line here because it now asks `themes.values(sensors.collect())` instead of a constant, so the
+refusal - `themes.ROW_WHY`, which names `tools/fanscan.py` and the pin table and says nothing
+about "this box" - is a per-body fact on every machine.
+
+Two findings about `/etc/sensors.d`, both measured and both written into docs/usage.md, because
+the second one contradicted what this repository's author had just said out loud:
+
+* **a label written there never reaches this program.**  `nct6683` publishes `temp*_label` and
+  no `fan*_label` at all; the labels `sensors` prints come from userspace `libsensors`, while
+  `sensors.py` reads sysfs.  Re-measured on the rewired box: `driver label: -` for all ten
+  tach inputs.  The pin table is the only route from a header to the glass.
+* **lm-sensors halves a `pwmN` before printing it, so its default percent is wrong.**  Raw and
+  display read in one breath: raw 174 → `87%` with no config, `68%` with
+  `compute pwmN @/1.275` - and 174/255 is 68.2%, so the config line was right and a suggestion
+  to delete it was wrong.  Raw 255 would print `127%` on a default install.  Parenthesising the
+  expressions changes nothing; both spellings were run.
+
+Ten checks in `tests/test_pump_speed.py`, 0 failures, 0.9 s.  The seven mutations and what each
+cost: the rule reading a name instead of the type → **1**; the zero guard dropped → **1**;
+`ROW_WHY` stripped of both command names → **2** (the in-process one and the CLI one); the pump
+taken out of the pin table → **1**; `_tach` back to name-first → **1**; `FAN_TYPED` emptied,
+i.e. the blanket refusal restored → **5**; `--list-themes` back to a constant → **1**.  Back as
+shipped: 0.
+
+What is **not** claimed: that the firmware has ever seen the string `"Pump"`.  All 34 captured
+bodies spell `"Fan"` or `"Chassis"` (PROTOCOL.md §8), so this program putting a third value in
+that field is a deviation that has never been asked of the panel - and it cannot be answered
+from the panel anyway, because nothing travels back up.  Also not claimed: that the pump's
+*duty* is its *speed*.  `pwm2` at 100% is a real reading of this box and `Pump Speed` filled
+from it would be a lie, which is why the source stays refused on a machine that reports no
+pump-typed row.  And the six case fans are out of reach: no new hwmon chip appeared
+(12 before, 12 after, each named), and the only non-panel oddity on the USB bus is a Jieli
+device bound to `snd-usb-audio`.  `Fan 3`/`Fan 4` will fill when something is plugged into a
+sensed header - `fan3`, `fan4`, `fan11`, `fan13-16` are waiting there with their `min` and
+`pulses` files - and nothing else has to be written for them to answer.
+
+
 ## The surface, and the geometry it must not break
 
 
@@ -1184,10 +1278,11 @@ default in the inspector is the vendor's own constant instead of our census. No 
 from the vendor app is tracked here - only their file names, in PROTOCOL.md section 10 -
 so it needs the installed app off the Windows machine again.
 
-### Three harness rules, each found the expensive way
+### Five harness rules, each found the expensive way
 
-All three failed in the check rather than in the program, which is why they are in `tests/`
-and not in a cautionary note.
+Four of them failed in the check rather than in the program, which is why they are in `tests/`
+and not in a cautionary note; the fifth is about the sitting itself, and it cost two bogus
+suite logs before it was understood.
 
 * **A shared body is an input, not a scratch pad.** `Editor.fixture()` once returned
   `dict(FIXTURE)`: one level deep, so every inner dict was the module's own object. A check
@@ -1228,6 +1323,20 @@ any of them to a labelled half, so one red run answers for all four. What stays 
 membership: a run's answer has to be one of the halves the page labels, so a third machine
 is a sentence to add rather than a range to widen. docs/gui.md carries those halves; this
 page does not repeat them.
+
+The fifth rule is about the sitting rather than the code, and it was bought with two useless
+logs on 2026-11-13: **a mutation sweep and a suite run must not overlap.**
+`tests/test_specials.py`'s door-marker check reads `inspect.getsource(fn)` - the file on disk
+at the moment it asks - while every other check works from a module the interpreter imported
+once.  Running the seven pump mutations while two full suites were in flight made that check
+report `'values' != 'pair'` and `'pair' != 'line'` about markers nobody had touched: the
+script was rewriting `themes.py` underneath the runs, the source line table had shifted, and
+what it read was a neighbouring function's body.  Nothing in the tree was wrong; the
+measurement was.  The same thing applies to editing a page while a suite that *reads that
+page* is running - `tests/test_bars_rows.py`, `test_ink.py`, `test_knobmap.py`,
+`test_specials.py` and `test_glass_ledger.py` all quote these documents - so the suite figure
+a changelog entry carries names one run taken with nothing else in flight, and the two
+contaminated logs from that afternoon are worth nothing except the rule above.
 
 ## What this document does not claim
 

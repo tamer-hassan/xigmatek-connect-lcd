@@ -153,17 +153,31 @@ def watch(seconds: float) -> None:
     visible the CPU has to warm up while this runs - play something, run a
     build, whatever you already do - because the discriminator is movement: the
     channel that swings with the CPU is the cooler's fan, the flat one is a case
-    fan.  On this board that measurement pinned `fan1` at 1360-2371 RPM,
-    tracking pwm1 (121-236) and k10temp Tctl (48-79 degC) across a 45 s load
+    fan or a pump.  On this board that measurement pinned `fan1` at 1360-2371
+    RPM, tracking pwm1 (121-236) and k10temp Tctl (48-79 degC) across a 45 s load
     ramp, while `fan12` sat at 1538-1577 throughout.  That matches the vendor's
     own Windows numbers closely: `Fan CPU` 1016-2448, `Fan System 5` 1529-1582.
+
+    A pump tells itself apart a third way, and this is where the duty readings come
+    in: a tachometer that stays flat **while its own header's duty sweeps** is not a
+    fan on a cold day.  Re-measured 2026-11-13 after the block cable moved to
+    PUMP_SYS1: `fan2` 2459-2469 (spread 10) across 23 rounds with all 24 threads
+    loaded, `pwm2` following `pwm1` 1:1 through raw 152-182 in paired samples, and
+    the tach unmoved - that is the channel `FAN_CHANNELS` now pins as `CPU PUMP`
+    (PROTOCOL.md 8 and the comment above `sensors.FAN_CHANNELS`).
     """
     end = time.monotonic() + seconds
     seen: dict[tuple[str, str], list[int]] = {}
+    duty: dict[tuple[str, str], list[int]] = {}
     while time.monotonic() < end:
         for row in channels():
             if row["rpm"] is not None:
                 seen.setdefault((row["chip"], row["chan"]), []).append(row["rpm"])
+        for chip, path in sensors.hwmon():
+            for f in sorted(glob.glob(os.path.join(path, "pwm*"))):
+                raw = sensors._read(f)
+                if raw.isdigit():
+                    duty.setdefault((chip, os.path.basename(f)), []).append(int(raw))
         time.sleep(2.0)
     if not seen:
         print("  no tach channels to sample; nothing bound")
@@ -174,17 +188,30 @@ def watch(seconds: float) -> None:
           f"round(s); {len(live)} channel(s) turning"
           + (f", {len(quiet)} reading 0 all along "
              f"({', '.join(c for _h, c in quiet)})" if quiet else ""))
+    spans = {}
+    for (chip, chan), vals in duty.items():
+        spans[(chip, chan)] = (min(vals), max(vals), max(vals) - min(vals))
+    if spans:
+        print("  outputs (raw 0-255; a percentage is the value over 255, and note that "
+              "lm-sensors itself halves this before printing it):")
+        for (chip, chan), (lo, hi, spread) in sorted(spans.items()):
+            print(f"    {chip:10} {chan:8} {lo:4}-{hi:4}  spread {spread:4}  "
+                  f"duty {lo / 255 * 100:.0f}-{hi / 255 * 100:.0f}%")
     for (chip, chan), vals in sorted(live.items(),
                                      key=lambda kv: max(kv[1]), reverse=True):
         nz = [v for v in vals if v > 0]
         spread = max(nz) - min(nz)
-        hint = ("moved a lot - with a warm CPU, this is the cooler's fan"
-                if spread > 150 else "steady - looks like a case fan")
+        pinned = sensors.FAN_CHANNELS.get((chip, chan))
+        if pinned:
+            hint = f"pinned as {pinned[0]!r} ({pinned[1]})"
+        else:
+            hint = ("moved a lot - with a warm CPU, this is the cooler's fan"
+                    if spread > 150 else "steady - a case fan, or a pump: check the duty")
         print(f"    {chip:10} {chan:8} {min(nz):5}-{max(nz):5} RPM  "
               f"spread {spread:5}  {hint}")
-        if spread <= 150:
+        if spread <= 150 and not pinned:
             print("      (a CPU idling through this window proves nothing; "
-                  "load it and run it again)")
+                  "load it and run it again, and compare the duty spread above)")
     print("  pinned in xigmalcd/sensors.py FAN_CHANNELS: " + ", ".join(
         f"{chip} {chan} = {name!r} ({kind})"
         for (chip, chan), (name, kind) in sorted(sensors.FAN_CHANNELS.items())))

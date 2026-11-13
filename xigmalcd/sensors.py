@@ -357,25 +357,49 @@ def _num(text):
 
 # ------------------------------------------------------------ fans, board --
 # The tachometer channels, named.  ALPHA's metrics blob carries entries shaped
-# `{"onBoard": true, "type": "Fan", "name": "Fan CPU", "value": 2051}`; the two
-# names below are the vendor's own, taken from the Windows logs where this
-# board's NCT6687D sensor collection published `Fan CPU` 1016-2448 RPM and
-# `Fan System 5` 1529-1582 RPM (PROTOCOL §8).
+# `{"onBoard": true, "type": "Fan", "name": "Fan CPU", "value": 2051}`; the names
+# `Fan CPU` and `Fan System 5` below are the vendor's own, taken from the Windows
+# logs where this board's NCT6687D sensor collection published `Fan CPU`
+# 1016-2448 RPM and `Fan System 5` 1529-1582 RPM (PROTOCOL.md §8).
 #
-# `nct6683` binds this chip as hwmon `nct6687` and publishes ten tach inputs and
-# four PWMs but no `fan*_label`, so which channel is the cooler's fan had to be
-# measured here rather than looked up.  Sampling every 3 s across 12 s idle,
-# 45 s of all-24-thread load and 25 s of cooldown, on 2026-11-06:
+# `nct6683` binds this chip as hwmon `nct6687` and publishes ten tach inputs and four
+# PWMs but **no `fan*_label`**, so which channel is which had to be measured here
+# rather than looked up - and re-measured when the machine was re-wired.
+#
+# 2026-11-06, sampled every 3 s across 12 s idle, 45 s of all-24-thread load and 25 s
+# of cooldown:
 #
 #   fan1   1360-2371 RPM, tracking pwm1 (121-236) and k10temp Tctl (48-79 degC)
 #   fan12  1538-1577 RPM throughout, never moved by the load
 #
-# So fan1 is the AIO's fan: it swings over the same span as the vendor's
-# `Fan CPU` (1016-2448) and its idle value sits in `Fan System 5`'s range only
-# by coincidence, while fan12 is flat at exactly the Windows chassis channel's
-# 1529-1582.  `tools/fanscan.py --watch 90` reproduces that measurement on any
-# box; re-pin this table from what it prints if you change board or header.
+# so fan1 is the cooler's fan - it swings over the same span as the vendor's `Fan CPU`
+# - while fan12 is flat at exactly the Windows chassis channel's 1529-1582.
+#
+# 2026-11-13, after six case fans moved to the Xigmatek Mini ARGB controller (which
+# exposes no sensor interface to Linux at all) and the Xigmatek Connect 360's block
+# cable went to PUMP_SYS1 while its radiator fans went to CPU_FAN1.  23 rounds over
+# 45 s, all 24 threads loaded:
+#
+#   fan1   1692-1957 RPM, spread 265, still tracking pwm1 and k10temp (53-76 degC)
+#   fan2   2459-2469 RPM, spread 10, unmoved while pwm2 followed pwm1's duty 1:1
+#          (raw 182, 178, 174, 167, 152 in successive paired samples)
+#   fan12  0 RPM - the header lost its fan in the same re-wiring
+#   fan3, fan4, fan11, fan13, fan14, fan15, fan16   0 RPM in every sample
+#
+# fan2 is the pump.  Two things say so, and neither is a name: it is the channel that
+# came alive when the block cable went into PUMP_SYS1 - it read 0 in all 30 samples of
+# the watch taken an hour earlier on the same kernel - and it ignores its own header's
+# duty while everything else on this chip follows the CPU curve, which is how a pump
+# differs from a fan.  The name `CPU PUMP` and the type `Pump` are **ours**: no
+# `Pump` type and no pump value appears in any captured vendor body (PROTOCOL.md §8),
+# and `themes.FAN_TYPED` is what turns that pinned type into the `Pump Speed` reading
+# nine of the 23 selectable layouts ask for.  fan12 keeps its pin although it reads
+# nothing today, because a re-connected case fan should name itself again.
+#
+# `tools/fanscan.py --watch 90` reproduces all of it on any box; re-pin this table from
+# what that prints when the board or the wiring changes.
 FAN_CHANNELS = {("nct6687", "fan1"): ("Fan CPU", "Fan"),
+                ("nct6687", "fan2"): ("CPU PUMP", "Pump"),
                 ("nct6687", "fan12"): ("Fan System 5", "Chassis")}
 
 
@@ -390,10 +414,13 @@ def fans() -> list[dict]:
     `chip fanN` name, because picking a CPU fan out of two unlabelled channels
     would be a guess.
 
-    `type` follows ALPHA's vocabulary ("Fan", "Chassis"; "Pump" is reserved for
-    a channel that says pump, which none here do).  Channels are keyed by chip
-    and channel rather than by value: a fan and a pump can legitimately read the
-    same RPM, and dropping one of them would be a lie.
+    `type` follows ALPHA's vocabulary - "Fan", "Chassis", and "Pump" for a channel pinned as
+    one.  The vendor's own bodies only ever carry "Fan" and "Chassis"; the pump entry below is
+    the one place this program puts a type the vendor never sent, and it is ours because the
+    *channel* is ours: pinned from measurement in `FAN_CHANNELS`, not inferred from a label
+    this driver does not publish.  Channels are keyed by chip and channel rather than by
+    value: a fan and a pump can legitimately read the same RPM, and dropping one of them
+    would be a lie.
     """
     out, seen = [], set()
     for chip, path in hwmon():

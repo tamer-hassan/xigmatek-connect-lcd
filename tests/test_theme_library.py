@@ -33,13 +33,16 @@ from xigmalcd import themes
 #: the package, so these counts are not a machine's state.
 PICKABLE, REFUSED = 23, 4
 
-#: The sources the library asks for, counted off the 23 pickable layouts.  Counted by the same code
-#: the window uses, pinned so a changed library or a changed reader is a diff someone notices.
+#: The library's `source` names, counted by the same code the window uses and pinned so a
+#: changed library or a changed reader is a diff someone notices.  Since 2026-11-13 every one
+#: of them has a rule (`Pump Speed` is answered by `themes.FAN_TYPED` from a fan row's type),
+#: so the vocabulary has no hole - what is left is a per-body question, and that pair is
+#: asserted in the check below: nine layouts are short one reading on a body that reports no
+#: pump row, and none is short anything on a body that does.
 SOURCES_USED = {"CPU Temperature": 17, "CPU Usage": 15, "Time": 11, "Pump Speed": 9,
                 "GPU Usage": 6, "GPU Temperature": 3, "CPU Frequency": 2}
-
-#: How many of the 23 need nothing this program has no reading for, and the only gap the rest have.
-CLEAR, ONLY_GAP = 14, {"Pump Speed"}
+RULELESS_HOLES: set = set()
+NEEDS_A_PUMP_ROW, ONLY_GAP = 9, ["Pump Speed"]
 
 
 class Selection(unittest.TestCase):
@@ -73,23 +76,44 @@ class Selection(unittest.TestCase):
                       "one of the five generated themes is not a file, and the reason should say so")
 
     def test_the_sources_the_library_asks_for_are_the_ones_this_program_has(self):
+        """Two different questions, and 2026-11-13 pulled them apart.
+
+        *Does a name have a rule at all?*  Since `Pump Speed` moved out of `UNMAPPED` (a
+        hard-coded sentence that no reading could clear) into `themes.FAN_TYPED` (a rule over a
+        fan row's own `type`), the answer is yes for every name the library asks - so this half
+        is now a check that the vocabulary has no hole, and that it did not grow one by
+        accident.
+
+        *Can a given body answer it?*  Still a nine-file question on a body with no pump row,
+        and a zero-file question on one that has a row typed `Pump` - and that pair is asserted
+        through `themes.values()`, the door the frame loop itself uses.
+        """
         used = themes.sources_used(self.pick)
         self.assertEqual(used, SOURCES_USED)
         answerable = set(themes.source_names())
-        gaps = {}
-        for rec in self.pick:
-            body = themes.load(rec["path"])
-            sources = {p.get("source") for w in (body.get("osd") or {}).get("widget") or []
-                       for p in w.get("property") or []}
-            gaps[rec["name"]] = {s for s in sources if s} - answerable
-        clear = sorted(name for name, gap in gaps.items() if not gap)
-        self.assertEqual(len(clear), CLEAR, clear)
-        for name, gap in gaps.items():
-            if gap:
-                self.assertEqual(gap, ONLY_GAP,
-                                 f"{name} asks for {sorted(gap)}: the library's only unanswered "
-                                 "source used to be Pump Speed, which has never been measured "
-                                 "on this box")
+        holes = {src for src in used if src not in answerable}
+        self.assertEqual(holes, RULELESS_HOLES,
+                         f"a source the shipped library asks for has no rule: {holes}")
+
+        def gapped(body) -> list:
+            absent = set(themes.values(body, fixtures.SESSION_WHEN)[1])
+            out = []
+            for rec in self.pick:
+                src = {p.get("source") for w in (themes.load(rec["path"]).get("osd") or {})
+                       .get("widget") or [] for p in w.get("property") or [] if p.get("source")}
+                if src & absent:
+                    out.append((rec["name"], sorted(src & absent)))
+            return out
+
+        without = gapped(fixtures.SESSION)
+        self.assertEqual(len(without), NEEDS_A_PUMP_ROW, without)
+        for name, gap in without:
+            self.assertEqual(gap, ONLY_GAP, f"{name} is short {gap} on a pumpless body")
+        pumped = gapped(dict(fixtures.SESSION,
+                             fans=[{"onBoard": True, "type": "Pump", "name": "CPU PUMP",
+                                    "value": 2453}]))
+        self.assertEqual(pumped, [],
+                         "a body that reports a pump row still leaves a library layout short")
 
 
 class Pairing(unittest.TestCase):

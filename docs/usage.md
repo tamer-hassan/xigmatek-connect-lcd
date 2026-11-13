@@ -51,9 +51,16 @@ Two things, in this order:
 Sensors on this machine: `k10temp` (Ryzen Tctl), `amdgpu` (iGPU power/voltage),
 `nvme` and `r8169` via hwmon, `nvidia-smi` for the discrete GPU, `/proc` for load,
 memory and network rates, and the board's Nuvoton NCT6687D tachometers once
-`sudo modprobe nct6683` has bound them — that is what makes `CPU FAN nnnn RPM` real
-(`tools/fanscan.py` lists the channels and shows how the CPU one was identified).
-Put the module in `/etc/modules-load.d/` if you want it at every boot.
+`sudo modprobe nct6683` has bound them — that is what makes `CPU FAN nnnn RPM` real, and
+since 2026-11-13 the pump row too: the block cable on `PUMP_SYS1` reads 2448-2469 RPM and
+`themes.FAN_TYPED` answers `Pump Speed` from it (`tools/fanscan.py` lists the channels and
+shows how each one was identified).  Put the module in `/etc/modules-load.d/` if you want it
+at every boot.  One caution if you go editing `/etc/sensors.d/` to read that output by hand:
+lm-sensors **halves** a `pwmN` input before printing it, so a header at full duty shows as
+`127%`.  Measured on this chip, raw 174 prints `87%` with no config and the true `68%` with
+`compute pwmN @/1.275, @*1.275` (the divisor is 255/200, undoing that half-scale).  None of it
+touches this program: `xigmalcd` never reads a `pwm*` file, and `tools/fanscan.py` lists the
+four outputs without values, which is why the pump's steadiness had to be read off its tach.
 
 ## Options
 
@@ -127,9 +134,11 @@ claim:
   to *read* one, in `themes.NEED_OSD_WHY`'s words, with the file named in `--list-themes`.
 * **7 metric names are asked for** over those 23 files: `CPU Temperature` 17 widgets,
   `CPU Usage` 15, `Time` 11, `Pump Speed` 9, `GPU Usage` 6, `GPU Temperature` 3,
-  `CPU Frequency` 2. **14 of the 23 need nothing this program has no reading for**; the
-  other 9 ask for `Pump Speed`, and no pump tachometer has ever been looked for on this
-  box (`tools/fanscan.py` has never been pointed at one).
+  `CPU Frequency` 2.  All seven have a rule now.  Since 2026-11-13 `Pump Speed` is answered by
+  a fan row whose `type` says `Pump` (`themes.FAN_TYPED`), and on this bench such a row exists:
+  the channel that came alive when the AIO's block cable went into `PUMP_SYS1`, 2448-2469 RPM
+  and steady through a duty sweep on its own header (PROTOCOL.md §8).  On a machine with no such
+  row the nine layouts ask and are refused, in words that name the command to run.
 * **A widget with no reading is skipped and said so**, not drawn as a zero. Painted
   offline from one pinned metrics dict and one pinned instant, all 23 layouts draw
   something - 114 widget boxes between them on this bench, whose font files resolve every
@@ -140,8 +149,12 @@ claim:
   lands under that count.  A row with **no `fontFamily` at all** drops the same way - the report
   says
   `font:` with nothing after the colon, because there is no default face to fall back to -
-  and 9 print
-  `skipped Pump Speed: no pump tachometer has been measured on this box`. The same notes
+  and at that pinned body, which carries no fan rows at all, 9 report
+  `Pump Speed` missing.  The reason they give is `themes.ROW_WHY`, and it names the command
+  that would answer the question rather than asserting a fact about the machine: `tools/fanscan.py`
+  lists the tach channels, and `xigmalcd/sensors.py` `FAN_CHANNELS` is where a measured one gets
+  pinned.  On this bench the pump is pinned and those same nine draw - see the `--check-theme`
+  transcript below.  The same notes
   name every face substitution (`arial` -> `LiberationSans-Regular.ttf`, `simsun` ->
   Noto Sans CJK) and every shape that is this repo's choice rather than something measured
   off the vendor's baked overlay: `Time`, `CPU Frequency`, `Pump Speed`.
@@ -186,19 +199,23 @@ claim:
 
   ```
   Theme_28 (1757491588618): 480x480 ratio 1:1, 7 widgets, from checkout
-  drawn from this machine's readings: 6 boxes, 19 253 lit px, skipped: Pump Speed
-  shaped by this repo rather than measured off the vendor's picture: Time
+  drawn from this machine's readings through `themes.paint`, the door the frame loop uses
+  for a layout file: 7 boxes, 20 036 lit px, skipped: nothing
+  shaped by this repo rather than measured off the vendor's picture: Pump Speed, Time
   this theme asks for: CPU Usage, Pump Speed, Time
-  this machine answers: CPU Usage, Time
-  and cannot: Pump Speed
+  this machine answers: CPU Usage, Pump Speed, Time
   ```
 
   Which lines of that are stable and which are not: the first is read out of the file and
   is the same on every machine (`tests/test_theme_library.py` pins 23 pickable / 4 refused
-  and every widget count), `skipped: Pump Speed` for those 9 themes is gated on every machine
-  by `tests/test_library_draw.py`, and the box
-  and pixel counts are this bench's - 19 253 lit px is from 2026-11-08, printed next to the
-  machine name for exactly that reason. For one of the five it says where the drawing comes
+  and every widget count), the box
+  and pixel counts are this bench's - 20 036 lit px is from 2026-11-13, printed next to the
+  machine name for exactly that reason, and `skipped: nothing` on that line is a fact about
+  this machine's wiring: `fan2` is pinned as a pump here (PROTOCOL.md §8), so the row draws.
+  On a box that reports no pump row the same command prints `skipped: Pump Speed` and the
+  reason under it, and that pair - nine layouts, one missing source each - is what
+  `tests/test_library_draw.py` gates, at a body with no fan rows at all.
+  For one of the five it says where the drawing comes
   from: `clock: generated from render.py, 3 widgets`. And the two halves of that report answer
   for different things, held in that direction rather than as one count:
   `skipped:` is **per widget** - one note each, repeats and all, where a row silenced by its
