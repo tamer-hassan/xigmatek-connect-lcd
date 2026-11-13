@@ -444,6 +444,21 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     six `ResourceWarning: unclosed file` blocks under the suite's own
     `-W error::ResourceWarning` - noise, not failure, and a `with` now.
 
+  * A third bench build, because the reports above need one.  Same recipe as
+    the other two (`dh_clean`, then `dpkg-buildpackage -us -uc -b`): code
+    5 453 302 B, sha256 ed2ea4e81c5c387772e75f3fa92b8b5dd19b03a05253fd658afb
+    0e848c44dfc1, and themes 79 881 020 B, sha256
+    c9552257e7a6008b398410991f5fa303dc6c4b51171a4423d6d1379af8ab9c6e.  Read
+    back rather than assumed: version parity across `pyproject.toml`,
+    `xigmalcd.__version__` and `dpkg-parsechangelog -SVersion` (all 0.7), one
+    date on every archive member, `lintian --tag-display-limit 0` quiet, and
+    both new doors present in the packaged
+    `/usr/lib/python3/dist-packages/xigmaui/app.py` - `def _frame_diff` and
+    `QPushButton("copy to a new name")`.  CI #184 built the same commit and its
+    install job ran `debian/tests/smoke` green there.  The two px figures this
+    cycle quotes were printed here, by this bench's press; the owner's desktop,
+    which reported them, has build #2 and needs this one.
+
   * The suite's figures, re-read rather than inherited.  This bench, one
     sitting, the same tree both ways, `python3 -W error::ResourceWarning -m
     unittest discover -s tests`: 485 checks in 48 files in 410.280 s, 3
@@ -459,13 +474,17 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     those checks: 337 s with 440 checks (#165), 387 with 441 (#168), 319 with
     442 (#169), 413 with 446 (#171), 416 with 447 (#172), 383 with 447 (#174),
     358 with 453 (#175), 387 with 453 (#176), 364 with 459 (#177), 433.423
-    with 475 (#178) and 442.333 with 481 (#180) - those last two runs skipping
-    4 rather than 3, the extra one being the glass ledger naming transcripts a
-    runner with no panel has never made, and the 9 s between them being what
-    the six new checks cost: five of them run a shipped script as a subprocess,
-    and the interpreter start-up that belongs to that is measured, not
-    assumed.  The spread is the runner's; the 435 in this entry's first bullet
-    is what the port landed at, not what the tree holds.
+    with 475 (#178), 442.333 with 481 (#180) and 336.831 with 485 (#184) -
+    those last three runs skipping 4 rather than 3, the extra one being the
+    glass ledger naming transcripts a runner with no panel has never made, and
+    the 9 s between #178 and #180 being what the six new checks cost: five of
+    them run a shipped script as a subprocess, and the interpreter start-up
+    that belongs to that is measured, not assumed.  #184 is the same suite four
+    checks larger and 105 s quicker than #180 on the same YAML, which is why
+    these numbers are printed as a list and never used as a gate: the spread is
+    the runner's, and the only honest assertion over two of them is about the
+    count.  The 435 in this entry's first bullet is what the port landed at,
+    not what the tree holds.
 
 
  -- Tamer Hassan <thameruddin@gmail.com>  Wed, 11 Nov 2026 22:05:00 +0200
