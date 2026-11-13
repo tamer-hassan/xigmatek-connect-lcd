@@ -91,12 +91,30 @@ BOARD_CHIPS = ("it87", "nct6775", "nct6779", "nct67xx", "nct6687", "nct6683",
 #: with a Super-IO never has its DIMM thermistors printed twice.
 DIMM_CHIPS = ("spd5118",)
 
-#: A network controller's die.  It is a real temperature and it is on the board, but it is not
-#: what a row labelled `Motherboard` means, so it is a last resort rather than a candidate:
-#: measured on this box it is the hottest of the lot (45.0-48.5 °C) and it was winning the
-#: `max()` below, which is how the glass came to print a Realtek NIC under the word
-#: "motherboard" (docs/limits.md).
-BOARD_LAST_RESORT_CHIPS = ("r8169",)
+#: On-board silicon that is not the board's sensor set: a network controller's die and the
+#: chipset's hub die.  Neither is what a row labelled `Motherboard` means, so they are a last
+#: resort rather than a candidate.  `r8169` is here because it *was* the only rule this file
+#: ever had - measured at 43.5-50.5 °C it was the hottest thing in a flat `max()`, which is how
+#: the glass came to print a Realtek NIC under the word "motherboard" (docs/limits.md).
+#: `prom21_xhci` - the AMD Promontory XHCI hub, part of the X870 chipset, soldered to this
+#: board - was added to this tier on the owner's decision of 2026-11-14, measured at **50.1 °C**
+#: beside the NIC's 43.5.  It changes nothing on a box like this one, because the Super-IO's
+#: diode wins the first tier at 38.5; it answers only where no Super-IO diode and no SPD hub is
+#: published, and the claim being made is the safe one: on such a box the chipset hub is a
+#: better stand-in for "the board" than a network controller is.
+#:
+#: `ath12k_hwmon` is deliberately **not** here, also the owner's decision of 2026-11-14.  It
+#: reads 42.0 °C on this box - cooler than both, so leaving it out costs nothing today - and the
+#: reason is the kind this repository keeps having to insist on: it is a Wi-Fi module on a
+#: socket, a card in every sense the row is meant to exclude, and there is no measurement here
+#: that would tell it apart from an add-in card's die.
+BOARD_LAST_RESORT_CHIPS = ("r8169", "prom21_xhci")
+
+#: Chips this boot enumerates that must never answer a `Motherboard` row at any tier: the CPU's
+#: own sensor hubs, the card's, the drives', and the Wi-Fi module's.  Named as data so a check
+#: can assert the tiers exclude them by membership, not by whatever the temperature happens to
+#: be - a cooler excluded chip proves nothing on its own.
+NOT_THE_BOARD_CHIPS = ("k10temp", "amdgpu", "nvme", "ath12k_hwmon", "drivetemp", "aacs")
 
 #: A channel whose own driver label names a processor rather than the board.  `nct6683` labels
 #: its temperatures even though it labels no tachometers, and on this board one of them is
@@ -663,13 +681,22 @@ def fans() -> list[dict]:
 def board_channels(*chips: str) -> list[tuple[str, str, int]]:
     """(chip, driver label, millidegrees) for every channel that can stand for the board.
 
-    Channels whose own label names a processor are dropped by `NOT_THE_BOARD`, which is the
-    whole reason the Super-IO can be added at all: on this board its hottest temperature is
-    `AMD TSI Addr 98h` (62-70 °C measured), and taking the max of everything would print that
-    under a row that says `Motherboard`.
+    Two guards, and they catch different things.  **Membership first**: a chip named in
+    `NOT_THE_BOARD_CHIPS` is skipped outright, whatever its number says.  That is not paranoia
+    about labels - the Wi-Fi module (`ath12k_hwmon`) and the drives (`nvme`) publish a channel
+    labelled plain `temp1`/`Composite`, which the label filter below would happily accept if a
+    tier ever named them.  A rule that only rejects things by name is one typo away from
+    reporting a SSD as the motherboard.
+
+    **Then the label**: channels whose own driver label names a processor or a card are dropped
+    by `NOT_THE_BOARD`, which is the whole reason the Super-IO can be a candidate at all - on
+    this board its hottest temperature is `AMD TSI Addr 98h` (60-70 °C measured), and taking the
+    max of everything would print that under a row that says `Motherboard`.
     """
     out = []
     for chip, path in hwmon(*(chips or BOARD_CHIPS)):
+        if chip in NOT_THE_BOARD_CHIPS:
+            continue
         for chan, label, val in _chan_attrs(path, "temp"):
             if 0 < val < 150_000 and not NOT_THE_BOARD.search(label or ""):
                 out.append((chip, label, val))

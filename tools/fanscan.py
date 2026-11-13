@@ -278,10 +278,15 @@ def main() -> int:
                                  or "-"))
     if won:
         print(f"  -> {sensors.motherboard()['temperature']} °C from {won[0]} [{won[1]}]  "
-              f"(a channel the driver labels a diode beats the tier's hottest, and labels naming "
-              f"a CPU or GPU are never candidates: {sensors.NOT_THE_BOARD.pattern})")
+              f"(a channel the driver labels a diode beats the tier's hottest; chips named in "
+              f"NOT_THE_BOARD_CHIPS are skipped by name: {', '.join(sensors.NOT_THE_BOARD_CHIPS)}"
+              f"; and labels naming a CPU or GPU are refused: {sensors.NOT_THE_BOARD.pattern})")
     else:
         print("  -> nothing answered: no board channel on this machine")
+    refused = sorted({c for c, _p in sensors.hwmon() if c in sensors.NOT_THE_BOARD_CHIPS})
+    if refused:
+        print("  chips this walk found and the rule refused by name: " + ", ".join(refused)
+              + "  (their channels are read by other doors, or by none)")
 
     deg, whence = sensors.disk_temperature()
     print(f"\nwhat answers `disk.temperature`: {deg} °C - {whence}")

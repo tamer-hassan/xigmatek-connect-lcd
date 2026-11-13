@@ -556,7 +556,7 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     which row becomes `Fan 1` the day two do.  `tools/fanscan.py` prints the
     tiers, the channel that won, the labels refused and each drive's composite
     against its raw probes, because every number above belongs to this bench
-    and can be reprinted on yours.  Twenty-two checks in
+    and can be reprinted on yours.  Twenty-three checks in
     `tests/test_sensor_rules.py` run against a **built** tree, since a CI
     runner has no NCT6687D and no SPD hubs: the rules are about selection, not
     about what one machine happens to expose.  The fifteen mutations aimed at
@@ -774,8 +774,8 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     slot order next to each drive's composite and raw probes, and no shipped
     layout asks for any of these names - the vendor's library has no storage
     metric at all - so the `bars` parity figures and the library's drawn-box
-    counts are unchanged.  `tests/test_sensor_rules.py` is twenty-two checks and
-    `tests/test_blob_probe.py` eighteen; their censuses are below.
+    counts are unchanged.  `tests/test_sensor_rules.py` is twenty-three
+    checks and `tests/test_blob_probe.py` eighteen; their censuses are below.
 
   * These rows are on the wire because the panel was asked, and asked again
     after the payload changed.  The first probe run that certified a `drives`
@@ -830,20 +830,78 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
 
 
 
+  * Which on-board silicon may answer a `Motherboard` row, decided from a
+    measured map of the box rather than from a datasheet.  This boot exposes
+    **22 temperature channels across 8 chips**: the Super-IO's diode at 38.5
+    and its three thermistors at 39.0-39.5 (plus `AMD TSI Addr 98h` at 60.0,
+    which is the CPU), the four DDR5 SPD hubs at 36.8-38.2, `r8169` at 43.5,
+    `prom21_xhci` - the X870's Promontory hub die, soldered down - at
+    49.2-50.1, the `ath12k_hwmon` Wi-Fi module at 42.0, `amdgpu` at 42.0,
+    `k10temp` 42.1-60.9 and two NVMe drives up to 67.8.  On the owner's
+    ruling, the hub die joins the **last-resort** tier: when a box has
+    neither a Super-IO diode nor an SPD hub, a chipset hub is a better
+    stand-in for "the board" than a network controller is.  The Wi-Fi module
+    joins **no** tier, because a module on a socket is a card in every sense
+    the row is meant to exclude and nothing measured here could tell it apart
+    from an add-in card's die.
+    On this machine the first ruling changes nothing at all - the diode wins
+    tier 1 either way - and that is said plainly rather than dressed up as an
+    improvement: it is a rule for a box this project has not seen, and it is
+    checked on a constructed tree where the hub die sits a hair above the NIC
+    so the tier's own ordering is visible, and taking the hub back out gives
+    the NIC the tier again.
+    The second ruling needed a guard that is not a label match, and that is
+    the part worth the code.  `ath12k_hwmon` and `nvme` publish channels
+    labelled plain `temp1`/`Composite`, which the existing label filter
+    (`TSI|Tctl|Tccd|CPU|GPU|edge|hotspot`) would accept the day a tier named
+    them.  So `NOT_THE_BOARD_CHIPS` skips whole chips by name, and the check
+    proves it the only way a membership rule can be proved: the built tree
+    gives the Wi-Fi die **61 °C**, hotter than every board candidate, and
+    asks for it as a tier - the answer must be nothing.  A rule that only
+    rejects things by their name is one typo away from printing an SSD as the
+    motherboard.  `tools/fanscan.py` now lists the chips it found and refused
+    by name, so this is re-runnable on any box: here it prints `amdgpu,
+    ath12k_hwmon, k10temp, nvme`.
+
+  * An eighth bench build, because this cycle changes the documents the
+    package installs and nothing it runs.  Same recipe (`dh_clean`, then
+    `dpkg-buildpackage -us -uc -b`): code 5 482 344 B, sha256
+    85cd0ab3403ed69d99f4fb20a05c56c8176e050ae6d1b838ea9f2853d90c0d28;
+    themes 79 892 768 B, sha256
+    f044a8e83be969f6d84e7fdaa2fd2f75170e355fbef7f81dce298d5a5f47a964.
+    Read back rather than inferred: `lintian --tag-display-limit 0` quiet, one
+    date across every archive member, version parity in three places, and the
+    shipped Python diffed against HEAD for both packages - empty.  Against the
+    seventh build (code 5 479 774 B, sha256
+    0b8bccc73e32a8a81ccebe149b5239ac1ff8a1bfc01d4a08359b1f666fa8c0a8) the two
+    unpacked trees differ in exactly three installed files - `changelog.gz`,
+    `docs/theme-editor.md`, `docs/tools.md` - which is the measured answer to
+    "do I need to reinstall for a docs-only change": for anything that runs,
+    no; for the documents the package installs, yes.  The unpacked bytes run
+    against this machine's own sensors: `motherboard` 38 °C won by
+    `('nct6687', 'Diode 0 (curr)', 38000)`, a `drives` section of `nvme0 39
+    [39, 51, 68]` and `nvme1 29 [29]`, `Disk 1` -> 39/`nvme0` and `Disk 2` ->
+    29/`nvme1` with slot 3 reported absent in words, `Pump Speed` 2434 and fan
+    rows `('Fan CPU','Fan')`, `('CPU PUMP','Pump')`.
+
   * The suite's figures, re-read rather than inherited.  This bench,
     `python3 -W error::ResourceWarning -m unittest discover -s tests`, one
     run of this tree with nothing else in flight - the only edits made after
     it are prose in this entry, re-gated by `tests/test_debian_changelog` in
-    0.02 s: 546 checks in 52 files in
-    463.635 s, 3 skipped, one of them the tray check naming the host it needs,
+    0.02 s: 547 checks in 52 files in
+    457.125 s, 3 skipped, one of them the tray check naming the host it needs,
     and no `ResourceWarning` printed at all now that `setUp` closes its own
     file.  The count is read off the tree as well as off the runner: `grep -c
-    "^    def test_" tests/*.py` answers 546 over 52 files and
-    `unittest.TestLoader().discover("tests")` answers 546 over 52 modules - the
-    same numbers the runner prints.  #195's 405.906 s over 536 checks is the
-    runner's sample for the drives commit, and #193's 431.661 s over 526 the
-    sample for the tree before it; the sample for this fix lands with the run
-    that reads it, as every cycle's has.
+    "^    def test_" tests/*.py` answers 547 over 52 files and
+    `unittest.TestLoader().discover("tests")` answers 547 over 52 modules - the
+    same numbers the runner prints.  #196's 405.166 s over 546 is the
+    runner's sample for the audit commit; #195's 405.906 s over 536 is the
+    drives commit's, and #193's 431.661 s over 526 the tree before that.  The
+    sample for these 547 arrives with the commit that reads it, as every
+    cycle's has - and #195/#196 are the pair to read for what a duration can
+    mean: 536 checks in 405.906 s, then 546 in 405.166 s.  Ten more checks in
+    0.74 s less, on consecutive commits, which is the whole reason this list is
+    kept as a series and no check reads it.
 
     Three other whole-suite logs from today name nothing, and saying which is
     part of what this entry is for.  Two ran while a mutation sweep was
@@ -859,8 +917,9 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     timer mid-run, and `test_zz_isolation.py` named the process and said to
     close it - the guard that exists for "a test wrote your settings", meeting
     a person instead.  Earlier readings of this same sentence, each the tree at
-    that step: 536 over 51 (the disk slots and the probe's shipped-payload
-    binding), 526 over 51 (the probe tool's boundaries), 525 over 51, 511 and
+    that step: 546 over 52 (the bare-runner audit), 536 over 51 (the disk
+    slots and the probe's shipped-payload binding), 526 over 51 (the probe
+    tool's boundaries), 525 over 51, 511 and
     510 over 50 (the sensor rules, and the fix to a check that read the wrong
     mount table), 496 over 49 (the pump rule) and 485 over 48 (before it).  They
     are kept because the deltas are the checks each step added, not a drift.
@@ -873,14 +932,14 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     (#186), 457.469 with 496 (#187), 453.508 with 496 (#188), 342.664 with 496
     (#189), 351.145 with 510 (#190, one failure), 460.228 with 511 (#191, one
     error), 339.250 with 525 (#192, green and powerless), 431.661 with 526
-    (#193), 460.878 with 526 (#194, one failure) and 405.906 with 536 (#195,
-    green and lucky) - the last several runs skipping 4 rather than 3, the
-    extra one being the glass ledger naming transcripts a runner with no
-    panel has never made, and the 9 s between #178 and #180 being what the
-    six new checks cost: five of them run a shipped script as a subprocess,
-    and the interpreter start-up that belongs to that is measured, not
-    assumed.  #187, #188 and
-    #189 are the honest trio: the same 496 checks, on the same YAML, in
+    (#193), 460.878 with 526 (#194, one failure), 405.906 with 536 (#195, green
+    and lucky) and 405.166 with 546 (#196) - the last several runs skipping 4
+    rather than 3, the extra one being the glass ledger naming transcripts a
+    runner with no panel has never made, and the 9 s between #178 and #180
+    being what the six new checks cost: five of them run a shipped script as
+    a subprocess, and the interpreter start-up that belongs to that is
+    measured, not assumed.  #187, #188 and #189 are the honest trio: the same
+    496 checks, on the same YAML, in
     457.469 s, 453.508 s and 342.664 s - a 114.805 s spread across runs whose
     trees differed only in prose.  So a pair of these numbers can bound a count
     and nothing else, which is why the list is kept and no check reads it.  #190

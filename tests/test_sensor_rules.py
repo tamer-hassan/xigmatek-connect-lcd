@@ -45,6 +45,11 @@ SUPERIO_BOARD_MAX = 42      # nct6687's hottest non-CPU channel (a 41.5 °C ther
                             # deliberately warmer than the diode so which one won is visible
 SPD_MAX = 51                # spd5118 hwmon6 at 51.0 - hotter than the NIC, and still a tier 2
 NIC = 50                    # r8169 at 50.0 - not the board, whatever its number says
+CHIPSET = 50                # prom21_xhci at 50.1: the hub die, a hair hotter than the NIC and
+                            # so the winner *within* the last-resort tier (measured like this
+                            # box's own 43.5 vs 50.1, in that order)
+WIFI = 61                   # ath12k_hwmon, built hotter than everything in the tiers: the
+                            # membership guard has to exclude it on chip name alone
 TSI = 67                    # AMD TSI Addr 98h: the CPU, in the same chip
 
 #: The three drives `make_tree` builds, in the order `sensors.drives()` must return them:
@@ -104,6 +109,10 @@ def make_tree(root: str) -> str:
         os.symlink(os.path.join(ctrl, hw), os.path.join(path, "device"))
     chip("hwmon10", {"name": "amdgpu", "temp1_input": 44000, "temp1_label": "edge"})
     chip("hwmon11", {"name": "k10temp", "temp1_input": 68000, "temp1_label": "Tctl"})
+    # on-board silicon of the "last resort" kind, and a card-shaped die put deliberately at the
+    # top of the tree so a membership rule is the only thing that can keep it out
+    chip("hwmon12", {"name": "prom21_xhci", "temp1_input": 50100, "temp1_label": "temp1"})
+    chip("hwmon13", {"name": "ath12k_hwmon", "temp1_input": WIFI * 1000, "temp1_label": "temp1"})
     return os.path.join(root, "hwmon*")
 
 
@@ -183,20 +192,65 @@ class ABoardSensor(Built):
         self.assertIn("diode", (sensors.motherboard_answer()[1] or "").lower(),
                       "restoring the diode rule did not restore the preference")
 
-    def test_the_nic_answers_only_when_nothing_else_can(self):
-        real = (sensors.BOARD_CHIPS, sensors.DIMM_CHIPS)
+    def test_the_last_resort_tier_answers_only_when_nothing_else_can(self):
+        """Two chips share the bottom tier, and the claim is only that one of them wins it.
+
+        The owner's ruling of 2026-11-14 put `prom21_xhci` - the X870's hub die, soldered down -
+        alongside `r8169`, on the argument that a chipset hub is a better stand-in for "the
+        board" than a network controller when nothing better exists.  On this box that changes
+        **nothing at all**: the Super-IO's diode wins tier 1.  So the check pins the case where
+        it does change something, and pins it in both directions: the hub die beats the NIC
+        inside the tier, and taking the hub back out gives the NIC the tier again.
+        """
+        real = (sensors.BOARD_CHIPS, sensors.DIMM_CHIPS, sensors.BOARD_LAST_RESORT_CHIPS)
         try:
             sensors.BOARD_CHIPS, sensors.DIMM_CHIPS = ("nosuchchip",), ("nosuchchip",)
             won = sensors.motherboard_answer()
-            self.assertEqual(won[0], "r8169_0_b00:00",
-                             f"with no Super-IO and no SPD hub the fallback should be the NIC, "
-                             f"got {won}")
-            self.assertEqual(sensors.motherboard(), {"temperature": NIC})
+            self.assertEqual(won[0], "prom21_xhci",
+                             f"the bottom tier should answer with its hottest on-board die "
+                             f"(hub 50.1 over NIC 50.0), got {won}")
+            self.assertEqual(sensors.motherboard(), {"temperature": CHIPSET})
+            sensors.BOARD_LAST_RESORT_CHIPS = ("r8169",)
+            won = sensors.motherboard_answer()
+            self.assertEqual((won[0], sensors.motherboard()["temperature"]),
+                             ("r8169_0_b00:00", NIC),
+                             f"un-listing the hub die did not fall back to the NIC: {won}")
             sensors.BOARD_CHIPS = real[0]
             self.assertEqual(sensors.motherboard_answer()[0], "nct6687",
-                             "the tiers did not put the Super-IO back in front of the NIC")
+                             "the tiers did not put the Super-IO back in front of the bottom")
         finally:
-            sensors.BOARD_CHIPS, sensors.DIMM_CHIPS = real
+            sensors.BOARD_CHIPS, sensors.DIMM_CHIPS, sensors.BOARD_LAST_RESORT_CHIPS = real
+
+    def test_a_card_die_is_excluded_by_its_chip_name_not_its_number(self):
+        """The membership guard, proved the only way it can be: make it the hottest thing left.
+
+        `ath12k_hwmon` publishes a channel labelled plain `temp1` at 61 °C in the built tree -
+        hotter than every board candidate - and a label filter would let it through, so the only
+        rule that keeps it out is the chip-name one.  Naming it as a tier explicitly is the test:
+        if the guard is membership, the answer is empty; if the guard is labels, it answers 61.
+        """
+        self.assertIn("ath12k_hwmon", sensors.NOT_THE_BOARD_CHIPS,
+                      "the Wi-Fi module is no longer on the exclusion list - it was left out of "
+                      "the board tiers on the owner's decision of 2026-11-14")
+        self.assertNotIn("ath12k_hwmon",
+                         sensors.BOARD_CHIPS + sensors.DIMM_CHIPS
+                         + sensors.BOARD_LAST_RESORT_CHIPS,
+                         "the Wi-Fi module was promoted into a board tier")
+        self.assertEqual(sensors.board_channels("ath12k_hwmon"), [],
+                         "asking for the Wi-Fi die as a board channel returned a channel: the "
+                         "exclusion is by name, and a cooler number today is not a rule")
+        real = (sensors.BOARD_CHIPS, sensors.DIMM_CHIPS, sensors.BOARD_LAST_RESORT_CHIPS)
+        try:
+            sensors.BOARD_CHIPS, sensors.DIMM_CHIPS = ("nosuchchip",), ("nosuchchip",)
+            sensors.BOARD_LAST_RESORT_CHIPS = ("ath12k_hwmon", "nosuchchip")
+            self.assertIsNone(sensors.motherboard_answer(),
+                              "a tier naming only the Wi-Fi die answered a motherboard "
+                              "temperature: the guard is not membership")
+            sensors.BOARD_LAST_RESORT_CHIPS = real[2]
+            self.assertEqual(sensors.motherboard_answer()[0], "prom21_xhci",
+                             "restoring the tier did not restore the hub die")
+        finally:
+            sensors.BOARD_CHIPS, sensors.DIMM_CHIPS, sensors.BOARD_LAST_RESORT_CHIPS = real
 
     def test_the_dimm_thermistors_are_a_tier_and_not_a_second_voice(self):
         """`spd5118` answers `memory.temperature` as well; a box with a Super-IO must not print
@@ -219,11 +273,13 @@ class ABoardSensor(Built):
         """k10temp and amdgpu sit in the same directories the board walk visits, and their
         channels are the CPU's and the card's - `NOT_THE_BOARD` is the only thing keeping them
         out of a `max()` that takes the hottest candidate."""
-        labels = {label for _c, label, _v in sensors.board_channels("k10temp", "amdgpu")}
+        blocked = ("k10temp", "amdgpu", "nvme", "ath12k_hwmon")
+        labels = {label for _c, label, _v in sensors.board_channels(*blocked)}
         self.assertEqual(labels, set(),
-                         f"the board walk accepted {labels} from the CPU and GPU chips: their "
-                         "own labels (Tctl, edge) are what keeps them out of a max() that "
-                         "otherwise takes the hottest candidate")
+                         f"the board walk accepted {labels} from the chips named in "
+                         f"NOT_THE_BOARD_CHIPS ({', '.join(blocked)}); both the label filter "
+                         "(Tctl, edge) and the membership guard have to hold, since `nvme` and "
+                         "the Wi-Fi module publish plain `temp1`/`Composite` labels")
 
 
 class AFanOrder(Built):

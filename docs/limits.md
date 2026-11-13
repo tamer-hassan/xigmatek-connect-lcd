@@ -282,14 +282,45 @@ What has been measured on glass, by whom, with how many frames - and what has no
    (`Diode 0 (curr)` 40.5-44.5, `Thermistor 1` 44.0, `Thermistor 15` 48.5-49.0) - and its
    hottest channel is `AMD TSI Addr 98h` at **62-70 °C**, which is the CPU read by the
    Super-IO, so adding that chip naively would have made the row worse in a different direction.
-   The rule now walks three tiers and takes the first that answers -
-   **Super-IO → SPD thermistors → network die as a last resort** - with a channel excluded when
-   its own driver label names a processor or a card (`TSI|Tctl|Tccd|CPU|GPU|edge|hotspot`); the
-   same driver that publishes no `fan*_label` does label its temperatures, and that label is
-   the whole discriminator.  Today that answers **49 °C from `nct6687 [Thermistor 15]`** while
-   the NIC sits at 50.5 - so the row is now the coolest of the candidates, which is the point:
-   it is the board's number, not the box's maximum.  The vendor's own captured body agrees with
-   that shape - `motherboard:{"temperature":38}` printed beside `cpu:{"temperature":57}`.
+   The rule now walks **three tiers**, first one that answers wins - **Super-IO → DDR5 SPD
+   thermistors → on-board silicon that is not the board's sensor set, as a last resort** -
+   and inside whichever tier answers, **a channel the driver labels a diode beats that tier's
+   hottest candidate.**  That preference is the owner's ruling of 2026-11-13, not a
+   measurement's conclusion: the BIOS and the `/etc/sensors.d` file written against this board
+   both call `Diode 0 (curr)` "Motherboard", so the row follows what the machine labels
+   rather than the maximum it could find.  Read in one breath, twice: diode **41.5** against
+   thermistors **43.0** (the row prints 42 where the maximum printed 43), and **42.5** against
+   **46.5** forty minutes later (43 against 47) - so the cost of agreeing with the board is
+   one to four degrees, and it is paid deliberately.  A chip that publishes no diode-labelled
+   channel - the SPD hubs, most Super-IOs under a driver that leaves `tempN_label` unset -
+   still falls back to that tier's hottest candidate.
+   Two guards keep candidates honest, and they catch different mistakes.  **A label filter**
+   (`TSI|Tctl|Tccd|CPU|GPU|edge|hotspot`) drops a channel whose own driver label names a
+   processor or a card: `nct6683` publishes no `fan*_label` at all, but it does label its
+   temperatures, and that label is the only thing separating the Super-IO's read of the CPU's
+   TSI (60-70 °C) from its diode and thermistors.  **A membership filter** skips whole chips by
+   name (`k10temp`, `amdgpu`, `nvme`, `ath12k_hwmon`, `drivetemp`, `aacs`) whatever their
+   number says, because an NVMe composite and a Wi-Fi module die both publish a channel
+   labelled plain `temp1`/`Composite` that the label filter would happily accept the day a
+   tier named them.
+   The bottom tier grew on the owner's ruling of 2026-11-14: `prom21_xhci`, the X870's
+   Promontory hub die, soldered to this board, joins `r8169` there - on the argument that a
+   chipset hub is a better stand-in for "the board" than a network controller when nothing
+   better exists.  **On this machine that changes nothing**: the diode wins tier 1 either way
+   (measured map of this boot: 22 temperature channels across 8 chips - Super-IO 38.5-39.5
+   plus a 60.0 TSI, SPD 36.8-38.2, `r8169` 43.5, `prom21_xhci` 49.2-50.1, `ath12k_hwmon`
+   42.0, `amdgpu` 42.0, `k10temp` 42.1-60.9, `nvme` 28.9-67.8).  The hub die answers only on a
+   box with neither a Super-IO diode nor an SPD hub, which is a machine this project has not
+   seen; and `ath12k_hwmon` was put in **no** tier by the same ruling, because a Wi-Fi module
+   on a socket is a card in every sense the row is meant to exclude, and nothing measured here
+   could tell it apart from an add-in card's die.
+   Under the first version of the rule this box answered **45-50 °C from `r8169`**; the row is
+   now cooler than that and, more to the point, named.  The vendor's own captured body agrees
+   with the shape the tiers reproduce and the NIC never did - `motherboard:{"temperature":38}`
+   printed beside `cpu:{"temperature":57}`.  `tools/fanscan.py` prints all three tiers, the
+   channel that won with its driver label, the guards that were applied, and every chip the
+   walk found that the membership rule refused - which is the command to run before believing
+   any figure in this bullet, because every number here belongs to this bench.
    `tools/fanscan.py` prints all three tiers, names the channel that won, and says which labels
    were refused; `tests/test_sensor_rules.py` gates the rule on a **built** tree (a runner has
    no NCT6687D), including the two faults this replaces: a flat max, and the NIC in the first
