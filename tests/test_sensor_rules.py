@@ -221,8 +221,20 @@ class ADiskSensor(Built):
         self.assertIn("hottest", whence.lower(), whence)
 
     def test_the_blob_gains_no_key_the_vendor_does_not_document(self):
-        """A new source name must not widen the `STATE all 1` body."""
-        body = sensors.collect()
+        """A new source name must not widen the `STATE all 1` body.
+
+        `_root_controller()` is pointed at one of the built drives here, and that is not
+        tidiness: the first version of this check let `collect()` ask the *host's* mount table
+        while the drives under test were synthetic, and it failed on CI's runner on 2026-11-13
+        (`55 != 42`) because no runner mounts `/` on `nvme0`-as-here.  A check that reads the
+        machine it runs on, in order to test a tree it built, is testing the machine.
+        """
+        real_root = sensors._root_controller
+        sensors._root_controller = lambda: "nvme0"
+        try:
+            body = sensors.collect()
+        finally:
+            sensors._root_controller = real_root
         for section in ("cpu", "disk", "fans", "memory", "motherboard", "timestamp"):
             self.assertIn(section, body, f"the built tree lost the {section!r} section")
         self.assertEqual(body["disk"]["temperature"], 42, "disk() did not use the new rule")
@@ -235,6 +247,34 @@ class ADiskSensor(Built):
         self.assertLessEqual(set(body), documented,
                              f"the blob grew keys the vendor never documented: "
                              f"{sorted(set(body) - documented)}")
+
+class TheSameDoor(unittest.TestCase):
+    """No synthetic tree: on whatever machine this runs, the blob and the rule must agree.
+
+    This is the check that would have caught the one that failed on CI's runner - not by
+    pinning a number, which is what went wrong first time, but by asserting a *relation*
+    between what `collect()` puts on the wire and what `disk_temperature()` reports about it.
+    """
+
+    def test_disk_and_motherboard_come_from_the_same_doors_the_pages_quote(self):
+        deg, whence = sensors.disk_temperature()
+        body = sensors.collect()
+        if "disk" in body:
+            self.assertEqual(body["disk"]["temperature"], deg,
+                             f"the blob says {body['disk']['temperature']} and the rule says "
+                             f"{deg} ({whence})")
+        won = sensors.motherboard_answer()
+        if won is not None:
+            self.assertEqual(body.get("motherboard", {}).get("temperature"),
+                             sensors.motherboard()["temperature"],
+                             "the wire and `motherboard()` disagree")
+            self.assertGreaterEqual(
+                sensors.motherboard()["temperature"], 0,
+                "a board answer that is not a temperature")
+        if "fans" in body:
+            self.assertEqual([f["name"] for f in body["fans"]],
+                             [f["name"] for f in sensors.fans()],
+                             "the fans in the blob are not the fans `fans()` reports")
 
 
 class TheNameIsOurs(unittest.TestCase):
