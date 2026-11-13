@@ -682,8 +682,9 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     own file.  The count is read off the tree as well as off the runner:
     `grep -c "^    def test_" tests/*.py` answers 526 over 51 files and
     `unittest.TestLoader().discover("tests")` answers 526 over 51 modules, the
-    same numbers the runner prints.  The earlier readings of this sentence in
-    this entry - 525, 524, 511 over 50, 510 over 50, 496 over 49 and 485 over
+    same numbers the runner prints, and the runner's own sample for these 526
+    is #193.  The earlier readings of this sentence in this entry - 525, 524,
+    511 over 50, 510 over 50, 496 over 49 and 485 over
     48 - are what the tree held at each step of this afternoon: before the
     constructed absent-case check, before the probe boundaries were gated,
     before the probe tool, before the mount-table fix, before the sensor rules
@@ -711,7 +712,8 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     442.333 with 481 (#180), 336.831 with 485 (#184), 451.632 with 495 (#186),
     457.469 with 496 (#187), 453.508 with 496 (#188), 342.664 with 496 (#189),
     351.145 with 510 (#190, one failure), 460.228 with 511 (#191, one error)
-    and 339.250 with 525 (#192) - the last several
+    and 339.250 with 525 (#192, green and powerless), 431.661 with 526 (#193)
+    - the last several
     runs skipping 4 rather than 3, the extra one being the glass ledger
     naming transcripts a runner with no panel has never made, and the 9 s
     between #178 and #180 being what the six new checks cost: five of them
