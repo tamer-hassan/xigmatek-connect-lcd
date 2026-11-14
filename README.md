@@ -68,7 +68,7 @@ reasoning and `tests/test_icons.py` the checks.
 
 | `clock` over `Theme_07.mp4` | `birdseye` over `theme_47-trimmed.mp4` |
 |---|---|
-| https://github.com/user-attachments/assets/ce8cab80-2125-4011-b44a-9a4e19a08ca3 | [docs/videos/birdseye-theme_47-trimmed.mp4](docs/videos/birdseye-theme_47-trimmed.mp4) |
+| https://github.com/user-attachments/assets/ce8cab80-2125-4011-b44a-9a4e19a08ca3 | https://github.com/user-attachments/assets/c63dcebf-f815-4471-aaaf-32642e622c5c |
 
 That second link is the repository's own file rather than an attachment, because a
 repo-path `.mp4` in markdown becomes an `<img>` no browser plays (recorded in
