@@ -164,10 +164,13 @@ loop on *this* machine draws the next time it names that theme
 `playing` and the `pane readings` knob on the rows above the picture, and under the log,
 behind `advanced controls`, the panel's own report and the guarded factory reset - the
 theme picker, the text-colour row and the layout editor in the middle, and the background
-clip library on the right, one row per distinct file: 40 rows from the 46 mp4 files this
-repository tracks](docs/screenshot-xigmaui.png)
+clip library on the right, one row per distinct file: 51 rows from the 57 mp4 files this
+repository carries in its two clip roots](docs/screenshot-xigmaui.png)
 
-*(both figures are the walk from before this repository's `media/` grew twice on 2026-11-14: `theme_47-trimmed.mp4` in this change and ten of the owner's own clips in the one after it; `xigmaui.clips.list_clips()` prints the current count)*  
+*(the 43 vendored clips plus 14 in `media/`: three of the vendor's own backgrounds, one
+cut here from a vendor clip, and ten made on this bench by its owner. The dedupe audit
+is `xigmaui.clips.list_clips()` and it is re-derived from the tree by
+`tests/test_clip_db.py`)*  
 
 These two are the same window at the two settings of its `advanced controls` switch, and
 all three pictures here come from one command: `tools/screenshot.py`, which builds the real

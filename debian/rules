@@ -117,16 +117,23 @@ execute_before_dh_builddeb:
 
 override_dh_auto_install:
 	# pybuild first (it fills debian/tmp: modules, entry points, METADATA), then
-	# the data files pyproject.toml does not describe - the three clips this
-	# project vendors, the udev rule, the unit, the menu entry and the icon.
+	# the data files pyproject.toml does not describe - the clips this repository
+	# carries in `media/`, the udev rule, the unit, the menu entry and the icon.
+	# That set was three and is now fourteen: the three vendored backgrounds, one
+	# cut here from a vendor clip (`theme_47-trimmed.mp4`, which `birdseye` pairs
+	# with) and ten made by the owner of the bench this project is developed on,
+	# contributed under the project's own license.  Installed as a glob rather
+	# than by name, so the next clip is a file drop and not a rules edit - and
+	# `tests/test_pinned_metrics.py` refuses a clip that is in `media/` but not
+	# in git, or in git but not installed, which is what would otherwise let a
+	# package silently ship less than the repository has.
 	# The rest of the vendor's theme library is the second binary package's own
 	# tree, kept out of media/ rather than symlinked into it: xigmaui/clips.py
 	# scans it as a clip root (xigmalcd/main.py:SYSTEM_THEMES is that root), and
 	# the display loop never reads it.
 	dh_auto_install
 	install -d $(TMP)/usr/share/xigmalcd/media
-	install -m 644 media/Theme_25.mp4 media/Theme_11.mp4 media/theme_48.mp4 \
-		$(TMP)/usr/share/xigmalcd/media/
+	install -m 644 media/*.mp4 $(TMP)/usr/share/xigmalcd/media/
 	install -d $(TMP)/usr/lib/udev/rules.d
 	install -m 644 install/99-xigmatek-lcd.rules $(TMP)/usr/lib/udev/rules.d/
 	install -d $(TMP)/usr/lib/systemd/user

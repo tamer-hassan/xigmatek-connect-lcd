@@ -41,8 +41,10 @@ PyQt6 in the extra and not in the base dependencies, all three console-script ta
 resolving to something callable, and that third one sending nothing when it is called
 without `--yes`. Run from a checkout, the first two are `python3 -m xigmalcd` and
 `python3 -m xigmaui` either way, and the third is `tools/reset_panel.py` - a wrapper over
-the same module. What `pip install .` does *not* do is install the three clips this repo
-vendors (see [Notes and known limits](limits.md)), so a pip install draws from the checkout's
+the same module. What `pip install .` does *not* do is install the clips this repo
+carries in `media/` - fourteen today: three the vendor's own, one cut here from a vendor
+clip, ten made on this bench by its owner (see
+[Notes and known limits](limits.md)) - so a pip install draws from the checkout's
 `media/`; the `.deb` is what puts them in `/usr/share/xigmalcd/media`.
 ## Run it at login
 

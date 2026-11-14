@@ -3,13 +3,16 @@ Upstream-Name: xigmalcd
 Upstream-Contact: Tamer Hassan <thameruddin@gmail.com>
 Source: https://github.com/tamer-hassan/xigmatek-connect-lcd
 
-# Two kinds of bytes in this tree, and this file keeps them apart rather than
+# Three kinds of bytes in this tree, and this file keeps them apart rather than
 # putting one licence over the whole thing.  The code, the documents and the
-# drawings made here are GPL-3.0-or-later.  The vendor's own files are in the
-# tree because every claim this project makes about ALPHA's themes is a claim
-# about those exact bytes - a reader should be able to hash them - and they are
-# not licensed by anyone who has a right to license them.  The last paragraph
-# says what was actually done to get them.
+# drawings made here are GPL-3.0-or-later - including ten backgrounds in `media/`
+# that the maintainer made.  The vendor's own files are in the tree because every
+# claim this project makes about ALPHA's themes is a claim about those exact
+# bytes - a reader should be able to hash them - and they are not licensed by
+# anyone who has a right to license them.  And one file, named in its own stanza
+# below, is a cut of a vendor clip: neither a copy of theirs nor our work from
+# scratch, so it gets its own words.  The last paragraph says what was actually
+# done to get any of them.
 
 Files: *
 Copyright: 2026 Tamer Hassan <thameruddin@gmail.com>
@@ -45,6 +48,52 @@ Copyright: XIGMATEK (the panel's vendor); these files are the vendor's own, and
  below, and themes/alpha/README.md for the path they were read out of
 License: OTHER
 
+Files: media/theme_47-trimmed.mp4
+Copyright: XIGMATEK (the panel's vendor); this file is that vendor's footage with
+ its first 17 frames removed - a cut of their clip, not a copy of it, and the
+ holder has granted no licence for either
+License: OTHER
+ This one file in `media/` is not byte-for-byte anything, and it is called out
+ separately for that reason. `theme_47.mp4`, the vendor's, opens on 17 still
+ frames (0.85 s at 20 fps) with a play button burned into the middle of the
+ picture; a drawn overlay placed under those frames shows the button, so the head
+ was removed - 168 frames / 8.40 s / 1 071 306 B taken from 185 / 9.25 s /
+ 1 211 106 B, re-encoded, no crop, no scaling, no colour change, nothing else
+ touched. It is the background `birdseye` pairs with, and it ships in the code
+ package because a theme that names a backdrop the package does not carry draws
+ its readings over whatever the panel happens to store.
+ .
+ Modifying someone's footage is a different act from copying it, so the assessment
+ is stated here rather than inherited from the paragraph below: the same
+ interoperability-and-record-keeping grounds, the same offer to take the file down
+ if the rights holder says otherwise, and no claim that the result is GPL. The
+ original's digest is verified against the library manifest by
+ tests/test_birdseye.py, which is what keeps "we copied it and cut it, we did not
+ edit it" a check instead of a sentence.
+
+Files: media/AI_chip_black.mp4
+       media/AI_chip_blue.mp4
+       media/AI_network.mp4
+       media/cpu_processing.mp4
+       media/interstellar.mp4
+       media/matrix_binary.mp4
+       media/matrix_black.mp4
+       media/matrix_blue.mp4
+       media/matrix_magenta.mp4
+       media/water_splash.mp4
+Copyright: 2026 Tamer Hassan <thameruddin@gmail.com>; these are the maintainer's
+ own backgrounds, not the vendor's, named here so the boundary between the three
+ kinds of clip in `media/` is written down and not inferred from a directory
+ listing
+License: GPL-3.0-or-later
+ They were measured, not assumed, to be different from the vendored set: none of
+ the ten matches any of the 125 files listed in themes/alpha/manifest.json, by
+ sha256. Each is pinned by length and digest in tests/test_pinned_metrics.py, and
+ its mean luma over every frame it holds is recorded in main.CLIP_LUMA and
+ reproducible with tools/clip_luma.py. What this file can hold is the bytes and
+ the statement made about them on 2026-11-14, that they are theirs to license;
+ what it cannot verify is that sentence, which is a fact about a person.
+
 License: GPL-3.0-or-later
  This package is free software: you can redistribute it and/or modify it under
  the terms of the GNU General Public License as published by the Free Software
@@ -72,7 +121,8 @@ License: GPL-3.0-or-later+OTHER
 
 License: OTHER
  What was done, plainly: the files under themes/alpha/ and the three clips in
- media/ were copied, byte for byte, out of a vendor installation on the author's
+ media/ named above (`Theme_11.mp4`, `Theme_25.mp4`, `theme_48.mp4`) were copied,
+ byte for byte, out of a vendor installation on the author's
  bench machine (`C:\Program Files\ALPHA\`, reached from Linux as a mounted
  Windows volume; themes/alpha/README.md names the paths and the tool,
  tools/thm_unlock.py, that took them out).  The `.thm` theme files were decrypted

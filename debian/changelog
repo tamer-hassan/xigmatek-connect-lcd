@@ -1318,6 +1318,95 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     The name census moved 108 -> 119 source rows, 190 rows carrying at
     least one.
 
+  * Ten backgrounds that are not the vendor's, installed as a set,
+    measured, and pinned by digest.
+
+    Found rather than planned: while `birdseye` was being built,
+    `git status` showed `media/` with three tracked clips deleted from the
+    working tree and ten untracked ones appeared beside them. Nothing in
+    the suite said so. The two checks that noticed anything were the ones
+    that resolve clip names ( `tests/test_media_roots.py`, 3 failures and 1
+    error, because `Theme_25.mp4` is what the session default names), and
+    they read as a birdseye regression until the listing was read line by
+    line. The deletions were put back; the ten files were asked about and
+    are the owner's own, contributed here under this project's license
+    ("They're mine / freely licensed - commit them", 2026-11-14). A public
+    GPL repository carrying somebody's footage is a decision about a
+    person, not about bytes, and nothing in this tree can verify the
+    sentence - so what *is* recorded is the byte set, and what is now gated
+    is that the set stays a set.
+
+    What they are, measured by `tools/clip_luma.py --dir media` (a new
+    door: it decodes a clip whole with `-vf format=gray`, one mean per
+    frame, and reports mean, darkest and brightest, plus what the scrim
+    rule would decide): 897 970 B / 360 frames / 88.3 mean for
+    `AI_chip_black.mp4`, 407 170 / 345 / 81.7 (brightest frame 159.3) for
+    `AI_chip_blue.mp4`, 1 683 651 / 375 / 37.6 `AI_network.mp4`, 638 956 /
+    152 / 89.2 `cpu_processing.mp4`, 1 269 262 / 199 / 20.3
+    `interstellar.mp4`, 2 655 470 / 902 / 22.2 `matrix_binary.mp4`, 502 996
+    / 299 / 7.4 `matrix_black.mp4`, 1 806 149 / 150 / 13.1
+    `matrix_blue.mp4`, 1 624 475 / 240 / 45.2 `matrix_magenta.mp4`, 3 522
+    068 / 328 / 45.4 `water_splash.mp4`. All 480x480, 13 145 408 B in
+    total, and all 14 files in `media/` are 480x480.
+
+    The names are not the measurements, and that is the sentence worth
+    keeping: ** `AI_chip_black.mp4` is the third-brightest of the fourteen
+    clips in the directory at 88.3 of 255**, behind `cpu_processing.mp4` at
+    89.2 and the vendor's `theme_48.mp4` at 227.3, while `matrix_black.mp4`
+    at 7.4 is the second-darkest - the darkest being `theme_47-trimmed.mp4`
+    at 6.5, the file `birdseye` is composited over. A rule that keys on a
+    name would have guessed wrong for all three; `main._scrim_for` keys on
+    `main.CLIP_LUMA`, which now holds all of them - 17 entries where it had
+    6, none of them reaching `BRIGHT_LUMA` 128 at the mean, so no new clip
+    asks for a plate. `theme_47-trimmed.mp4` measures 6.5 whole-file where
+    the preview's own readout said 6.3 mid-loop, and `Theme_25.mp4` 18.7
+    whole-file where the single-frame survey said 17.9: the door that
+    produces the pinned numbers decodes every frame, and it reproduces the
+    three vendored clips' recorded figures exactly (17.5, 18.7, 227.3),
+    which is what makes the eleven new ones comparable rather than merely
+    plausible.
+
+    `debian/rules` installs `media/*.mp4` instead of three names, so the
+    next background is a file drop rather than a rules edit. That moves 16
+    079 473 B into the code package (the ten new clips plus
+    `theme_47-trimmed.mp4`, which the repository had been carrying without
+    shipping), and `docs/packaging.md` 's clean-machine section is
+    annotated with the vintage of its figures rather than quietly rewritten
+    - the .deb sizes are read back from the next artefact.
+
+    Three checks, because two directions of drift had just been
+    demonstrated: `tests/test_pinned_metrics.py::CarriedBackgrounds` pins
+    each carried clip by length and sha256 (11 files, 16 079 473 B, `ftyp`
+    container asserted, a re-encode shown as a changed digest);
+    `test_every_clip_in_media_is_tracked_and_every_tracked_one_is_present`
+    compares the directory against the git index **raw**, because
+    `fixtures.tracked()` filters to files that exist and so cannot see a
+    tracked clip deleted underneath it - which was half of what happened
+    today; and `test_the_package_installs_the_whole_set` reads the install
+    line and refuses a package that ships less than the repository carries
+    (it accepts either an explicit list matching the set or a glob, and
+    refuses a line that does both).
+
+    The clip-set figures the pages quote moved with it, re-printed from the
+    doors rather than typed in: the walk covers **57 mp4 files** where it
+    covered 46 - 43 in the vendored library and 14 in `media/` - and lists
+    **51 distinct clips** where it listed 40, because the 6 dropped copies
+    are the same 6: three pairs inside the vendor's own tree ( `Theme_26` /
+    `Theme_31`, `Theme_27` / `theme_38`, `Theme_29` / `theme_51`) and the
+    three `media/` clips the library also holds, which are duplicates **on
+    purpose** because `media/Theme_25.mp4` is the file `DEFAULT_MP4` names
+    and the root order is what makes it resolve there first. On this bench,
+    with the Windows volume mounted, the same walk sees 215 files, 164 of
+    them copies, 38 of those renamed, and still 51 rows. 49 of the 51 are
+    under 5 MB, so the length-plus-edges comparison is a whole-file
+    comparison for all but two of them.
+
+    Nothing was paired with any of this: `themes.CODE_CLIPS` is untouched,
+    and which of these clips goes under which theme is still the owner's
+    call. Gates: 3 new checks, the suite at **630 over 55 test files**, and
+    `xigmalcd/layout.py`, `render.py`, `themes.py` and `xigmaui/edit.py`
+    unchanged by this commit.
+
   * A sixth theme, `birdseye`: six dials in two sections, five usage meters
     with figures, and a background this repository cut for the purpose.
 

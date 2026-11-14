@@ -273,6 +273,9 @@ a plain directory, with nothing of ours on the import path, the three commands a
 build below, before its `--text-color` flag existed), `import xigmalcd.protocol`
 resolves inside the
 unpacked tree, the packaged code finds its own three clips by its own root rules at the
+  *(the reading below is from when `media/` held three: today `debian/rules` installs
+  every file in `media/`, fourteen of them, and the byte figures here are re-taken at the
+  next build)*
 sizes and md5s `tests/test_pinned_metrics.py` pins, `xigmalcd --dry-run DIR --once` writes one 480×480 PNG and
 opens no port, `xigmalcd-reset` with no `--yes` prints the 109-byte frame and sends
 nothing, the themes tree re-hashes to its manifest (125 entries over 98 distinct paths,
@@ -298,6 +301,7 @@ the 0.2 upgrade starting the display on its own, and the transcript two files do
 `debian/tests/smoke` then ran against that install and said `all installed checks
 passed` - imports out of `/usr/lib/python3/dist-packages`, `xigmalcd --help` 9 808 B
 and `xigmaui --help` 1 498 B, the three clips found under `/usr/share/xigmalcd/media`
+  *(same vintage: the count is now every clip in `media/`)*
 by the packaged code's own root rules at the sizes and md5s `tests/test_pinned_metrics.py`
 pins, one 480×480
 PNG from a dry run with the port never opened, the udev rule, the unit's

@@ -43,8 +43,8 @@ comes first in the order below is the row that stays, because that is the file
   pictures over five backgrounds and the themes package's own 43 sat in the working
   tree - correctly, since the supported route to that library was the package, and
   wrong for anything that wanted to follow a layout's declared background.  Both
-  sentences are measured now: a checkout on its own walks 46 tracked mp4 files into the
-  same **40 rows** this bench walks out of 204 files, and `tests/test_media_roots.py`
+  sentences are measured now: a checkout on its own walks 57 carried mp4 files into the
+  same **51 rows** this bench walks out of 215 files, and `tests/test_media_roots.py`
   asserts that every selectable layout can pair there - counting them, not quoting a
   number for them (docs/gui.md).
 
@@ -347,22 +347,34 @@ def list_clips(extra: str = "") -> list[Clip]:
     Duplicates are collapsed **by content, not by name**, and the row that stays is
     the one the roots' precedence order would have chosen anyway (a clip this repo
     vendors, then the installed copy, then the vendor library, then what the Windows
-    app left behind).  Measured on the files this repository tracks - 46 of them - the
-    rule keeps **40 distinct clips** (whole-file sha256, so the count is an audit and not a
-    guess); on the author's bench the same walk sees 204 files and still lists 40 rows.
-    **40 distinct clips**: the Windows app's own upload history repeats the vendor's
+    app left behind).  Measured on the files this repository carries in its two
+    clip roots - 43 in `themes/alpha/clips` and 14 in `media/`, **57** today, against the 46
+    it carried before `media/` grew - the rule keeps **51 distinct clips** (whole-file
+    sha256, so the count is an audit and not a guess); on the author's bench the same walk
+    sees 215 files, 164 of them copies, and still lists the same 51 rows.
+    **51 distinct clips**: the Windows app's own upload history repeats the vendor's
     library under a timestamp name - all 26 `175749*.mp4` files are byte-identical
     copies of a `Theme_NN.mp4` / `theme_NN.mp4` - and a name-keyed rule cannot see
     that.  It was keying on (name, length), which left 69 rows standing where 40
     exist.
 
     The vendor's library repeats itself too, inside our own tracked copy: 43 clip files,
-    40 distinct, because `Theme_31.mp4` == `Theme_26.mp4`, `theme_38.mp4` ==
+    40 of them distinct, because `Theme_31.mp4` == `Theme_26.mp4`, `theme_38.mp4` ==
     `Theme_27.mp4` and `theme_51.mp4` == `Theme_29.mp4` (sha256, measured 2026-11-07).
     Those files stay in the tree - the identity claim is that the library was copied as
     the vendor ships it, manifest and all, and `tools/verify_manifest.py` verifies every
     byte against it - but the list shows one row for them, and `scan["library_dups"]`
-    says how many. """
+    says how many.
+
+    The other three copies are `media/` holding the same bytes as the library - which is
+    not a duplicate to be cleaned up but the point of that directory: `media/Theme_25.mp4`
+    is the file the daemon's session default names, and it resolves there before any
+    library root (`xigmalcd.main.media_roots`, and `tests/test_media_roots.py` holds the
+    order).  `media/` also holds eleven files the vendor never shipped: the cut copy
+    `birdseye` pairs with and ten made on this bench by its owner, contributed here under
+    this project's own license - and `tests/test_pinned_metrics.py` pins all eleven by
+    length and sha256, `tools/clip_luma.py` measures each one's whole-file mean luma into
+    `main.CLIP_LUMA`, and `debian/rules` installs the whole directory. """
     from xigmalcd.main import (MEDIA_ENV, REPO_CLIP_LIB, SYSTEM_CLIP_LIB,
                                SYSTEM_MEDIA, SYSTEM_THEMES, WIN_STATIC,
                                WIN_UPLOADS, media_roots)
@@ -378,7 +390,7 @@ def list_clips(extra: str = "") -> list[Clip]:
         handful of pairs however many roots exist.  Reading the whole file is the
         honest comparison and this costs 2 MB of the largest clip in the library
         instead; for anything up to 2 MiB the two windows *are* the whole file, so
-        those comparisons are exact (and 39 of the 40 distinct clips here are under
+        those comparisons are exact (and 49 of the 51 distinct clips here are under
         5 MB).  Above that, agreement on length and on both edges is treated as the
         same clip: nothing in this library differs only in its middle.
         """
@@ -434,7 +446,7 @@ def list_clips(extra: str = "") -> list[Clip]:
         vendors that the themes package also carries, the vendor library repeating
         itself inside its own tree, and the Windows app's upload history re-adding what
         its static media already is.  `realpath` alone caught none of that: on the
-        author's bench 204 files stood where 40 clips exist (46 of them tracked here).
+        author's bench 215 files stood where 51 clips exist (57 of them carried here).
         """
         real = os.path.realpath(path)
         scan["files"] += 1

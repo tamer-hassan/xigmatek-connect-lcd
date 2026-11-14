@@ -146,7 +146,9 @@ WIN_STORE = "/media/windows-c/Users/Tamer/AppData/Roaming/alpha/store.json"
 #   <checkout>/media             the repository copy - what runs from a clone, and
 #                                what every clip figure in README was read from
 #   /usr/share/xigmalcd/media    the Debian/Ubuntu layout: where the .deb puts the
-#                                three clips it ships
+#                                clips it ships (fourteen in `media/`
+#                                today: three the vendor's bytes, one
+#                                cut from a vendor clip, ten made here)
 #
 # `media_dir()` is the first that exists, so a clone on a box that also has the
 # .deb installed still draws from the clone: otherwise the numbers README quotes
@@ -277,7 +279,24 @@ BRIGHT_MP4 = find_media(
 # whether the drawing needs a dark plate behind the glyphs, and a wrong guess
 # there is a legibility problem, not a protocol problem.
 CLIP_LUMA = {"theme_48.mp4": 227.3, "Theme_11.mp4": 17.5, "Theme_25.mp4": 18.7,
-             "Theme_24.mp4": 19.2, "Theme_35.mp4": 7.9, "1757491588831.mp4": 7.9}
+             "Theme_24.mp4": 19.2, "Theme_35.mp4": 7.9, "1757491588831.mp4": 7.9,
+             # the clips `media/` carries that this program did not get from the vendor: ten
+             # made by the owner of this bench and one cut here from the vendor's
+             # `theme_47.mp4`.  Measured on 2026-11-14 by `tools/clip_luma.py --dir media`,
+             # which decodes every frame and means them - the same method that produced the
+             # six above, and the tool reproduces those exactly (17.5, 18.7, 227.3), which is
+             # what makes the new figures comparable rather than merely plausible.  None of
+             # them reaches `BRIGHT_LUMA`, so none needs a plate at its mean; the reason to
+             # name them anyway is `AI_chip_black.mp4`, whose **name says black and whose
+             # pixels say 88.3 of 255**, and `AI_chip_blue.mp4`, whose brightest frame
+             # reaches 159.3.  An unmeasured clip answers this rule with 0, which is only
+             # correct while the clip happens to be dark.
+             "AI_chip_black.mp4": 88.3, "AI_chip_blue.mp4": 81.7,
+             "AI_network.mp4": 37.6, "cpu_processing.mp4": 89.2,
+             "interstellar.mp4": 20.3, "matrix_binary.mp4": 22.2,
+             "matrix_black.mp4": 7.4, "matrix_blue.mp4": 13.1,
+             "matrix_magenta.mp4": 45.2, "water_splash.mp4": 45.4,
+             "theme_47-trimmed.mp4": 6.5}
 SCRIM_ON_BRIGHT = 150       # the plate that makes white glyphs readable there
 BRIGHT_LUMA = 128           # where "white-on-white" starts, on 255
 

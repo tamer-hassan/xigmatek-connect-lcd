@@ -164,5 +164,117 @@ class VendoredBackgrounds(unittest.TestCase):
                                  "the vendor's own bytes, not ours")
 
 
+class CarriedBackgrounds(unittest.TestCase):
+    """The clips `media/` holds that are *not* the vendor's bytes, and the set as a set.
+
+    `VendoredBackgrounds` above pins three files with an MD5 each, because the claim in
+    `debian/copyright` is that those are XIGMATEK's and unchanged.  This class holds the
+    other eleven, and the reason is different: those are ours to make, so nothing forbids
+    changing them - but a clip that a theme *pairs with*, or that ships in a package,
+    should not change silently either.  Two of them do carry a claim:
+
+    * `theme_47-trimmed.mp4` is a derived asset: 17 leading frames removed from the
+      vendor's `theme_47.mp4`, whose own digest `tests/test_birdseye.py` verifies against
+      the library manifest.  Its frames, length and digest are pinned there; pinned here as
+      well so the whole media set is one table.
+    * the ten made on this bench by the owner of it, contributed on 2026-11-14 with the
+      owner's own statement that they are theirs to license.  Nothing here can verify that
+      sentence - it is a fact about a person, not about bytes - so the pin records what was
+      contributed, which is the half that *is* checkable and the half a later reader can
+      diff against.
+
+    Then the two directions the set can drift: a file in `media/` that git does not track
+    (this happened on 2026-11-14, when three tracked clips vanished from the working tree
+    and ten untracked ones appeared, and nothing but a `git status` said so), and an
+    install line in `debian/rules` that names fewer clips than the repository holds.
+    """
+
+    #: name -> (bytes, sha256), as measured on the tree 2026-11-14
+    OWN = (
+        ("AI_chip_black.mp4", 897970,
+         "7af4554236bf8217d474646e13fc55d408ab89dd11a5ac9aee489163b0c0a80e"),
+        ("AI_chip_blue.mp4", 407170,
+         "b3395fea1af3200c28a6b596731f3728e183d7e7b6ad9981f0d6e417372bd1d9"),
+        ("AI_network.mp4", 1683651,
+         "0aca417addb5b81441aa1916ee1e69d5583cd2b6fe1dc64532287440a9472f45"),
+        ("cpu_processing.mp4", 638956,
+         "3f1f8ecace47a43ac5e174af04a292a187b3395bb55c8efe4eaae935cffd1ec9"),
+        ("interstellar.mp4", 1269262,
+         "da76c24f38ccf9f117985e5a0a36489dcb3a392c9c04a052adcd136b06e51f06"),
+        ("matrix_binary.mp4", 2655470,
+         "9bf2d8bc5ad54c8b7cce56c35161c209c2c65fcd82b4075e20f4b1ca9f00b51e"),
+        ("matrix_black.mp4", 502996,
+         "7b6e3cb71f0d4ed0149a2c83df99725fe95ca3f98e7f39b3bc08ec7d20f4060c"),
+        ("matrix_blue.mp4", 1806149,
+         "cda74b7d9ed65a92cc884fab08ec0045cc3ed191629586c916f9d9d7c7247bec"),
+        ("matrix_magenta.mp4", 1624475,
+         "54cdbc50cbac8d9a8ef29964c5a5e2024bed287b37e03a1dfb52e2ca2fdc5b93"),
+        ("water_splash.mp4", 3522068,
+         "edd044a0c2fb56706427bba8720d3c4e241b4f4abb2c60719e8fbf0d688986e0"),
+        ("theme_47-trimmed.mp4", 1071306,
+         "21a949135a287d7df7cb143ebf4cdc635feb9785ec0b4153dcf479734c842f2d"),
+    )
+
+    def test_each_carried_clip_is_the_file_the_table_records(self):
+        import hashlib
+        total = 0
+        for name, size, digest in self.OWN:
+            path = os.path.join("media", name)
+            with self.subTest(clip=name):
+                if not os.path.exists(path):
+                    self.skipTest(f"no {path} in this checkout")
+                with open(path, "rb") as fh:
+                    blob = fh.read()
+                self.assertEqual(len(blob), size, f"{name} changed length")
+                self.assertEqual(blob[4:8], b"ftyp", "an MP4 container, not a stub")
+                self.assertEqual(hashlib.sha256(blob).hexdigest(), digest,
+                                 f"{name}'s bytes changed: this is a re-encode, not an edit")
+                total += size
+        print(f"  carried clips pinned: {len(self.OWN)}, {total:,d} B "
+              f"(every one of them the repository's own, not the vendor's)")
+
+    def test_every_clip_in_media_is_tracked_and_every_tracked_one_is_present(self):
+        """Both halves of the slip this bench had on 2026-11-14.
+
+        Three vendored clips had been deleted from the working tree and ten untracked ones
+        had appeared in the same directory, and every gate in the suite stayed green except
+        the two that resolve clip names - because nothing else asked what `git` thinks is in
+        that directory.  A media set that ships is a set, and a set has membership.
+        """
+        on_disk = sorted(f for f in os.listdir("media") if f.lower().endswith(".mp4"))
+        tracked = sorted(os.path.basename(p) for p in fixtures.tracked()
+                         if p.startswith("media/") and p.endswith(".mp4"))
+        print(f"  media/: {len(on_disk)} files on disk, {len(tracked)} tracked by git")
+        self.assertEqual(on_disk, tracked,
+                         f"the directory and the index disagree: on disk only "
+                         f"{sorted(set(on_disk) - set(tracked))}, in git only "
+                         f"{sorted(set(tracked) - set(on_disk))}")
+
+    def test_the_package_installs_the_whole_set(self):
+        """`debian/rules` names what ships, so the rules can be read and counted."""
+        with open(os.path.join("debian", "rules"), encoding="utf-8") as fh:
+            rules = fh.read()
+        tracked = sorted(os.path.basename(p) for p in fixtures.tracked()
+                         if p.startswith("media/") and p.endswith(".mp4"))
+        # the *file* install, not the `install -d` that makes the directory first
+        line = [ln for ln in rules.split("\n")
+                if "usr/share/xigmalcd/media" in ln and "install -m" in ln]
+        self.assertEqual(len(line), 1, rules[:200])
+        spelled = " ".join(line)
+        named = [f for f in tracked if f in spelled]
+        globbed = "media/*.mp4" in spelled
+        print(f"  debian/rules installs {len(named)} named clips"
+              + (" plus a `media/*.mp4` glob" if globbed else " (no glob)"))
+        if globbed:
+            self.assertEqual(named, [], "a glob and named files in one line: the named ones "
+                                        "are either redundant or the set is not a set")
+            return
+        self.assertEqual(sorted(named), tracked,
+                         f"the install line names {len(named)} of {len(tracked)} clips the "
+                         f"repository tracks; the rest ship as nothing at all: "
+                         f"{sorted(set(tracked) - set(named))}")
+
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

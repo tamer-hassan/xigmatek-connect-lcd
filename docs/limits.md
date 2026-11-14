@@ -202,8 +202,7 @@ What has been measured on glass, by whom, with how many frames - and what has no
   does with them is unmeasured.** ffprobe over the installed library:
   `/usr/share/xigmalcd/themes/alpha/clips/` holds 43 clips, **40 at 480×480** and **3 at
   320×240** (`2024-05-30_13-43-24-476.mp4`, `2024-05-30_14-09-30-913.mp4`,
-  `2024-05-31_15-01-03-396.mp4`); the three clips this repository vendors are all
-  480×480. So the vendor's own app ships files that are not the glass's resolution -
+  `2024-05-31_15-01-03-396.mp4`); the fourteen files in `media/` are all 480×480 too. So the vendor's own app ships files that are not the glass's resolution -
   which means the panel, or that app, scales them somewhere - but there is no readback
   (§11) and nobody has looked at the glass with one of those three stored, so this
   project states the numbers instead of the effect: `xigmaui` puts the measured size on
