@@ -1406,11 +1406,29 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     tray check naming the host it needs - and no `ResourceWarning` printed at
     all now that `setUp` closes its own file.
 
+    The count has moved again since that reading, to **570 over 53 files**, and
+    two doors agree on it without needing a frozen machine: the command
+    `grep -c "^    def test_" tests/*.py` answers 570 over 53 and
+    `unittest.TestLoader().discover("tests")` answers 570 over 53 modules.  The
+    *timing* for that tree is deliberately not quoted: the one full run made so
+    far finished with a failure of `tests/test_zz_isolation.py`, which named a
+    `python3 -m xigmaui` window started at 06:17:43 - during the run, by the
+    person watching the new row in the preview pane - and its 500 ms save timer
+    wrote `~/.config/xigmaui/config.json` under the run.  That guard is doing
+    its job rather than misfiring, so the 466.767 s it took is a record of a
+    busy machine and not a measurement; the census lines from that same run are
+    quoted here, because they read files in this repository and never the
+    session.  Same run also moved the skip count from 3 to **4**: the
+    review-door check in `tests/test_bars_rows.py` now skips on this box,
+    because `bars` has no unanswered source here to exercise it.
+
     The count is read off the tree as well as off the runner.  The command
     `grep -c "^    def test_" tests/*.py` answers 568 over 53 files, and
     `unittest.TestLoader().discover("tests")` answers 568 over 53 modules, the
     same numbers the runner prints.  What the count has been at each step of
-    this stretch, in one place rather than in thirteen, newest first: 568 over
+    this stretch, in one place rather than in fourteen, newest first: 570 over
+    53 (`Fan GPU` moved into the fan group, and the grid census became a check),
+    568 over
     53 (the GPU-fan row: five checks for the row, two for the pairing gate in
     both directions, one for the shared bodies), 560 over 53 (the CI cycle: four
     checks reading the workflow, one bounding the new state-wait), 555 over
