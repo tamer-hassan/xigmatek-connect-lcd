@@ -1279,15 +1279,18 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
   * The suite's figures, re-read rather than inherited.  This bench, one run
     of the committed tree with nothing else in flight,
     `python3 -W error::ResourceWarning -m unittest discover -s tests`:
-    **560 checks in 53 files in 462.727 s**, OK, 3 skipped - one of them the
+    **568 checks in 53 files in 466.010 s**, OK, 3 skipped - one of them the
     tray check naming the host it needs - and no `ResourceWarning` printed at
     all now that `setUp` closes its own file.
 
     The count is read off the tree as well as off the runner.  The command
-    `grep -c "^    def test_" tests/*.py` answers 560 over 53 files, and
-    `unittest.TestLoader().discover("tests")` answers 560 over 53 modules, the
+    `grep -c "^    def test_" tests/*.py` answers 568 over 53 files, and
+    `unittest.TestLoader().discover("tests")` answers 568 over 53 modules, the
     same numbers the runner prints.  What the count has been at each step of
-    this stretch, in one place rather than in eleven, newest first: 555 over
+    this stretch, in one place rather than in thirteen, newest first: 568 over
+    53 (the GPU-fan row: five checks for the row, two for the pairing gate in
+    both directions, one for the shared bodies), 560 over 53 (the CI cycle: four
+    checks reading the workflow, one bounding the new state-wait), 555 over
     52 (both drive slots in `bars`, the gigabyte row, the census prints and
     the quoted-span gate), 549 over 52 (the drive row and its prints), 547
     over 52 (the chipset ruling, one check added to
@@ -1337,7 +1340,10 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     error), 339.250 with 525 (#192, green and powerless), 431.661 with 526
     (#193), 460.878 with 526 (#194, one failure), 405.906 with 536 (#195, green
     and lucky), 405.166 with 546 (#196), 403.049 with 547 (#197), 410.181 with
-    549 (#200) and 414.204 with 555 (#202).  The last
+    549 (#200), 414.204 with 555 (#202) and 419.829 with 568 (#203, the first
+    run under the raised 45-minute cap).  #202 and #203 are the pair that
+    bounds a count again: thirteen more checks, 5.625 s more, on runners that
+    took 449 s and 414 s of job for the same five steps.  The last
     several skip 4 rather than 3, the extra one being the glass ledger naming
     transcripts a runner with no panel has never made, and the 9 s between #178
     and #180 is what the six new checks cost: five of them run a shipped script
