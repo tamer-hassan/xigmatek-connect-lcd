@@ -481,12 +481,22 @@ back in `notes["missing"]` as `special:<name>`, so a typo in a layout is reporte
 drawn as something else.
 
 With those in place, all five generate: `clock` 3 and 1 448 characters, `gauge` 5 and 2
-314, `dual` 10 and 4 677, `alpha` 12 and 6 312, `bars` 32 and 14 121 - each
-byte-identical across runs - and parity reports the same painted count both ways on
-every reading that answers what the theme asks for: 25 530, 25 343, 22 944, 25 010 and
-21 003 lit pixels for `clock`, 20 608, 21 391, 20 498 and 20 743 for `gauge`, 40 006 and
-41 842 for `dual`, 40 426 and 39 186 for `alpha`, 76 916 and 76 022 for `bars`, every
-one of them **zero** differing pixels and a worst channel delta of 0. The diff is taken
+314, `dual` 10 and 4 677, `alpha` 12 and 6 312, `bars` **35 and 15 434** - each
+byte-identical across two exports in one run - and `python3 -m unittest
+tests.test_export_parity` prints the whole census, per case, with its diff.  Measured
+2026-11-14, the two doors agree at **zero** differing pixels and worst channel delta 0 on
+every reading that answers what the theme asks, and the cases where they part are named
+rather than left out of the list: `clock` agrees at all five (25 530 / 25 343 / 22 944 /
+25 010 / 21 003 lit px) and `bars` at all five (69 996 / 68 610 / 15 655 / 20 551 /
+10 767); `gauge` at four of five (20 608 / 21 391 / 20 498 / 20 743, and the fifth 17 451
+against 4 319); `dual` at three (40 006 / 41 842 / 31 338); `alpha` at two (40 426 /
+39 186, then 9 174 px apart at each of the last three).  Those gaps are the known
+asymmetry, not a regression: with no `gpu` section to read, the code drawing keeps the
+widget and prints `--%`, while the file has no source to name and reports the row as
+skipped - so a page that claimed five zeroes for every theme would be quoting a fiction,
+and the print says which cases are which.  This passage's previous `bars` pair, 76 916 /
+76 022, had been stale since the meter track went 10 px -> 6 px: a loss of ink with a gain
+(a new row) inside it, which no gate would have caught by itself. The diff is taken
 over all four channels on purpose: an alpha-only comparison would not see a colour that
 had drifted, and colour is exactly what a layout carries in `textColor`.
 `tests/test_library_draw.py` watches the vendor side from the other direction: all 23
@@ -656,10 +666,12 @@ place. No static file - fan slots or repeat group - can put a row where such a d
 move it.
 
 So the decision had a second half, and it is built now: **`theme_bars` lays out the same rows on
-every machine** - six fixed readings plus four reserved slots taken by position, and since
-2026-11-14 a drive row between them, **eleven** - which keeps the pitch at 32 px everywhere
-(the span grew from 320 to 352 to hold the extra row at the same pitch; docs/limits.md has that
-arithmetic and the clearance measurement behind it), and **a row with no reading keeps its place**: it is not drawn, and the
+every machine** - six fixed readings plus six reserved slots taken by position (four fan, two
+drive), **twelve** as of 2026-11-14 - which keeps the pitch at 32 px everywhere, on any hardware,
+because twelve rows is the ceiling the reservation implies.  Holding that pitch cost span
+320 -> 352 -> **384** and the clock line moving from y=452 to y=458; docs/limits.md has the
+arithmetic, the clearance measurements, and the 3 px of air left between the last row's meter and
+the clock's ink, which is now a floor a check enforces rather than a fact this page asserts. and **a row with no reading keeps its place**: it is not drawn, and the
 advance happens anyway. That is the rule the 27 library layouts already follow and the
 hole-that-says-what-it-is rule docs/themes.md states. `bars` is this project's own drawing
 rather than a reproduction of a vendor frame, so nothing measured off glass is invalidated by
@@ -671,7 +683,7 @@ eyeball, not by a check.
 The per-machine cost this document recorded an hour ago shrinks with it: the pitch no longer
 depends on this box's fan inventory, and what still varies per box is which slots draw.
 
-**The sources are in** (2026-11-09): `themes.BARS_ROWS` named all ten rows then (eleven today)
+**The sources are in** (2026-11-09): `themes.BARS_ROWS` named all ten rows then (twelve today)
 in the order the
 drawing lays them out - label, meter source, number source, scale - and `themes.values()`
 answers them. Four are per-sensor fan slots (`Fan 1 Speed`..`Fan 4 Speed`, `Fan 1 Name`..
@@ -684,7 +696,7 @@ way the drawing does, because `sensors` also reports a separate `memory.load`, w
 the same number as that division on this box, and a meter 424 px wide cannot afford to be
 handed the wrong tenth of a percent.
 
-**And `bars` is a file now** (2026-11-09): `themes.bars_recipe()` generates 32 widgets out of
+**And `bars` is a file now** (2026-11-09, 32 widgets then and 35 since the drive row): `themes.bars_recipe()` generates those widgets out of
 that table and those constants - the heading, the clock line, and three rows per reading -
 and it reaches **zero differing pixels at every reading** `tests/test_bars_rows.py` and
 `tests/test_export_parity.py` give it, the ones
@@ -724,7 +736,7 @@ what keeps that from being a claim.
 What `tests/test_bars_rows.py` holds, all of it measured: an `ImageDraw.text` spy runs
 while the frame is painted, and the label-and-value strings it captures equal, row for
 row, what `layout.text_for` produces from `themes.BARS_ROWS` - over four boxes and every
-row of the table, eleven today - and the rows the sources answer are the rows ink lands in. The generated
+row of the table, twelve today - and the rows the sources answer are the rows ink lands in. The generated
 file's row count, kinds and `y` values are compared against `BARS_ROWS` and the `BARS_*`
 constants rather than against remembered numbers, `xigma.showIf` appears on exactly the
 two rows whose number and meter read different sources, and the review door's skip list
@@ -762,12 +774,13 @@ reserved-slots rule being visible rather than hidden.  Three claims about it are
 * **the two doors put down the same pixels.**  All five themes at that fixture, at seven ink
   choices: zero differing pixels, worst channel 0.  Measured through the pane's own door
   (`Editor.paint(*Editor.fixture(), ink=...)`), not a hand-built call - and the row counts
-  with it, in `bars`: **29 of its 35 rows** at the completed fixture today, against the 26 of 32
-  measured when that rule was written and the 14 of 32 the stale dict produced, a 34 362 px
-  difference between those two 2026-11-12 frames (61 790 lit px against 28 860).  Today the same
-  door lays 57 036 lit px, and `themes.parity("bars", edit.FIXTURE, WHEN)` prints the pair with
-  the pixel diff - which is the form these pages use now, because the row count moved twice in
-  two days and a count copied by hand is a count that goes wrong.
+  with it, in `bars`: **32 of its 38 rows** at the completed fixture today, against the 29 of 35
+  one drive row gave, the 26 of 32 measured when that rule was written, and the 14 of 32 the stale
+  dict produced - a 34 362 px difference between those last two 2026-11-12 frames (61 790 lit px
+  against 28 860).  Today the same door lays 63 284 lit px, and `themes.parity("bars",
+  edit.FIXTURE, edit.FIXTURE_WHEN)` prints the pair with the pixel diff - which is the form these
+  pages use now, because the row count moved three times in one day and a count copied by hand is
+  a count that goes wrong.
 
 That last claim needed a rule the library did not have.  `themes.draw` takes no `ink`
 and is right not to: a layout's colours are its own, which is why a vendored theme looks
@@ -1227,7 +1240,10 @@ a sensed header - `fan3`, `fan4`, `fan11`, `fan13-16` are waiting there with the
 `themes.DISK_SLOTS` is the same machinery as the fan slots: four positional pairs,
 `Disk 1 Temperature`/`Disk 1 Name` … `Disk 4`, answered by index into `sensors.drives()` and
 reported, in words, when a slot has no drive behind it (`this box reports 2 drive rows in
-`drives`; slot 3 has no name`).  The vocabulary the editor's `source` menu offers went from 29
+`drives`; slot 3 has no name`).  The first two of those pairs are drawn by our own `bars` as of
+2026-11-14 - the claim in this section that "nothing shipped asks for any of these names" was
+true for one commit and is not any more, and it is left here with that note rather than rewritten,
+because the measurement it records is the one that made the rows possible.  The vocabulary the editor's `source` menu offers went from 29
 names to **37**; `layout.VENDOR_FORMAT` grew the same eight shapes, which is what
 `tests/test_bars_rows.py` requires of every answerable name - a source with no shape is a row
 that prints nothing at all.
@@ -1245,9 +1261,14 @@ Two things had to be settled first, and only one of them was a design choice.
   PROTOCOL.md §8).  What the run cannot show is whether the panel parses the section - there is
   no read-back for a `STATE` frame, and the only topic that would make the panel draw these
   numbers itself is `realtimeDisplay`, which ALPHA sends only to an `OS === "RTOS"` unit.
-* **Ordering, which the slots make load-bearing.**  `sensors.drives()` sorts by **controller**
-  (`nvme0` before `nvme2`), not by hwmon directory number, because a slot is a thing a layout
-  names and a reader expects to mean the same drive next boot.  The built tree in
+* **Ordering, which the slots make load-bearing.**  `sensors.drives()` sorts **the drive under
+  `/` first**, then the rest by controller (`nvme0` before `nvme2`), never by the number the
+  kernel happened to give the hwmon directory - because a slot is a thing a layout names and a
+  reader expects to mean the same drive next boot.  Root-first is what lets a block mark the boot
+  drive by position (`layout.VENDOR_FORMAT["Disk 1 Name"]` prints `nvme0 /`, the other slots plain)
+  and what makes `Disk 1 Temperature` the same reading as the scalar `disk.temperature` whose
+  capacity sits beside it - an equality a check now asserts, and it is not vacuous here: the
+  second drive's composite is 31 °C against the first's 41.  The built tree in
   `tests/test_sensor_rules.py` puts `nvme2` in `hwmon7` - first in walk order - on purpose, so a
   regression to walk order moves the 55 °C drive into `Disk 1` and fails.
 
@@ -1490,7 +1511,7 @@ does **not** exist in this tree:
   copied files are the evidence, and `--print-theme-fields` is how they are read out.
 
 What does exist, gated rather than asserted in prose: the five exports and their zero-diff
-parity (`tests/test_export_parity.py`); the generated `bars` file, its rows - eleven as of
+parity (`tests/test_export_parity.py`); the generated `bars` file, its rows - twelve as of
 2026-11-14 - and its two memory rules (`tests/test_bars_rows.py`); the file model with its save, revert, rename and
 delete doors (`tests/test_theme_files.py`); the editor's model and the doors over it
 (`tests/test_editor.py`); pointing, dragging and the marks (`tests/test_canvas.py`,

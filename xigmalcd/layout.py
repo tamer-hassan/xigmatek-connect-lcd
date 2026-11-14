@@ -28,7 +28,7 @@ import json
 from PIL import Image, ImageDraw, ImageFont
 
 from .render import (A26_FAN_F, A26_FAN_MAX_W, A26_TVAL_F, SS, _FONT_GLOBS,
-                     fan_figures, heat, value_pair)
+                     fan_figures, gb, heat, value_pair)
 
 # Fonts the layouts name, and what this machine has.  No Microsoft fonts are
 # installed here, so every one of these is a substitution; Liberation Sans is
@@ -145,8 +145,8 @@ VENDOR_FORMAT = {
     # `draw_theme` reports them as gaps, and `formats_measured()` says which four are.
     "RAM Rate": _pct,
     "GPU Memory Rate": _pct,
-    "Used RAM": lambda v: f"{int(v) // 1024} GB",
-    "Used GPU Memory": lambda v: f"{int(v) // 1024} GB",
+    "Used RAM": gb,                    # one decimal: `render.gb`, shared with the code door
+    "Used GPU Memory": gb,             # (floor gigabytes disagreed with its own meter)
     "Motherboard Temperature": _deg,
     # the drive that owns `/`, in the same shape the other two temperatures use; ours, not
     # measured off the vendor's picture, and no shipped layout asks for it
@@ -167,7 +167,11 @@ VENDOR_FORMAT = {
     "Disk 2 Temperature": _deg,
     "Disk 3 Temperature": _deg,
     "Disk 4 Temperature": _deg,
-    "Disk 1 Name": lambda v: str(v)[:10],
+    # slot 1 is the drive `/` sits on (the sort in `sensors.drives()` puts it first), so the
+    # boot drive is marked by its position in the vocabulary: the name is cut to 8 and given a
+    # trailing slash instead of 10 characters.  `render.theme_bars` spells the same mark the
+    # same way, and `tests/test_bars_rows.py` compares the two strings row for row.
+    "Disk 1 Name": lambda v: f"{str(v)[:8]} /",
     "Disk 2 Name": lambda v: str(v)[:10],
     "Disk 3 Name": lambda v: str(v)[:10],
     "Disk 4 Name": lambda v: str(v)[:10],

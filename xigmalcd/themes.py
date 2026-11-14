@@ -303,13 +303,26 @@ BARS_FIXED_ROWS = (
 #: drives on two different boxes.  Added 2026-11-14 on the owner's request; the 25..80 scale
 #: mirrors `BOARD`'s, and like `BOARD`'s it is this repo's choice, not measured off the
 #: vendor's overlay (`layout.FORMATS_MEASURED` stays at four, and `--check-theme` says so).
-BARS_DISK_ROWS = (("DISK", "Disk Temperature", "Disk Temperature", 25, 80),)
+#: The two drive slots.  Like the fan slots these are **positional and reserved**: the row is
+#: `drives[i]`, its number is that drive's own temperature and its label is that drive's name,
+#: and a box with one drive reports the second slot unanswered rather than drawing a hole or
+#: closing the block up.  Slot 1 is the boot drive by the sort rule in `sensors.drives()`
+#: (root first, then controller order), which is why the mark can be a *position* - see
+#: `layout.VENDOR_FORMAT` for how the name is spelled - and why the meter scale mirrors
+#: `BOARD`'s 25..80 rather than inventing a drive-specific one.  The earlier single row on the
+#: scalar `disk.temperature` is gone: one block mixing a non-positional row with a positional
+#: one is how the two come to mean different drives on a different box.
+BARS_DISK_ROWS = tuple((None, temp, temp, 25, 80) for temp, _name in DISK_SLOTS[:2])
 
 BARS_ROWS = (BARS_FIXED_ROWS[:3] + BARS_DISK_ROWS + BARS_FIXED_ROWS[3:]
              + tuple((None, speed, speed, 0, 3000) for speed, _name in FAN_SLOTS))
 
-#: Which reading prints a fan row's label, given the source its meter reads.
-_FAN_NAME = {speed: name for speed, name in FAN_SLOTS}
+#: Which reading prints a slot row's label, given the source its meter reads - the fan slots and
+#: the drive slots in one map, because the recipe and the tests must not each carry their own
+#: copy of "which name goes with which reading".  Public for that reason: `tests/test_bars_rows.py`
+#: reads it instead of rebuilding it.
+SLOT_NAMES = {**{speed: name for speed, name in FAN_SLOTS},
+             **{temp: name for temp, name in DISK_SLOTS}}
 
 #: Sources that want a wall clock, and get one instant per frame - the same rule
 #: `render._now()` exists for (a frame that calls `time.strftime` twice shows two
@@ -440,16 +453,20 @@ def values(metrics: dict, when=None) -> tuple:
     for (tkey, nkey) in DISK_SLOTS:
         slot = int(tkey.split()[1]) - 1
         row = disks[slot] if slot < len(disks) else None
-        out[tkey] = (row or {}).get("temperature")
-        if out[tkey] is None:
-            absent[tkey] = (f"this box reports {len(disks)} drive row"
-                            f"{'s' if len(disks) != 1 else ''} in `drives`; slot {slot + 1} "
-                            f"has no temperature")
-        out[nkey] = (row or {}).get("name")
-        if out[nkey] is None:
-            absent[nkey] = (f"this box reports {len(disks)} drive row"
-                            f"{'s' if len(disks) != 1 else ''} in `drives`; slot {slot + 1} "
-                            f"has no name")
+        # Exactly the fan-slot rule, and it is a rule rather than a style: a slot with nothing
+        # behind it is left out of the value table entirely and reported in `absent`, because a
+        # key that answers `None` reaches `layout.draw_bar` as a number and raises there.  That
+        # is how this was found - my first version set the key to None, and the drive row's
+        # meter died with `float() argument must be ... not 'NoneType'` at a reading where the
+        # box had one drive.
+        for src, key in ((tkey, "temperature"), (nkey, "name")):
+            val = (row or {}).get(key)
+            if val is None:
+                absent[src] = (f"this box reports {len(disks)} drive row"
+                               f"{'s' if len(disks) != 1 else ''} in `drives`; slot {slot + 1} "
+                               f"has no {key}")
+            else:
+                out[src] = val
     for src, kind in FAN_TYPED.items():
         # A row that reports 0 is no reading, the same rule `sensors.fans()` applies when it
         # drops an empty header and `render._tach` applies when it picks a figure: a stopped
@@ -1896,7 +1913,7 @@ def bars_recipe() -> dict:
         slug = bar_src.lower().replace(" ", "-")
         if label is None:
             rows.append(widget(f"xigma-bars-{slug}-name", "data", {
-                "x": render.BARS_LBL_X, "y": y, "source": _FAN_NAME[bar_src],
+                "x": render.BARS_LBL_X, "y": y, "source": SLOT_NAMES[bar_src],
                 "fontFamily": "dejavu", "fontSize": render.BARS_LBL_F, "bold": True,
                 "textColor": rgba_str(render.DIM), "xigma": {"anchor": "lm"}}, len(rows)))
         else:

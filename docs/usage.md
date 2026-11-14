@@ -72,9 +72,12 @@ a CPU or GPU refused too — and for `disk.temperature` the drive that
 holds `/`, its composite beside its raw probes, and every drive's slot number.  Both rules, the
 before-and-after numbers and the reason for each tier are in
 [limits](limits.md).  A layout reaches them through the source names `Disk Temperature` (the
-mounted drive) and `Disk 1 Temperature` … `Disk 4 Temperature` with their `Disk N Name` partners
-(positional, ordered by controller); no shipped layout asks for any of those, because the
-vendor's library names no storage metric at all.
+mounted drive, the scalar the capacity numbers come from) and `Disk 1 Temperature` …
+`Disk 4 Temperature` with their `Disk N Name` partners - positional, and ordered so slot 1 is the
+drive under `/`, which is how `bars` marks it: `Disk 1 Name` prints `nvme0 /`, the others plain.
+Since 2026-11-14 our own generated `bars` draws slots 1 and 2 of those; the vendored library
+names no storage metric at all, and of the 21 distinct `source` values across the 28 layouts,
+the four disk names are the only ones any generated export asks for.
 
 ## Options
 
@@ -260,19 +263,31 @@ claim:
   (docs/gui.md); the CLI has no writer.  Neither writes anything to the panel: a
   layout file never goes over the wire (§11), so an edit changes what a loop *on
   this machine* draws when it names that theme.
-* **All five export as data, and all five are pixel-identical to the code.** What
-  `--export-theme NAME` writes, widgets and characters, per theme, each byte-identical
-  between two runs: `clock` 3 and 1 448, `gauge` 5 and 2 314,
-  `dual` 10 and 4 677, `alpha` 12 and 6 312, `bars` 32 and 14 121. The parity gate paints
-  each one both ways -
+* **All five export as data, and all five are pixel-identical to the code.** The census
+  is printed by the gate itself - `python3 -m unittest tests.test_export_parity` ends with
+  one line per theme giving widgets, characters and the lit-pixel count down each door -
+  and as measured on 2026-11-14: `clock` 3 widgets and 1 448 characters, `gauge` 5 and
+  2 314, `dual` 10 and 4 677, `alpha` 12 and 6 312, `bars` **38 and 16 787**.  That pair
+  moved twice in one day - 32 and 14 121, then 35 and 15 434 with one drive row, then the
+  present count when the row became two positional slots. Each is byte-identical
+  between two exports in the same run. The parity gate paints each one both ways -
   through `render.py` and through `layout.draw_theme` - on every reading that answers what
-  the theme asks: **zero differing pixels, worst channel delta 0**, at 25 530 / 25 343 /
-  22 944 / 25 010 / 21 003 lit pixels for `clock`, 20 608 / 21 391 / 20 498 / 20 743 for
-  `gauge`, 40 006 / 41 842 for `dual`, 40 426 / 39 186 for `alpha` and 76 916 / 76 022 for
-  `bars`. `bars` is the one that could not be exported as it was drawn: its rows had to stop
-  moving with the box first, and it needed a key the schema had never had (`xigma.showIf`)
-  for a meter that divides two readings beside a number that prints one. Getting
-  those to zero forced five keys into the schema, each with a measured reason and each
+  the theme asks: **zero differing pixels, worst channel delta 0**, at 25 530 / 25 343 lit
+  pixels for `clock`, 20 608 / 21 391 for `gauge`, 40 006 / 41 842 for `dual`, 40 426 /
+  39 186 for `alpha` and 76 253 / 74 864 for `bars` - `bars` agrees at all five cases,
+  the other three themes part company on the readings that leave a whole group out, and
+  the gate prints every case with its diff so the sentence cannot be read as five zeroes
+  for every theme.
+  One figure in that list had been stale for two days and no gate said so: the page
+  carried `bars` at 76 916 / 76 022 lit px, a reading taken before the meter track
+  went 10 px -> 6 px and before the drive row went in - a net loss of ink with a gain
+  inside it, which is the kind of number nobody re-checks by eye.  The gate prints the
+  pair now, so the page points at a door rather than at a transcription: a count no
+  command reprints is what this project keeps having to go back for.
+  `bars` is the one that could not be exported as it was drawn: its rows had to stop
+  moving with the box first, and it needed a key the schema had never had
+  (`xigma.showIf`) for a meter that divides two readings beside a number that
+  prints one.  Getting those to zero forced five keys into the schema, each
   printed by `--print-theme-fields`: `xigma.arcPaint` (our ring is 3-degree segments
   sampled at their start, ALPHA's measured ring is 1-degree segments sampled at their
   middle - 164 to 6 989 differing pixels on one arc), `xigma.barPaint` (the same argument

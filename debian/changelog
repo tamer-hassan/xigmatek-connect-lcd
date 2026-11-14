@@ -1008,18 +1008,124 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     `--theme bars`, set in the unit's `ExecStart` or chosen in the window's
     layout picker.
 
+  * `bars` now shows both NVMe drives, and the gigabyte rows stop flooring.
+    Two things the owner asked for in one sitting, both measured before and
+    after.
+
+    **The drive rows.** The single `DISK` row is gone; `bars` reserves **two
+    positional drive slots** beside the four fan slots - `Disk 1 Name` /
+    `Disk 1 Temperature` and `Disk 2 ...` - so the block is twelve rows on
+    every machine and the vendored row count stops being a fact about one
+    box. Ordering changed to make that honest: `sensors.drives()` puts **the
+    drive under `/` first**, then the rest by controller, so slot 1 is by
+    rule the same drive whose `disk.total` / `disk.used` the blob reports,
+    and the boot drive can be marked by position -
+    `layout.VENDOR_FORMAT["Disk 1 Name"]` prints `nvme0 /`, the other slots
+    plain.  A check proves the ordering rather than the box: the built tree's
+    controllers are `nvme0`, `nvme1`, `nvme2` in name order, so pointing
+    the mount at `nvme1` is what separates "root first" from "alphabetical",
+    and slot 1 must equal the scalar at both mounts.  On the shipped painter
+    at this machine's own readings the block now writes `CPU 61°C`, `GPU 44°C`,
+    `BOARD 39°C`, `nvme0 / 40°C`, `nvme1 29°C`, `LOAD 1%`, `RAM 82.8 GB`,
+    `VRAM 15.6 GB`, `Fan CPU 1626` and `CPU PUMP 2453`, with the two fan slots
+    reported unanswered.
+    The geometry the owner's eye caught and my arithmetic missed: the page
+    said 31 px of air under the
+    block, but the block itself carries blank reserved slots, so the real gap
+    measured **93 px** between the last row's ink (y=335) and the clock's ink
+    (y=445) - room for roughly three rows, exactly as seen on the glass.  So
+    the span grew to 384 and the clock moved from y=452 to y=458, and the
+    pitch stayed 32 px with the 6 px track untouched.  Twelve rows is now the
+    ceiling the reservation implies, and a new check measures the margin in
+    the case never drawn here - every slot answered - holding the last row's
+    meter (to y=442) clear of the clock's ink (from y=446) with a floor of 2
+    px, and printing what a thirteenth row would compute (pitch 29, which the
+    clearance rule already refuses).
+
+    **The gigabyte rows.** `VRAM` read `15 GB` on a card whose meter stood at
+    **97.4%**: 15 952 MB of 16 376 is 15.58 GiB, and the number's rule was
+    `int(mb) // 1024`, so one row showed a nearly full card as having a
+    gigabyte of headroom.  Rounding to whole gigabytes is not better - it
+    prints `16 GB`, equal to the total, at 97% - so the spelling is now one
+    decimal, `15.6 GB`, from one function `render.gb()` that
+    `layout.VENDOR_FORMAT` references for the file door and `theme_bars`
+    calls for the code door.  The two gigabyte rows share it instead of each
+    carrying a lambda of its own, which a row-string check now pins, and a
+    new check holds a row's two halves to the same fraction (printed value
+    over the card's total within 0.01 of the meter) while asserting the floor
+    rule **would** have disagreed by more than 0.03 - so the guard fails if
+    someone decides a whole gigabyte looks tidier. Width costs nothing: the
+    widest number in the block, `82.8 GB`, starts at x=365 and the label
+    column ends by x=133.
+
+    Three faults of mine surfaced while doing it, recorded rather than
+    smoothed over.  The first version of the slot values put `None` in the
+    table for an unanswered slot, and `layout.draw_bar` then raised
+    `float() argument must be a string or a real number, not 'NoneType'` -
+    the fan slots already had the right rule (omit the key, report it in
+    `absent` ), and mine was a second copy written badly. Replacing `fmt`
+    with `gb` on the RAM/VRAM rows silently fed the formatter the meter's
+    **fraction** instead of the used field, printing `0.1 GB` for 10 240 MB;
+    the parity gate caught it as an 831 px split on the first reading with a
+    GPU. And `tests/test_bars_rows.py` 's `wanted_rows()` had rebuilt the
+    slot-name map from `FAN_SLOTS` and counted `metrics["fans"]` by hand - a
+    second copy of the rule, which raised `KeyError: 'Disk 1 Temperature'`
+    the day the drive slots arrived.  Both doors and the tests now read one
+    map, `themes.SLOT_NAMES` .
+
+    Census and coverage: `tests/test_bars_rows.py` 24 -> 28 (a `TheSlotRows`
+    class for a drive row with a name and no reading, and
+    `TheBlockStopsBeforeTheClock` for the margin),
+    `tests/test_sensor_rules.py` 23 -> 24 (root-first ordering), and
+    `tests/test_export_parity.py` prints its own per-theme census with every
+    case's diff, which is how `bars` came to be quoted at all five agreeing
+    and `alpha` at two.  One coverage hole found the way the others keep being
+    found - a mutation costing nothing: making a slot's label follow the
+    reading rather than the subject failed **no** check, because every case
+    on hand had name and temperature together or neither; the new `nvme7`
+    -with-no-temperature row makes that mutation cost 2. Thirteen mutations
+    now, counted: table loses a slot -> 35; code door loses them -> 30; doors
+    read different fields -> 14; meter scale in the table only -> 9; label
+    follows the reading -> 2; `gb` back to flooring -> 3; `gb` handed the
+    fraction -> 7; mark dropped in the file door -> 11; mark dropped in the
+    code door -> 12; clock back to y=452 -> 1; span back to 352 with twelve
+    rows -> 13; one slot reserved instead of two -> 30; slots left out of the
+    pitch arithmetic -> 23.
+
+    Figures re-read, not retyped: `bars` is 38 widgets / 16 787 characters
+    (32 -> 35 -> 38 as the row appeared and became two slots), parity is 0 px
+    and worst channel 0 at all five readings, 76 253 / 74 864 / 15 021 / 19
+    917 / 10 133 lit px, and 63 284 px down each door at the editor's pinned
+    fixture with 32 of 38 rows drawn.  The row census prints 149 `text` /
+    `data` rows, 136 twins, 13 skips; the snap census 191 rows / 95 / 48 /
+    426 with the gap histogram unchanged ({0: 95, 2: 12, 3: 4, 4: 14, 5: 4})
+    and the pull percentages moved to 10 / 12 / 58%; ink moves 26 glyph roles
+    of 38 widgets; `test_row_acts` counts 191 rows in the 28 layouts.
+    docs/gui.md, docs/usage.md, docs/themes.md, docs/limits.md and
+    docs/theme-editor.md were all re-pointed at those printings, and the
+    claim - true for one commit - that no shipped layout asks for a disk name
+    is corrected in place with its supersession noted rather than deleted.
+
+    Also found, unrelated to the request and worth its own line:
+    `xigmalcd/sensors.py` still carried a **second, dead** `BOARD_CHIPS`
+    assignment from before the tier rules - defined at the top of the file,
+    overridden 50 lines later, and harmless only because Python takes the
+    last binding.  It is gone, and one definition of each chip list is now
+    what the module has.
+
   * The suite's figures, re-read rather than inherited.  This bench, one run
     of the committed tree with nothing else in flight,
     `python3 -W error::ResourceWarning -m unittest discover -s tests`:
-    **549 checks in 52 files in 460.914 s**, OK, 3 skipped - one of them the
+    **555 checks in 52 files in 464.529 s**, OK, 3 skipped - one of them the
     tray check naming the host it needs - and no `ResourceWarning` printed at
     all now that `setUp` closes its own file.
 
     The count is read off the tree as well as off the runner.  The command
-    `grep -c "^    def test_" tests/*.py` answers 549 over 52 files, and
-    `unittest.TestLoader().discover("tests")` answers 549 over 52 modules, the
+    `grep -c "^    def test_" tests/*.py` answers 555 over 52 files, and
+    `unittest.TestLoader().discover("tests")` answers 555 over 52 modules, the
     same numbers the runner prints.  What the count has been at each step
-    of this stretch, in one place rather than in six: 546 over 52 (the
+    of this stretch, in one place rather than in nine: 549 over 52 (the drive
+    row, the census prints and the quoted-span gate), 546 over 52 (the
     bare-runner audit), 547 over 52 (the chipset ruling, one check added to
     `tests/test_sensor_rules.py`), 536 over 51 (the disk slots and the probe's
     shipped-payload binding), 526 over 51 (the probe tool's boundaries), 525

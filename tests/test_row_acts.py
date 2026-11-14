@@ -81,9 +81,10 @@ class TheEnvelopeComesFromTheFiles(unittest.TestCase):
                     and field in (widget.get("property") or [{}])[0]}
 
     def test_every_row_of_every_layout_carries_the_same_five_keys(self):
-        # 185 -> 188 on 2026-11-14, when `bars` gained a labelled row (label, number, meter).
-        # Pinned rather than derived, because this is the count that says a layout grew.
-        self.assertEqual(len(self.rows), 188, f"{len(self.rows)} rows in "
+        # 185 -> 188 -> 191 on 2026-11-14: `bars` gained a labelled drive row, then that
+        # row became two positional slots (name, number, meter each).  Pinned rather than
+        # derived, because this is the count that says a layout grew.
+        self.assertEqual(len(self.rows), 191, f"{len(self.rows)} rows in "
                                               f"{len(self.editors)} layouts")
         odd = [widget for widget in self.rows
                if frozenset(widget) != frozenset(gui_edit.WIDGET_KEYS)]

@@ -10,13 +10,23 @@ Reference from a Windows capture (see PROTOCOL.md):
           "voltage":0.965,"memoryUsage":0,"dedicated":0,"dedicatedTotal":0},
    "disk":{"total":998,"used":206,"load":20,"activity":0,"temperature":32,
            "readSpeed":0,"writeSpeed":0},
+   "drives":[{"name":"nvme0","temperature":32,"sensors":[32,54,68]},
+             {"name":"nvme1","temperature":31,"sensors":[31]}],
    "fans":[{"onBoard":true,"type":"Fan","name":"Fan CPU","value":1476}],
    "motherboard":{"temperature":38},
    "timestamp":1793863294763}
 
+One section in the body below is **not** in that capture: `drives[]` is this program's own,
+added on 2026-11-14 after the panel was asked directly whether it would answer a `STATE all 1`
+body carrying a key it has never seen - it did, `1 200` with `CkOK True`, and accepted the frame
+uploaded afterwards (PROTOCOL.md 8).  What that does not show is whether the firmware *reads* the
+section, only that it does not refuse it.
+
 Units as they appear there: memory MB, disk GB, temperatures whole degrees
 Celsius, cpu.speedAverage / gpu.speed MHz, power Watts, voltage Volts,
-fans RPM, network KB/s, timestamp in milliseconds.
+fans RPM, network KB/s, timestamp in milliseconds; and in `drives[]`,
+`name` the controller instance, `temperature` whole degrees the drive
+reports about itself, and `sensors` every reading it publishes, rounded.
 
 Anything a machine cannot measure is left out; ALPHA's own captures drop
 whole sections too (no gpu on a box without one, no fans when nothing reads).
@@ -33,8 +43,6 @@ import time
 CPU_CHIPS = ("k10temp", "zenpower", "coretemp", "k8temp", "cpu_thermal",
              "soc_thermal")
 GPU_CHIPS = ("amdgpu", "nvidia", "i915", "gma")
-BOARD_CHIPS = ("spd5118", "it87", "nct6775", "nct6779", "f71882fg",
-               "emc2305", "r8169")
 DISK_CHIPS = ("nvme", "drivetemp", "aacs")
 
 
@@ -365,7 +373,7 @@ def _drive_choice(rows: list[tuple[str, int]]) -> tuple[int, bool]:
     return max(v for _l, v in rows), False
 
 
-def drives() -> list[dict]:
+def drives(root: str | None = None) -> list[dict]:
     """Per-drive readings, the section the panel was asked about on 2026-11-13.
 
     The shape - `{name, temperature, sensors}` - is deliberately **exactly what the probe
@@ -387,6 +395,16 @@ def drives() -> list[dict]:
     itself - its `Composite` when it publishes one, else its hottest sensor - and `sensors`
     carries every published reading rounded, so a layout that wants the hotter raw probe can
     name it instead of quietly substituting one.
+
+    **Slot 1 is the drive that holds `/`.**  The order is root drive first, then the rest by
+    controller - so a layout that draws `Disk 1` is drawing the same drive whose capacity the
+    blob's `disk.total`/`disk.used` describe, and a boot drive can be marked by *position*
+    rather than by a rule two doors have to agree on.  That is not decoration: measured here,
+    the second drive's composite (31 °C today) differs from the first's (41), so a walk-order
+    list would put a different drive in slot 1 than the capacity numbers describe, and the
+    check that pins this ordering is the one that fails when someone "simplifies" it back to
+    the kernel's numbering.  `root` is a parameter for the same reason the disk scalar has one:
+    a machine with `/` on its second controller cannot be gated on this box's mount table.
     """
     out = []
     for _chip, dev, rows in _disk_channels():
@@ -396,7 +414,8 @@ def drives() -> list[dict]:
         out.append({"name": dev,
                     "temperature": _round_temp(chosen),
                     "sensors": sorted({round(v / 1000) for _l, v in rows if 0 < v < 150_000})})
-    out.sort(key=lambda d: _disk_sort_key(d["name"]))
+    want = _root_controller() if root is None else root
+    out.sort(key=lambda d: (d["name"] != want, _disk_sort_key(d["name"])))
     return out
 
 

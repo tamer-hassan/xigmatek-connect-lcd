@@ -106,10 +106,12 @@ class TheFixtureNamesWhatARealBoxReports(unittest.TestCase):
                          "export needs a pinned value")
 
     def test_the_completion_still_buys_something_so_the_relation_below_is_not_hollow(self):
+        # dict groups only: `fans` and `drives` are lists, and `motherboard` is the one field
+        # the thin body never carried (THIN_BEFORE names keys per group, and a list has none)
         thin = {group: {key: value for key, value in fields.items()
                         if key not in THIN_BEFORE.get(group, ())}
                 for group, fields in gui_edit.FIXTURE.items()
-                if group not in ("fans", "motherboard")}
+                if isinstance(fields, dict) and group != "motherboard"}
         asked = {((widget.get("property") or [{}])[0])["source"]
                  for editor in generated() for widget in editor.widgets()
                  if (widget.get("property") or [{}])[0].get("source")}
@@ -155,10 +157,12 @@ class ThePreviewIsThePictureTheLoopSends(unittest.TestCase):
             render._now = saved
 
     def test_the_completed_fixture_paints_more_of_bars_than_the_body_it_replaced(self):
+        # dict groups only: `fans` and `drives` are lists, and `motherboard` is the one field
+        # the thin body never carried (THIN_BEFORE names keys per group, and a list has none)
         thin = {group: {key: value for key, value in fields.items()
                         if key not in THIN_BEFORE.get(group, ())}
                 for group, fields in gui_edit.FIXTURE.items()
-                if group not in ("fans", "motherboard")}
+                if isinstance(fields, dict) and group != "motherboard"}
         editor = next(e for e in self.editors if e.name == "bars")
         _full, full_notes = editor.paint(*editor.fixture())
         _thin, thin_notes = themes.draw(editor.obj, thin, gui_edit.FIXTURE_WHEN)

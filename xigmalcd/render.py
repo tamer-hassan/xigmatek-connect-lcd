@@ -417,6 +417,27 @@ def temp_arc(img, cx, cy, value, lo, mid, hi, radius, width, track,
     return frac
 
 
+def gb(mb) -> str:
+    """One memory figure, spelled the same by both doors: `15.6 GB`.
+
+    The rule used to be `int(mb) // 1024` - floor to whole gigabytes - and that misreads
+    against the meter standing beside it.  Measured at this box's own GPU readings:
+    `memoryUsage` 15 952 of `dedicatedTotal` 16 376 MB is 15.58 GiB, so the bar is at
+    **97.4%** while the number printed `15 GB` on a 16 GB card: the two halves of one row
+    disagreed by 0.58 GB, and on the glass that reads as a card with room left on it.
+    Rounding to whole gigabytes is not better here - it would print `16 GB`, equal to the
+    card's total at 97% - so the number carries one decimal and agrees with its own meter.
+
+    One function, referenced by `layout.VENDOR_FORMAT` for the file door and called directly
+    by `theme_bars` for the code door: two copies of a formatting rule is how the doors
+    drifted apart in 2026-11-12 in the first place.
+    """
+    try:
+        return f"{float(mb) / 1024:.1f} GB"
+    except (TypeError, ValueError):
+        return "--"
+
+
 def pct_pair(part: dict, numerator: str, denominator: str):
     """One pair of reported fields as a percentage, or None where there is no pair.
 
@@ -688,12 +709,12 @@ def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY, ink=None):
 #: clock line's own ink begins at y=440 (measured, 31 px of air), so the span grows and the
 #: pitch, the 6 px track and the clearance stay exactly as the ten-row layout had them: 3 px
 #: above a meter, 4 px below.
-BARS_Y0, BARS_SPAN = 72, 352
+BARS_Y0, BARS_SPAN = 72, 384
 BARS_ROW_MIN, BARS_ROW_MAX = 28, 56
 BARS_LBL_X, BARS_VAL_X = 28, 452
 BARS_BAR_X, BARS_BAR_DY, BARS_BAR_WH = 28, 12, (424, 6)
 BARS_LBL_F, BARS_VAL_F, BARS_CLOCK_F = 18, 20, 28
-BARS_CLOCK_XY, BARS_CLOCK_ANCHOR = (240, 452), "mm"
+BARS_CLOCK_XY, BARS_CLOCK_ANCHOR = (240, 458), "mm"
 BARS_TITLE_TEXT, BARS_TITLE_X, BARS_TITLE_Y = "SYSTEM MONITOR", 240, 30
 BARS_TITLE_F, BARS_TITLE_W = 24, 440        # the ceiling and the width `_fit` walks
 BARS_SLOTS = 4
@@ -747,17 +768,28 @@ def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
     rows = [("CPU", cpu.get("temperature"), 30, 90, lambda v: f"{v:.0f}\u00b0C", True),
             ("GPU", gpu.get("temperature"), 30, 90, lambda v: f"{v:.0f}\u00b0C", True),
             ("BOARD", board.get("temperature"), 25, 80,
-             lambda v: f"{v:.0f}\u00b0C", True),
-            # the drive the capacity numbers describe: `disk.temperature`, the same scalar,
-            # not `drives[0]` - see `themes.BARS_DISK_ROWS` for why one row may not mix a
-            # positional label with a non-positional reading
-            ("DISK", (m.get("disk") or {}).get("temperature"), 25, 80,
-             lambda v: f"{v:.0f}\u00b0C", True),
+             lambda v: f"{v:.0f}\u00b0C", True)]
+    # the two drive slots, positional like the fan slots: `drives[i]`, and a slot past the
+    # drives this box reports keeps its place and says so.  The label carries the controller
+    # name, and slot 1 - the drive `/` sits on, by the sort in `sensors.drives()` - carries a
+    # mark, spelled the same way `layout.VENDOR_FORMAT["Disk 1 Name"]` spells it; the row
+    # string check in tests/test_bars_rows.py is what keeps the two spellings one rule.
+    for _slot in range(2):
+        row = (m.get("drives") or [])[_slot] if _slot < len(m.get("drives") or []) else None
+        nm = str((row or {}).get("name") or "")
+        label = f"{nm[:8]} /" if (_slot == 0 and nm) else nm[:10]
+        rows.append((label, (row or {}).get("temperature"), 25, 80,
+                     lambda v: f"{v:.0f}\u00b0C", row is not None))
+    rows += [
             ("LOAD", cpu.get("load"), 0, 100, lambda v: f"{v:.0f}%", True),
-            ("RAM", ram, 0, 100,
-             lambda v: f"{mem.get('used', 0) // 1024} GB", True),
-            ("VRAM", gm, 0, 100,
-             lambda v: f"{gpu.get('memoryUsage', 0) // 1024} GB", True)]
+            # the number and the meter read different fields here, by design: the meter is the
+            # division and the number is one side of it (`themes.BARS_ROWS` spells the same
+            # split, and `xigma.showIf` is what says so in a file).  `gb` is the shared
+            # spelling, applied to `used`, not to the fraction the row's `val` carries - a
+            # mistake I made while introducing it, which printed `0.1 GB` for 10 240 MB and
+            # showed up as an 831 px parity break at the first reading that has a GPU.
+            ("RAM", ram, 0, 100, lambda _v: gb(mem.get("used", 0)), True),
+            ("VRAM", gm, 0, 100, lambda _v: gb(gpu.get("memoryUsage", 0)), True)]
     fans = m.get("fans") or []
     for slot in range(BARS_SLOTS):
         fan = fans[slot] if slot < len(fans) else None

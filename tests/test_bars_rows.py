@@ -61,6 +61,8 @@ ALL_SIX = {"cpu": {"temperature": 57.0, "load": 62.0},
            "gpu": {"temperature": 47.0, "load": 22.0, "memoryUsage": 4096,
                    "dedicatedTotal": 8192},
            "motherboard": {"temperature": 51.0}, "disk": {"temperature": 44.0},
+           "drives": [{"name": "nvme0", "temperature": 44, "sensors": [44, 55, 68]},
+                      {"name": "nvme1", "temperature": 33, "sensors": [33]}],
            "memory": {"used": 10240, "total": 16384}, "timestamp": {}}
 
 #: A body missing several labelled rows - BOARD, DISK, RAM and VRAM: the rows below each gap
@@ -115,15 +117,21 @@ def drawn_rows(metrics: dict) -> tuple:
 
 
 def wanted_rows(metrics: dict) -> tuple:
-    """What the source table says each row shows, and which rows carry a number."""
+    """What the source table says each row shows, and which rows carry a number.
+
+    One rule for every slot row, fan or drive: the name is asked of `themes.values()` and the
+    answer says whether the slot is filled.  The version before this one rebuilt the map from
+    `FAN_SLOTS` and counted `metrics["fans"]` by hand, which is a second copy of the rule - and
+    the second copy is what raised `KeyError: 'Disk 1 Temperature'` the day the drive slots
+    arrived, exactly as the same mistake has been caught here a dozen times.
+    """
     values, _gone = themes.values(metrics, WHEN)
-    fans = (metrics or {}).get("fans") or []
-    name_of = {speed: name for speed, name in themes.FAN_SLOTS}
     want, answered = [], []
     for label, bar_src, text_src, _lo, _hi in themes.BARS_ROWS:
-        if label is None:                       # a fan slot: its name is a reading too
-            if int(bar_src.split()[1]) - 1 < len(fans):
-                want.append(layout.text_for(name_of[bar_src], values[name_of[bar_src]]))
+        if label is None:                       # a slot row: its name is a reading too
+            name_src = themes.SLOT_NAMES[bar_src]
+            if name_src in values:
+                want.append(layout.text_for(name_src, values[name_src]))
         else:                                   # a fixed row has its metric either way
             want.append(label)
         filled = bar_src in values and text_src in values
@@ -164,7 +172,7 @@ class TheBodyItself(unittest.TestCase):
         self.assertIn("y, span = BARS_Y0, BARS_SPAN", self.src,
                       "the block is not the named 72 + span")
         self.assertEqual((render.BARS_Y0, render.BARS_SPAN, render.BARS_ROW_MIN,
-                          render.BARS_ROW_MAX), (72, 352, 28, 56),
+                          render.BARS_ROW_MAX), (72, 384, 28, 56),
                          "the row geometry the page describes is not what the drawing names")
 
     def test_the_fan_rows_are_reserved_positional_slots(self):
@@ -177,13 +185,16 @@ class TheBodyItself(unittest.TestCase):
         and one expression the slot loop reuses.  An eighth labelled row, or a slot drawn by its
         own copy of the formatter, changes that count - and the pitch census below would then be
         counting a different number of rows."""
-        labelled = len(themes.BARS_FIXED_ROWS) + len(themes.BARS_DISK_ROWS)
-        self.assertEqual(self.src.count("lambda v:"), labelled + 1,
-                         f"{self.src.count('lambda v:')} formatters, {labelled} labelled rows")
-        self.assertEqual(ROWS_TOTAL, 11, ROWS_TOTAL)
-        self.assertEqual(len(themes.BARS_DISK_ROWS), 1,
-                         "the drive row count moved: the pitch, the widget census and every pixel"
-                         " window in this file follow it")
+        # four lambdas for the labelled rows (CPU, GPU, BOARD, LOAD - the two gigabyte rows
+        # share `render.gb` rather than each carrying their own copy), plus one per slot loop.
+        self.assertEqual(self.src.count("lambda v:"), len(themes.BARS_FIXED_ROWS) - 2 + 2,
+                         f"{self.src.count('lambda v:')} formatters in the body")
+        self.assertEqual(self.src.count("gb("), 2,
+                         "the RAM and VRAM numbers must format through the one `gb` function - "
+                         "and pass it the field they print, not the fraction their meter uses")
+        self.assertEqual(ROWS_TOTAL, 12, ROWS_TOTAL)
+        self.assertEqual(len(themes.BARS_DISK_ROWS), len(themes.DISK_SLOTS[:2]),
+                         "the drive slots in the block and in the vocabulary moved apart")
 
 
 class WhatTheGlassHolds(unittest.TestCase):
@@ -199,8 +210,9 @@ class WhatTheGlassHolds(unittest.TestCase):
         none = slots_with_ink(render.draw(ALL_SIX, "bars", bg=render.OVERLAY))
         six = slots_with_ink(render.draw(dict(ALL_SIX, fans=FANS_SIX), "bars",
                                          bg=render.OVERLAY))
-        labelled = len(themes.BARS_FIXED_ROWS) + len(themes.BARS_DISK_ROWS)
-        self.assertEqual(none, [True] * labelled + [False] * render.BARS_SLOTS,
+        answered_rows = sum(1 for r in themes.BARS_ROWS if r[0] is not None) \
+            + len(themes.BARS_DISK_ROWS)
+        self.assertEqual(none, [True] * answered_rows + [False] * render.BARS_SLOTS,
                          "a box with no fans no longer reserves the slots it is not drawing")
         self.assertEqual(six, [True] * ROWS_TOTAL,
                          "the fifth fan onward is not being kept out of the reserved slots")
@@ -214,7 +226,12 @@ class WhatTheGlassHolds(unittest.TestCase):
         slots, and `PARTIAL` answers the first two, the load, and nothing else.
         """
         got = slots_with_ink(render.draw(PARTIAL, "bars", bg=render.OVERLAY))
-        want = [True, True, False, False, True, False, False] + [False] * render.BARS_SLOTS
+        # CPU and GPU answer; BOARD, both drive slots, RAM and VRAM do not (PARTIAL has no
+        # `drives` section at all, which is also a real shape: a kernel with no disk driver).
+        want = ([True, True, False,                   # CPU, GPU, BOARD
+                 False, False,                        # both drive slots
+                 True, False, False,                  # LOAD, RAM, VRAM
+                 ] + [False] * render.BARS_SLOTS)
         self.assertEqual(len(want), ROWS_TOTAL, "the hand-written pattern and the table disagree")
         self.assertEqual(got, want, (got, "rows below a missing reading closed up again"))
 
@@ -346,9 +363,10 @@ class TheGeneratedFile(unittest.TestCase):
         kinds: dict = {}
         for w in self.widgets:
             kinds[w["type"]] = kinds.get(w["type"], 0) + 1
+        slots = sum(1 for r in themes.BARS_ROWS if r[0] is None)   # fan slots and drive slots
         self.assertEqual(kinds, {
-            "text": 1 + len(themes.BARS_FIXED_ROWS) + len(themes.BARS_DISK_ROWS),
-            "data": 1 + len(themes.BARS_ROWS) + len(themes.FAN_SLOTS),
+            "text": 1 + len(themes.BARS_ROWS) - slots,
+            "data": 1 + len(themes.BARS_ROWS) + slots,
             "bar": len(themes.BARS_ROWS)}, kinds)
 
     def test_each_rows_three_widgets_answer_for_the_same_place_on_the_glass(self):
@@ -378,7 +396,7 @@ class TheGeneratedFile(unittest.TestCase):
                                  "the key that says *when* a number draws is on the wrong half "
                                  "of a row whose meter and number divide one pair")
                 if label is None:
-                    self.assertEqual(lbl["property"][0]["source"], themes._FAN_NAME[bar_src],
+                    self.assertEqual(lbl["property"][0]["source"], themes.SLOT_NAMES[bar_src],
                                      "a fan slot's label is not reading the name its box reports")
                 else:
                     self.assertEqual(lbl["property"][0]["content"], label)
@@ -403,8 +421,84 @@ class TheGeneratedFile(unittest.TestCase):
         self.assertIn('pct_pair(gpu, "memoryUsage", "dedicatedTotal")', src)
 
 
+class TheSlotRows(unittest.TestCase):
+    """A slot row's label belongs to the **subject**, and the case that proves it is a row with
+    a name and no reading.
+
+    A census mutation - making the drive slot's label follow the temperature instead of the
+    row's presence - cost **0 failures**, which is not a fact about the mutation but about the
+    readings on hand: every case so far had a name and a temperature together, or neither.  This
+    class supplies the missing shape, a `drives[]` row that names a controller and publishes no
+    temperature at all (a driver that binds a device before its thermal sensor answers, which is
+    what `nvme` does at a cold start here).  Under the shipped rule the label draws, the number
+    and the meter do not, and both doors agree; under the mutation the code door silences the
+    label and the two part company.
+    """
+
+    def row_of(self, source: str) -> int:
+        hit = [i for i, r in enumerate(themes.BARS_ROWS) if source in (r[1], r[2])]
+        self.assertEqual(len(hit), 1, f"{source} is at {hit}")
+        return hit[0]
+
+    def body(self):
+        return dict(ALL_SIX, drives=[{"name": "nvme7"},
+                                     {"name": "nvme0", "temperature": 44, "sensors": [44]}])
+
+    def test_the_two_doors_agree_when_a_slot_has_a_name_and_no_number(self):
+        got = themes.parity("bars", dict(self.body(), timestamp={}), WHEN)
+        self.assertEqual((got["diff_px"], got["worst_channel_delta"]), (0, 0),
+                         f"a slot row with a name and no temperature split the doors: {got}")
+        self.assertIn("Disk 1 Temperature", got["missing"],
+                      f"the number was not reported skipped: {got['missing']}")
+        self.assertNotIn("Disk 1 Name", got["missing"],
+                         "the label was reported skipped too, which is the wrong half of the "
+                         "rule: this row has a subject, only its reading is missing")
+
+    def test_the_label_is_drawn_and_the_number_is_not(self):
+        rows = rows_by_slot(self.body())
+        index = self.row_of("Disk 1 Temperature")
+        drawn = rows.get(index, [])
+        self.assertIn(("label", "nvme7 /"), drawn,
+                      f"row {index} did not draw its marked name: {drawn}")
+        self.assertFalse([t for kind, t in drawn if kind == "value"],
+                         f"row {index} printed a number it has no reading for: {drawn}")
+        img = render.draw(dict(self.body(), timestamp={}), "bars", bg=render.OVERLAY)
+        self.assertFalse(slots_with_ink(img)[index],
+                         "the value column has ink in a slot whose reading is absent")
+        # and the row keeps its place: the next slot's number lands where the table says
+        nxt = self.row_of("Disk 2 Temperature")
+        self.assertTrue(slots_with_ink(img)[nxt],
+                        "the row below a nameless-number slot closed up")
+
+
 class TheMemoryRows(unittest.TestCase):
     """The two rules the diff hunt turned up, measured at the readings that found them."""
+
+    def test_a_partial_gigabyte_agrees_with_its_own_meter(self):
+        """The report that started this: VRAM read `15 GB` on a card sitting at 97%.
+
+        At this box's own GPU numbers - 15 952 MB used of 16 376 - the row's meter filled to
+        97.4% while the figure floored to `15 GB`.  On the glass that reads as a card with a
+        gigabyte of headroom left, from the same row, at the same instant.  The number now
+        carries one decimal, and the check below holds the two halves of the row to the same
+        fraction rather than trusting the spelling.
+        """
+        used, total = 15_952, 16_376
+        vals, _gone = themes.values({"gpu": {"memoryUsage": used,
+                                             "dedicatedTotal": total}}, WHEN)
+        shown = layout.text_for("Used GPU Memory", vals["Used GPU Memory"])
+        self.assertEqual(shown, "15.6 GB", shown)
+        printed_gib = float(shown.split()[0])
+        meter = (used / total)
+        # the printed number, read back against the card's total, has to land on the meter
+        self.assertLess(abs(printed_gib / (total / 1024) - meter), 0.01,
+                        f"{shown} against a meter at {meter:.3f}: the row's two halves disagree")
+        # and the rule this replaced, kept visible rather than deleted
+        floored = used // 1024
+        self.assertEqual(floored, 15)
+        self.assertGreater(meter - floored / (total / 1024), 0.03,
+                           "the floor rule now agrees with the meter, so this check has stopped "
+                           "guarding the defect it was written for")
 
     def test_parity_holds_at_every_memory_shape_that_broke_a_row(self):
         for tag, metrics in MEMORY_CASES:
@@ -424,18 +518,18 @@ class TheMemoryRows(unittest.TestCase):
                          "the RAM row drew a number for a numerator that was never reported - "
                          "or `pct_pair` still raises")
         self.assertEqual([t for c, t in rows.get(slot_of("VRAM"), []) if c == "value"],
-                         ["4 GB"], rows.get(slot_of("VRAM")))
+                         ["4.0 GB"], rows.get(slot_of("VRAM")))
         self.assertFalse(slots_with_ink(render.draw(dict(body), "bars",
                                                   bg=render.OVERLAY))[slot_of("RAM")],
                          "the value column has ink in a row whose number is not drawn")
 
     def test_a_gpu_at_exactly_zero_used_keeps_its_row_at_nothing_filled(self):
         """The other half of the asymmetry: a 0 reading is a reading.  The number stays, and it
-        reads `0 GB`."""
+        reads `0.0 GB`."""
         rows = rows_by_slot(dict(ALL_SIX, gpu={"temperature": 47.0, "load": 22.0,
                                                "memoryUsage": 0, "dedicatedTotal": 8192}))
         self.assertEqual([t for c, t in rows.get(slot_of("VRAM"), []) if c == "value"],
-                         ["0 GB"],
+                         ["0.0 GB"],
                          "a GPU at 0 used dropped its row again - the asymmetry between the two "
                          "memory rows is back")
 
@@ -547,6 +641,66 @@ class TheReviewDoor(unittest.TestCase):
         lacking = {d for d in deps if d in cannot}
         self.assertTrue(lacking <= notes,
                         "a dependency this box lacks never arrived as a `showIf:<source>` note")
+
+
+class TheBlockStopsBeforeTheClock(unittest.TestCase):
+    """The row count has a ceiling, and it is the clock - not taste.
+
+    `bars` reserves six slot rows (four fan, two drive) beside the six fixed readings, so
+    **twelve rows is the most this block can ever ask for** on any machine: the reservation is
+    what makes that a constant rather than a property of this box.  Adding the second drive slot
+    moved the last row's centre from 392 to 424, and the clock from y=452 to y=458 to keep room
+    under it.  Nothing held that margin, so this does: the ink of the last row's meter, measured
+    from the shipped painter with every slot answered, must clear the clock line's own ink.
+    """
+
+    def ink_rows(self, img) -> list:
+        d = img.convert("RGBA").getchannel("A").load()
+        return [y for y in range(render.H)
+                if sum(1 for x in range(render.W) if d[x, y] > 8) > 40]
+
+    def test_the_last_meters_ink_clears_the_clocks_ink(self):
+        body = dict(ALL_SIX, fans=FANS_SIX,
+                    drives=[{"name": "nvme0", "temperature": 44, "sensors": [44, 55, 68]},
+                            {"name": "nvme1", "temperature": 33, "sensors": [33]}])
+        real_wh = render.BARS_BAR_WH
+        try:
+            render.BARS_BAR_WH = (0, 0)
+            text_only = set(self.ink_rows(render.draw(dict(body, timestamp={}), "bars")))
+        finally:
+            render.BARS_BAR_WH = real_wh
+        full = self.ink_rows(render.draw(dict(body, timestamp={}), "bars"))
+        pitch = min(render.BARS_ROW_MAX, max(render.BARS_ROW_MIN,
+                                            render.BARS_SPAN // len(themes.BARS_ROWS)))
+        last_centre = render.BARS_Y0 + (len(themes.BARS_ROWS) - 1) * pitch
+        # the clock's ink is the run of inked rows below the last row's text band; the meter of
+        # the last row is the ink between those two, and it is what must not touch either
+        below_text = [y for y in full if y > last_centre + 11]
+        meter = [y for y in below_text if y not in text_only]
+        if not meter:
+            self.skipTest("no meter ink below the last row on this machine: the faces or the "
+                          "readings dropped the row, so there is no margin to measure")
+        clock_top = min(y for y in below_text if y > max(meter))
+        margin = clock_top - max(meter) - 1
+        self.assertGreaterEqual(margin, 2,
+                                f"the last row's meter ends at y={max(meter)} and the clock's ink "
+                                f"begins at y={clock_top}: {margin} px of air.  Adding a row, or "
+                                f"moving either anchor, has to keep this measurable - at pitch "
+                                f"{pitch} the block has no room for a thirteenth row at all")
+        print(f"  block margin: last row centre {last_centre}, meter ink to y={max(meter)}, "
+              f"clock ink from y={clock_top} -> {margin} px of air; {len(themes.BARS_ROWS)} rows "
+              f"at pitch {pitch}")
+
+    def test_a_thirteenth_row_would_not_fit_and_says_so(self):
+        """The ceiling, printed rather than assumed: what the next row would cost."""
+        span, y0 = render.BARS_SPAN, render.BARS_Y0
+        for n in (11, 12, 13, 14):
+            pitch = min(render.BARS_ROW_MAX, max(render.BARS_ROW_MIN, span // n))
+            last = y0 + (n - 1) * pitch
+            print(f"  {n} rows -> pitch {pitch}, last centre {last}, meter to "
+                  f"{last + render.BARS_BAR_DY + render.BARS_BAR_WH[1] // 2}, canvas {render.H}")
+        self.assertEqual(len(themes.BARS_ROWS), 12,
+                         "the row count moved; the ceiling claim above needs re-reading")
 
 
 class TheRowsDoNotRunIntoEachOther(unittest.TestCase):

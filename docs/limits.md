@@ -348,6 +348,22 @@ What has been measured on glass, by whom, with how many frames - and what has no
    name is ours, spelled like `CPU Temperature` and `Motherboard
    Temperature`, and `layout.FORMATS_MEASURED` stays at four, which is what
    `--list-themes` means when it says which shapes are this repo's choice.
+ * **The gigabyte rows were flooring, and the number disagreed with its own meter.**
+   `bars` prints RAM and VRAM as a meter (the division) beside a number (one side of it), and the
+   number's rule was `int(mb) // 1024`.  At this box's own GPU readings - 15 952 MB of 16 376 -
+   that is **15.58 GiB**, so the meter stood at **97.4%** while the figure read `15 GB` on a 16 GB
+   card: a nearly full card presented as having a gigabyte of headroom, in one row, at one
+   instant.  Rounding to whole gigabytes is not better here, it prints `16 GB` equal to the card's
+   total while the meter is at 97%.  So the spelling is one decimal - `15.6 GB` - from one
+   function, `render.gb()`, which `layout.VENDOR_FORMAT` references for the file door and
+   `theme_bars` calls for the code door; the two gigabyte rows now share it instead of each
+   carrying its own lambda, and a row-string check in `tests/test_bars_rows.py` pins that.  The
+   check holds the row's two halves to the same fraction (printed value against the card's total,
+   within 0.01 of the meter) and asserts the floor rule *would* have disagreed by more than 0.03 -
+   so the guard fails if someone decides a whole gigabyte looks tidier.  Width costs nothing
+   measurable: the widest number in the block is `82.4 GB`, its ink begins at x=365 and the label
+   column ends by x=133, leaving 230 px of air in the row.
+
  * **Four per-drive slots, on a section the panel was asked about and answered.**
    `sensors.drives()` publishes `drives[]` in the blob - one row per storage controller,
    `{name, temperature, sensors}` - and `themes.DISK_SLOTS` names them for layouts:
@@ -358,9 +374,11 @@ What has been measured on glass, by whom, with how many frames - and what has no
    `nvme1` 31 °C then 33 °C - the drives warm while the box works, which is exactly why these
    are printed by `tools/fanscan.py` rather than quoted as a figure a reader has to trust.  So a
    layout can put the boot drive in slot 1 while the hotter raw probe stays visible in the row
-   instead of being quietly dropped.  Nothing shipped asks for any of these
-   names - none of the 21 `source` values those 28 layouts carry is storage-shaped - so they
-   exist for layouts you write, and the `bars` parity numbers are unchanged.
+   instead of being quietly dropped.  **`bars` draws two of them** as of 2026-11-14 -
+   `Disk 1 Name`/`Disk 1 Temperature` and `Disk 2 Name`/`Disk 2 Temperature` - so the first two
+   slots are on the glass under that theme, and slots 3 and 4 stay in the vocabulary for layouts
+   you write.  No vendored file asks for any of these names: of the 21 distinct `source` values
+   across the 28 layouts, none was storage-shaped until our own generated `bars` added four.
  * **The blob tolerates what the vendor never sent - asked directly three times on 2026-11-13.**
    One session, five `STATE all 1` bodies: the control in the vendor's shape; the control plus
    a fan row typed `"Pump"`; the control plus a new top-level `drives` key; both changes
@@ -1297,30 +1315,40 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   `sensors.collect()` reported - six fixed readings plus one row per fan, up to four - and
   the row pitch was `min(56, max(28, 320 // len(rows)))`, so the vertical geometry of the
   theme moved with whatever the box happened to report. That is closed as of 2026-11-08. `theme_bars` now lays out **ten rows on every machine**
-  - six fixed readings, the drive row, and four reserved fan slots, taken by position - which
-  makes the pitch 32 px everywhere, and a row with no reading keeps its place: it is not drawn,
+  - six fixed readings, two reserved drive slots and four reserved fan slots, all taken by
+  position - which makes the pitch 32 px everywhere on every machine, because twelve rows is
+  the most the block can ever be asked to lay out, and a row with no reading keeps its place: it is not drawn,
   and the
   advance still happens. That is what the 27 library layouts do, and it is the rule
   docs/themes.md states as "a hole that says what it is, rather than a zero that reads as a
-  measurement"; `tests/test_bars_rows.py` holds the eleven-row layout and the keep-place behaviour by counting
+  measurement"; `tests/test_bars_rows.py` holds the twelve-row layout, the keep-place behaviour and the margin under the last meter, counting
   ink in the slots, and it is what made the earlier stance - "invent a repeat group" -
   unnecessary: the 23 selectable library layouts ask for 7 `source` names and none of them is
   a fan, so `Fan 1` is a new name in our own table, while a repeat group would have been a
   new structure in a file whose whole point is being a fixed list of rows.
 
-  What the **drive row** cost, in pixels, measured rather than guessed (2026-11-14): the pitch
-  is `BARS_SPAN // len(rows)`, so at `BARS_SPAN` 320 ten rows gave 32 px and eleven give 29 -
-  and at 29 the shipped meter (`BARS_BAR_DY` 12, a 6 px track) sat **1 px** from the text band of
-  the row below it and nearer that row's label (1 px) than its own (3 px), which is the
-  difference between a meter and a separator line.  `tests/test_bars_rows.py`'s clearance floor
-  is 2 px and it failed on both halves.  Two ways out were swept on the real painter, all ink
-  measured from it: thin the meter to (11, 4) at pitch 29, which clears by 2 px above and 4 below
-  - at the floor, on a track already thinned once from 10 px for the same reason; or give the
-  block the room below it, which is empty: the last row's meter ends at y=409 and the clock
-  line's own ink starts at y=440, **31 px of air** measured at 480 px tall.  So `BARS_SPAN` went
-  320 -> 352 and the pitch stayed 32: clearances 3 px above a meter and 4 below, the track
-  untouched, and every pixel window in the row tests the same as before.  The theme now paints
-  57 036 lit px at the editor's pinned fixture, both doors, at 0 px difference.
+  What the **drive slots** cost, in pixels, measured rather than guessed (2026-11-14).  The
+  pitch is `BARS_SPAN // len(rows)`, so at `BARS_SPAN` 320 ten rows gave 32 px, eleven gave 29
+  and twelve give 26 - and at 29 the shipped meter (`BARS_BAR_DY` 12 over a 6 px track) sat
+  **1 px** from the text band of the row below it, nearer *that* row's label (1 px) than its own
+  (3 px), which is the difference between a meter and a separator line; `tests/test_bars_rows.py`'s
+  clearance floor is 2 px and it failed on both halves.  Two ways out were swept on the shipped
+  painter with the ink measured from it: thin the meter to (11, 4) at pitch 29, which clears 2 px
+  above and 4 below - at the floor, on a track already thinned once from 10 px for this same
+  reason - or use the room the block already has below it.  The room was larger than the
+  arithmetic suggested, because two of the reserved fan slots draw nothing on a box with two
+  tachometers: measured on this machine, the ink ends at y=335 and the clock's own ink begins at
+  y=445, **93 px of empty canvas** inside the block.  So the span grew instead of the meter being
+  thinned - 320 -> 352 for one drive row, then 352 -> **384** for two, with the clock moved from
+  y=452 to y=458 to keep the margin - and the pitch stayed 32 px at twelve rows, the track stayed
+  6 px, and the inter-row clearances are 3 px above a meter and 4 below.
+  The margin under the last row is now measured too, because at twelve rows there is not much of
+  it: `TheBlockStopsBeforeTheClock` in `tests/test_bars_rows.py` draws the block with **every slot
+  answered** - the case that has never been drawn here, since this box leaves two fan slots empty
+  - and holds the last row's meter ink (to y=442) clear of the clock's ink (from y=446), 3 px of
+  air, floor 2.  It also prints what a thirteenth row would compute (pitch 29, last centre 420),
+  which is the arithmetic the clearance rule already refuses.  The theme paints 76 253 lit px at
+  the first complete parity reading, both doors, at 0 px difference.
 
   What the change costs, stated rather than left to be noticed: on the glass a missing
   reading now leaves a gap where the rows used to close up, and the `bars` preview clip
@@ -1330,12 +1358,13 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   stale clip failed. Nothing does that now: the six video files are 0.7's deliberate
   gap, and `ffprobe` plus `du -b` are the doors to re-measure them at (docs/tools.md).
   The sources followed on 2026-11-09, and so did the file: `themes.BARS_ROWS` names the
-  rows - **eleven today**, six fixed readings, four per-sensor fan slots and the drive row
-  that went in on 2026-11-14 (see the pitch arithmetic below).  Four of them are (`Fan N Speed`, `Fan N Name`) - which the
+  rows - **twelve today**, six fixed readings, four per-sensor fan slots and two per-drive
+  slots that went in on 2026-11-14 (see the pitch arithmetic above).  Six of them are slot
+  pairs (`Fan N Speed`/`Fan N Name`, `Disk N Temperature`/`Disk N Name`) - which the
   vendor's own vocabulary has no word for, since it offers the aggregates `cpuFansSpeed`
   "CPU Fans Speed" and `gpuFansSpeed` and never a row per tachometer (PROTOCOL.md 10) -
   while `RAM Rate` and `Used RAM` come out of that record's `RAMRate` and `UsedRAM`; and
-  `themes.bars_recipe()` generates the 32 widgets out of that table and the `BARS_*`
+  `themes.bars_recipe()` generates the 38 widgets out of that table and the `BARS_*`
   constants. It is pixel-identical to `render.py` at every reading
   `tests/test_bars_rows.py` and `tests/test_export_parity.py` give it, answered and
   unanswered alike. Two things that took were not in the plan:
@@ -1360,7 +1389,7 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
     the memory row kept it. Both go through `render.pct_pair` now, and `tests/test_bars_rows.py` measures the
     rules that follow: at `memory: {total, no used}` the frame draws and the RAM row keeps its
     label with no number and no meter, and at `gpu: {memoryUsage: 0, dedicatedTotal: 8192}`
-    the VRAM row draws `0 GB` with its track unfilled. A zero numerator is a reading; a zero
+    the VRAM row draws `0.0 GB` with its track unfilled. A zero numerator is a reading; a zero
     or absent denominator is not a pair. `bars` was the only theme that could have found
     either, because it is the only one that reads those fields.
 

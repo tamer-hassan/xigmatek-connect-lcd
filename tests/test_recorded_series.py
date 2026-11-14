@@ -164,16 +164,23 @@ class RecordedSeries(unittest.TestCase):
         """
         labelled = [row for row in themes.BARS_ROWS if row[0] is not None]
         slots = [row for row in themes.BARS_ROWS if row[0] is None]
-        self.assertEqual(len(labelled), len(themes.BARS_FIXED_ROWS) + len(themes.BARS_DISK_ROWS),
-                         f"{len(labelled)} labelled rows in the table: the split by shape here "
-                         "has to agree with the split the recipe draws")
+        slots = [r for r in themes.BARS_ROWS if r[0] is None]
+        self.assertEqual(len(labelled), len(themes.BARS_FIXED_ROWS),
+                         f"{len(labelled)} labelled rows: only the fixed readings carry a literal "
+                         "label now, the drive slots name theirs by reading")
+        self.assertEqual(len(slots), len(themes.FAN_SLOTS) + len(themes.BARS_DISK_ROWS),
+                         f"{len(slots)} slot rows: the split by shape has to agree with the "
+                         "recipe, or this check counts a different block than the one drawn")
         gaps = []
         for n, sample in enumerate(self.series):
             values, _ = themes.values(sample["metrics"],
                                       preview_gif.series_clock(sample, self.tzoff))
-            mine = labelled + [
-                row for row in slots
-                if int(row[1].split()[1]) - 1 < len(sample["metrics"].get("fans") or [])]
+            # a slot row is in scope when the box reports that many of whatever it indexes -
+            # fans for a fan slot, drives for a drive slot - which the values table answers
+            # directly, so the sample itself decides and no per-kind arithmetic lives here
+            mine = labelled + [row for row in slots if row[1] in
+                               (themes.values(sample["metrics"],
+                                              preview_gif.series_clock(sample, self.tzoff))[0])]
             unanswered = sorted({source for _label, bar, text, _lo, _hi in mine
                                  for source in (bar, text) if source and source not in values})
             if unanswered:

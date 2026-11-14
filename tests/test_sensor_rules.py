@@ -481,6 +481,28 @@ class TheDriveSlots(Built):
         self.assertEqual(deg, row["temperature"], f"{deg} vs {row}")
         self.assertIn("composite", whence.lower(), whence)
 
+    def test_the_boot_drive_is_slot_1_even_when_the_kernel_disagrees(self):
+        """Root-first ordering, proven on a tree where controller order says otherwise.
+
+        The built tree's controllers are `nvme0`, `nvme1`, `nvme2` in that order by name, so a
+        sort that only knew the number would put the same drive first here and prove nothing.
+        Pointing the mount at `nvme1` is what separates the two rules: slot 1 must follow the
+        filesystem, because `Disk 1 Name` is how `bars` marks the boot drive and
+        `disk.temperature` - the scalar whose capacity the row sits beside - is the same drive.
+        """
+        as_root = [d["name"] for d in sensors.drives(root="nvme1")]
+        self.assertEqual(as_root, ["nvme1", "nvme0", "nvme2"],
+                         f"root-first ordering did not move the boot drive to slot 1: {as_root}")
+        self.assertEqual(sensors.drives(root="nvme1")[0]["temperature"],
+                         sensors.disk_temperature(root="nvme1")[0],
+                         "slot 1 and the scalar are different drives: one block would print a "
+                         "capacity from one disk and a temperature from another")
+        plain = [d["name"] for d in sensors.drives(root="nvme2")]
+        self.assertEqual(plain[0], "nvme2", f"the third drive, mounted, did not come first: {plain}")
+        self.assertEqual(plain[1:], ["nvme0", "nvme1"],
+                         "the non-root drives are no longer in controller order behind it")
+
+
     def test_the_slots_answer_positionally_and_say_what_they_dont(self):
         from xigmalcd import themes
         body = {"drives": sensors.drives()}

@@ -165,8 +165,8 @@ SESSION_WHEN = datetime.datetime(2026, 11, 8, 3, 40, 0)
 #: **four fan rows**, because `bars` reserves four slots and a box reporting one fan leaves three
 #: unanswered by construction.  The last three deliberately do not.  Both complete readings sit at
 #: the ends of every scale: 100 degrees, 0 % load, 12 345 RPM on a 0..3000 meter, and
-#: `disk.temperature` at the top of its 25..80 meter (80); the other complete case carries a
-#: mid-scale 41 with the rest of its readings, as it always has.  The drive row went into `bars`
+#: `disk.temperature` at the top of its 25..80 meter (80) and both drive slots filled; the
+#: other complete case carries mid-scale values with the rest of its readings, as it always has.  The drive row went into `bars`
 #: on 2026-11-14, and that is the first time these cases stopped being complete without a disk
 #: section: the parity check reported `['Disk Temperature', 'Disk Temperature']` - number and
 #: meter, from both doors - and was right to.
@@ -175,6 +175,8 @@ PARITY_CASES = ({"cpu": {"temperature": 57, "load": 62},
                          "dedicatedTotal": 8_000_000},
                  "motherboard": {"temperature": 41},
                  "disk": {"temperature": 41, "total": 786, "used": 73},
+                 "drives": [{"name": "nvme0", "temperature": 41, "sensors": [41, 52, 68]},
+                            {"name": "nvme1", "temperature": 33, "sensors": [33]}],
                  "memory": {"used": 4_200_000, "total": 16_000_000},
                  "fans": [{"value": 1957, "name": "Fan CPU"},
                           {"value": 1102, "name": "Fan System 5"},
@@ -185,6 +187,11 @@ PARITY_CASES = ({"cpu": {"temperature": 57, "load": 62},
                          "dedicatedTotal": 8_000_000},
                  "motherboard": {"temperature": 0},
                  "disk": {"temperature": 80, "total": 786, "used": 73},
+                 # both drive slots at the opposite end of the same meter: 80 fills it, 25 is
+                 # empty, and slot 1 is spelled with the boot mark while slot 2 is not - the
+                 # two doors have to agree on that mark or parity moves
+                 "drives": [{"name": "nvme0", "temperature": 80, "sensors": [80]},
+                            {"name": "nvme1", "temperature": 25, "sensors": [25]}],
                  "memory": {"used": 0, "total": 16_000_000},
                  "fans": [{"value": 12345, "name": "Fan CPU"}, {"value": 0, "name": "Fan System 5"},
                           {"value": 1, "name": "Fan Pump"}, {"value": 3000,

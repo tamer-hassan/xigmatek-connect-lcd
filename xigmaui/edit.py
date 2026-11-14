@@ -2240,6 +2240,13 @@ FIXTURE = {"cpu": {"temperature": 57.0, "load": 62.0, "usage": 62.0,
            # capacity numbers, because a preview that silences a row this box answers is the
            # half-truth this fixture was completed to stop being
            "disk": {"temperature": 44.0, "total": 786, "used": 73},
+           # This key is not from the captured sample and is labelled as such: `drives[]` is a
+           # section this program added, and the panel was asked about it and answered `200`
+           # without refusing (PROTOCOL.md 8).  It belongs here because `bars` draws two of its
+           # slots, and a preview that silences rows this machine reports is the half-truth the
+           # fixture was completed to stop being.  Slot 1 is the drive under `/`.
+           "drives": [{"name": "nvme0", "temperature": 44, "sensors": [44, 55, 68]},
+                      {"name": "nvme1", "temperature": 33, "sensors": [33]}],
            "fans": [{"onBoard": True, "type": "Fan", "name": "Fan CPU", "value": 1180},
                     {"onBoard": True, "type": "Chassis", "name": "Fan System 5",
                      "value": 890}],

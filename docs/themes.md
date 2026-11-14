@@ -114,14 +114,16 @@ asserted here:
 * **7 metric names over those 23, in 82 widgets' worth of counts**: `CPU Temperature` 17,
   `CPU Usage` 15, `Time` 11, `Pump Speed` 9, `GPU Usage` 6, `GPU Temperature` 3,
   `CPU Frequency` 2.  The vocabulary this program answers is wider than what the library
-  asks - **37 names** through `themes.source_names()` - and eight of them are asked by nothing
-  shipped here: `Disk Temperature` (→ `disk.temperature`, the composite of the drive that
+  asks - **37 names** through `themes.source_names()` - and eight of them are asked by nothing in
+  the vendored library: `Disk Temperature` (→ `disk.temperature`, the composite of the drive that
   holds `/`) and the four positional pairs `Disk 1 Temperature`/`Disk 1 Name` …
-  `Disk 4 Temperature`/`Disk 4 Name`, which index the `drives` list `sensors.drives()`
-  publishes - ordered by controller, so `nvme0` is slot 1 whatever the kernel numbered its
-  hwmon directory.  No file of the vendor's names a storage reading at all, so those names and
-  their display shapes are this repo's, and they exist so a layout of **yours** can put drive
-  temperatures on the glass (docs/limits.md has the rules, the measured numbers and the
+  `Disk 4 Temperature`/`Disk 4 Name`, which index the `drives` list `sensors.drives()` publishes -
+  **the drive under `/` first**, then the rest by controller, so slot 1 is the boot drive whatever
+  number the kernel gave its hwmon directory, and `Disk 1 Name` prints it with a trailing slash.
+  Our own generated `bars` draws the first two pairs as of 2026-11-14; **no vendored file names a
+  storage reading at all**, so these names and their display shapes are this repo's, and slots 3
+  and 4 exist so a layout of **yours** can put a further drive on the glass (docs/limits.md has the
+  rules, the measured numbers and the
   probe that made the extra blob section permissible).  Whether any of them is missing from a given machine is a per-machine
   question, and since 2026-11-13 the only one that can be is `Pump Speed`: it is answered by a
   fan row whose `type` is `Pump` (`themes.FAN_TYPED`), and this bench has one - the channel that

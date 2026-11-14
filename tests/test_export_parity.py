@@ -104,6 +104,35 @@ class Parity(unittest.TestCase):
                     self.assertEqual(result["code_px"], result["layout_px"])
                     reached.add(name)
         self.assertEqual(reached, set(themes.EXPORTS))
+        # docs/usage.md quotes this census, so the page names a command instead of a
+        # transcription.  The counts moved on 2026-11-14 when `bars` gained a row (32
+        # widgets and 14 121 characters -> 35 and 15 434), and a figure with no door to
+        # reprint it through is a figure nobody can check.
+        import json
+        for name in sorted(themes.EXPORTS):
+            obj = themes.export(name)
+            one = json.dumps(obj, sort_keys=True, indent=1)
+            two = json.dumps(themes.export(name), sort_keys=True, indent=1)
+            # every case in the file, not only the two complete ones: docs quote the
+            # whole sequence, and a print that covers part of it invites a transcription
+            # of the part that happens to be handy
+            # Every case in the file, with its diff beside it rather than hidden.  The
+            # first two cases answer everything the theme asks, and those are the ones
+            # held to zero differing pixels above.  The last three deliberately do not,
+            # and the doors part company there by design: with no `gpu` section at all,
+            # the code drawing prints `--%` inside a widget it still lays out, while the
+            # file has no reading to name and reports the row as skipped.  That
+            # asymmetry is documented (docs/limits.md) and worth printing, because a
+            # page that quotes "5 readings, all zero" would be quoting a fiction - the
+            # numbers here say which cases agree.
+            per_case = []
+            for index, body in enumerate(fixtures.PARITY_CASES):
+                res = themes.parity(name, body, fixtures.SESSION_WHEN)
+                per_case.append(f"case{index} {res['code_px']}/{res['layout_px']}"
+                                f" diff {res['diff_px']}")
+            print(f"  {name:6} {len(obj['osd']['widget']):>3} widgets, "
+                  f"{len(one):>6} characters (byte-stable across two exports: {one == two})")
+            print(f"         " + ", ".join(per_case))
 
     def test_a_missing_reading_is_reported_with_its_cause_and_only_from_the_exported_sources(self):
         """`xigma.showIf` reports an unmet dependency as `showIf:<source>`, and the source it names
