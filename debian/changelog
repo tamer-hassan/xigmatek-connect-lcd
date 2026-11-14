@@ -1067,7 +1067,7 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     with `gb` on the RAM/VRAM rows silently fed the formatter the meter's
     **fraction** instead of the used field, printing `0.1 GB` for 10 240 MB;
     the parity gate caught it as an 831 px split on the first reading with a
-    GPU. And `tests/test_bars_rows.py` 's `wanted_rows()` had rebuilt the
+    GPU. And `tests/test_bars_rows.py`'s `wanted_rows()` had rebuilt the
     slot-name map from `FAN_SLOTS` and counted `metrics["fans"]` by hand - a
     second copy of the rule, which raised `KeyError: 'Disk 1 Temperature'`
     the day the drive slots arrived.  Both doors and the tests now read one
@@ -1305,7 +1305,7 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     defect it was written for.
 
     Two more pins moved with the row size, both corrected by deriving
-    rather than re-typing: `tests/test_row_acts.py` 's reorder test walked
+    rather than re-typing: `tests/test_row_acts.py`'s reorder test walked
     a **literal** three steps on the theory that a row is label, number,
     meter, and now computes the steps from the export (
     `per_row = (widgets - 2) // rows` , four today); and the generated-file
@@ -1510,18 +1510,19 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     slot 1 and the rest in controller order - the positional rule `bars`
     uses to mark the boot drive. The four checks that gate it (
     `tests/test_sensor_rules.py::TheDriveSlots`, two sites in
-    `tests/test_blob_probe.py`, and `tests/test_bare_audit.py`'s end-to-end
-    run over one of those files) install a constructed hwmon tree by
-    swapping `sensors.HWMON_GLOB`, and asserted the order
+    `tests/test_blob_probe.py`, and `tests/test_bare_audit.py`'s
+    end-to-end run over one of those files) install a constructed hwmon
+    tree by swapping `sensors.HWMON_GLOB`, and asserted the order
     `nvme0, nvme1, nvme2`. But `_root_controller()` - the half that decides
     slot 1 - reads `/proc/mounts`, and the mount belongs to the machine
-    running the test. This bench came back from a boot with its two NVMe
-    controllers enumerated the other way round: the same Kingston disk, on
-    the same partition, answered `nvme1` where it had answered `nvme0` on
-    2026-11-13. The walk was pinned and the mount was not, so `drives()`
-    answered correctly - `nvme1, nvme0, nvme2` - against an expectation
-    that had quietly been this box's mount table all along. Fixed at the
-    root: `fixtures.pin_hwmon(pattern, root=...)` swaps both the glob and
+    running the test. This bench rebooted at 12:04:05 on 2026-11-14 (
+    `uptime -s`) and came back with its two NVMe controllers enumerated the
+    other way round: the same Kingston disk, on the same partition,
+    answered `nvme1` where it had answered `nvme0` on 2026-11-13. The walk
+    was pinned and the mount was not, so `drives()` answered correctly -
+    `nvme1, nvme0, nvme2` - against an expectation that had quietly been
+    this box's mount table all along. Fixed at the root:
+    `fixtures.pin_hwmon(pattern, root=...)` swaps both the glob and
     `_root_controller`, `unpin_hwmon` restores them, and `Built` in
     `tests/test_sensor_rules.py` plus the two built-tree sites in
     `tests/test_blob_probe.py` use it.
@@ -1627,7 +1628,7 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     next background is a file drop rather than a rules edit. That moves 16
     079 473 B into the code package (the ten new clips plus
     `theme_47-trimmed.mp4`, which the repository had been carrying without
-    shipping), and `docs/packaging.md` 's clean-machine section is
+    shipping), and `docs/packaging.md`'s clean-machine section is
     annotated with the vintage of its figures rather than quietly rewritten
     - the .deb sizes are read back from the next artefact.
 
@@ -1745,7 +1746,7 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     it was built to protect.
 
     **Parity caught one real defect and one near-miss.** The near-miss:
-    `birdseye` 's rings first disagreed with the file by 156 px in exactly
+    `birdseye`'s rings first disagreed with the file by 156 px in exactly
     one dial, and it was neither geometry nor colour but **z-order** - the
     painter drew each dial's name before its ring, the file declares ring,
     number, name, and the second tachometer's name ( `Fan System`, ten
