@@ -678,7 +678,17 @@ def theme_clock(m, clock=True, big=140, date=True, bg=OVERLAY, ink=None):
 #: meters suppressed, once as shipped - and holds the clearance positive on each side and the
 #: meter closer to its own label than to the row under it, because a bar that sits nearer the
 #: line below reads as that line's separator rather than as this row's meter.
-BARS_Y0, BARS_SPAN = 72, 320
+#: `BARS_SPAN` moved 320 -> 352 when the drive row went in (2026-11-14), and the reason is
+#: arithmetic the clearance check forced: the pitch is `BARS_SPAN // len(BARS_ROWS)`, so at 320
+#: ten rows gave 32 px and eleven give 29 - and at 29 the shipped meter sat **1 px** from the
+#: text band of the row below it, nearer that row's label than its own, i.e. a bar reading as
+#: the next line's separator.  Two ways out were measured, not chosen: thin the meter to
+#: (DY 11, height 4), which clears by 2 px - at the floor - and costs track thickness on the
+#: glass; or give the block the room it already had below it.  The block ends at y=409 and the
+#: clock line's own ink begins at y=440 (measured, 31 px of air), so the span grows and the
+#: pitch, the 6 px track and the clearance stay exactly as the ten-row layout had them: 3 px
+#: above a meter, 4 px below.
+BARS_Y0, BARS_SPAN = 72, 352
 BARS_ROW_MIN, BARS_ROW_MAX = 28, 56
 BARS_LBL_X, BARS_VAL_X = 28, 452
 BARS_BAR_X, BARS_BAR_DY, BARS_BAR_WH = 28, 12, (424, 6)
@@ -737,6 +747,11 @@ def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
     rows = [("CPU", cpu.get("temperature"), 30, 90, lambda v: f"{v:.0f}\u00b0C", True),
             ("GPU", gpu.get("temperature"), 30, 90, lambda v: f"{v:.0f}\u00b0C", True),
             ("BOARD", board.get("temperature"), 25, 80,
+             lambda v: f"{v:.0f}\u00b0C", True),
+            # the drive the capacity numbers describe: `disk.temperature`, the same scalar,
+            # not `drives[0]` - see `themes.BARS_DISK_ROWS` for why one row may not mix a
+            # positional label with a non-positional reading
+            ("DISK", (m.get("disk") or {}).get("temperature"), 25, 80,
              lambda v: f"{v:.0f}\u00b0C", True),
             ("LOAD", cpu.get("load"), 0, 100, lambda v: f"{v:.0f}%", True),
             ("RAM", ram, 0, 100,

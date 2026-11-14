@@ -133,6 +133,12 @@ class WhatARowPaints(unittest.TestCase):
                            f"nothing was skipped: the reasons {sorted(reasons)} are the other half "
                            "of the sentence")
         self.assertTrue(reasons, "a skipped row named no reason")
+        # the census docs/gui.md quotes, printed rather than pinned: rows, twins, skips and the
+        # reason each skip was blamed on.  A figure that only a run can reprint is a figure the
+        # page can name the command for.
+        print(f"  row census: {rows} `text`/`data` rows over {len(self.editors)} layouts; "
+              f"{twins} twins, {skipped} skipped, {caveats} caveats; reasons: "
+              + ", ".join(f"{k} {v}" for k, v in sorted(reasons.items())))
 
 
 class AFormatBothDoors(unittest.TestCase):

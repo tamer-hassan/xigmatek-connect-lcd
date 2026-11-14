@@ -118,6 +118,13 @@ class TheFilesLineUpOrTheyDoNot(unittest.TestCase):
                                        "have nothing to pull onto")
         self.assertGreater(share_y, 0)
         self.assertGreater(same, 0)
+        # docs/gui.md quotes these four totals as the reach of the 2 px snap.  Printed here so
+        # the page can name the command that re-counts them instead of carrying numbers that go
+        # stale the day a layout grows a row (it did, on 2026-11-14: `bars` took a drive row and
+        # the census moved 185 -> 188 rows).
+        print(f"  snap census: {len(rows)} rows carry an x or y across {len(self.objects)} "
+              f"layouts; {share_x} hold an x a peer in the same file holds, {share_y} do the "
+              f"same with y; {same} pairs of rows hold one number between them")
 
     def test_two_pixels_is_a_break_in_the_histogram_not_a_point_on_a_slope(self):
         """The two shape claims, not just the totals: nothing sits one pixel from a peer's number,
@@ -134,6 +141,11 @@ class TheFilesLineUpOrTheyDoNot(unittest.TestCase):
                          f"something now sits 1 px from a peer's number: {sorted(distances.items())}")
         self.assertEqual(distances.get(6, 0), 0, f"the 6-7 px gap has filled in: {sorted(distances.items())}")
         self.assertEqual(distances.get(7, 0), 0, f"the 6-7 px gap has filled in: {sorted(distances.items())}")
+        # the histogram the page reads the 2 px break out of, printed so the figures in
+        # docs/gui.md name a command rather than a snapshot
+        near = {k: v for k, v in sorted(distances.items()) if k <= 5}
+        print(f"  nearest-peer x gap, {len(rows)} rows: {near} px; "
+              f"nothing at 1, 6 or 7 px is the claim")
 
     def test_three_pixels_is_more_grabbable_than_two_on_this_corpus(self):
         """The prose says a 3 px reach would pull rows onto columns they do not mean; that has to
@@ -149,6 +161,8 @@ class TheFilesLineUpOrTheyDoNot(unittest.TestCase):
         self.assertLess(pulled(2), pulled(3),
                         "3 px is no more grabbable than 2 px on this corpus, so the sentence that "
                         "says otherwise has to go")
+        print(f"  a drag pulled onto a peer's number: {pulled(1)}% at 1 px, {pulled(2)}% at 2 px, "
+              f"{pulled(3)}% at 3 px of {len(rows)} rows")
 
     def test_no_row_declares_a_number_on_the_canvas_edge(self):
         edge = sum(1 for _i, x, y in self.declared for value in (x, y)

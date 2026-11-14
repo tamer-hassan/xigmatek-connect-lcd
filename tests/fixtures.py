@@ -164,11 +164,17 @@ SESSION_WHEN = datetime.datetime(2026, 11, 8, 3, 40, 0)
 #: asks for - which, once `bars` was exported, means a board temperature, a GPU memory pair and
 #: **four fan rows**, because `bars` reserves four slots and a box reporting one fan leaves three
 #: unanswered by construction.  The last three deliberately do not.  Both complete readings sit at
-#: the ends of every scale: 100 degrees, 0 % load, 12 345 RPM on a 0..3000 meter.
+#: the ends of every scale: 100 degrees, 0 % load, 12 345 RPM on a 0..3000 meter, and
+#: `disk.temperature` at the top of its 25..80 meter (80); the other complete case carries a
+#: mid-scale 41 with the rest of its readings, as it always has.  The drive row went into `bars`
+#: on 2026-11-14, and that is the first time these cases stopped being complete without a disk
+#: section: the parity check reported `['Disk Temperature', 'Disk Temperature']` - number and
+#: meter, from both doors - and was right to.
 PARITY_CASES = ({"cpu": {"temperature": 57, "load": 62},
                  "gpu": {"temperature": 47, "load": 22, "memoryUsage": 2_100_000,
                          "dedicatedTotal": 8_000_000},
                  "motherboard": {"temperature": 41},
+                 "disk": {"temperature": 41, "total": 786, "used": 73},
                  "memory": {"used": 4_200_000, "total": 16_000_000},
                  "fans": [{"value": 1957, "name": "Fan CPU"},
                           {"value": 1102, "name": "Fan System 5"},
@@ -178,6 +184,7 @@ PARITY_CASES = ({"cpu": {"temperature": 57, "load": 62},
                  "gpu": {"temperature": 100, "load": 0, "memoryUsage": 0,
                          "dedicatedTotal": 8_000_000},
                  "motherboard": {"temperature": 0},
+                 "disk": {"temperature": 80, "total": 786, "used": 73},
                  "memory": {"used": 0, "total": 16_000_000},
                  "fans": [{"value": 12345, "name": "Fan CPU"}, {"value": 0, "name": "Fan System 5"},
                           {"value": 1, "name": "Fan Pump"}, {"value": 3000,

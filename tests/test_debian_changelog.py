@@ -78,6 +78,68 @@ class Width(unittest.TestCase):
                                 "is the file's own measured budget no longer holds")
 
 
+class QuotedSpans(unittest.TestCase):
+    """A code span that carries a quoted argument must not be broken by a line wrap.
+
+    Found the hard way twice in one sitting.  A helper that re-wraps changelog
+    paragraphs reflowed the entry's own counting command, and
+
+        `grep -c "^    def test_" tests/*.py`      became      `grep -c "^
+        def test_" tests/*.py`
+
+    which is a command that counts something else - the four spaces inside the
+    pattern became a newline plus the continuation indent.  `test_no_line_is_over_80_columns`
+    passed on the mangled text, because a gate over line lengths cannot see that
+    a span's content changed.  The same scan found one more case, older and
+    cosmetic: a `{"cmd": "text_color", "value": "#ff4040"}` socket example in an
+    earlier stanza, wrapped in the middle since well before this check existed.
+
+    Only spans holding a double-quoted argument are in scope: plenty of prose
+    spans wrap across lines harmlessly (a flag name, a file path), and a rule
+    that flags all of them would be a rule a reader learns to ignore.
+    """
+
+    def spans(self) -> list:
+        text = fixtures.read(CHANGELOG)
+        out, i = [], 0
+        while True:
+            a = text.find("`", i)
+            if a < 0:
+                return out
+            b = text.find("`", a + 1)
+            if b < 0:
+                return out
+            body = text[a + 1:b]
+            if '"' in body and "\n" in body:
+                out.append((text[:a].count("\n") + 1, body.replace("\n", "\\n")[:72]))
+            i = b + 1
+
+    def test_no_quoted_span_crosses_a_line_break(self):
+        bad = self.spans()
+        self.assertEqual(bad, [],
+                         f"{len(bad)} code span(s) in debian/changelog carry a quoted argument "
+                         f"across a line break, so the command they show is not the command that "
+                         f"runs: {bad[:4]}")
+
+    def test_the_scan_is_not_blind(self):
+        """The gate on the gate: a mangled span must be found by the same scan."""
+        broken = 'a command `grep -c "^\n    def test_" tests/*.py` here'
+        out, i, found = 0, 0, []
+        while True:
+            a = broken.find("`", i)
+            if a < 0:
+                break
+            b = broken.find("`", a + 1)
+            if b < 0:
+                break
+            body = broken[a + 1:b]
+            if '"' in body and "\n" in body:
+                found.append(a)
+            i = b + 1
+        self.assertEqual(len(found), 1,
+                         "the scan does not notice the exact corruption it exists to catch")
+
+
 class Shape(unittest.TestCase):
     """The three shapes dpkg allows: indented body, well-formed heading, ` -- ` trailer."""
 

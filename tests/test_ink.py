@@ -172,8 +172,8 @@ class InkThroughTheFileDoor(unittest.TestCase):
             self.assertEqual(T.export(theme), base, "`with_ink` wrote through its copy")
 
     def test_only_the_glyph_roles_move(self):
-        """`bars` is where the glyph/graphic distinction has teeth: its heading glyph and its ten
-        meter tracks are the same CYAN, and an ink may take only the glyph."""
+        """`bars` is where the glyph/graphic distinction has teeth: its heading glyph and its
+        eleven meter tracks are the same CYAN, and an ink may take only the glyph."""
         base = T.export("bars")
         inked, _note = T.with_ink(base, "bars", "amber")
         for key in ("startColor", "endColor", "bgColor"):
@@ -181,8 +181,15 @@ class InkThroughTheFileDoor(unittest.TestCase):
                               f"an ink moved a graphic's colour ({key}), not a glyph's")
         moved = sum(1 for a, b in zip(keyed(base, "textColor"), keyed(inked, "textColor"))
                     if a != b)
-        self.assertEqual(moved, 22, "the glyph roles an ink may move are no longer 22 of "
+        # 24 today: the heading, the clock, one label per row and one number per row.  The
+        # figure moved from 22 when the drive row went in (2026-11-14); a widget count derived
+        # from the table and a glyph count pinned like this one meet in the middle, and the
+        # difference between them is exactly the meters.
+        self.assertEqual(moved, 24, "the glyph roles an ink may move are no longer 24 of "
                                     f"{len(base['osd']['widget'])} widgets")
+        self.assertEqual(moved + sum(1 for w in base["osd"]["widget"] if w["type"] == "bar"),
+                         len(base["osd"]["widget"]),
+                         "glyph roles plus meter tracks are not the whole layout")
 
     def test_a_layout_that_is_not_one_of_the_five_comes_back_untouched(self):
         refused, note = T.with_ink(T.export("bars"), "Theme_28", "amber")

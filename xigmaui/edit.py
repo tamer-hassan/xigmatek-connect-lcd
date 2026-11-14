@@ -2223,7 +2223,9 @@ _NOT_A_LINE = {
 #: read were missing.  A fixture can be wrong in both directions at once, and only a gate
 #: over the key names sees it: at that fixture the pane's file door left `alpha`'s GPU row
 #: out altogether while its code door drew `--%` and the ring's track - 4 587 px between
-#: them at one instant - and it showed `bars` with 14 of its 32 rows.
+#: them at one instant - and it showed `bars` with 14 of its 32 rows (the layout is 35
+#: widgets now: it gained a drive row on 2026-11-14; `themes.parity("bars", ...)` prints
+#: the drawn count alongside the pixel diff).
 #:
 #: `memory.used`/`total` are MB as that sample spells them, chosen so the derived ratio
 #: and the printed gigabytes agree (53 740 of 131 072 is 41 %, which reads `52 GB`);
@@ -2234,6 +2236,10 @@ FIXTURE = {"cpu": {"temperature": 57.0, "load": 62.0, "usage": 62.0,
                    "power": 90.0, "memoryUsage": 2458, "dedicatedTotal": 8192},
            "memory": {"load": 41.0, "used": 53740, "total": 131072},
            "motherboard": {"temperature": 44.0},
+           # the drive row `bars` gained on 2026-11-14: a scalar temperature beside the same
+           # capacity numbers, because a preview that silences a row this box answers is the
+           # half-truth this fixture was completed to stop being
+           "disk": {"temperature": 44.0, "total": 786, "used": 73},
            "fans": [{"onBoard": True, "type": "Fan", "name": "Fan CPU", "value": 1180},
                     {"onBoard": True, "type": "Chassis", "name": "Fan System 5",
                      "value": 890}],

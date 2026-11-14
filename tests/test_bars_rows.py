@@ -60,10 +60,11 @@ SLOT_MARKERS = ('for slot in range(BARS_SLOTS)', '(fan or {}).get("value")',
 ALL_SIX = {"cpu": {"temperature": 57.0, "load": 62.0},
            "gpu": {"temperature": 47.0, "load": 22.0, "memoryUsage": 4096,
                    "dedicatedTotal": 8192},
-           "motherboard": {"temperature": 51.0},
+           "motherboard": {"temperature": 51.0}, "disk": {"temperature": 44.0},
            "memory": {"used": 10240, "total": 16384}, "timestamp": {}}
 
-#: A body missing three of the six: the rows below the gap have to stay where they are.
+#: A body missing several labelled rows - BOARD, DISK, RAM and VRAM: the rows below each gap
+#: have to stay where they are.
 PARTIAL = {"cpu": {"temperature": 57.0, "load": 62.0}, "gpu": {"temperature": 47.0},
            "memory": {"used_percent": 41.0}, "timestamp": {}}
 
@@ -75,7 +76,16 @@ FANS_SIX = [{"name": f"Fan {i} on this box", "value": 900 + i, "type": "Fan"}
 FANS_TWO = [{"name": "Fan CPU", "value": 2000, "type": "Fan"},
             {"name": "Fan System 5", "value": 0, "type": "Fan"}]
 
-ROWS_TOTAL = len(themes.BARS_FIXED_ROWS) + render.BARS_SLOTS
+#: The row count `bars` draws: the six fixed readings, the drive row added 2026-11-14, and
+#: four reserved fan slots.  Derived so a row cannot be inserted in one place and forgotten in
+#: another; pinned once, in the census below, where the number is what is being claimed.
+ROWS_TOTAL = len(themes.BARS_ROWS)
+
+#: The pitch those rows compute: `BARS_SPAN // ROWS_TOTAL`, inside the shipped clamp.  Named
+#: because every pixel window in this file is measured in row bands, and 320 // 10 = 32 stopped
+#: being the answer when the drive row went in (2026-11-14): it is 29 now, and the clamp at
+#: `BARS_ROW_MIN` is what keeps a twelfth row from spilling past the block.
+PITCH = min(render.BARS_ROW_MAX, max(render.BARS_ROW_MIN, render.BARS_SPAN // ROWS_TOTAL))
 
 
 def pitch_of(rows: int = ROWS_TOTAL) -> int:
@@ -124,7 +134,7 @@ def wanted_rows(metrics: dict) -> tuple:
 
 
 def slots_with_ink(img) -> list:
-    """Which of the ten rows has value text in it, counted in the right-hand value column.
+    """Which row has value text in it, counted in the right-hand value column.
 
     Two geometric facts decide the window, and both are stated rather than tuned away: a meter
     sits `BARS_BAR_DY` below its row's centre and its track is opaque across the whole width, so
@@ -154,7 +164,7 @@ class TheBodyItself(unittest.TestCase):
         self.assertIn("y, span = BARS_Y0, BARS_SPAN", self.src,
                       "the block is not the named 72 + span")
         self.assertEqual((render.BARS_Y0, render.BARS_SPAN, render.BARS_ROW_MIN,
-                          render.BARS_ROW_MAX), (72, 320, 28, 56),
+                          render.BARS_ROW_MAX), (72, 352, 28, 56),
                          "the row geometry the page describes is not what the drawing names")
 
     def test_the_fan_rows_are_reserved_positional_slots(self):
@@ -162,15 +172,18 @@ class TheBodyItself(unittest.TestCase):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.src, "the fan rows are not reserved positional slots")
 
-    def test_the_row_set_is_the_six_plus_the_slots_the_plan_describes(self):
-        """The count of formatters in the body is the shape of the row table: six fixed rows and
-        one expression that the slot loop reuses.  A seventh fixed row, or a slot drawn by its own
-        copy of the formatter, changes that count - and the pitch census below would then be
+    def test_the_row_set_is_the_six_plus_the_drive_plus_the_slots(self):
+        """The count of formatters in the body is the shape of the row table: seven labelled rows
+        and one expression the slot loop reuses.  An eighth labelled row, or a slot drawn by its
+        own copy of the formatter, changes that count - and the pitch census below would then be
         counting a different number of rows."""
-        self.assertEqual(self.src.count("lambda v:"), len(themes.BARS_FIXED_ROWS) + 1,
-                         f"{self.src.count('lambda v:')} formatters, "
-                         f"{len(themes.BARS_FIXED_ROWS)} fixed rows")
-        self.assertEqual(ROWS_TOTAL, 10, ROWS_TOTAL)
+        labelled = len(themes.BARS_FIXED_ROWS) + len(themes.BARS_DISK_ROWS)
+        self.assertEqual(self.src.count("lambda v:"), labelled + 1,
+                         f"{self.src.count('lambda v:')} formatters, {labelled} labelled rows")
+        self.assertEqual(ROWS_TOTAL, 11, ROWS_TOTAL)
+        self.assertEqual(len(themes.BARS_DISK_ROWS), 1,
+                         "the drive row count moved: the pitch, the widget census and every pixel"
+                         " window in this file follow it")
 
 
 class WhatTheGlassHolds(unittest.TestCase):
@@ -180,22 +193,30 @@ class WhatTheGlassHolds(unittest.TestCase):
         """The reservation is the whole point of 2026-11-09's change: a box with four fewer
         tachometers gets the same ten places, not a tighter stack."""
         self.assertEqual(pitch_of(), render.BARS_SPAN // ROWS_TOTAL, pitch_of())
-        self.assertEqual(pitch_of(), 32, "the pitch moved off 32 px, so every window in this "
-                                         "file's pixel census is counting a different row")
+        self.assertEqual(pitch_of(), PITCH, f"the pitch moved off {PITCH} px, so every window in "
+                                            "this file's pixel census is counting a different "
+                                            "row")
         none = slots_with_ink(render.draw(ALL_SIX, "bars", bg=render.OVERLAY))
         six = slots_with_ink(render.draw(dict(ALL_SIX, fans=FANS_SIX), "bars",
                                          bg=render.OVERLAY))
-        self.assertEqual(none, [True] * len(themes.BARS_FIXED_ROWS) + [False] * render.BARS_SLOTS,
+        labelled = len(themes.BARS_FIXED_ROWS) + len(themes.BARS_DISK_ROWS)
+        self.assertEqual(none, [True] * labelled + [False] * render.BARS_SLOTS,
                          "a box with no fans no longer reserves the slots it is not drawing")
         self.assertEqual(six, [True] * ROWS_TOTAL,
                          "the fifth fan onward is not being kept out of the reserved slots")
 
     def test_a_row_below_a_missing_reading_keeps_its_place(self):
-        """The compaction that was removed on purpose: with three of the six fixed rows
-        unanswered, the rows that are drawn stay in their slots rather than closing up."""
+        """The compaction that was removed on purpose: with three of the labelled rows
+        unanswered, the rows that are drawn stay in their slots rather than closing up.
+
+        Spelled out row by row rather than derived, because this is the check that catches a
+        reordering: the order is CPU, GPU, BOARD, DISK, LOAD, RAM, VRAM, then the four fan
+        slots, and `PARTIAL` answers the first two, the load, and nothing else.
+        """
         got = slots_with_ink(render.draw(PARTIAL, "bars", bg=render.OVERLAY))
-        self.assertEqual(got, [True, True, False, True] + [False] * (ROWS_TOTAL - 4),
-                         (got, "rows below a missing reading closed up again"))
+        want = [True, True, False, False, True, False, False] + [False] * render.BARS_SLOTS
+        self.assertEqual(len(want), ROWS_TOTAL, "the hand-written pattern and the table disagree")
+        self.assertEqual(got, want, (got, "rows below a missing reading closed up again"))
 
     def test_a_box_that_answers_nothing_draws_no_row(self):
         self.assertEqual(slots_with_ink(render.draw({"cpu": {}, "timestamp": {}}, "bars",
@@ -255,6 +276,19 @@ class TheDisplayShapes(unittest.TestCase):
                            "probably not covering the fan names any more")
 
 
+def slot_of(label: str) -> int:
+    """The row index a label sits at, read out of the table that draws it.
+
+    Three checks here used literal indices (4 for RAM, 5 for VRAM).  Adding a row above them
+    re-points those numbers at a different row, which is how a positional pin survives a change
+    and then measures the wrong thing - so the labels ask the table where they are.
+    """
+    hit = [i for i, r in enumerate(themes.BARS_ROWS) if r[0] == label]
+    if len(hit) != 1:
+        raise AssertionError(f"{label!r} is at {hit} in {[r[0] for r in themes.BARS_ROWS]}")
+    return hit[0]
+
+
 def rows_by_slot(metrics: dict) -> dict:
     """Every string `bars` writes, grouped by the row band it lands in.
 
@@ -312,9 +346,10 @@ class TheGeneratedFile(unittest.TestCase):
         kinds: dict = {}
         for w in self.widgets:
             kinds[w["type"]] = kinds.get(w["type"], 0) + 1
-        self.assertEqual(kinds, {"text": 1 + len(themes.BARS_FIXED_ROWS),
-                                 "data": 1 + len(themes.BARS_ROWS) + len(themes.FAN_SLOTS),
-                                 "bar": len(themes.BARS_ROWS)}, kinds)
+        self.assertEqual(kinds, {
+            "text": 1 + len(themes.BARS_FIXED_ROWS) + len(themes.BARS_DISK_ROWS),
+            "data": 1 + len(themes.BARS_ROWS) + len(themes.FAN_SLOTS),
+            "bar": len(themes.BARS_ROWS)}, kinds)
 
     def test_each_rows_three_widgets_answer_for_the_same_place_on_the_glass(self):
         """The label and the number share the row's centre; the meter hangs `BARS_BAR_DY` under
@@ -385,11 +420,13 @@ class TheMemoryRows(unittest.TestCase):
         The row keeps its label and leaves its number and its meter undrawn."""
         body = dict(ALL_SIX, memory={"total": 16384})
         rows = rows_by_slot(body)
-        self.assertEqual(rows.get(4), [("label", "RAM")],
+        self.assertEqual(rows.get(slot_of("RAM")), [("label", "RAM")],
                          "the RAM row drew a number for a numerator that was never reported - "
                          "or `pct_pair` still raises")
-        self.assertEqual([t for c, t in rows.get(5, []) if c == "value"], ["4 GB"], rows.get(5))
-        self.assertFalse(slots_with_ink(render.draw(dict(body), "bars", bg=render.OVERLAY))[4],
+        self.assertEqual([t for c, t in rows.get(slot_of("VRAM"), []) if c == "value"],
+                         ["4 GB"], rows.get(slot_of("VRAM")))
+        self.assertFalse(slots_with_ink(render.draw(dict(body), "bars",
+                                                  bg=render.OVERLAY))[slot_of("RAM")],
                          "the value column has ink in a row whose number is not drawn")
 
     def test_a_gpu_at_exactly_zero_used_keeps_its_row_at_nothing_filled(self):
@@ -397,13 +434,15 @@ class TheMemoryRows(unittest.TestCase):
         reads `0 GB`."""
         rows = rows_by_slot(dict(ALL_SIX, gpu={"temperature": 47.0, "load": 22.0,
                                                "memoryUsage": 0, "dedicatedTotal": 8192}))
-        self.assertEqual([t for c, t in rows.get(5, []) if c == "value"], ["0 GB"],
+        self.assertEqual([t for c, t in rows.get(slot_of("VRAM"), []) if c == "value"],
+                         ["0 GB"],
                          "a GPU at 0 used dropped its row again - the asymmetry between the two "
                          "memory rows is back")
 
     def test_a_zero_denominator_is_not_a_pair_to_divide(self):
         rows = rows_by_slot(dict(ALL_SIX, memory={"used": 0, "total": 0}))
-        self.assertEqual(rows.get(4), [("label", "RAM")], "a zero denominator drew a RAM row")
+        self.assertEqual(rows.get(slot_of("RAM")), [("label", "RAM")],
+                         "a zero denominator drew a RAM row")
 
 
 class TheKeyThatNamesTheDependency(unittest.TestCase):

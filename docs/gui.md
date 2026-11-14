@@ -424,7 +424,7 @@ layout, then widget - and then **every field that widget carries is on screen at
 one row each**: no menu to open to find out what a row holds. The counts are the
 model's, not a table kept here: `edit.field_names(kind)` plus
 `edit.extension_fields(kind)` is **10 rows for a `text` widget, 11 for `data`, 12 for
-`special`, 8 for `line`, 15 for `bar`, 18 for `arc`** - measured across the **185
+`special`, 8 for `line`, 15 for `bar`, 18 for `arc`** - measured across the **188
 widgets** in the 28 layouts the editor can open, counted by `tests/test_editor.py`.
 Which control a row uses is the model's answer too: a menu wherever a vocabulary already
 exists in code (`edit.choices()` - 5 families, 27 readings for `source` and `showIf`, 6
@@ -453,15 +453,25 @@ commonly gets wrong:
   order (`themes.values` for the reading, `layout.text_for` for the shape,
   `layout.font_for` for the face, a `showIf` asked before the row's own source), and it is
   proved by painting rather than by agreement between two pieces of code:
-  `tests/test_row_notes.py` draws each of the **145** `text`/`data` rows of the **28**
+  `tests/test_row_notes.py` draws each of the **147** `text`/`data` rows of the **28**
   layouts twice, once as the file has it and once with that row replaced by a literal
   `text` widget whose `content` is the string the model named, and the two frames must be
   byte-identical; a row the painter answers with nothing is counted as a skip, and the
   check fails if twins and skips ever stop adding up to the rows.  What follows the faces
-  installed is a record of two runs rather than a figure a gate quotes: 132 of the 145
-  paint a line on this bench and all 132 twins came back identical, and on CI's runner,
-  where no CJK face is installed for the vendor's `simsun` rows to resolve, 131 paint and
-  all 131 twins come back identical.  The 13 that paint nothing here (14 there) are rows
+  installed is a record of runs rather than a figure a gate quotes, and the check now prints
+  its own census, so a reader re-reads it instead of trusting this page.  What
+  `python3 -m unittest tests.test_row_notes` ends with on 2026-11-14:
+
+  ```
+  row census: 147 `text`/`data` rows over 28 layouts; 134 twins, 13 skipped, 24 caveats;
+  reasons: Fan 3 Name 1, Fan 3 Speed 1, Fan 4 Name 1, Fan 4 Speed 1, Pump Speed 9
+  ```
+
+  On CI's runner the count is one row lower, because that image has no CJK face for the
+  vendor's `simsun` rows to resolve: **131 of 145** twins identical, recorded on 2026-11-13.
+  The 147-vs-145 shift is this page's own change (the drive row added two), and no CI reading
+  at 147 rows has been taken yet - so the honest reading of that pair is that the runner's
+  figure predates the row, not that it is 133 today.  The 13 that paint nothing here (14 there) are rows
   the painter skips too, each with the reason the model gives: `Pump Speed` in **9**
   layouts, the `Fan 3`/`Fan 4` slots this box reports no tachometer for, and on the
   runner the rows whose family has no file to open.  Those are counts at the editor's
@@ -516,7 +526,7 @@ commonly gets wrong:
   and an honest one was not available: the vendor's application bundles are not in this tree
   (only their file names are, in PROTOCOL.md §10), so the files are the only evidence of what
   a row of a kind looks like. The files decide the shape too, and they answer the same count
-  whenever they are counted: all **185** rows in the **28** layouts carry exactly the **5** keys
+  whenever they are counted: all **188** rows in the **28** layouts carry exactly the **5** keys
   `id`, `layerIndex`, `type`, `property`, `widgetContent`; `property` is a one-element list in
   every one and `widgetContent` is `""`; and a new row carries the **7 / 7 / 11 / 14 / 7 / 9**
   keys that `text` / `data` / `bar` / `arc` / `special` / `line` rows always carry, each of its
@@ -551,7 +561,7 @@ commonly gets wrong:
   A one-axis drag on one of those squares makes the box no longer square, and the note says
   so instead of quietly squaring it back.
 * **A `text` or `data` row is resized by its face, because it owns no other size.** Not one
-  of the **145** `text`/`data` rows carries a `width` or `height` key: their box is the ink
+  of the **147** `text`/`data` rows carries a `width` or `height` key: their box is the ink
   the face lays down, and a +8 px push on `fontSize` moves that box's width by an amount
   that is never 8 px, differs from row to row, and belongs to this machine's fonts rather
   than to the file (`tests/test_row_resize.py` measures the spread on every row and fails if a +8 px ask ever
@@ -601,17 +611,23 @@ commonly gets wrong:
 
 * **A drag can be pulled onto a number this same file already uses, 2 px at most.** The lines are
   the layout's own, and the reach comes out of counting them rather than out of taste: of the
-  **185** rows that carry an `x` or a `y` in the **28** layouts this pane can open, **89** hold an
-  `x` that another row of the same file holds exactly and **44** do the same with `y`, which is
-  **317** pairs of rows holding one number between them.  The rest are apart on purpose: the
+  **188** rows that carry an `x` or a `y` in the **28** layouts this pane can open, **92** hold
+  an `x` that another row of the same file holds exactly and **46** do the same with `y`, which
+  is **369** pairs of rows holding one number between them.  The rest are apart on purpose: the
   nearest other row's `x` is 1 px away for **0** of those rows, 2 px away for **12**, and 3 px
   away for **4**, and nothing at all sits 6 or 7 px off.  So 2 px is the break between "this file
   means these two to line up" and "these two are spaced", and that is `edit.Editor.SNAP_PX`.  Three
   is not the break: a drag of 3 px is pulled onto another row's number 11% of the time at 1 px,
   **12%** at 2 px and 57% at 3 px, because rows sharing a column sit within 3 px of each other's
   landing - a snap arguing with the person dragging.  All of that is counted from the files, so the
-  suite re-counts it wherever it runs and this bench and CI's runner are held to the same 185 / 89
-  / 44 / 317 and the same 11 / 12 / 57.  What a row *presents* on the glass is a different kind of
+  suite re-counts it wherever it runs, and prints what it counted:
+  `python3 -m unittest tests.test_snapping` ends with the row/pair totals, the nearest-peer gap
+  histogram and the pulled-at-1/2/3-px percentages this page quotes (measured 2026-11-14:
+  188 / 92 / 46 / 369, gaps {0: 92, 2: 12, 3: 4, 4: 14, 5: 4}, and 11 / 12 / 57 %).  The
+  thresholds - nothing at 1, 6 or 7 px, and 2 px strictly less grabby than 3 - are what the
+  checks assert; the counts above them are a record with a command attached, because the row
+  total moved twice in this project's history (185 -> 188 when `bars` took its drive row on
+  2026-11-14) while the shape of the histogram did not move at all.  What a row *presents* on the glass is a different kind of
   figure - it follows the face the layout is drawn in - so the drawn census the same pass reports
   (how many pairs of drawn boxes already share an alignment number, how many box centres sit on the
   middle) is printed by `tests/test_snapping.py` on the machine it ran on, and no page quotes it as one number.
@@ -639,7 +655,7 @@ commonly gets wrong:
   not a number rows line up on.
 * **How a row gets off a line, and what a snap never touches.** A line the row was already sitting
   on is not offered back to it: `snap_move` is given the anchor the drag *started* from, and the
-  rule in the door is "the line you left is not a line".  With 89 of 185 rows parked on a column
+  rule in the door is "the line you left is not a line".  With 92 of 188 rows parked on a column
   their own file already uses, that is what makes a 2 px drag away from a shared column stick - and
   it is why there is no Shift to hold and no checkbox to remember.  While a pull is on, the pane
   draws that line end to end across the glass in a colour the marks layer owns, and the note line
@@ -1090,7 +1106,7 @@ reordered only through the list that *is* the draw order; a row's size changes o
 through the keys its kind owns - there is no scale-everything handle - and a drag may be
 pulled onto a number this same file already uses, never onto a grid: the gcd of every
 declared `x` and of every declared `y` in the corpus is **1**, and only **27** of its
-**185** declared `x` values are multiples of 16, so these files have no grid to snap to
+**188** declared `x` values are multiples of 16, so these files have no grid to snap to
 and this program does not invent one and call it the vendor's.  Nothing about a row's
 *position* is guessed at either: the editor draws from the pinned fixture unless the reader
 chooses another body on the knob above the picture, and the marks always belong to the frame

@@ -913,55 +913,116 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     currency: a reader who wants the installed pages to match the checkout
     should take the tree, not the .deb.
 
-  * The suite's figures, re-read rather than inherited.  This bench,
-    `python3 -W error::ResourceWarning -m unittest discover -s tests`, one
-    run of this tree with nothing else in flight.  The edits made after it are
-    prose only: this entry; two lines of docs/usage.md and docs/tools.md that
-    still described the bottom board tier as one chip; and four places that
-    quoted a count of checks - the audit's 95 (it prints 96 now, because
-    `tests/test_sensor_rules.py` gained a check the very next commit) and this
-    cycle's per-file tallies - replaced by the command that prints each number,
-    since a check count is an output and not a fact worth keeping.  No test
-    count moved in those edits, and the gates that read the pages
-    (`tests/test_debian_changelog`, `tests/test_docs_links`) re-run in 0.04 s.
-    547 checks in 52 files in
-    457.125 s, 3 skipped, one of them the tray check naming the host it needs,
-    and no `ResourceWarning` printed at all now that `setUp` closes its own
-    file.  The count is read off the tree as well as off the runner: `grep -c
-    "^    def test_" tests/*.py` answers 547 over 52 files and
-    `unittest.TestLoader().discover("tests")` answers 547 over 52 modules - the
-    same numbers the runner prints.  #196's 405.166 s over 546 is the
-    runner's sample for the audit commit; #195's 405.906 s over 536 is the
-    drives commit's, and #193's 431.661 s over 526 the tree before that.  The
-    sample for these 547 arrives with the commit that reads it, as every
-    cycle's has, and the sample for a prose-only commit afterwards is not
-    added: the list records what changed a count, not every push.  #195/#196
-    are the pair to read for what a duration can mean - 536 checks in
-    405.906 s, then 546 in 405.166 s, ten more checks in 0.74 s less on
-    consecutive commits - and #196/#197 say the same again: 547 checks in
-    403.049 s against 405.166, two more checks 2.1 s quicker.  Which is the
-    whole reason this list is kept as a series and no check reads it.
+  * The boot drive gets a row of its own in `bars`, and its price was
+    measured before it was paid.  `themes.BARS_DISK_ROWS` is one labelled row -
+    `DISK`, number and meter both on `disk.temperature`, the same scalar that
+    describes the capacity printed beside it - sitting after `BOARD` so the
+    component temperatures keep together: CPU, GPU, BOARD, DISK, LOAD, RAM,
+    VRAM, then the four fan slots.  Labelling it `Disk 1 Name` would have
+    paired a positional name with a non-positional reading in a single row,
+    which is how a row starts meaning two different drives on two different
+    boxes.
+    What one more row costs is arithmetic: the pitch is `BARS_SPAN //
+    len(rows)`, so at span 320 ten rows gave 32 px and eleven give 29 - and
+    at 29 the shipped meter (`BARS_BAR_DY` 12 over a 6 px track) sat **1 px**
+    from the text band of the row below it, nearer that row's label (1 px)
+    than its own (3 px).  Both halves of the clearance check failed, and they
+    are the check that exists because a 10 px track did exactly this in
+    2026-11-12.  Two ways out were swept on the shipped painter, measuring
+    ink rather than reasoning about it: thin the meter to (11, 4), which
+    clears 2 px above and 4 below - at the floor, on a track already thinned
+    once for this same reason; or give the block the room under it, which is
+    empty: the last row's meter ends at y=409 and the clock line's own ink
+    begins at y=440, 31 px of measured air on a 480 px panel.  `BARS_SPAN`
+    went 320 -> 352, the pitch stayed 32, the track stayed 6 px, and the
+    clearances became 3 above / 4 below.
+    After: `bars` is 35 widgets, 29 rows drawn at the editor's pinned fixture
+    with 6 reported skipped (the `Fan 3`/`Fan 4` slots, same in kind as before),
+    and `themes.parity("bars", edit.FIXTURE, edit.FIXTURE_WHEN)` reports 0
+    differing pixels, worst channel 0, 57 036 lit px down each door.  The row
+    census `tests/test_row_notes.py` now prints moved 145 -> 147 `text`/`data`
+    rows over 28 layouts with 134 twins and 13 skips; the fixture answers 16 of
+    the 20 sources the five exports ask, leaving exactly the four fan slots; and
+    the 23 pickable library files still paint 114 boxes and 315 287 lit px,
+    because the row went into a generated layout rather than a vendored one.
+    `edit.FIXTURE` grew a `disk` section so the preview answers the row - a pane
+    that silences a reading this box reports is the half-truth that fixture was
+    completed to stop being. `fixtures.PARITY_CASES` grew a
+    `disk.temperature`: mid-scale 41 in the first complete case, the top of
+    the 25..80 meter (80) in the second where every other field sits at an
+    end of its own scale. That went in because the parity check reported
+    `['Disk Temperature', 'Disk Temperature']` - number and meter, from both
+    doors - and was right to.
+    `tests/test_recorded_series.py` broke first, and informatively: it sliced
+    `BARS_ROWS[len(fixed):]` and called everything past the six fixed rows a
+    fan slot, so the new row reached `int('Temperature')` - an assumption about
+    where rows live, checked by counting rather than by asking what they are.
+    It splits the table by shape now, and the published series answers the row:
+    all twelve samples carry a `disk.temperature` of 33, inside the 25..80
+    meter, so the tracked clip's provenance covers the reading instead of
+    quietly not containing it.
+    `--check-theme bars` lists `Disk Temperature`
+    among the shapes this repo chose rather than measured off the vendor's
+    picture, as it already did for `Time` and the fan slots.
+    Eight mutations, counted as failing check-runs (the parity probe repeats per
+    reading): the table loses the row while the code still draws it -> 26; the
+    code door loses it while the table declares it -> 28; the two doors read
+    different fields for one row -> 14; the meter's scale moves in the table
+    only -> 8; the span goes back to 320 with eleven rows -> 12; the label
+    follows the reading instead of the subject in one door -> 5; the row moves
+    to the end of the table alone -> 21; the row left out of the pitch
+    arithmetic -> 21.
+    Three positional lookups in `tests/test_bars_rows.py` (row 4 meant RAM,
+    row 5 meant VRAM) became `slot_of("RAM")` reads against the table.
+    Inserting a row above a hard-coded index silently re-points that check at
+    a different row - it passes, and measures the wrong thing - which is the
+    same fault shape as a count that stops matching the tree it came from.
 
-    Three other whole-suite logs from today name nothing, and saying which is
-    part of what this entry is for.  Two ran while a mutation sweep was
-    rewriting `xigmalcd/themes.py` underneath them, and
-    `tests/test_specials.py`'s door-marker check reads the file on disk with
-    `inspect.getsource`, so it compared a shifted line table against markers
-    nobody had touched - the failures in those logs described a race, not a
-    defect.  A third was killed mid-run on purpose: it had started before I
-    edited a test file, and a figure cannot belong to a tree that changed
-    while it was being measured.  An earlier cycle's run came back red for a
-    real reason instead: the suite's own isolation check caught a live
-    `xigmaui` on this machine writing the session file through its 500 ms save
-    timer mid-run, and `test_zz_isolation.py` named the process and said to
-    close it - the guard that exists for "a test wrote your settings", meeting
-    a person instead.  Earlier readings of this same sentence, each the tree at
-    that step: 546 over 52 (the bare-runner audit), 536 over 51 (the disk
-    slots and the probe's shipped-payload binding), 526 over 51 (the probe
-    tool's boundaries), 525 over 51, 511 and
-    510 over 50 (the sensor rules, and the fix to a check that read the wrong
-    mount table), 496 over 49 (the pump rule) and 485 over 48 (before it).  They
-    are kept because the deltas are the checks each step added, not a drift.
+  * The suite's figures, re-read rather than inherited.  This bench, one run
+    of the committed tree with nothing else in flight,
+    `python3 -W error::ResourceWarning -m unittest discover -s tests`:
+    **549 checks in 52 files in 460.914 s**, OK, 3 skipped - one of them the
+    tray check naming the host it needs - and no `ResourceWarning` printed at
+    all now that `setUp` closes its own file.
+
+    The count is read off the tree as well as off the runner.  The command
+    `grep -c "^    def test_" tests/*.py` answers 549 over 52 files, and
+    `unittest.TestLoader().discover("tests")` answers 549 over 52 modules, the
+    same numbers the runner prints.  What the count has been at each step
+    of this stretch, in one place rather than in six: 546 over 52 (the
+    bare-runner audit), 547 over 52 (the chipset ruling, one check added to
+    `tests/test_sensor_rules.py`), 536 over 51 (the disk slots and the probe's
+    shipped-payload binding), 526 over 51 (the probe tool's boundaries), 525
+    and 524 over 51, 511 and 510 over 50 (the sensor rules, and the fix to a
+    check that read the wrong mount table), 496 over 49 (the pump rule) and 485
+    over 48 (before it).  Those deltas are the checks each step added, not
+    drift.
+
+    A count carried in prose is a count that goes stale quietly, so the things
+    that move now print themselves.  `tools/audit_bare_runner.py` read 95
+    checks over 6 modules one commit and 96 the next, because a check went
+    into `tests/test_sensor_rules.py` in between - nothing about the audit
+    changed - and docs/tools.md and docs/theme-editor.md say "it prints its own
+    tally" instead of carrying either number.  `tests/test_row_notes.py` prints
+    its row census (147 rows, 134 twins, 13 skips today) and
+    `tests/test_snapping.py` prints its totals, its gap histogram and its
+    percentages (188 / 92 / 46 / 369; gaps {0: 92, 2: 12, 3: 4, 4: 14, 5: 4};
+    11 / 12 / 57 %), which is how a reader tells a shape that held (the
+    histogram, unchanged by a row insertion) from a total that moved.
+
+    Three whole-suite logs from these days name nothing and are kept only as
+    the lesson.  Two ran while a mutation sweep was rewriting
+    `xigmalcd/themes.py` underneath them, and `tests/test_specials.py`'s
+    door-marker check reads the file on disk with `inspect.getsource`, so it
+    compared a shifted line table against markers nobody had touched - those
+    failures described a race, not a defect.  A third was killed mid-run on
+    purpose: it had started before a test file was edited, and a figure cannot
+    belong to a tree that changed while it was being measured.  An earlier
+    cycle's run came back red for a real reason instead: the suite's own
+    isolation check caught a live `xigmaui` on this machine writing the session
+    file through its 500 ms save timer mid-run, and `test_zz_isolation.py`
+    named the process and said to close it - the guard that exists for "a test
+    wrote your settings", meeting a person instead.
 
     CI's runner, the `tests/` step alone, over the cycles that added those
     checks: 337 s with 440 checks (#165), 387 with 441 (#168), 319 with 442
@@ -972,24 +1033,37 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     (#189), 351.145 with 510 (#190, one failure), 460.228 with 511 (#191, one
     error), 339.250 with 525 (#192, green and powerless), 431.661 with 526
     (#193), 460.878 with 526 (#194, one failure), 405.906 with 536 (#195, green
-    and lucky), 405.166 with 546 (#196) and 403.049 with 547 (#197) - the last
-    several runs skipping 4
-    rather than 3, the extra one being the glass ledger naming transcripts a
-    runner with no panel has never made, and the 9 s between #178 and #180
-    being what the six new checks cost: five of them run a shipped script as
-    a subprocess, and the interpreter start-up that belongs to that is
-    measured, not assumed.  #187, #188 and #189 are the honest trio: the same
-    496 checks, on the same YAML, in
-    457.469 s, 453.508 s and 342.664 s - a 114.805 s spread across runs whose
-    trees differed only in prose.  So a pair of these numbers can bound a count
-    and nothing else, which is why the list is kept and no check reads it.  #190
-    came back red rather than slow: 510 checks in 351.145 s, one failure, and
-    the failure was this entry's own subject - a new check reading the host it
-    ran on.  #191 was red for the same reason one level down, and #192 green
-    without ever reaching the shape that broke it.  The runner's sample for
-    these 536 checks arrives with the commit that reads it, as every cycle's
-    has.  The 435 in this entry's first bullet is what the port landed at, not
-    what the tree holds.
+    and lucky), 405.166 with 546 (#196) and 403.049 with 547 (#197).  The last
+    several skip 4 rather than 3, the extra one being the glass ledger naming
+    transcripts a runner with no panel has never made, and the 9 s between #178
+    and #180 is what the six new checks cost: five of them run a shipped script
+    as a subprocess, and the interpreter start-up that belongs to that is
+    measured, not assumed.  #187, #188 and #189 are the honest trio - the same
+    496 checks, the same YAML, 457.469 s / 453.508 s / 342.664 s, a 114.805 s
+    spread across runs whose trees differed only in prose - and #196/#197 say
+    it again: 546 checks in 405.166 s, 547 in 403.049 s, one more check 2.1 s
+    quicker.  So a pair of these numbers can bound a count and nothing else,
+    which is why the list is kept and no check reads it.  #190 came back red
+    rather than slow (510 in 351.145 s, one failure, and the failure was a new
+    check reading the host it ran on); #191 was red one level down, and #192
+    green without ever reaching the shape that broke it.  A sample is not added
+    for a prose-only push: the list records what changed a count, not every
+    commit.  The 435 in this entry's first bullet is what the port landed at,
+    not what the tree holds.
+
+    And how this bullet went wrong once, since the record should say.  While
+    these numbers were being set, a helper that re-wraps paragraphs broke a
+    quoted command in two places in this same file - `^    def test_` lost its
+    four spaces and became `^ def test_`, a command that counts something else
+    - and an earlier splice left a second copy of this paragraph standing
+    below the first.  The width gate passed on both.  A gate over line lengths
+        cannot see that the content of a sentence changed, so
+    `tests/test_debian_changelog.py`
+    now also refuses any code span that carries a quoted argument across a line
+    break.  Run against the whole file, that check found exactly two spans: the
+    command above, and a `{"cmd": "text_color", "value": "…"}` example in a
+    0.4-era stanza where the wrap had been cosmetic and unread for months.  Both
+    are on one line now.
 
 
  -- Tamer Hassan <thameruddin@gmail.com>  Wed, 11 Nov 2026 22:05:00 +0200
@@ -2050,9 +2124,9 @@ xigmatek-connect-lcd (0.3) resolute; urgency=medium
     contradicted the `320x240` printed on the same row.
 
   * The text this program draws can be another colour, from all three doors:
-    `--text-color` on the display's command line, `{"cmd": "text_color",
-    "value": "#ff4040"}` on the control socket, and a `text colour` row in the
-    window's theme box - its own palette by name, with swatches, or the colour
+    `--text-color` on the display's command line; on the control socket,
+    `{"cmd": "text_color", "value": "#ff4040"}`; and a `text colour` row in
+    the window's theme box - its own palette by name, with swatches, or the
     dialog.  One parser, `render.parse_ink`, so the doors cannot drift.  Our own
     layer only: a vendor theme's lettering is decided inside that theme's layout
     file, and those are not all white either - 88 of the 106 text colours in the

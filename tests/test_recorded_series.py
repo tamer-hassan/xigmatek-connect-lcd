@@ -150,19 +150,29 @@ class RecordedSeries(unittest.TestCase):
     def test_every_bar_row_this_box_could_have_is_answered_at_every_sample(self):
         """The rule that makes the `bars` clip durable rather than lucky.
 
-        `themes.bars_recipe()` builds the six fixed rows and then the reserved fan slots.  A slot
-        past the reported count has no subject, and a row with no subject draws empty in the old
-        drawing and the new one alike - so the changes that move rows with no subject, or a pair
-        that cannot be divided, cannot move a frame of this clip.  What has to hold is that every
-        row this recording could have had gets a reading at every one of its twelve samples.
+        `themes.bars_recipe()` builds the labelled rows - the six fixed readings and the drive
+        row that went in on 2026-11-14 - and then the reserved fan slots.  A slot past the
+        reported count has no subject, and a row with no subject draws empty in the old drawing
+        and the new one alike - so the changes that move rows with no subject, or a pair that
+        cannot be divided, cannot move a frame of this clip.  What has to hold is that every row
+        this recording could have had gets a reading at every one of its twelve samples.
+
+        Rows are told apart by **shape**, not by offset.  The previous version sliced
+        `BARS_ROWS[len(fixed):]` and called everything past the six a fan slot, which is how an
+        inserted row broke it with `invalid literal for int(): 'Temperature'` - an assumption
+        about where rows live, checked by counting rather than by asking what they are.
         """
-        fixed = themes.BARS_FIXED_ROWS
+        labelled = [row for row in themes.BARS_ROWS if row[0] is not None]
+        slots = [row for row in themes.BARS_ROWS if row[0] is None]
+        self.assertEqual(len(labelled), len(themes.BARS_FIXED_ROWS) + len(themes.BARS_DISK_ROWS),
+                         f"{len(labelled)} labelled rows in the table: the split by shape here "
+                         "has to agree with the split the recipe draws")
         gaps = []
         for n, sample in enumerate(self.series):
             values, _ = themes.values(sample["metrics"],
                                       preview_gif.series_clock(sample, self.tzoff))
-            mine = list(fixed) + [
-                row for row in themes.BARS_ROWS[len(fixed):]
+            mine = labelled + [
+                row for row in slots
                 if int(row[1].split()[1]) - 1 < len(sample["metrics"].get("fans") or [])]
             unanswered = sorted({source for _label, bar, text, _lo, _hi in mine
                                  for source in (bar, text) if source and source not in values})

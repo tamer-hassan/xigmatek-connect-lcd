@@ -1297,15 +1297,30 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   `sensors.collect()` reported - six fixed readings plus one row per fan, up to four - and
   the row pitch was `min(56, max(28, 320 // len(rows)))`, so the vertical geometry of the
   theme moved with whatever the box happened to report. That is closed as of 2026-11-08. `theme_bars` now lays out **ten rows on every machine**
-  - six fixed ones plus four reserved fan slots, taken by position - which makes the pitch
-  32 px everywhere, and a row with no reading keeps its place: it is not drawn, and the
+  - six fixed readings, the drive row, and four reserved fan slots, taken by position - which
+  makes the pitch 32 px everywhere, and a row with no reading keeps its place: it is not drawn,
+  and the
   advance still happens. That is what the 27 library layouts do, and it is the rule
   docs/themes.md states as "a hole that says what it is, rather than a zero that reads as a
-  measurement"; `tests/test_bars_rows.py` holds the ten-slot layout and the keep-place behaviour by counting
+  measurement"; `tests/test_bars_rows.py` holds the eleven-row layout and the keep-place behaviour by counting
   ink in the slots, and it is what made the earlier stance - "invent a repeat group" -
   unnecessary: the 23 selectable library layouts ask for 7 `source` names and none of them is
   a fan, so `Fan 1` is a new name in our own table, while a repeat group would have been a
   new structure in a file whose whole point is being a fixed list of rows.
+
+  What the **drive row** cost, in pixels, measured rather than guessed (2026-11-14): the pitch
+  is `BARS_SPAN // len(rows)`, so at `BARS_SPAN` 320 ten rows gave 32 px and eleven give 29 -
+  and at 29 the shipped meter (`BARS_BAR_DY` 12, a 6 px track) sat **1 px** from the text band of
+  the row below it and nearer that row's label (1 px) than its own (3 px), which is the
+  difference between a meter and a separator line.  `tests/test_bars_rows.py`'s clearance floor
+  is 2 px and it failed on both halves.  Two ways out were swept on the real painter, all ink
+  measured from it: thin the meter to (11, 4) at pitch 29, which clears by 2 px above and 4 below
+  - at the floor, on a track already thinned once from 10 px for the same reason; or give the
+  block the room below it, which is empty: the last row's meter ends at y=409 and the clock
+  line's own ink starts at y=440, **31 px of air** measured at 480 px tall.  So `BARS_SPAN` went
+  320 -> 352 and the pitch stayed 32: clearances 3 px above a meter and 4 below, the track
+  untouched, and every pixel window in the row tests the same as before.  The theme now paints
+  57 036 lit px at the editor's pinned fixture, both doors, at 0 px difference.
 
   What the change costs, stated rather than left to be noticed: on the glass a missing
   reading now leaves a gap where the rows used to close up, and the `bars` preview clip
@@ -1315,7 +1330,8 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   stale clip failed. Nothing does that now: the six video files are 0.7's deliberate
   gap, and `ffprobe` plus `du -b` are the doors to re-measure them at (docs/tools.md).
   The sources followed on 2026-11-09, and so did the file: `themes.BARS_ROWS` names the
-  ten rows, four of them per-sensor fan slots (`Fan N Speed`, `Fan N Name`) - which the
+  rows - **eleven today**, six fixed readings, four per-sensor fan slots and the drive row
+  that went in on 2026-11-14 (see the pitch arithmetic below).  Four of them are (`Fan N Speed`, `Fan N Name`) - which the
   vendor's own vocabulary has no word for, since it offers the aggregates `cpuFansSpeed`
   "CPU Fans Speed" and `gpuFansSpeed` and never a row per tachometer (PROTOCOL.md 10) -
   while `RAM Rate` and `Used RAM` come out of that record's `RAMRate` and `UsedRAM`; and

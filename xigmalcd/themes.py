@@ -295,8 +295,18 @@ BARS_FIXED_ROWS = (
     ("RAM", "RAM Rate", "Used RAM", 0, 100),
     ("VRAM", "GPU Memory Rate", "Used GPU Memory", 0, 100),
 )
-BARS_ROWS = BARS_FIXED_ROWS + tuple(
-    (None, speed, speed, 0, 3000) for speed, _name in FAN_SLOTS)
+#: The drive row, kept apart from the six so a reader can see what was added and why: its
+#: label is literal like the fixed rows (it names a *subject*), and its number and meter read
+#: `disk.temperature` - the scalar that describes the same drive as the `total` and `used`
+#: already in the blob - rather than a positional `Disk 1 Temperature`.  Pairing a positional
+#: name with a non-positional number in one row is how a row starts meaning two different
+#: drives on two different boxes.  Added 2026-11-14 on the owner's request; the 25..80 scale
+#: mirrors `BOARD`'s, and like `BOARD`'s it is this repo's choice, not measured off the
+#: vendor's overlay (`layout.FORMATS_MEASURED` stays at four, and `--check-theme` says so).
+BARS_DISK_ROWS = (("DISK", "Disk Temperature", "Disk Temperature", 25, 80),)
+
+BARS_ROWS = (BARS_FIXED_ROWS[:3] + BARS_DISK_ROWS + BARS_FIXED_ROWS[3:]
+             + tuple((None, speed, speed, 0, 3000) for speed, _name in FAN_SLOTS))
 
 #: Which reading prints a fan row's label, given the source its meter reads.
 _FAN_NAME = {speed: name for speed, name in FAN_SLOTS}
@@ -1873,7 +1883,7 @@ def bars_recipe() -> dict:
     """
     row_h = min(render.BARS_ROW_MAX,
                 max(render.BARS_ROW_MIN,
-                    render.BARS_SPAN // (len(BARS_FIXED_ROWS) + len(FAN_SLOTS))))
+                    render.BARS_SPAN // len(BARS_ROWS)))
     track = rgba_str((40, 46, 50, 255))            # `render.bar`'s own default track
     rows = [widget("xigma-bars-heading", "text", {
         "x": render.BARS_TITLE_X, "y": render.BARS_TITLE_Y,

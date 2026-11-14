@@ -655,9 +655,11 @@ Measured off the drawn frame, the fourth row of the code's own list came out in 
 place. No static file - fan slots or repeat group - can put a row where such a drawing will
 move it.
 
-So the decision had a second half, and it is built now: **`theme_bars` lays out ten rows on
-every machine** - six fixed plus four reserved slots taken by position - which makes the pitch
-32 px everywhere, and **a row with no reading keeps its place**: it is not drawn, and the
+So the decision had a second half, and it is built now: **`theme_bars` lays out the same rows on
+every machine** - six fixed readings plus four reserved slots taken by position, and since
+2026-11-14 a drive row between them, **eleven** - which keeps the pitch at 32 px everywhere
+(the span grew from 320 to 352 to hold the extra row at the same pitch; docs/limits.md has that
+arithmetic and the clearance measurement behind it), and **a row with no reading keeps its place**: it is not drawn, and the
 advance happens anyway. That is the rule the 27 library layouts already follow and the
 hole-that-says-what-it-is rule docs/themes.md states. `bars` is this project's own drawing
 rather than a reproduction of a vendor frame, so nothing measured off glass is invalidated by
@@ -669,7 +671,8 @@ eyeball, not by a check.
 The per-machine cost this document recorded an hour ago shrinks with it: the pitch no longer
 depends on this box's fan inventory, and what still varies per box is which slots draw.
 
-**The sources are in** (2026-11-09): `themes.BARS_ROWS` names all ten rows in the order the
+**The sources are in** (2026-11-09): `themes.BARS_ROWS` named all ten rows then (eleven today)
+in the order the
 drawing lays them out - label, meter source, number source, scale - and `themes.values()`
 answers them. Four are per-sensor fan slots (`Fan 1 Speed`..`Fan 4 Speed`, `Fan 1 Name`..
 `Fan 4 Name`), which the vendor's vocabulary has no word for: it offers `cpuFansSpeed`
@@ -720,8 +723,8 @@ what keeps that from being a claim.
 
 What `tests/test_bars_rows.py` holds, all of it measured: an `ImageDraw.text` spy runs
 while the frame is painted, and the label-and-value strings it captures equal, row for
-row, what `layout.text_for` produces from `themes.BARS_ROWS` - over four boxes and all
-ten rows - and the rows the sources answer are the rows ink lands in. The generated
+row, what `layout.text_for` produces from `themes.BARS_ROWS` - over four boxes and every
+row of the table, eleven today - and the rows the sources answer are the rows ink lands in. The generated
 file's row count, kinds and `y` values are compared against `BARS_ROWS` and the `BARS_*`
 constants rather than against remembered numbers, `xigma.showIf` appears on exactly the
 two rows whose number and meter read different sources, and the review door's skip list
@@ -741,8 +744,10 @@ layouts ask, while carrying four keys nothing in the library reads (`gpu.usage`,
 painted `bars` with 14 of its 32 rows against a code drawing of 26, and `alpha`'s GPU row was
 missing from one door and `--%` in the other: 4 587 px at one clock instant.
 
-So the preview was fixed by fixing the fixture, not the layout.  `edit.FIXTURE` now answers
-15 of the 19 sources, and the four it leaves are `Fan 3`/`Fan 4` name and speed - the
+So the preview was fixed by fixing the fixture, not the layout.  `edit.FIXTURE` answers
+**16 of the 20 sources** the five exports ask today - the count moved from 15 of 19 when `bars`
+took its drive row on 2026-11-14 and the fixture grew a `disk` section to answer it - and the
+four it leaves are `Fan 3`/`Fan 4` name and speed, the
 slots past the two tachometers this shape reports, empty in **both** doors, which is `bars`'s
 reserved-slots rule being visible rather than hidden.  Three claims about it are held in
 `tests/test_fixture_shape.py`:
@@ -757,9 +762,12 @@ reserved-slots rule being visible rather than hidden.  Three claims about it are
 * **the two doors put down the same pixels.**  All five themes at that fixture, at seven ink
   choices: zero differing pixels, worst channel 0.  Measured through the pane's own door
   (`Editor.paint(*Editor.fixture(), ink=...)`), not a hand-built call - and the row counts
-  with it, in `bars`: 26 of its 32 rows at the completed fixture, where the same door painted
-  14 of its 32 rows before, those two frames differing by 34 362 px (61 790 lit px against
-  28 860).
+  with it, in `bars`: **29 of its 35 rows** at the completed fixture today, against the 26 of 32
+  measured when that rule was written and the 14 of 32 the stale dict produced, a 34 362 px
+  difference between those two 2026-11-12 frames (61 790 lit px against 28 860).  Today the same
+  door lays 57 036 lit px, and `themes.parity("bars", edit.FIXTURE, WHEN)` prints the pair with
+  the pixel diff - which is the form these pages use now, because the row count moved twice in
+  two days and a count copied by hand is a count that goes wrong.
 
 That last claim needed a rule the library did not have.  `themes.draw` takes no `ink`
 and is right not to: a layout's colours are its own, which is why a vendored theme looks
@@ -1482,8 +1490,8 @@ does **not** exist in this tree:
   copied files are the evidence, and `--print-theme-fields` is how they are read out.
 
 What does exist, gated rather than asserted in prose: the five exports and their zero-diff
-parity (`tests/test_export_parity.py`); the generated `bars` file, its ten rows and its two
-memory rules (`tests/test_bars_rows.py`); the file model with its save, revert, rename and
+parity (`tests/test_export_parity.py`); the generated `bars` file, its rows - eleven as of
+2026-11-14 - and its two memory rules (`tests/test_bars_rows.py`); the file model with its save, revert, rename and
 delete doors (`tests/test_theme_files.py`); the editor's model and the doors over it
 (`tests/test_editor.py`); pointing, dragging and the marks (`tests/test_canvas.py`,
 `tests/test_pane_chrome.py`); the row acts and the reorder census
