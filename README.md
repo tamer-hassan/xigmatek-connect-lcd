@@ -70,14 +70,21 @@ reasoning and `tests/test_icons.py` the checks.
 |---|---|
 | https://github.com/user-attachments/assets/ce8cab80-2125-4011-b44a-9a4e19a08ca3 | https://github.com/user-attachments/assets/c63dcebf-f815-4471-aaaf-32642e622c5c |
 
-That second link is the repository's own file rather than an attachment, because a
-repo-path `.mp4` in markdown becomes an `<img>` no browser plays (recorded in
-`docs/limits.md`); the attachment rows above were uploaded by hand, and the seventh could
-not be: GitHub's `user-attachments` upload endpoint answers **HTTP 500** to an API caller -
-tried twice, with and without the preview `Accept` header - so an inline seventh preview
-needs a person's drag into the web editor rather than a script. Until then the row above
-links the repository's own copy, and the same file is attached to the `v0.7` release
-(`birdseye-theme_47-trimmed.mp4`, 1 223 967 B), so it is downloadable from the release page.  Its backdrop is also the one clip here that the vendor
+All seven rows above are inline attachments.  The seventh was made by a person, not by
+this project's tooling: dragging the file into GitHub's web editor (2026-11-14, 16:14),
+because the `user-attachments` upload endpoint answers **HTTP 500** to an API caller - tried
+twice, with and without the preview `Accept` header, request ids `9B9C:1D08F7…` and
+`D752:9D5F3…`.  A repo-path `.mp4` in markdown becomes an `<img>` no browser plays
+(recorded in `docs/limits.md`), which is why that cell held a repository path for about
+twenty minutes.
+
+The bytes are worth naming, because a playing preview is only evidence if it is the same
+file the checks read: the tracked `docs/videos/birdseye-theme_47-trimmed.mp4`, the inline
+attachment above, and the `v0.7` release asset of the same name are each **1 223 967 B** with
+sha256 `8ac45b90646e97a5d8798e1b0364dc91cea4f4e73a8c084bf028d9fb67be9040` - `cmp` clean
+against a download of each URL.  `tests/test_theme_library.py` derives every theme's pairing
+from those file names, so the picture a reader watches is the file the suite is reasoning
+about, not a re-encoded stand-in.  Its backdrop is also the one clip here that the vendor
 did not ship as-is: `theme_47.mp4` opens on **17 still frames with a play button burned
 into the middle**, so the theme pairs with a cut copy in `media/` - 168 frames / 8.40 s,
 head centre-luma 1.53 against the original's 6.62, loop seam 5.572 against 5.917 - while

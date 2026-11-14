@@ -974,6 +974,20 @@ were re-queued by the window and accepted 39 s and 6 s after that. Three things 
     say and what has to be looked at.  It is a hand measurement with a date rather than a
     gate: a suite that fetched the CDN would stop being the offline suite.  And it says
     nothing about the panel, which still cannot be asked what it shows (§11).
+
+    **The seventh row, measured the same way on 2026-11-14.** `birdseye` arrived with a
+    preview and it is now an inline attachment like the other six: `curl -L` on
+    `https://github.com/user-attachments/assets/c63dcebf-…` returns **1 223 967 B**, sha256
+    `8ac45b90646e97a5d8798e1b0364dc91cea4f4e73a8c084bf028d9fb67be9040`, `cmp` clean against
+    `docs/videos/birdseye-theme_47-trimmed.mp4` in the tree and against the `v0.7` release
+    asset of the same name - three copies of one file, one playing preview, no re-encode in
+    between.  How it got minted is a limit of the tooling rather than of the project, and it
+    belongs in the same breath as the byte check: GitHub's `user-attachments` upload endpoint
+    answers **HTTP 500** to an API caller (two attempts, with and without the preview
+    `Accept` header, request ids `9B9C:1D08F7…` and `D752:9D5F3…`), so these URLs exist only
+    because a person dragged the file into the web editor.  The cell held a repository path
+    for about twenty minutes before that happened, which is the gap the README now says out
+    loud instead of leaving a reader to wonder why one row behaves differently.
   * **A frame's clock is one instant, and its zone has to be written down.** The first CI
     run of this section measured a different picture than the bench from byte-identical
     files: `clock`'s glyph-against-halo gap read **134.6** here and **126.2** there.  The
