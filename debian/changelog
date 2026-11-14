@@ -1640,9 +1640,32 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     compared a host's unanswered names against a pinned body.  The first is a
     machine that needs a measured budget, the second a check that needs to
     compare the right two things; neither was visible from this bench, which is
-    what a second machine is for.  The last
-    several skip 4 rather than 3, the extra one being the glass ledger naming
-    transcripts a runner with no panel has never made, and the 9 s between #178
+    what a second machine is for.  **#208 puts that machine's speed in bounds
+    from the other side**: the same tree took 345.592 s there and 463.960 s
+    here, the runner 1.34x *faster* than this bench - the same kind of spread
+    #202's first attempt showed at 4.2x slower, arriving in the opposite
+    direction, and the fastest step since #189's 342.664 s.  Which is the whole
+    argument for sizing the checks job's cap against the tail rather than the
+    mean: 45 minutes is not a claim about how long this suite takes, it is a
+    claim about how long a machine may be having a bad day before GitHub stops
+    counting it as a result.  And the reason no cost gate in this package
+    asserts a duration - every one of them asserts a count.
+    The last several skip 4 or 5 rather than
+    3, and the two machines do not skip the same things - a bare count hides
+    that, so it is spelled out from the verbose runs.  This bench's four: the
+    canvas hit-and-move overlap case, the tray check that names the host it
+    needs, the review-door dependency check that has had nothing to exercise
+    here since the reorder, and `nothing_created_one_where_there_was_none`,
+    skipped because this machine already *has* a settings file.  #208's five on
+    the runner: the same canvas and tray cases, the glass ledger naming
+    transcripts a runner with no panel ever made, the protocol capture checks
+    over `data/captures`, and
+    `test_the_diagnosis_names_a_time_and_where_it_falls`, which skips there for
+    the mirror-image reason: no settings file to read a timestamp off.  The two
+    isolation checks trade places between the machines,
+    so each one is exercised somewhere and neither is quietly dead, and the
+    runner runs the review door because its `bars` has holes this box cannot
+    make.  The 9 s between #178
     and #180 is what the six new checks cost: five of them run a shipped script
     as a subprocess, and the interpreter start-up that belongs to that is
     measured, not assumed.  #187, #188 and #189 are the honest trio - the same
