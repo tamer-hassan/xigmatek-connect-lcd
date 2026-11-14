@@ -1318,6 +1318,97 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     The name census moved 108 -> 119 source rows, 190 rows carrying at
     least one.
 
+  * The 634 readings, CI #216-#220, and builds #17-#19.
+
+    The count,
+    read twice off the tree. `grep -c "^ def test_" tests/test_*.py`
+    answers **634 over 55 files**;
+    `unittest.TestLoader().discover("tests")` answers 634 over 55 modules.
+    The two doors have disagreed before - a file with no `def test_` stanza
+    at the indentation the grep counts, or a module the loader skips - so
+    both are asked, and the pair is printed by `tools/audit_bare_runner.py`
+    and `tests/test_bare_audit.py` rather than kept here.
+
+    Two runs of that tree, both quoted rather than predicted. This bench:
+    **634 checks in 507.046 s**, OK, `skipped=4`, no `ResourceWarning`, no
+    `Exception ignored`, with no `xigmaui` window open and the settings
+    file last written two hours before the run (
+    `tests/test_zz_isolation.py` reads that timestamp and says so in its
+    diagnosis). GitHub: **#219** on `59f7e1a` at **526.686 s** (OK,
+    `skipped=6`) with its checks and build jobs green and the
+    install-and-smoke job red on the manifest-form bug recorded above;
+    **#220** on the fixed tip `e1f95c3` at **387.720 s** (OK, `skipped=6`
+    ), all three jobs green. The skipped pair is the machine's, not the
+    tree's: the two extra skips on the runner are `tests/test_birdseye.py`
+    's checks that need the vendored library's manifest, and the library is
+    not in git.
+
+    The runner spread is quoted because it is now three wide over one day
+    of the same count: **387.720 / 471.971 / 526.686 s** for 632-634 checks
+    on three runners of the same workflow, a 1.36x band. That is the whole
+    argument for the rule this stretch has been applying: no gate reads a
+    duration. `tests/test_loop_counters.py` is bounded by 12 frames and
+    asserts 12 frames; `tests/test_window_sizing.py` waits on a settle
+    predicate with a pump ceiling; the CI workflow's `timeout-minutes` is a
+    wall, not a test.
+
+    Three artefacts cut since the last recorded build, all from the same
+    UNRELEASED 0.7 stanza, so the file names collide and each one
+    overwrites the last - which is why the #16 archives are no longer on
+    this disk and the earliest comparison available is #17. Read back out
+    of the unpacked archives rather than from the build log: #17 from
+    `e836321`, **21 568 962 B** code / sha256
+    `e3a8d278e630e5b4d2aac7e71d92730b9f9c61c4647d9a01a65cecdef99a40a6`,
+    themes **79 927 678 B** /
+    `e07684532a5c4171c47936530acbc5bfb670e5643c7a4c5406ebeaa1705151e8`; #18
+    from `59f7e1a`, **21 571 166 B** /
+    `4220f53ce9f70bf8ebf091de7df91513b6c9b3651eef7f74590794d3b54787f0` and
+    **79 928 796 B** /
+    `407086678ce803d741835574940f19fd7f5abada0b1bc5e182f3810b5d2a250c`; #19
+    from the green tip `e1f95c3`, **21 572 286 B** /
+    `0e4a10da79e31d92c0065258affe6e8a721857d20b2a15efd57789cd44db35d9` and
+    **79 931 420 B** /
+    `d103e0aebc7f3a26019f58098b3bc21a658bc4eaeb9f9dc3ab4307cf2dff64a8`.
+
+    Every one of them the same shape: 88 members in the code archive, **all
+    dated 2026-11-11 22:05**, which is the 0.7 stanza's own maintainer line
+    and the value `SOURCE_DATE_EPOCH` takes - an UNRELEASED stanza carries
+    no date of its own, so the stamp stays where 0.6 left it until the
+    release is cut and the stamp is refreshed; `lintian` reports **0 tags**
+    on both packages; every shipped `.py` in the archive is byte-identical
+    to `HEAD` of the tree it was built from (18 modules compared against
+    `git show` ); `usr/share/xigmalcd/media` holds **14 files, 21 030 137
+    B**, each one the byte count `tests/test_pinned_metrics.py` names; and
+    the themes archive unpacks to **115 members** whose `themes/alpha` tree
+    measures 85 035 549 B and compares empty against the copy installed on
+    this bench.
+
+    The deltas between the archives, measured by `diff -rq` on the two
+    extracted trees rather than inferred from a commit message: #17 to #18
+    is **9 files** - five shipped modules ( `xigmalcd/control.py`,
+    `layout.py`, `themes.py`, `xigmaui/app.py`, `xigmaui/edit.py` ),
+    `changelog.gz`, and three docs pages ( `gui.md`, `limits.md`,
+    `theme-editor.md` ). #18 to #19 is **one file**: `changelog.gz`,
+    because the only change in between was the packaging prose and a smoke
+    check that is not installed. A fix that lands in a job rather than in
+    an artefact is worth seeing that way - `debian/tests/smoke` ships in
+    neither deb, which is exactly why no local check could have caught its
+    bug and why the run that performs an install did. Since #16's tree
+    `a9ec742`, 50 files have changed: 14 in `tests`, 11 in `media`, 8 in
+    `docs`, 6 in `xigmalcd`, 3 in `xigmaui`, 3 in `debian`, 2 in `tools`,
+    one in `docs/videos` (the seventh preview), one in `debian/tests`, and
+    README.
+
+    What #220's smoke step printed, which is the half this tree could not
+    check for itself: the line headed `media set` reports 14 clips
+    installed, dpkg's own md5sums naming 14 under that directory, and every
+    one of them hashing to what dpkg recorded at install time; the line
+    headed `pairing` reports 6 drawn themes with every one of their
+    backdrops resolving on the installed box - including
+    `theme_47-trimmed.mp4`, the file this repository made. The pairing
+    claim is no longer something the pages assert about a checkout; it is
+    something an installed machine answers.
+
   * A remembered count in shipped prose, and the gate that had pinned it.
 
     Eleven sentences in shipped code still described the drawn set as five,
