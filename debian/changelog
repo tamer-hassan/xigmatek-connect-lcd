@@ -1593,16 +1593,33 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     review-door dependency check in `tests/test_bars_rows.py` has nothing to
     exercise here now, because `bars` leaves no source unanswered on this box.
 
-    Two readings of that 571, both from runs rather than from arithmetic: this
-    bench, one run of the committed tree (`6f306e1`) with no window open,
-    **571 checks in 463.960 s**, OK, 4 skipped, no `ResourceWarning` and no
-    `Exception ignored` line.  A near-miss worth recording because it is how
-    the last paragraph was settled: the check for a live window first run as
-    `pgrep -c -f "python3 -m xigmaui"` answered **1** with nothing open,
-    because the wrapper shell carries that exact string in its own command
+    A near-miss from settling those skip sets, worth recording because it is the
+    second one of the day: the first attempt at asking whether a window was live
+    ran as `pgrep -c -f "python3 -m xigmaui"` and answered **1** with nothing
+    open, because the wrapper shell carries that exact string in its own command
     line.  `tests/test_zz_isolation.py` writes its pattern as `xigma[u]i` for
-    that reason, and this is the second time in two days that a process scan
-    counted its own measurement.
+    that reason, and a process scan that counts itself is a measurement of the
+    wrong thing.
+
+    The count has moved three times since that reading, and each figure is a
+    run rather than arithmetic.  **570 over 53** with the reordered block -
+    472.924 s on this bench, the tree at `810b7a0`.  **571** with the
+    isolation-diagnosis check - 463.960 s here, 345.592 s on GitHub's #208, the
+    tree at `6f306e1`.  And **581 over 53** with Apply's background branches
+    and the headless boundary - seven checks in `tests/test_display_remote.py`,
+    three in `tests/test_launcher.py` - at 469.714 s here and 486.841 s on
+    #211, the tree at `7cf3d1a`; the bench run OK with 4 skipped, no
+    `ResourceWarning` and no `Exception ignored` line.  Both tree doors confirm
+    the current figure: `grep -c` for the test stanzas answers 581 over 53
+    files and the loader answers 581 over 53 modules.  Two earlier readings are
+    refused rather than quoted: 466.767 s and 466-ish of the same shape, each
+    ending in a `test_zz_isolation.py` failure because a `python3 -m xigmaui`
+    window (one started at 06:17:43, a second leaving a write timestamped
+    06:35:57) saved `~/.config/xigmaui/config.json` under the run.  The guard
+    was right both times; a timing taken while someone is using the machine is
+    a record of that machine, not of the tree.  The census lines those runs
+    printed are kept, because a census reads files in this repository and never
+    the session.  The skip count on this bench moved from 3 to **4** with the
 
     **Provenance, said plainly rather than papered over.**  The CI-hardening
     set - the checks job's 30 -> 45 minute cap, `tests/test_ci_workflow.py`,
@@ -1629,6 +1646,16 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     0.7 in `dpkg-parsechangelog`, `pyproject.toml` and the packaged module.
     #12 -> #13 had been eleven files (three modules, six docs, `PROTOCOL.md`,
     the changelog), which is the shape of the two commits between them.
+    **#15** was cut from `7cf3d1a` and differs from #14 in six files:
+    `xigmaui/app.py`, `README.md`, `docs/gui.md`, `docs/usage.md`,
+    `changelog.gz` - and the wheel's `METADATA`, because that file embeds the
+    front page.  So a README sentence is a shipped byte, worth knowing before
+    anyone treats the front page as something only humans read.  Sizes
+    5 519 092 B and 79 920 336 B; one date across every member; `lintian` run
+    with `--tag-display-limit 0` exiting 0 and printing no tags; the 146 MB
+    vendored library byte-identical to the installed copy; and the packaged
+    `xigmaui` carries the new Apply door, read out of the unpacked file rather
+    than assumed.
 
     The count is read off the tree as well as off the runner.  The command
     `grep -c "^    def test_" tests/*.py` answers 581 over 53 files, and
@@ -1699,8 +1726,9 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     run under the raised 45-minute cap), 1872.756 with 568 (#204, two failures
     and no cancellation - the cap letting a loaded run finish and report what
     the load did), 418.376 with 570 (#205, one failure, mine), 475.172 with 570
-    (#206, the same failure on a prose-only head) and 463.128 with 570 (#207,
-    green).  #202 and #203 are the pair that
+    (#206, the same failure on a prose-only head), 463.128 with 570 (#207,
+    green), 345.592 with 571 (#208, green, 5 skipped) and 486.841 with 581
+    (#211, green, 5 skipped).  #202 and #203 are the pair that
     bounds a count again: thirteen more checks, 5.625 s more, on runners that
     took 449 s and 414 s of job for the same five steps.  **#204 and #205 are
     the two red ones and they are not the same story**: #204 took 1872.756 s of
@@ -1715,7 +1743,11 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     from the other side**: the same tree took 345.592 s there and 463.960 s
     here, the runner 1.34x *faster* than this bench - the same kind of spread
     #202's first attempt showed at 4.2x slower, arriving in the opposite
-    direction, and the fastest step since #189's 342.664 s.  Which is the whole
+    direction, and the fastest step since #189's 342.664 s.  #211 and this
+    bench's run of its tree are the pair at the tight end of the same day:
+    486.841 s there against 469.714 s here, **3.6 %** apart.  Three ratios from
+    two machines - 0.75, 1.04 and 4.2 - is the whole case for never asserting a
+    duration.  Which is the whole
     argument for sizing the checks job's cap against the tail rather than the
     mean: 45 minutes is not a claim about how long this suite takes, it is a
     claim about how long a machine may be having a bad day before GitHub stops
