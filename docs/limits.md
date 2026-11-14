@@ -5,6 +5,21 @@ What has been measured on glass, by whom, with how many frames - and what has no
 
 ## What the panel answers, with the panel attached
 
+* **`birdseye` has been on this panel since 15:02 on 2026-11-14, and it is still drawing.**
+  Read from the door, not from memory: `python3 -m xigmalcd --status` answers `showing
+  birdseye at 2.0 fps on /dev/ttyACM0`, and at 15:39:55 the same line carried **4 404 of
+  4 413 frames confirmed, 7 refused, 0 link errors, 9 session renewals**, the current session
+  at 174 uploads / 86 s old. It is the installed service drawing (`MainPID=181597`,
+  `ExecMainStartTimestamp=15:02:01`, `NRestarts=0`), and its
+  `/usr/lib/python3/dist-packages/xigmalcd/themes.py` and `render.py` compare **byte-identical
+  to this tree** - so the picture behind the glass is the code in this repository, not a
+  checkout run and not a preview. The unit's own `ExecStart` still names `--theme alpha`: the
+  switch to `birdseye` went through the control socket, which is what the window's theme picker
+  writes, and a theme change is not a restart, which is why `NRestarts=0` says nothing about
+  it. Those counters are a snapshot of a live loop, so they move; the two commands that print
+  them are named above and in the bullet below.
+
+
 * **A chosen text colour reaches the upload, not the panel, and it survives the palette
   encoding.** `--text-color` and the window's `text colour` row change the ink of the
   glyphs this program draws; the frame is then uploaded as pixels, which is the only
@@ -150,6 +165,37 @@ What has been measured on glass, by whom, with how many frames - and what has no
   only reliable check: `transported` answers `{"state":"success"}` even for a refused
   file, and `space` does not move for accepted uploads either.
 ## Refusals, and what the unattended run left unexplained
+**One live session, counted rather than described.** `journalctl --user -u xigmalcd --since
+"2026-11-14 15:02"` holds 48 lines from the process above, no serial among them, and it is a
+better teacher about media uploads than any scripted phase has been: **11 accepted background
+uploads over 8 distinct files**, against **8 refusal lines** (`device refused the file:
+1 400 b''`), and every file that was refused landed eventually. The refusals split cleanly:
+6 first attempts said no and the loop's own single retry (`retrying once`) fixed **4** of them
+2 s later; the other 2 refused twice in a row, printed the sentence this program was written to
+print - `leaving the panel's stored background as it is (--no-mp4 to skip this upload)` - and
+were re-queued by the window and accepted 39 s and 6 s after that. Three things worth keeping:
+
+* **The clock on an upload says what the panel already holds.** Accepted on the first try:
+  0.4 s for 214 917 B, 0.6 for 502 996, 0.9 for 897 970, 1.3 for 1 806 149. Accepted after a
+  refusal: **3.0 / 3.0 / 3.2 / 3.3 s** - the four files in the 1.07-1.68 MB band. And
+  `theme_47-trimmed.mp4`, 1 071 306 B, took **1.0 s** on an upload where the panel already
+  stored that same file, at 15:04:31. Size, storage state and refusal each move the number,
+  and no one reading of "how long a media upload costs" survives all three. The largest file
+  ever sent from this bench, `water_splash.mp4` at 3 522 068 B, landed in 2.4 s after two
+  refusals.
+* **`space` is not a ledger that only falls.** It went 68 944 -> 68 628 -> 66 784 -> 65 824 ->
+  64 908 -> 64 440 -> ... -> 51 380 as clips were stored, and **rose twice inside one
+  session**: 61 244 -> 62 068 (+824) and 51 380 -> 54 124 (+2 744). Refusals happened at 68 628
+  and at 51 380; acceptances happened at both too. So the field is a momentary reading of the
+  panel's own allocation, and any claim of the form "it fits because the number is big enough"
+  is unsupported by these lines.
+* **The panel takes files it was never shipped with.** Seven of the eight distinct uploads
+  above are the backgrounds this repository carries in `media/` - the cut `theme_47-trimmed.mp4`
+  plus the maintainer's own `AI_chip_black`, `AI_network`, `matrix_black`, `interstellar`,
+  `water_splash`, `matrix_blue`, all 480x480, 0.5-3.5 MB - and each answered `1 200`
+  eventually. Nothing about ALPHA's clip list is a whitelist anyone has ever demonstrated;
+  what the panel checks is the transport, and the section above has the measured lumas.
+
 
 * **Seven refusals in fifty-six unattended minutes, and no explanation for them.** The
   packaged unit, left drawing `alpha` at 2 fps after the 0.2 upgrade, logged

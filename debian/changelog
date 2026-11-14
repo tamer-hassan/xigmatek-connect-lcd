@@ -1318,6 +1318,53 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     The name census moved 108 -> 119 source rows, 190 rows carrying at
     least one.
 
+  * A live theme on the glass, and three measurements it handed over for free.
+
+    The owner switched the installed service to `birdseye` at 15:02 on
+    2026-11-14 and it is still drawing: `python3 -m xigmalcd --status`
+    answered `showing birdseye at 2.0 fps on /dev/ttyACM0` with **4 404 of
+    4 413 frames confirmed, 7 refused, 0 link errors, 9 session renewals**
+    at 15:39:55. The process is the installed service ( `MainPID=181597`,
+    started 15:02:01, `NRestarts=0`) and its installed `themes.py` and
+    `render.py` compare byte-identical to this tree, which is the chain
+    this project has always wanted and now has for a sixth theme: the code
+    committed here is the code behind the glass. Recorded in
+    `docs/limits.md` with the two doors that print it.
+
+    The same session's journal (
+    `journalctl --user -u xigmalcd --since 15:02`, 48 lines, no serial) is
+    the best media-upload evidence this repository has, because it was not
+    designed as an experiment: **11 accepted background uploads over 8
+    distinct files, 8 refusal lines**, and every refused file landed
+    eventually. Six first attempts were refused; the loop's own single
+    retry fixed 4 of them 2 s later, and the other 2 printed the give-up
+    sentence this program was written to print (
+    `leaving the panel's stored background as it is`) before the window
+    re-queued them 39 s and 6 s later. Three findings worth their own
+    lines. Upload time tracks **what the panel already holds**, not just
+    size: 0.4-1.3 s accepted first time, **3.0-3.3 s after a refusal**, and
+    1.0 s for a 1 071 306 B file the panel already stored. `space` is **not
+    a falling ledger**: it rose twice inside one session, +824 B and +2 744
+    B, and refusals happened at both a high and a low value, so any claim
+    that a file "fits because the number is big enough" is unsupported. And
+    seven of the eight distinct files are this repository's own `media/`
+    backgrounds - 0.5-3.5 MB, all 480x480 - every one accepted eventually,
+    which is the first time this project has had more than vendor footage
+    on the device.
+
+    The pairing asymmetry, asked and answered: `--theme birdseye` on the
+    loop does **not** look up `themes.CODE_CLIPS` to choose a backdrop -
+    the window does that, and the loop uploads only what `--mp4` names.
+    Offered the choice, the owner said on 2026-11-14 that this is
+    deliberate from their side: a background change is a thing a reader
+    should see and confirm, not a default a daemon can swap underneath
+    them. So the asymmetry stays, and `docs/themes.md` now says so where
+    the pairing rule is stated, with the line that gets the pair on a
+    service: `--theme birdseye --fps 2 --mp4 theme_47-trimmed.mp4` - which
+    is exactly what the session above ran, four uploads of that clip
+    included. No code changed for this entry; the suite stays at 634 over
+    55.
+
   * The 634 readings, CI #216-#220, and builds #17-#19.
 
     The count,

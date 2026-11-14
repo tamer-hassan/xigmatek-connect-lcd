@@ -22,6 +22,18 @@ opening a layout puts that clip under the preview unless the reader has ticked *
 background* (docs/gui.md). The six themes this repository draws from `render.py` are not
 vendor pages, so there is no vendor record to read for them: they pair with the backdrop
 their own published picture is composited over, kept in `themes.CODE_CLIPS` and derived
+
+  **That table is the window's, and the loop does not read it - deliberately.** A session
+  started with `--theme birdseye` draws the overlay for that theme and uploads whatever
+  `--mp4` names (the unit ships no `--mp4` at all, so an installed service keeps the panel's
+  stored background); it does not look up `CODE_CLIPS` and pick the theme's own backdrop.
+  Asked about it on 2026-11-14, the owner said the asymmetry is intentional from their side,
+  so it stays: the pairing is a *choice the reader sees and confirms* in the window, not a
+  default the loop can change underneath them. To get the pair on the service, name it -
+  `ExecStart=/usr/bin/xigmalcd --theme birdseye --fps 2 --mp4 theme_47-trimmed.mp4` - which
+  is also what the glass session in docs/limits.md actually did: `theme_47-trimmed.mp4` was
+  uploaded there four times, at 0.4-3.3 s per attempt depending on what the panel already
+  held.
 back out of the README's `<theme>-<clip>.mp4` names by `tests/test_theme_library.py`.
 Three of the four canvas-refused files name clips as
 well, and one names a `.png` rather than a clip - one more reason the refusal is keyed on
