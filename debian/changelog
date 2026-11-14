@@ -1223,6 +1223,43 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     bench that stops exercising its own skip reporting; that is worth knowing
     the same afternoon it becomes true rather than the next time CI says so.
 
+    **#206 went red for the same reason as #205, and #207 is what proves the
+    fix rather than this bench.**  #206's head was a prose-only commit that
+    still carried the bad assertion, so it failed the identical check - a red
+    run is not always a signal about the change sitting at its tip, and that is
+    worth knowing before reading a series backwards.  #207, carrying the fix,
+    came back green: **570 checks in 463.128 s**, job 493 s, all jobs success.
+    And its four skips are *not* the review door's: on a runner with no GPU and
+    no tachometers, `bars` has holes, so `cannot` is non-empty there and the
+    two new relations - `asks == answers` plus `cannot`, and no name in both -
+    were actually evaluated on a machine shape this bench can no longer
+    produce.  That is the argument for the second machine, stated as a fact
+    about coverage rather than as a preference: since the row order below left
+    this box answering every source `bars` asks, several of its skip-reporting
+    assertions are tautologies here, and only a GPU-less runner gives them
+    anything to bite on.
+
+    **The isolation guard fired twice locally, once with the right answer and
+    once with the wrong one, and the wrong answer was the message's fault.**
+    Both firings were true - `~/.config/xigmaui/config.json` had changed under
+    a run - but the second blamed a test when the write came from a window that
+    opened and closed between two `pgrep` checks.  Settling it by measurement
+    rather than by argument: twelve modules that build a window or run one in a
+    subprocess (`test_launch_unit`, `test_launcher`, `test_packaging_parity`,
+    `test_editor`, `test_display_remote`, `test_conventions`,
+    `test_apply_layout`, `test_window_sizing`, `test_ink`,
+    `test_theme_library`, `test_bars_rows`, `test_bare_audit`) each leave the
+    file byte-identical when run alone, while the file's own mtime - 06:35:57,
+    into a run that began at 06:30:20, holding `"theme": "bars"` - names a
+    person reading the preview pane.  A diagnosis that asks "is a window alive
+    *right now*?" cannot answer "what wrote this at 06:35:57?", so
+    `who_else()` now reports the timestamp and whether it falls inside the run
+    (from `fixtures.RUN_STARTED`, captured when the suite imported it), and a
+    new check reads that sentence on a **passing** suite, because the thing that
+    failed here was the advice rather than the assertion: a guard whose
+    diagnosis misleads sends someone to audit 570 checks when the culprit was
+    their own window.
+
     Suite counts are unchanged by this fix (570 over 53 files, `grep -c` and
     the loader both answering it): the review-door change replaced one
     assertion with two relations and one helper, and the loop fix moved a
@@ -1468,28 +1505,35 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     tray check naming the host it needs - and no `ResourceWarning` printed at
     all now that `setUp` closes its own file.
 
-    The count has moved again since that reading, to **570 over 53 files**, and
-    two doors agree on it without needing a frozen machine: the command
-    `grep -c "^    def test_" tests/*.py` answers 570 over 53 and
-    `unittest.TestLoader().discover("tests")` answers 570 over 53 modules.  The
-    *timing* for that tree is deliberately not quoted: the one full run made so
-    far finished with a failure of `tests/test_zz_isolation.py`, which named a
-    `python3 -m xigmaui` window started at 06:17:43 - during the run, by the
-    person watching the new row in the preview pane - and its 500 ms save timer
-    wrote `~/.config/xigmaui/config.json` under the run.  That guard is doing
-    its job rather than misfiring, so the 466.767 s it took is a record of a
-    busy machine and not a measurement; the census lines from that same run are
-    quoted here, because they read files in this repository and never the
-    session.  Same run also moved the skip count from 3 to **4**: the
-    review-door check in `tests/test_bars_rows.py` now skips on this box,
-    because `bars` has no unanswered source here to exercise it.
+    The count has moved twice since that reading.  To **570 over 53 files**
+    with the reordered block - measured on this bench as **570 checks in
+    472.924 s**, OK, 4 skipped, no `ResourceWarning` and no `Exception
+    ignored` line, one run of the committed tree (`810b7a0`) with the desktop
+    window shut - and to **571 over 53** with the isolation-diagnosis check
+    recorded below.  Two earlier readings are refused rather than quoted:
+    466.767 s and 466-ish of the same shape, each ending in a
+    `test_zz_isolation.py` failure because a `python3 -m xigmaui` window (one
+    started at 06:17:43, a second leaving a write timestamped 06:35:57) saved
+    `~/.config/xigmaui/config.json` under the run.  The guard was right both
+    times; a timing taken while someone is using the machine is a record of
+    that machine, not of the tree.  The census lines those runs printed are
+    kept, because a census reads files in this repository and never the
+    session.  The skip count on this bench moved from 3 to **4** with the
+    reordering, and the extra skip is a result rather than a flake: the
+    review-door dependency check in `tests/test_bars_rows.py` has nothing to
+    exercise here now, because `bars` leaves no source unanswered on this box.
 
     The count is read off the tree as well as off the runner.  The command
-    `grep -c "^    def test_" tests/*.py` answers 568 over 53 files, and
-    `unittest.TestLoader().discover("tests")` answers 568 over 53 modules, the
-    same numbers the runner prints.  What the count has been at each step of
-    this stretch, in one place rather than in fourteen, newest first: 570 over
-    53 (`Fan GPU` moved into the fan group, and the grid census became a check),
+    `grep -c "^    def test_" tests/*.py` answers 571 over 53 files, and
+    `unittest.TestLoader().discover("tests")` answers 571 over 53 modules; the
+    runner's own number for that tree comes from the next pair of runs, this
+    bench and GitHub's, and is written in beside it rather than predicted here.
+    What the count has been at each step of
+    this stretch, kept in one list rather than scattered through the entry,
+    newest first: 571 over
+    53 (the isolation guard's diagnosis put under test, on a passing suite), 570
+    over 53 (`Fan GPU` moved into the fan group, and the grid census became a
+    check),
     568 over
     53 (the GPU-fan row: five checks for the row, two for the pairing gate in
     both directions, one for the shared bodies), 560 over 53 (the CI cycle: four
@@ -1544,7 +1588,11 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     (#193), 460.878 with 526 (#194, one failure), 405.906 with 536 (#195, green
     and lucky), 405.166 with 546 (#196), 403.049 with 547 (#197), 410.181 with
     549 (#200), 414.204 with 555 (#202) and 419.829 with 568 (#203, the first
-    run under the raised 45-minute cap).  #202 and #203 are the pair that
+    run under the raised 45-minute cap), 1872.756 with 568 (#204, two failures
+    and no cancellation - the cap letting a loaded run finish and report what
+    the load did), 418.376 with 570 (#205, one failure, mine), 475.172 with 570
+    (#206, the same failure on a prose-only head) and 463.128 with 570 (#207,
+    green).  #202 and #203 are the pair that
     bounds a count again: thirteen more checks, 5.625 s more, on runners that
     took 449 s and 414 s of job for the same five steps.  **#204 and #205 are
     the two red ones and they are not the same story**: #204 took 1872.756 s of

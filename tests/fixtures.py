@@ -67,6 +67,12 @@ def config_fingerprint() -> str:
 
 BASELINE_CONFIG = config_fingerprint()
 
+#: When this process began measuring.  `test_zz_isolation.py` uses it to say whether the
+#: settings file was written **during** the run rather than before it - the difference between
+#: "a test wrote your session" and "a window opened and closed while I was measuring", which a
+#: single `pgrep` at the end of the run cannot tell apart.
+RUN_STARTED = time.time()
+
 #: Optional external programs.  Each check that needs one says so out loud rather than measuring a
 #: zero and calling it a result - the old suite's worst near-miss was `measure` returning 0.0 luma
 #: because ffmpeg was missing, which looked like a changed clip and was an absent decoder.
