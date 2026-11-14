@@ -1523,6 +1523,43 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     review-door dependency check in `tests/test_bars_rows.py` has nothing to
     exercise here now, because `bars` leaves no source unanswered on this box.
 
+    Two readings of that 571, both from runs rather than from arithmetic: this
+    bench, one run of the committed tree (`6f306e1`) with no window open,
+    **571 checks in 463.960 s**, OK, 4 skipped, no `ResourceWarning` and no
+    `Exception ignored` line.  A near-miss worth recording because it is how
+    the last paragraph was settled: the check for a live window first run as
+    `pgrep -c -f "python3 -m xigmaui"` answered **1** with nothing open,
+    because the wrapper shell carries that exact string in its own command
+    line.  `tests/test_zz_isolation.py` writes its pattern as `xigma[u]i` for
+    that reason, and this is the second time in two days that a process scan
+    counted its own measurement.
+
+    **Provenance, said plainly rather than papered over.**  The CI-hardening
+    set - the checks job's 30 -> 45 minute cap, `tests/test_ci_workflow.py`,
+    the state-wait fix in `tests/test_window_sizing.py` and the
+    docs/packaging.md paragraphs that record them - arrived in `8d1e05e`,
+    whose subject names only the fan row, because that commit was staged with
+    `git add -A` while both bodies of work were in flight.  Both are described
+    in this entry, so nothing
+    about the change is undocumented; what is imperfect is the address.  The
+    fix for a mislabelled commit is a sentence in the next one, not a
+    force-push on a shared `main`, and the cost is concrete: bisecting the
+    timeout change lands on a commit labelled as a theme change.  Since then,
+    staging has been checked per commit (`git status --porcelain` printed before
+    each one, 18 / 13 / 4 / 3 files) precisely so this cannot recur silently.
+
+    **Build record.**  #13 was cut from `fc5a9bb` and #14 from `6f306e1`; the
+    two unpacked trees differ in **exactly one file**, `changelog.gz` - the
+    shipped Python is byte-identical to HEAD in both, so the reordered block an
+    install carries did not move between them, and the vendored 146 MB library
+    diffs clean against the installed copy in both.  One date across every
+    member of each (nothing newer than the changelog stamp), `lintian` run with
+    `--tag-display-limit 0` exiting 0 and printing no tags both times, and
+    version parity at
+    0.7 in `dpkg-parsechangelog`, `pyproject.toml` and the packaged module.
+    #12 -> #13 had been eleven files (three modules, six docs, `PROTOCOL.md`,
+    the changelog), which is the shape of the two commits between them.
+
     The count is read off the tree as well as off the runner.  The command
     `grep -c "^    def test_" tests/*.py` answers 571 over 53 files, and
     `unittest.TestLoader().discover("tests")` answers 571 over 53 modules; the
