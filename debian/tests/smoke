@@ -82,7 +82,45 @@ want = {"Theme_25.mp4": (214_917, "b818b7d3294b3625e9f143e920ccc9b0"),
         "Theme_11.mp4": (3_402_098, "4a515a8a17204ffb5a23d2ac34dd37ee"),
         "theme_48.mp4": (1_333_649, "51701687804f60875da872c7f27ad673")}
 got = sorted(os.listdir(m.SYSTEM_MEDIA))
-assert got == sorted(want), got
+# The rule, not one release's directory listing.  `want` is three files whose bytes are the
+# vendor's, so the claim that survives is that they are **here** and unchanged - the set
+# around them is this repository's own to grow: `media/` carried three clips when this
+# section was written and now carries fourteen, and an equality against a hardcoded three
+# was the reason CI #217 went red on a box that had installed the package correctly.  What
+# the whole set must equal is the package's own declaration, which dpkg recorded at install
+# time - a claim with a source, rather than one kept by hand here.
+assert set(want) <= set(got), (sorted(set(want) - set(got)), got)
+_declared = []
+try:
+    with open("/var/lib/dpkg/info/xigmatek-connect-lcd.md5sums", encoding="utf-8") as _fh:
+        for _line in _fh:
+            _parts = _line.split(None, 1)
+            if len(_parts) == 2:
+                _declared.append(_parts[1].strip())
+except OSError:
+    pass
+if _declared:
+    _here = [os.path.join("/usr/share/xigmalcd/media", n) for n in got]
+    _said = sorted(x for x in _declared if x.startswith("/usr/share/xigmalcd/media/"))
+    assert _here == _said, (len(_here), len(_said),
+                            sorted(set(_here) ^ set(_said))[:4])
+    print(f"  media set    {len(got)} clips installed, and dpkg's own md5sums names "
+          f"{len(_said)} under that directory - they are the same list")
+else:
+    print(f"  media set    {len(got)} clips installed (no dpkg manifest to compare "
+          f"against on this box)")
+# A drawn theme that names a backdrop the package does not install would draw its readings
+# over whatever the panel happens to keep, and say nothing while doing it: pair through the
+# shipped door, on the shipped box.
+from xigmalcd import themes
+_gone = []
+for _t, _clip in sorted(themes.CODE_CLIPS.items()):
+    _p = m.find_media(_clip)
+    if not (os.path.isfile(_p) and os.path.basename(_p) == _clip):
+        _gone.append((_t, _clip, _p))
+assert _gone == [], _gone
+print(f"  pairing      {len(themes.CODE_CLIPS)} drawn themes, every one of their "
+      f"backdrops resolves on this installed box")
 for name, (size, md5) in want.items():
     blob = open(os.path.join(m.SYSTEM_MEDIA, name), "rb").read()
     assert len(blob) == size, (name, len(blob), size)

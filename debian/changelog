@@ -1318,6 +1318,31 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     The name census moved 108 -> 119 source rows, 190 rows carrying at
     least one.
 
+  * The smoke test asserted a directory listing, not a rule.
+
+    The smoke test asserted a directory listing, and CI #217 went red on a
+    box that had installed the package correctly. `debian/tests/smoke`
+    compared the installed `media/` directory against a hardcoded list of
+    three names - `Theme_11.mp4`, `Theme_25.mp4`, `theme_48.mp4` - written
+    when that directory held three files. Fourteen land there now, so the
+    equality failed on an install that was right, and it failed only in CI:
+    the suite does not run the autopkgtest, and this bench still has the
+    older package installed. Replaced with three claims that each have a
+    source. The vendor's three are still pinned by length and MD5 and must
+    be present, as a subset rather than as the whole set. The whole set
+    must equal what the package declared it would install, read out of
+    dpkg's own md5sums file for the package - a record rather than a second
+    list kept by hand here - and the count prints either way, with the
+    reason said out loud when there is no manifest to compare against. And
+    the pairing has its own assertion now: for every drawn theme, the
+    backdrop named in `themes.CODE_CLIPS` must resolve through
+    `main.find_media` to a file of that name on the installed box, which is
+    exactly the check that would have caught shipping `birdseye` while
+    leaving behind the clip it names. Both python blocks in the file were
+    checked with `compile()` and the script with `bash -n`, and the pairing
+    relation was run against this bench's roots, where all six themes
+    answer - three from `media/`, three from the installed library.
+
   * Two gates that were bets on the machine, and the bench that called
     them: the drive slots and the loop's budget.
 
