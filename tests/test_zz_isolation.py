@@ -63,7 +63,7 @@ class RealSessionUntouched(unittest.TestCase):
         began = time.strftime("%H:%M:%S",
                                             time.localtime(fixtures.RUN_STARTED))
         evidence = (f"the file was last written at {when}, "
-                    + ("**inside** this run, which began at " + began
+                    + ("inside this run, which began at " + began
                        if inside else "before this run began at " + began))
         try:
             seen = subprocess.run(["pgrep", "-af", "xigma[u]i"], capture_output=True, text=True)

@@ -202,9 +202,9 @@ class TheBodyItself(unittest.TestCase):
         # table on purpose: a row that stops sharing the function shows up here as a count.
         self.assertEqual(self.src.count("lambda v:"), 5,
                          f"{self.src.count('lambda v:')} own-copy formatters in the body")
-        self.assertEqual(self.src.count("pct, True)"), 2,
-                         "the two percentage rows (LOAD, GPU FAN) must format through the one "
-                         "`render.pct` both doors share")
+        self.assertEqual(self.src.count("pct, True,"), 2,
+                         "the two percentage rows (LOAD and Fan GPU) must format through the "
+                         "one `render.pct` both doors share")
         self.assertEqual(self.src.count("gb("), 2,
                          "the RAM and VRAM numbers must format through the one `gb` function - "
                          "and pass it the field they print, not the fraction their meter uses")
@@ -465,10 +465,10 @@ class TheGeneratedFile(unittest.TestCase):
         cls.obj = themes.export("bars")
         cls.widgets = cls.obj["osd"]["widget"]
 
-    def test_the_export_is_the_heading_the_clock_and_three_widgets_per_row(self):
-        self.assertEqual(len(self.widgets), 2 + 3 * len(themes.BARS_ROWS),
-                         "the export is not the heading, the clock and three widgets per "
-                         "`themes.BARS_ROWS` entry")
+    def test_the_export_is_the_heading_the_clock_and_four_widgets_per_row(self):
+        self.assertEqual(len(self.widgets), 2 + 4 * len(themes.BARS_ROWS),
+                         "the export is not the heading, the clock and four widgets "
+                         "(figure, label, number, meter) per `themes.BARS_ROWS` entry")
         kinds: dict = {}
         for w in self.widgets:
             kinds[w["type"]] = kinds.get(w["type"], 0) + 1
@@ -476,19 +476,49 @@ class TheGeneratedFile(unittest.TestCase):
         self.assertEqual(kinds, {
             "text": 1 + len(themes.BARS_ROWS) - slots,
             "data": 1 + len(themes.BARS_ROWS) + slots,
-            "bar": len(themes.BARS_ROWS)}, kinds)
+            "bar": len(themes.BARS_ROWS),
+            # one gutter figure per row, named from `themes.ROW_ICONS`
+            "special": len(themes.BARS_ROWS)}, kinds)
 
-    def test_each_rows_three_widgets_answer_for_the_same_place_on_the_glass(self):
-        """The label and the number share the row's centre; the meter hangs `BARS_BAR_DY` under
-        it.  That is the offset both doors use, and it is why the three are not one assertion: a
-        file that put the meter at the row's own y would still draw, and every bar would sit on
-        top of its own number."""
+    def test_each_rows_four_widgets_answer_for_the_same_place_on_the_glass(self):
+        """A row is four widgets - figure, label, number, meter - and all four mean one line.
+
+        The label and the number share the row's centre; the meter hangs `BARS_BAR_DY` under
+        it; the gutter figure's box is centred on the same line, in the strip left of the
+        label column.  That is the offset both doors use, and it is why the four are not one
+        assertion: a file that put the meter at the row's own y would still draw, and every
+        bar would sit on top of its own number - and a file that put the figure at the
+        label's x would draw a die across the word `CPU`.  The row's four widgets are also
+        checked to be **in the order the painter draws them**, because where two of them
+        overlap, the last one down wins, and the two doors once differed by exactly the
+        number of antialiased pixels at that boundary.
+        """
         pitch = render.BARS_SPAN // len(themes.BARS_ROWS)
         for i, (label, bar_src, text_src, lo, hi) in enumerate(themes.BARS_ROWS):
             y = render.BARS_Y0 + i * pitch
-            lbl, num, meter = (self.widgets[1 + 3 * i], self.widgets[2 + 3 * i],
-                               self.widgets[3 + 3 * i])
+            icon, lbl, num, meter = (self.widgets[1 + 4 * i], self.widgets[2 + 4 * i],
+                                     self.widgets[3 + 4 * i], self.widgets[4 + 4 * i])
             with self.subTest(row=i):
+                base = themes.ROW_ICONS[bar_src]
+                self.assertEqual(icon["type"], "special")
+                # the file names the **base** figure and points at the source that may ask
+                # for a variant; the variant is resolved at draw time from the reading, so
+                # the declared name cannot depend on this machine's fan types
+                self.assertEqual(icon["property"][0]["name"], f"icon-{base}",
+                                 "the figure the file asks for is not the one this row's "
+                                 "meter source maps to in `themes.ROW_ICONS`")
+                want_variant = (themes.SLOT_TYPES.get(bar_src)
+                                if bar_src in themes.SLOT_TYPES else None)
+                declared = (icon["property"][0].get("xigma") or {}).get("iconVariant")
+                self.assertEqual(declared, want_variant,
+                                 "a tachometer row must name the source its figure's variant "
+                                 "comes from, and no other row may name one")
+                self.assertEqual((icon["property"][0]["x"],
+                                  icon["property"][0]["width"]),
+                                 (render.BARS_ICON_X, render.BARS_ICON_BOX[0]))
+                self.assertAlmostEqual(
+                    icon["property"][0]["y"], y - render.BARS_ICON_BOX[1] / 2,
+                    msg="the figure is off its row's line", places=3)
                 self.assertEqual((lbl["type"] == "text"), label is not None)
                 self.assertEqual(num["property"][0]["source"], text_src)
                 self.assertEqual(meter["property"][0]["source"], bar_src)
@@ -1048,8 +1078,18 @@ class TheRowsDoNotRunIntoEachOther(unittest.TestCase):
     """
 
     def profile(self, img) -> list:
+        """Ink per canvas row, **in the text and meter columns only**.
+
+        The x window is not a tuning knob, it is the thing being measured: this class asks
+        whether a row's meter is clear of the text above and below it, and the gutter
+        figures added on 2026-11-14 stand at x 3..25 - left of both the label column (28)
+        and every meter (28..452) - so including them would report a collision that cannot
+        happen on the glass.  Their own clearances are measured in `tests/test_icons.py`,
+        which holds each figure inside its declared box and clear of the label column.
+        """
         d = img.convert("RGBA").getchannel("A").load()
-        return [sum(1 for x in range(render.W) if d[x, y] > 8) for y in range(render.H)]
+        return [sum(1 for x in range(render.BARS_LBL_X, render.W)
+                    if d[x, y] > 8) for y in range(render.H)]
 
     def bands(self) -> tuple:
         body = dict(ALL_SIX, fans=FANS_SIX, timestamp={})

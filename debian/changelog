@@ -1166,6 +1166,158 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     suite's GUI checks carry real per-window work, and a contended runner pays
     for all of it in series.
 
+  * A gutter of figures beside the rows: drawn vectors, named from the
+    layout, coloured by the row's own reading.
+
+    The owner asked for intuitive icons - CPU, GPU, fan, pump, board,
+    RAM/VRAM, storage - and offered SVGs, Font Awesome, Nerd Fonts or any
+    mix as means. What was built is none of those, for two measured
+    reasons. A glyph from an icon **font** resolves against whatever face
+    this machine has installed, and this repository has already paid for
+    face dependence twice: the vendor's own `simsun` rows are *dropped* on
+    a runner with no CJK face (docs/limits.md, and
+    `tests/test_library_draw.py` reports the faces a machine cannot
+    resolve), and the same `text` row measures different ink widths under
+    Liberation Sans than under the Arial the vendor designed for. A figure
+    that vanishes because the host lacks a font is worse than no figure,
+    and a figure that changes width with the host breaks the rule this
+    project holds highest: both doors paint the same pixels. A **baked
+    asset** - SVG rasterised to a PNG - fails the other way: it cannot be
+    moved, resized or recoloured from a layout, it puts a second copy of
+    the theme's ink outside the palette rules, and `--check-theme` could
+    not tell a reader which of its parts came from where.
+
+    So the figures are polygons, drawn in `render.ICONS` , and a layout
+    names one through the `special` kind that already exists:
+    `name: "icon-chip4"` , `x` / `y` the box corner, `width` / `height` its
+    size, `source` / `minValue` / `maxValue` the reading, and
+    `xigma.colourRamp: "heat"` . That is the fourth door for a `special` -
+    `layout.draw_special_glyph` - joining `line` , `pair` and `values` ,
+    and the door-marker check in `tests/test_specials.py` was extended to
+    hold it to the same rule: exactly one door per registered drawing,
+    marked, and the marker verified against the call the body actually
+    makes.
+
+    Nine figures, each chosen for what survives at **22 px** (one
+    twenty-second of the glass, which is a hard design limit: at that size
+    a second detail becomes mud): `chip4` a die with leads on four edges
+    and a solid core (CPU), `card` a plate with a bracket tab and a blower
+    ring (GPU), `board` the plate with a socket, two expansion slots and
+    four mounting holes, `drive` an M.2 body with a **keyed end** drawn as
+    a step in the outline (both storage rows), `dimm` a stick with four
+    chips and a notch in its bottom edge (RAM), `chip2` a package with
+    leads on two edges and a pin-1 index dot (VRAM), `fan` a ring with
+    three wedges and a hollow hub, `impeller` a volute ring with two broad
+    vanes and a **tangential outlet** (the pump), and `gauge` a 240-degree
+    dial whose **needle is the reading**. That last one is the creative
+    part the others are not: `LOAD` at 3 % points the needle low and at 97
+    % points it high, because the angle comes from the same fraction the
+    meter beside it fills with.
+
+    Colour is not decoration either: each figure is drawn in `heat(frac)`
+    of its own row, so a cold CPU die is cyan-green beside a half-full
+    meter and a hot pump volute is red beside a full one. The fraction
+    comes from `layout.frac_of` , the same call the row's meter goes
+    through, so the two cannot disagree - which is the same defect class as
+    the `15 GB` -at-97 % row, one figure and one bar describing one reading
+    at two colours. And a figure deliberately carries **no** `textColor` :
+    choosing amber for the text must not make a cool chip warm, and a check
+    in `tests/test_ink.py` refuses the key on an icon widget while
+    asserting the census still adds up (24 glyph roles + 11 meter tracks +
+    11 figures = 46 widgets).
+
+    **A pump is chosen by what was measured, never by what a label
+    spells.** `xigma. iconVariant: "Fan 2 Type"` names another of the row's
+    readings; the value table answers `Pump` because `sensors.FAN_CHANNELS`
+    pinned that channel by a tachometer that stays flat while its own
+    header's duty sweeps (PROTOCOL.md §8, docs/limits.md); and
+    `render.ICON_VARIANTS` maps rotor + `Pump` -> volute. Four new source
+    names went into the vocabulary to carry it - `Fan 1 Type` ..
+    `Fan 4 Type` , 38 -> 42 through `themes.source_names()` - with a
+    display shape each, because a type is a fact the machine reports about
+    a channel and a layout may want to print it. The honesty check is
+    driven in code, not asserted in prose: a row renamed `CPU PUMP` that
+    reports `type: Fan` still draws a rotor, and a row named `Pump` that
+    reports `Pump` draws the volute, in both doors. Label-sniffing is how
+    this project has been wrong about sensors repeatedly, so the drawing is
+    not allowed to do it.
+
+    The gate for all of it is a new file, `tests/test_icons.py` (15
+    checks), and it earned its keep before it was finished. Two checks
+    caught real geometry bugs in the first cut: the die's leads and the
+    stick's ends were drawn **outside** the box they declare - the
+    double-scaled arithmetic put a CPU figure's ink at x=27.6 against a
+    label column starting at x=28 - and the frame's whole-frame parity
+    still reported a plausible number while the two doors disagreed about
+    which of them won the overlap (1 720 px of grey against green). So
+    `test_ink_stays_inside_the_declared_box` measures the ink of every
+    registered figure against its box, and
+    `test_the_two_doors_agree_on_the_figure_column` compares the doors **in
+    the gutter column, row by row**, because a whole-frame diff can be paid
+    for by an offset in one place and still come out even. Two more measure
+    the claims themselves: `test_the_volute_is_not_the_rotor` (a measured
+    pixel difference, not a rename) and
+    `test_the_needle_of_the_usage_dial_is_the_reading` (both doors must
+    move when the reading moves).
+
+    **Two coverage holes in the new gate, found the way they keep being
+    found here: a mutation that cost nothing.** Twelve were run. The first
+    hole: the door resolving a figure's variant from the row's **label**
+    rather than its reported type cost **0** - because my honesty check
+    compared the two doors only at the body where the type *was* `Pump` ,
+    where a label rule and a type rule agree. The case that separates them
+    is the awkward one: a row named `CPU PUMP` that reports `type: Fan` .
+    Driving both bodies through both doors makes that mutation cost 1. The
+    second hole: giving the CPU row the GPU's figure - wrong, and
+    consistent across the doors, so parity, the ink box, the column census
+    and the clearance checks all stayed silent. Nothing in the suite asked
+    whether rows about different things look different. So `bars` now has a
+    mapping check of its own: the three temperature rows must wear three
+    distinct figures, system memory and card memory two distinct ones, the
+    two storage rows one figure each, the four tachometer rows a shared
+    rotor, and no figure may be reused across those families - which makes
+    the mutation cost 1 and states, in code rather than in prose, what the
+    column is *for*. Final counts for the twelve: 2, 1, **1**, 27, **1**,
+    1, 13, 1, 16, 5, 3, 1 (the two in bold were the zeros until the checks
+    grew).
+
+    And one defect the suite did not find at all: adding a fourth `special`
+    door left the caption table behind in `--list-specials` , and the flag
+    raised `KeyError: 'glyph'` while **596 checks ran green**. It was found
+    by typing the command. That is now a check - the flag is run, every
+    registered drawing must appear in its output with the door it claims,
+    and an entry with no caption is a failure rather than a hole in a
+    printout - because a listing kept *beside* a registry is the same
+    second-copy mistake this file has been written to catch in everybody
+    else's code. Three findings of process, recorded because they repeat.
+    `themes.keys_read()` finds the extension keys the painter reads by
+    scanning for lookups hung off `prop` or `ext` - an inline
+    `(prop.get("xigma") or {}).get("iconVariant")` on a temporary is
+    **invisible** to it, which would have left `xigma.iconVariant` a key
+    with a written reason and no reader (fixed by binding `ext` , and the
+    reason is stated in the door's own docstring). The door markers use
+    `inspect.getsource` + `ast.parse` , which refuses a nested closure's
+    indented source - `textwrap.dedent` now. And a check that insists every
+    `special` reports a box had to learn the honest exception: a figure
+    whose row this body cannot answer draws nothing, and that absence is
+    already named by the source in `cannot` , so the check now separates
+    "box-less because unanswered" from "box-less and silent", which is the
+    defect it was written for.
+
+    Two more pins moved with the row size, both corrected by deriving
+    rather than re-typing: `tests/test_row_acts.py` 's reorder test walked
+    a **literal** three steps on the theory that a row is label, number,
+    meter, and now computes the steps from the export (
+    `per_row = (widgets - 2) // rows` , four today); and the generated-file
+    check that counted three widgets per row counts four. The block is 46
+    widgets (11 rows x 4 plus heading and clock), the row census 147
+    text/data rows unchanged, and the snap census 199 rows with **103**
+    sharing a column - eleven of those new sharings are the gutter figures,
+    all at x=3 - while the gap histogram stayed {0: 103, 2: 12, 3: 4, 4:
+    14, 5: 4} with nothing at 1, 6 or 7 px, for the fifth census running.
+    The name census moved 108 -> 119 source rows, 190 rows carrying at
+    least one.
+
   * `Apply these settings` now carries the background too, unless the
     reader has said otherwise, and the README says out loud that the panel
     runs headless.
@@ -1658,14 +1810,16 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     than assumed.
 
     The count is read off the tree as well as off the runner.  The command
-    `grep -c "^    def test_" tests/*.py` answers 581 over 53 files, and
-    `unittest.TestLoader().discover("tests")` answers 581 over 53 modules; the
+    `grep -c "^    def test_" tests/*.py` answers 598 over 54 files, and
+    `unittest.TestLoader().discover("tests")` answers 598 over 54 modules; the
     runner's own number for that tree comes from the next pair of runs, this
     bench and GitHub's, and is written in beside it rather than predicted here.
     What the count has been at each step of
     this stretch, kept in one list rather than scattered through the entry,
-    newest first: 581 over 53 (Apply carrying the background: seven checks on
-    the branches, three on the headless boundary), 571 over 53 (the isolation
+    newest first: 598 over 54 (the gutter figures: a new file of 16 checks, the
+    fourth `special` door, and the printed door list held to the registry), 581
+    over 53 (Apply carrying the background: seven checks on the branches, three
+    on the headless boundary), 571 over 53 (the isolation
     guard's diagnosis put under test, on a passing suite), 570 over 53
     (`Fan GPU` moved into the fan group, and the grid census became a
     check),

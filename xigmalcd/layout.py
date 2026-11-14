@@ -28,7 +28,7 @@ import json
 from PIL import Image, ImageDraw, ImageFont
 
 from .render import (A26_FAN_F, A26_FAN_MAX_W, A26_TVAL_F, SS, _FONT_GLOBS,
-                     fan_figures, gb, heat, pct, value_pair)
+                     draw_icon, fan_figures, figure_for, gb, heat, pct, value_pair)
 
 # Fonts the layouts name, and what this machine has.  No Microsoft fonts are
 # installed here, so every one of these is a substitution; Liberation Sans is
@@ -165,6 +165,15 @@ VENDOR_FORMAT = {
     "Fan 2 Speed": lambda v: f"{int(round(v))}",
     "Fan 3 Speed": lambda v: f"{int(round(v))}",
     "Fan 4 Speed": lambda v: f"{int(round(v))}",
+    # what kind of channel a slot is - `Fan`, `Chassis`, or the `Pump` pinned by
+    # measurement - printed as the machine words it, cut like a fan label.  Four names
+    # exist so a layout can *show* the type; one of them also decides which figure the
+    # gutter draws, and it is the type, never the label, that is asked (`themes.SLOT_TYPES`,
+    # `render.ICON_VARIANTS`)
+    "Fan 1 Type": lambda v: str(v)[:10],
+    "Fan 2 Type": lambda v: str(v)[:10],
+    "Fan 3 Type": lambda v: str(v)[:10],
+    "Fan 4 Type": lambda v: str(v)[:10],
     "Fan 1 Name": lambda v: str(v)[:10],
     "Fan 2 Name": lambda v: str(v)[:10],
     "Fan 3 Name": lambda v: str(v)[:10],
@@ -367,6 +376,48 @@ def draw_special_pair(draw: ImageDraw.ImageDraw, prop: dict, figures) -> tuple:
                                   path, max(int(px), 1) * SS)) if path else None)
     return size, (min(b[0] for b in boxes), min(b[1] for b in boxes),
                   max(b[2] for b in boxes), max(b[3] for b in boxes))
+
+
+def draw_special_glyph(draw: ImageDraw.ImageDraw, prop: dict, figure: str, value,
+                       values: dict):
+    """A `special` row whose picture is a **figure**, not a line of text.
+
+    The fourth door, and the same shape as the other three: the file gives placement and
+    colour (`x`/`y` the box's corner, `width`/`height` its size, `source`/`minValue`/
+    `maxValue` the reading the figure speaks with, `xigma.colourRamp` the ramp), and the
+    geometry itself stays in `render.ICONS`.  Panel px in, panel px out: the conversion to
+    the supersampled canvas is the drawing's business, and reporting boxes in the units the
+    rest of this module reports in is what makes a figure's box comparable with a text
+    row's - which is what `--check-theme` prints and what `tests/test_icons.py` measures
+    clearances against.
+
+    A row may ask for a **variant** of its figure by another of its own readings:
+    `xigma.iconVariant: "Fan 2 Type"` names a source, the table answers `Pump`, and
+    `render.figure_for` picks the volute.  That key is resolved *here*, with the other
+    `xigma.` keys, because the census gate asks which extension names the painter reads
+    and requires each one to carry a written reason: a key read only by a caller would be
+    a key no door could be audited against.
+
+    Returns the box in panel px, or None when the figure name is not drawable: an unknown
+    name is refused rather than drawn as something else.
+    """
+    # bound to a name on purpose: `themes.keys_read()` recognises a key as read when the
+    # lookup hangs off `prop` or `ext`, and an inline `(... or {}).get("k")` on a temporary
+    # is invisible to it - which would make `xigma.iconVariant` a key with a stated reason
+    # and no reader, the exact one-sided drift that check exists to catch
+    ext = prop.get("xigma") or {}
+    variant = str(ext.get("iconVariant") or "")
+    figure = (figure_for(str(prop.get("source") or ""),
+                         values.get(variant) if variant else None) or figure)
+    frac = frac_of(prop, value)
+    ramp, _bad = colour_ramp(prop)
+    ink = (ramp or heat)(frac)
+    x0, y0 = float(prop.get("x") or 0), float(prop.get("y") or 0)
+    w0 = float(prop.get("width") or 0)
+    h0 = float(prop.get("height") or 0)
+    if draw_icon(draw, figure, x0, y0, w0, h0, ink, frac=frac) is None:
+        return None
+    return (x0, y0, x0 + w0, y0 + h0)
 
 
 def draw_special_line(draw: ImageDraw.ImageDraw, prop: dict, text: str):
@@ -999,15 +1050,20 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
             if fn is None:
                 notes["missing"].append(f"special:{name}")
                 continue
-            # a `special` needs a face like any text row does - both doors build one - so
-            # an unresolvable family is said here, in the same words the text kinds use,
-            # rather than drawing nothing.  A None box from the door is not an error: it
-            # means the drawing had nothing to say (a composite line with no readings),
-            # and `notes["missing"]` is for what the file asked for and this machine lacks
-            face, fam, path = font_for(prop)
-            if face is None:
-                notes["missing"].append(f"font:{fam or 'default'}")
-                continue
+            # A `special` that draws a **line of text** needs a face like any text row
+            # does, and an unresolvable family is said here in the same words the text
+            # kinds use rather than drawing nothing.  A `special` that draws geometry
+            # asks for none: it is polygons, and dropping it because this machine has no
+            # CJK font would be a picture lost to an unrelated absence.  The door carries
+            # the difference as an attribute on the function (`needs_face`), so one rule
+            # decides it rather than a name test here, and a None box from the door is not
+            # an error - it means the drawing had nothing to say (a composite line with no
+            # readings, or a figure whose row this machine cannot answer).
+            if getattr(fn, "needs_face", True):
+                face, fam, path = font_for(prop)
+                if face is None:
+                    notes["missing"].append(f"font:{fam or 'default'}")
+                    continue
             notes["boxes"].append(("special", name, fn(draw, prop, values), wi))
         elif kind == "line":
             notes["gaps"].append("line colour")

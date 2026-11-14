@@ -983,14 +983,21 @@ def main(argv=None) -> int:
     if args.list_specials:
         # each name says the door it goes through, in the words the registry itself uses
         # (`themes.special_door`): the door is what decides what the row's `x`, `width` and
-        # fit key mean, and a reader authoring a file has to know which of the three they
-        # are writing before they pick numbers
+        # fit key mean, and a reader authoring a file has to know which of the four they
+        # are writing before they pick numbers.  A door with no caption here is printed as
+        # a gap rather than raising - `tests/test_specials.py` fails on that text, so the
+        # listing cannot quietly fall behind the registry the way it did when the `glyph`
+        # door was added and this dict was not (KeyError in a shipped CLI flag, found by
+        # hand and not by the suite, until now).
         shapes = {"line": "one line of text built by code",
                   "pair": "two figures at one size, fitted to `xigma.autoFitMax`",
-                  "values": "two figures at one size, fitted to `xigma.fitArc`"}
+                  "values": "two figures at one size, fitted to `xigma.fitArc`",
+                  "glyph": "a drawn figure: the box is x, y, width, height; the shape is "
+                           "`render.ICONS`; its ink is the row's own ramp at its own reading"}
+        gap = "NO CAPTION (a door was added without a line here)"
         for name in themes.special_names():
             door = themes.special_door(name)
-            print(f"  {name}  [{door}] {shapes[door]}")
+            print(f"  {name}  [{door}] {shapes.get(door, gap)}")
         print("  A special is drawn by code and placed by the layout: see "
               "xigmalcd/themes.SPECIALS and docs/theme-editor.md.")
         return 0

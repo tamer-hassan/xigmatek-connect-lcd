@@ -32,6 +32,8 @@ import ast
 import datetime
 import inspect
 import itertools
+import sys
+import textwrap
 import unittest
 from PIL import Image, ImageDraw, ImageChops
 
@@ -350,7 +352,12 @@ class TheDoorMarkers(unittest.TestCase):
     """
 
     DOOR_CALLS = {"line": "layout.draw_special_line(", "pair": "layout.draw_special_pair(",
-                  "values": "layout.draw_special_values("}
+                  "values": "layout.draw_special_values(",
+                  # the gutter figures added 2026-11-14: placed and coloured by the file,
+                  # drawn by `render.ICONS`.  A fourth shape, so a fourth door - and the
+                  # marker test below is what makes "which door does this row go through"
+                  # a fact a file can be checked against, not a detail of one painter
+                  "glyph": "layout.draw_special_glyph("}
 
     def test_every_registered_drawing_carries_a_marker(self):
         for name, fn in sorted(themes.SPECIALS.items()):
@@ -367,7 +374,11 @@ class TheDoorMarkers(unittest.TestCase):
         node and cannot be mistaken for a lookup.
         """
         found = set()
-        for node in ast.walk(ast.parse(inspect.getsource(fn))):
+        # `textwrap.dedent` because the icon door is a closure: the generated
+        # `_sp_icon`'s source arrives indented, and `ast.parse` refuses that.  The other
+        # registered drawings are module-level functions, where it does not matter.
+        source = textwrap.dedent(inspect.getsource(fn))
+        for node in ast.walk(ast.parse(source)):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
                     and node.func.attr == "get" and isinstance(node.func.value, ast.Name) \
                     and node.func.value.id == "values" \
@@ -413,6 +424,32 @@ class TheDoorMarkers(unittest.TestCase):
                 self.assertEqual(keys, listed,
                                  f"{name} reads {sorted(keys)} from the table and "
                                  f"`SPECIAL_LINES` fills {sorted(listed)} for it")
+
+    def test_the_printed_door_list_covers_every_registered_drawing(self):
+        """`--list-specials` cannot fall behind the registry, and it is not allowed to crash.
+
+        When the fourth door went in (the gutter figures, 2026-11-14) the caption table in
+        the CLI did not, and the flag raised `KeyError: 'glyph'` - found by running it by
+        hand, which is the same lesson as every other check in this class: a listing kept
+        beside a registry drifts from it, and the drift is invisible until someone asks the
+        door that reads it.  So the flag is run, its lines counted against
+        `themes.special_names()`, and a missing caption is a failure rather than a gap in
+        the print.
+        """
+        got = fixtures.run(sys.executable, "-m", "xigmalcd", "--list-specials")
+        self.assertEqual(got.returncode, 0, got.stderr[-400:])
+        out = got.stdout
+        self.assertNotIn("NO CAPTION", out, out[:600])
+        lines = [ln.strip() for ln in out.splitlines() if ln.strip().startswith(
+            tuple(themes.special_names()))]
+        self.assertEqual(len(lines), len(themes.special_names()),
+                         f"{len(lines)} lines for {len(themes.special_names())} registered "
+                         f"drawings: {out[:400]}")
+        for name, fn in sorted(themes.SPECIALS.items()):
+            with self.subTest(special=name):
+                self.assertIn(f"{name}  [{fn.door}]", out,
+                              f"{name} is registered but the printed list does not say "
+                              "which door it goes through")
 
     def test_the_marker_is_the_call_the_body_actually_makes(self):
         for name, fn in sorted(themes.SPECIALS.items()):
@@ -491,6 +528,25 @@ class ALoopAndAPanePaintOnePicture(fixtures.FreshConfigRoot):
         return {what: box for kind, what, box, _i in (notes.get("boxes") or [])
                 if kind == "special"}
 
+    def sources_of(self, path: str, names) -> dict:
+        """For each `special` row the door drew, the source it reads - or nothing.
+
+        Read out of the saved file, not from a table kept here: the question this answers is
+        what *the file* asked for, which is the only thing both doors can agree or disagree
+        about.
+        """
+        obj = themes.load(path)
+        want = {}
+        for w in obj["osd"]["widget"]:
+            if str(w.get("type")) != "special":
+                continue
+            pr = (w.get("property") or [{}])[0]
+            if str(pr.get("name")) in names:
+                src = pr.get("source")
+                if src:
+                    want[str(pr.get("name"))] = str(src)
+        return want
+
     def ink(self, img, box) -> int:
         """Inked pixels inside one reported box, counted from alpha, not colour."""
         if not box:
@@ -525,8 +581,22 @@ class ALoopAndAPanePaintOnePicture(fixtures.FreshConfigRoot):
                                  f"{export}: the frame the loop paints and the frame the editor "
                                  f"paints differ by {differing} px (worst channel {worst}) - the "
                                  f"pane is not showing what the glass gets")
+                # Which `special` rows read the table by **source** rather than by a
+                # code-built line: the gutter figures (2026-11-14) ask for `source`,
+                # `minValue`/`maxValue` and a ramp, and a figure whose row this body
+                # cannot answer draws nothing - legitimately, and reported by the same
+                # note as the number and meter of that row.  A text composite with no
+                # readings is the other case, and both are separated from the fault this
+                # check exists for: a row that goes box-less and says nothing.
+                answered = {k for k in (pane_notes.get("missing") or [])}
+                asked = self.sources_of(rec["path"], rows)
                 for name, box in sorted(rows.items()):
                     with self.subTest(layout=export, row=name):
+                        if name in asked and asked[name] in answered:
+                            self.assertIsNone(box,
+                                              f"{export}/{name}: a figure for a reading this "
+                                              "body does not answer still drew something")
+                            continue
                         self.assertIsNotNone(box, f"{export}/{name} reported no box: a row that "
                                                   f"comes back box-less is how this defect reached "
                                                   f"the glass")

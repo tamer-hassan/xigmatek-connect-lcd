@@ -47,6 +47,17 @@ making the videos runs its own model server at about 390 % of 24 cores — so th
 ring spends the clip near the top of its measured 30..75 °C scale. It is a busy machine,
 and the file says so.
 
+`bars` carries a column of small drawn figures down its left edge — a die, a card with a
+blower, a board, two drives, a rotor, a volute, a memory stick, a package, and a dial whose
+**needle is the reading**.  They are polygons in code, not an icon font and not a baked
+picture: a glyph resolves against whatever face this machine happens to have installed, and
+a face this box lacks drops a widget rather than substituting (PROTOCOL and `docs/limits.md`
+have both measurements).  Each figure is inked in its own row's colour ramp, and the pump
+row gets a volute because the channel was *measured* as a pump, not because its label says
+so.  All of it is named from the layout file the same way the meters are, so the picture on
+the glass and the picture in the editor are the same pixels: `docs/limits.md` keeps the
+reasoning and `tests/test_icons.py` the checks.
+
 | `alpha` (default) over `Theme_25.mp4` | `gauge` over `3.mp4` |
 |---|---|
 | https://github.com/user-attachments/assets/79094fe1-e2e9-4ce0-9f81-3f3f3ee123e0 | https://github.com/user-attachments/assets/da2cbb5a-cb17-4121-b4c4-f1f53c9cc3ce |

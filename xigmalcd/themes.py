@@ -310,6 +310,14 @@ FAN_SLOTS = tuple((f"Fan {i} Speed", f"Fan {i} Name") for i in range(1, 5))
 #: accept rather than one the vendor sent (PROTOCOL.md §8).
 DISK_SLOTS = tuple((f"Disk {i} Temperature", f"Disk {i} Name") for i in range(1, 5))
 
+#: Which reading reports a slot row's **type** - `Fan`, `Chassis`, or the `Pump` this
+#: program pins by measurement - given the source its meter reads.  The type is a fact the
+#: machine reports about the channel, so it belongs in the value table like the name and the
+#: speed do, and it is what lets a drawing pick a pump's volute without reading a label:
+#: `themes.SLOT_TYPES` is consulted by the recipe, the painter and `tests/test_icons.py`.
+SLOT_TYPES = {speed: f"Fan {int(speed.split()[1])} Type" for speed, _name in FAN_SLOTS}
+
+
 #: `bars`'s rows in the order the drawing lays them out: the label it prints - a literal for
 #: the six fixed rows, `None` for a fan slot, whose label is its `Fan N Name` source - then
 #: the source the meter divides, the source the number beside it prints, and the scale.  One
@@ -379,6 +387,33 @@ BARS_ROWS = (BARS_TEMP_ROWS + BARS_DISK_ROWS + BARS_FAN_ROWS
 SLOT_NAMES = {**{speed: name for speed, name in FAN_SLOTS},
              **{temp: name for temp, name in DISK_SLOTS}}
 
+#: Which figure a row of a block gets, keyed by the **source its meter reads**.  One table,
+#: read by the code theme and by `bars_recipe()` alike, because two copies of "which shape
+#: goes with which reading" is the failure this repository keeps being caught by: the shapes
+#: would drift, and a parity check comparing the two doors would agree with neither.
+#:
+#: Keyed by source rather than by label or by position, for the same reason the slot rows are
+#: named rather than numbered by y: a row's subject is what decides its figure.  Nothing here
+#: sniffs a machine's sensor name - `Fan 3 Speed` gets a rotor because it *is* the tachometer
+#: row, whichever tachometer this box happens to put there - and nothing keys on a row's
+#: index, which would move a figure when the block is reordered.
+ROW_ICONS = {
+    "CPU Temperature": "chip4",              # a die: four edges of leads, a solid core
+    "GPU Temperature": "card",               # a board with a blower ring on its face
+    "Motherboard Temperature": "board",      # the plate, a socket, two expansion slots
+    "GPU Fans Speed": "fan",                 # a rotor; a duty percent, drawn as a wheel
+    "CPU Usage": "gauge",                    # a dial whose **needle is the reading**
+    "RAM Rate": "dimm",                      # a stick: chips along the face, a keyed notch
+    "GPU Memory Rate": "chip2",              # a memory package: leads on two edges, pin-1 dot
+    # the tachometer rows all start from the rotor figure; a row whose **type** the machine
+    # reports as `Pump` is drawn as a volute instead, through `render.ICON_VARIANTS` and
+    # the `Fan N Type` source above - never by looking for "PUMP" in the label
+    "Fan 1 Speed": "fan", "Fan 2 Speed": "fan", "Fan 3 Speed": "fan", "Fan 4 Speed": "fan",
+    **{temp: "drive" for temp, _name in DISK_SLOTS},     # an M.2 body with a keyed end
+    **{speed: "fan" for speed, _name in FAN_SLOTS},      # one rotor per tachometer row
+}
+
+
 #: Sources that want a wall clock, and get one instant per frame - the same rule
 #: `render._now()` exists for (a frame that calls `time.strftime` twice shows two
 #: different seconds in one picture).
@@ -406,13 +441,13 @@ ROW_WHY = ("no fan row this machine reports is typed `Pump`.  `tools/fanscan.py`
 
 def source_names() -> tuple:
     """Every `source` name this program can put a reading behind: the flat fields, the
-    derived ratios, the clock, the positional fan slots, and the sources answered by a
-    fan row of a given type.  The checks that
+    derived ratios, the clock, the positional fan slots - name, speed **and type** - and
+    the sources answered by a fan row of a given type.  The checks that
     count them - `tests/test_theme_library.py` and `tests/test_library_draw.py` -
     ask through this door rather than keeping a list of their own, so a new source
     cannot be invisible to the check that would have to know about it."""
     return (tuple(SOURCES) + tuple(DERIVED) + CLOCKED
-            + tuple(n for pair in FAN_SLOTS for n in pair)
+            + tuple(n for pair in FAN_SLOTS for n in pair) + tuple(SLOT_TYPES.values())
             + tuple(n for pair in DISK_SLOTS for n in pair)
             + tuple(FAN_TYPED))
 
@@ -490,14 +525,20 @@ def values(metrics: dict, when=None) -> tuple:
     for (speed, name) in FAN_SLOTS:
         slot = int(speed.split()[1]) - 1
         fan = fans[slot] if slot < len(fans) else None
-        for src, key in ((speed, "value"), (name, "name")):
+        for src, key in ((speed, "value"), (name, "name"),
+                         (SLOT_TYPES[speed], "type")):
             if key == "name":
                 # `FAN 3` is what the drawing prints for a row that reports a tachometer
                 # under no name, so the source answers the same thing: an empty label would
                 # disagree with the theme over one row, far from any cause a reader could see
                 val = (fan.get("name") or f"FAN {slot + 1}") if fan else None
             else:
-                val = fan.get("value") if fan else None
+                # `value` and `type` both come from the fan row itself; only `name` needs a
+                # stand-in, because a tachometer with no label is still a tachometer and the
+                # painter prints `FAN n` for it.  Reading a fixed "value" here for every key
+                # was the bug: `Fan 1 Type` answered 1660, the RPM, in a body that reports
+                # `type: "Fan"` - a third field answering with the first one's number.
+                val = fan.get(key) if fan else None
             if val is None:
                 absent[src] = (f"this box reports {len(fans)} fan row"
                                f"{'s' if len(fans) != 1 else ''}; slot {slot + 1} has "
@@ -814,6 +855,15 @@ XIGMA_KEYS = {
               "`%A %d %B %Y`); the vendor `Date` shape in this repo is `%m/%d/%Y`; neither "
               "has been measured off the vendor's picture, so rewriting our theme to the "
               "other one would change the glass for no measured reason",
+    "iconVariant": "a gutter figure asked to change shape by **another** of its row's "
+                   "readings: `iconVariant: \"Fan 2 Type\"` says look that source up in the "
+                   "value table, and where this machine reports the channel as a `Pump`, "
+                   "draw the volute (`render.ICON_VARIANTS`) instead of the rotor. It "
+                   "exists so the shape follows what was measured about the header - the "
+                   "pin is a tach that stays flat while its own duty sweeps, docs/limits.md "
+                   "and PROTOCOL.md \u00a78 - and never what a label happens to spell, which "
+                   "is the mistake this project has kept making with sensor names. Both "
+                   "doors resolve it through one function, `render.figure_for`.",
     "colourRamp": "a ramp this program draws, named rather than copied into stops: "
                   "`heat` divides by the literals 0.3 and 0.2 where its own breakpoints "
                   "would give 0.30000000000000004 and 0.19999999999999996, so the data "
@@ -1504,9 +1554,50 @@ _sp_temp_values.door = "values"
 _sp_temp_labels.door = "values"
 
 
+def _make_icon_special(which: str):
+    """The `special` row that draws one figure, placed and coloured by the layout.
+
+    A file gives it the same vocabulary a `bar` row already carries - `x`/`y` for the box,
+    `width`/`height` for its size, `source`/`minValue`/`maxValue` for the reading the
+    figure should speak with, and `xigma.colourRamp` for the ramp - and the drawing itself
+    is one function in `render.ICONS`, shared by the code door and the file door.  That is
+    deliberate: these are not text, so no face is asked for and nothing is dropped when a
+    font is missing; and they are not baked pictures, so an editor can move one, resize it
+    and recolour it through the keys it already knows.
+
+    The fraction is computed by `layout.frac_of` - the same call the meter of the same row
+    goes through - so a figure's colour cannot disagree with the bar beside it, and the
+    gauge figure gets that fraction as its needle angle, which is the one icon here that
+    carries a reading in its *shape* rather than only its ink.
+
+    A row may also ask for a **variant** of its figure, named by another of its own
+    readings: `xigma.iconVariant: "Fan 2 Type"` says "look that source up in the value
+    table, and if this machine reports the channel as a `Pump`, draw the volute".  Both
+    doors resolve it through `render.figure_for`, because a pump that is a rotor on the
+    glass and a volute in the file is the same second-copy defect this repository keeps
+    meeting - and neither door asks a *label* what the channel is: labels are what a
+    person typed, `type` is what was measured (docs/limits.md, PROTOCOL.md §8).
+    """
+    def _sp_icon(draw, prop, values):
+        src = str(prop.get("source") or "")
+        val = values.get(src)
+        if val is None:
+            return None                     # no reading: the row says so, the figure too
+        return layout.draw_special_glyph(draw, prop, which, val, values)
+    _sp_icon.needs_face = False             # geometry, not glyphs: ask no font
+    _sp_icon.draws_icon = which
+    _sp_icon.door = "glyph"                 # the fourth door, marked like the other three
+    return _sp_icon
+
+
 SPECIALS = {"clock-readings": _sp_clock_readings, "dual-status": _sp_dual_status,
             "fan-figures": _sp_fan_figures, "temp-values": _sp_temp_values,
             "temp-labels": _sp_temp_labels}
+#: One `icon-<figure>` name per entry in `render.ICONS`, generated from that table so a
+#: figure that exists is drawable from a layout file and a figure that does not is refused
+#: by name.  `--list-specials` prints these, and `tests/test_icons.py` walks the registry
+#: rather than a list of names kept beside it.
+SPECIALS.update({f"icon-{k}": _make_icon_special(k) for k in render.ICONS})
 
 #: A `special` that draws text this repo builds in code: name -> the (key, builder) pairs
 #: it needs.  Every door that paints fills those keys - `_overlay` calls `fill_lines` for
@@ -1972,6 +2063,22 @@ def bars_recipe() -> dict:
     for i, (label, bar_src, text_src, lo, hi) in enumerate(BARS_ROWS):
         y = render.BARS_Y0 + i * row_h
         slug = bar_src.lower().replace(" ", "-")
+        figure = ROW_ICONS.get(bar_src)
+        if figure:
+            # The gutter figure for this row: the `special` kind, named, and carrying the
+            # same `source`/`minValue`/`maxValue`/`colourRamp` vocabulary its meter already
+            # declares - so the file's icon and the code's icon are the same function asked
+            # the same question, and an editor can move it, resize it or take the ramp away
+            # without touching a picture.  `x`/`y` is the box's corner, as it is for a `bar`
+            # row; no anchor is declared because geometry has one meaning here.
+            rows.append(widget(f"xigma-bars-{slug}-icon", "special", {
+                "name": f"icon-{figure}", "x": render.BARS_ICON_X,
+                "y": y - render.BARS_ICON_BOX[1] / 2,
+                "width": render.BARS_ICON_BOX[0], "height": render.BARS_ICON_BOX[1],
+                "source": bar_src, "minValue": lo, "maxValue": hi,
+                "xigma": {"colourRamp": "heat",
+                          **({"iconVariant": SLOT_TYPES[bar_src]}
+                             if bar_src in SLOT_TYPES else {})}}, len(rows)))
         if label is None:
             rows.append(widget(f"xigma-bars-{slug}-name", "data", {
                 "x": render.BARS_LBL_X, "y": y, "source": SLOT_NAMES[bar_src],

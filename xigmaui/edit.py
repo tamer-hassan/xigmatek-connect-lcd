@@ -96,12 +96,23 @@ def field_note(kind: str, field: str, name: str = "") -> str:
         return ""
     pair = themes.special_is_pair(name)
     if field == "width":
-        return (("for this drawing, `width` is the distance between the two figures' "
-                 "centres: each is placed half this far to one side of x, so the pair "
-                 "stays centred on it. It is not a box width") if pair else
-                ("this drawing is one line of built text: it does not read `width`. What "
-                 "the line may be is `fontSize` with `xigma.autoFitMax`, and where it "
-                 "starts is x, y with `xigma.anchor`"))
+        if pair:
+            return ("for this drawing, `width` is the distance between the two figures' "
+                    "centres: each is placed half this far to one side of x, so the pair "
+                    "stays centred on it. It is not a box width")
+        if themes.special_door(name) == "glyph":
+            return ("for a drawn figure, `width` and `height` are the box: x, y is its "
+                    "corner, the same vocabulary a `bar` row uses, and no anchor is "
+                    "involved. The ink may not cross the box - `tests/test_icons.py` "
+                    "measures the figures the shipped painter lays down, and it caught "
+                    "leads reaching into the label column before this sentence was true")
+        return ("this drawing is one line of built text: it does not read `width`. What "
+                "the line may be is `fontSize` with `xigma.autoFitMax`, and where it "
+                "starts is x, y with `xigma.anchor`")
+    if themes.special_door(name) == "glyph" and field in ("x", "y", "height"):
+        return ("this row's geometry is a box: x, y is its corner and width/height its "
+                "size; the figure inside is drawn by `render.ICONS` and cannot be edited "
+                "from here beyond moving, resizing or clearing the ramp")
     if not pair:
         return ""
     if field in ("x", "y"):

@@ -425,6 +425,74 @@ What has been measured on glass, by whom, with how many frames - and what has no
    with `copy.deepcopy`, plus `test_the_shared_bodies_are_still_whole_when_everything_else_ran`,
    which catches that shape of mistake whoever makes it.
 
+ * **Gutter figures are drawn, not fonts and not assets** (2026-11-14, at the owner's
+   request for icons in `bars`).  Three ways to put a small picture beside a row, two refused
+   by measurement rather than taste.  An **icon font** (Font Awesome, a Nerd Font's codings,
+   any private-use glyph) resolves against whatever face this machine has, and this project
+   has already paid twice for face dependence: the vendor's `simsun` rows are *dropped* on a
+   runner with no CJK face - nine widgets, and `tests/test_library_draw.py` reports the faces
+   a machine cannot resolve rather than substituting - and the same `text` row measures
+   different ink widths under Liberation Sans than under the Arial the vendor designed for
+   (`tools/theme_check.py` measures that gap against the vendor's own baked PNG instead of
+   trusting the metric-compatibility claim).  A figure that disappears with the font, or
+   shifts a pixel with the host, breaks the rule this project holds highest: both doors paint
+   identical pixels.  A **baked asset** - an SVG rasterised to a PNG - cannot be moved,
+   resized or recoloured from a layout, puts a second copy of the theme's ink outside the
+   palette rules, and has no widget kind to sit in: the overlay vocabulary is `text`, `data`,
+   `bar`, `arc`, `line` and `special`, and none of them is an image.  So the figures are
+   **polygons**: nine of them in `render.ICONS`, drawn on the same supersampled canvas as the
+   meters, named from a layout through the `special` kind that already exists, and placed by a
+   fourth door - `layout.draw_special_glyph` - joining `line`, `pair` and `values`.
+   At **22 px** (1/22 of the glass) the design limit is legibility: one silhouette cue per
+   figure, no second detail, because a second detail downsamples into mud.  What survives: a
+   die with four-edge leads and a solid core (`chip4`, CPU), a plate with a bracket tab and a
+   blower ring (`card`, GPU), a plate with socket, slots and mounting holes (`board`), an M.2
+   body with its end notched as a step in the outline (`drive`, both storage rows), a stick
+   with four chips and a keyed notch in the bottom edge (`dimm`, RAM), a two-edge package with
+   a pin-1 dot (`chip2`, VRAM), a three-wedge rotor (`fan`), a volute ring with two vanes and a
+   **tangential outlet** (`impeller`, the pump), and a 240-degree dial whose **needle is the
+   row's own fraction** (`gauge`, LOAD: 3 % points low, 97 % points high).
+   **Colour is a reading, not a style.**  Each figure is drawn in `heat(frac)` of its own row,
+   through `layout.frac_of` - the same call the meter beside it fills with - so the two cannot
+   disagree, which is the same defect class as the `15 GB`-at-97 % row one bullet below, in a
+   different pair of halves.  A figure carries no `textColor` at all: choosing amber for the
+   text must not make a cold die look cool, and a check in `tests/test_ink.py` refuses the key
+   on an icon widget while the census adds up as 24 glyph roles + 11 meter tracks + 11 figures
+   = 46 widgets.
+   **The pump is chosen by what was measured, never by what a label spells.**
+   `xigma.iconVariant: "Fan 2 Type"` names another of the row's readings; the table answers
+   `Pump` because that channel is pinned by a tachometer that stays flat while its own header's
+   duty sweeps (PROTOCOL.md §8); `render.ICON_VARIANTS` maps rotor + `Pump` -> volute.  Four
+   source names joined the vocabulary to carry it - `Fan 1 Type` .. `Fan 4 Type`,
+   `themes.source_names()` 38 -> 42 - each with a display shape, because a layout may want to
+   *print* the type as well as draw by it.  The honesty check is driven at two bodies, because
+   one was not enough: at `type: Pump` both doors draw the volute, and at a row **named**
+   `CPU PUMP` that reports `type: Fan` both doors draw a rotor - the second case is where a
+   label-sniffing implementation shows up, and it took a mutation (the door reading the label)
+   to find that the check was only comparing the easy body.
+   Two defects the first cut had, and the reason the gate measures ink instead of trusting
+   boxes: a die's leads and a stick's ends were drawn **outside** the box they declare
+   (double-scaled arithmetic put the CPU figure's ink at x=27.6 against a label column
+   starting at x=28), and the whole-frame parity number stayed plausible while the two doors
+   disagreed about which of them *won* that overlap - 1 720 px of grey against green.  So
+   `tests/test_icons.py` measures every registered figure's ink against its box, and compares
+   the doors **row by row in the gutter column**, because a frame-wide diff can be paid for by
+   an offset in one place and still come out even.  Twelve mutations counted against the rule:
+   leads outside the box -> 2; the notch double-scaled again -> 1; the row table giving CPU the
+   GPU's figure -> 1; the export declaring no figure for a row -> 27; the door resolving the
+   variant from the **label** -> 1; the variant table emptied -> 1; a fixed ink instead of the
+   row's ramp -> 13; the dial's needle ignoring the reading -> 1; the geometry door asking for
+   a font again -> 16; the recipe stop naming the variant source -> 5; the key's reason deleted
+   -> 3; an unknown figure name drawing something anyway -> 1.
+   Census, printed by `python3 -m unittest tests.test_icons`: 11 figure rows of 11,
+   **2 717 lit px in the gutter** of 73 128 in the frame, both doors at 73 128 and 0 px
+   differing; per-figure ink in device px `board 698, card 430, chip2 436, chip4 631,
+   dimm 817, drive 397, fan 915, gauge 355, impeller 614`.  And one process lesson recorded
+   here because it was found by hand rather than by a check: adding the fourth door left
+   `--list-specials`'s caption table behind it, and the flag raised `KeyError: 'glyph'` -
+   596 checks, all green.  A check now runs the flag and fails if any registered drawing
+   lacks a caption, or if the print and the registry disagree about the count.
+
  * **The gigabyte rows were flooring, and the number disagreed with its own meter.**
    `bars` prints RAM and VRAM as a meter (the division) beside a number (one side of it), and the
    number's rule was `int(mb) // 1024`.  At this box's own GPU readings - 15 952 MB of 16 376 -

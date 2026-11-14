@@ -190,9 +190,24 @@ class InkThroughTheFileDoor(unittest.TestCase):
         # middle, and the difference between them is exactly the meter tracks.
         self.assertEqual(moved, 24, "the glyph roles an ink may move are no longer 24 of "
                                     f"{len(base['osd']['widget'])} widgets")
-        self.assertEqual(moved + sum(1 for w in base["osd"]["widget"] if w["type"] == "bar"),
-                         len(base["osd"]["widget"]),
-                         "glyph roles plus meter tracks are not the whole layout")
+        glyphs = sum(1 for w in base["osd"]["widget"] if w["type"] == "bar")
+        figures = sum(1 for w in base["osd"]["widget"]
+                      if w["type"] == "special"
+                      and str((w.get("property") or [{}])[0].get("name", "")
+                               ).startswith("icon-"))
+        self.assertEqual(moved + glyphs + figures, len(base["osd"]["widget"]),
+                         "glyph roles, meter tracks and gutter figures are not the whole layout")
+        # and the third group is the interesting one: an ink choice moves glyphs, paints
+        # nothing on the figures, and touches no track.  The figures are coloured by their
+        # row's ramp - which is a reading, not a preference - so choosing amber for the
+        # text cannot make a cold CPU die warm, or a hot pump cool
+        icons = [w for w in base["osd"]["widget"]
+                 if w["type"] == "special"
+                 and str((w.get("property") or [{}])[0].get("name", "")).startswith("icon-")]
+        self.assertEqual(figures, len(icons))
+        self.assertFalse([w for w in icons if (w["property"][0].get("textColor"))],
+                         "a gutter figure carries a text colour: it would then move with "
+                         "the reader's ink and stop meaning the row's reading")
 
     def test_a_layout_that_is_not_one_of_the_five_comes_back_untouched(self):
         refused, note = T.with_ink(T.export("bars"), "Theme_28", "amber")

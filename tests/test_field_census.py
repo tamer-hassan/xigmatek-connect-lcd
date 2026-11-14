@@ -43,7 +43,12 @@ READ_WITHOUT_A_FILE = ["lineColor", "lineWidth", "name", "xigma"]
 #: directions: a tenth name appearing in `layout.py` without a `XIGMA_KEYS` entry fails here, and
 #: so does an entry no painter reads.
 EXTENSION_KEYS = ["anchor", "arcPaint", "autoFitMax", "barPaint", "colourRamp",
-                  "colourStops", "fitArc", "format", "showIf"]
+                  "colourStops", "fitArc", "format", "iconVariant", "showIf"]
+# `iconVariant` joined on 2026-11-14 with the gutter figures: a row asks that its figure
+# change shape according to **another** of its readings (`Fan 2 Type` answering `Pump`
+# draws a volute rather than a rotor).  The reason is written where the mechanism keeps
+# them, in `themes.XIGMA_KEYS`, and the check below refuses a key read by the painter with
+# no reason beside it - which is the whole value of listing them twice.
 
 
 class FieldCensus(unittest.TestCase):

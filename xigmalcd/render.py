@@ -743,6 +743,291 @@ BARS_TITLE_F, BARS_TITLE_W = 24, 440        # the ceiling and the width `_fit` w
 BARS_SLOTS = 2
 
 
+# ------------------------------------------------------------------ icons --
+#: Small vector figures for the rows of a block: a chip, a card, a board, a drive, a
+#: rotor, a stick.  These are **drawn, not fonts and not assets**: a glyph from
+#: Font Awesome or a Nerd Font would resolve against whatever face this machine has
+#: installed - and this repository has already measured what face substitution does to
+#: a frame's pixels (docs/limits.md: the same `text` row lands on different ink widths
+#: under Liberation Sans than under the vendor's Arial, and a `special` row whose family
+#: cannot be resolved is *dropped*, not substituted).  A baked PNG of an icon would be
+#: worse for the editor: it cannot be moved, resized or recoloured from a layout, and it
+#: would put a second copy of the theme's ink outside the palette rules.  So the figures
+#: below are polygons, lines and arcs on the same supersampled canvas as the meters, in
+#: the same colour the row's own ramp computes, and a layout can name each one by the
+#: `special` kind that already exists (`xigma.` keys unchanged, no new widget kind).
+#:
+#: Every function draws inside a box given in panel px, converts once, and returns the
+#: box it was asked to fill - `tests/test_icons.py` measures the ink that actually came
+#: out and holds it clear of the row's label and meter, because an icon that touches its
+#: text is worse than no icon.  A box is 20 px wide by 20 tall on the `bars` block, which
+#: is 1/24th of the glass: the figures are deliberately coarse (one stroke, one silhouette
+#: cue each) because at that size a second detail becomes mud.
+def _ip(v) -> int:
+    """Panel px to device px, for the **constants** inside a figure.
+
+    The trap this avoids: `draw_icon` converts the box once, so inside a figure `x`, `y`,
+    `w` and `h` are already device px - and writing `x + _ip(w - 5)` scales `w` a second
+    time.  That is exactly what the first cut of this section did, and it drew every chip
+    about twice as wide as its box: the ink ran into the label column, and the two doors
+    disagreed only about which of the two was on top, which showed up as 1 720 differing
+    pixels of grey against green rather than as an obvious mistake.  Rule used here:
+    `w`/`h`/`x`/`y` are used as they are, and `_ip()` is applied only to literals written
+    in panel px.
+    """
+    return int(round(v * SS))
+
+
+def _ic_chip(d, x, y, w, h, ink, sides=4):
+    """A die: the body, a filled core, and leads that stay **inside the box**.
+
+    The box is the promise the caller clears against, so nothing - not a pin, not a corner
+    dot - may leave it.  `tests/test_icons.py` measures the ink the shipped painter lays
+    down rather than trusting the box, because the first version broke that rule by 2.6 px
+    on every side.
+    """
+    inset, core, lead, thick = _ip(5), _ip(3), _ip(3), _ip(1.4)
+    d.rectangle([x + inset, y + inset, x + w - inset, y + h - inset], outline=ink,
+                width=_ip(1.5))
+    d.rectangle([x + inset + core, y + inset + core, x + w - inset - core,
+                 y + h - inset - core], fill=ink)
+    for k in (0.30, 0.50, 0.70):
+        if sides in (4, "tb"):
+            cx = x + int(w * k)
+            d.rectangle([cx - thick // 2, y + inset - lead, cx + thick // 2, y + inset],
+                        fill=ink)
+            d.rectangle([cx - thick // 2, y + h - inset, cx + thick // 2,
+                         y + h - inset + lead], fill=ink)
+        if sides in (4, "lr"):
+            cy = y + int(h * k)
+            d.rectangle([x + inset - lead, cy - thick // 2, x + inset, cy + thick // 2],
+                        fill=ink)
+            d.rectangle([x + w - inset, cy - thick // 2, x + w - inset + lead,
+                         cy + thick // 2], fill=ink)
+    return (x, y, x + w, y + h)
+
+
+def _ic_pkg(d, x, y, w, h, ink):
+    """A memory package: the body, leads on two edges only, and a pin-1 dot.
+
+    VRAM's figure.  Same family as the die on purpose - both are silicon in a quad pack -
+    and told apart by leads on two edges rather than four and by the index dot.
+    """
+    body_t, body_b, lead, thick = y + _ip(6), y + h - _ip(6), _ip(4), _ip(1.4)
+    d.rectangle([x + _ip(4), body_t, x + w - _ip(4), body_b], outline=ink,
+                width=_ip(1.5))
+    for k in (0.28, 0.50, 0.72):
+        cx = x + int(w * k)
+        d.rectangle([cx - thick // 2, y + _ip(2), cx + thick // 2, body_t], fill=ink)
+        d.rectangle([cx - thick // 2, body_b, cx + thick // 2, y + h - _ip(2)], fill=ink)
+    r = _ip(1.3)
+    d.ellipse([x + _ip(7) - r, y + _ip(9) - r, x + _ip(7) + r, y + _ip(9) + r], fill=ink)
+    return (x, y, x + w, y + h)
+
+
+def _ic_card(d, x, y, w, h, ink):
+    """A graphics card: the plate, a bracket tab at one end, a blower ring on the face."""
+    d.rounded_rectangle([x + _ip(1), y + _ip(4), x + w - _ip(1), y + h - _ip(3)],
+                        radius=_ip(1.5), outline=ink, width=_ip(1.5))
+    d.rectangle([x + _ip(1), y + _ip(1), x + _ip(3), y + _ip(4)], fill=ink)
+    cx, cy = x + int(w * 0.60), y + int(h * 0.52)
+    r, hub = _ip(3.4), _ip(1)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=ink, width=_ip(1.2))
+    d.ellipse([cx - hub, cy - hub, cx + hub, cy + hub], fill=ink)
+    return (x, y, x + w, y + h)
+
+
+def _ic_board(d, x, y, w, h, ink):
+    """A mainboard: the plate, a socket, two expansion slots, four mounting holes."""
+    edge = _ip(2)
+    d.rectangle([x + edge, y + edge, x + w - edge, y + h - edge], outline=ink,
+                width=_ip(1.5))
+    d.rectangle([x + _ip(4), y + _ip(4), x + _ip(9), y + _ip(9)], fill=ink)
+    for k in (0.62, 0.78):
+        top = y + int(h * k)
+        d.rectangle([x + _ip(4), top, x + w - _ip(4), top + _ip(1.4)], fill=ink)
+    t = _ip(1.2)
+    inset = _ip(3.2)
+    for cx, cy in ((x + inset, y + inset), (x + w - inset, y + inset),
+                   (x + inset, y + h - inset), (x + w - inset, y + h - inset)):
+        d.ellipse([cx - t, cy - t, cx + t, cy + t], fill=ink)
+    return (x, y, x + w, y + h)
+
+
+def _ic_drive(d, x, y, w, h, ink):
+    """Storage: a drive body with a **keyed end** drawn as a step in the outline.
+
+    The cue that survives at 22 px is the silhouette - a long body, a notched end, one
+    filled pad.  The first cut tried a 1 px edge connector, and at panel size the notches
+    merged into a smudge that read as a slightly broken rectangle.
+    """
+    top, bot = y + _ip(5), y + h - _ip(5)
+    mid = y + h // 2
+    step = x + w - _ip(5)
+    lw = _ip(1.5)
+    pts = [(x + _ip(2), top), (step, top), (step, top + _ip(2)),
+           (x + w - _ip(2), top + _ip(2)), (x + w - _ip(2), bot - _ip(2)),
+           (step, bot - _ip(2)), (step, bot), (x + _ip(2), bot), (x + _ip(2), top)]
+    for a, b in zip(pts, pts[1:]):
+        d.line([a, b], fill=ink, width=lw)
+    d.rectangle([x + _ip(5), mid - _ip(2), x + _ip(9), mid + _ip(2)], fill=ink)
+    return (x, y, x + w, y + h)
+
+
+def _ic_dimm(d, x, y, w, h, ink):
+    """A memory stick: the body, a keyed notch in the bottom edge, chips along the face."""
+    top, bot = y + _ip(4), y + h - _ip(5)
+    lw = _ip(1.5)
+    d.line([x + _ip(1), top, x + w - _ip(1), top], fill=ink, width=lw)
+    d.line([x + w - _ip(1), top, x + w - _ip(1), bot], fill=ink, width=lw)
+    d.line([x + w - _ip(1), bot, x + int(w * 0.60), bot], fill=ink, width=lw)
+    d.line([x + int(w * 0.60), bot, x + int(w * 0.60), bot + _ip(1.4)], fill=ink,
+           width=_ip(1.2))
+    d.line([x + int(w * 0.40), bot + _ip(1.4), x + int(w * 0.40), bot], fill=ink,
+           width=_ip(1.2))
+    d.line([x + int(w * 0.40), bot, x + _ip(1), bot], fill=ink, width=lw)
+    d.line([x + _ip(1), bot, x + _ip(1), top], fill=ink, width=lw)
+    for k in (0.18, 0.36, 0.64, 0.82):
+        cx = x + int(w * k)
+        d.rectangle([cx - _ip(1.4), top + _ip(2), cx + _ip(1.4), bot - _ip(2)], fill=ink)
+    return (x, y, x + w, y + h)
+
+
+def _ic_fan(d, x, y, w, h, ink, blades=3):
+    """A rotor: the ring, `blades` wedges, and a hub that is an outline, not an erase."""
+    cx, cy = x + w // 2, y + h // 2
+    r = min(w, h) // 2 - _ip(1)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=ink, width=_ip(1.5))
+    step = 360.0 / blades
+    for i in range(blades):
+        d.pieslice([cx - r, cy - r, cx + r, cy + r], start=i * step,
+                   end=i * step + step * 0.62, fill=ink)
+    hub = _ip(2.2)
+    d.ellipse([cx - hub, cy - hub, cx + hub, cy + hub], outline=ink, width=_ip(1.4))
+    return (x, y, x + w, y + h)
+
+
+def _ic_gauge(d, x, y, w, h, ink, frac=0.5):
+    """A usage dial: a 240-degree scale, and a needle at the row's **own** fraction.
+
+    The one figure here that carries a reading in its shape rather than only its colour:
+    `LOAD` at 3 % points the needle near the low end, at 97 % near the top of the scale,
+    and the angle comes from the same fraction its meter fills with.
+    """
+    cx, cy = x + w // 2, y + int(h * 0.58)
+    r = min(w, h) // 2 - _ip(1.5)
+    d.arc([cx - r, cy - r, cx + r, cy + r], start=150, end=390, fill=ink,
+          width=_ip(1.8))
+    frac = min(max(float(frac), 0.0), 1.0)
+    ang = math.radians(150 + 240 * frac)
+    tip = (cx + int(r * 0.82 * math.cos(ang)), cy - int(r * 0.82 * math.sin(ang)))
+    d.line([cx, cy, tip[0], tip[1]], fill=ink, width=_ip(1.8))
+    hub = _ip(1.6)
+    d.ellipse([cx - hub, cy - hub, cx + hub, cy + hub], fill=ink)
+    return (x, y, x + w, y + h)
+
+
+def _ic_impeller(d, x, y, w, h, ink):
+    """A water pump: a volute ring, two broad vanes, and a **tangential outlet**.
+
+    The figure the pump row gets, and it is chosen by the fan row's pinned `type` - the
+    channel `sensors.FAN_CHANNELS` measured as a pump, steady at 2 443-2 469 RPM while its
+    own header's duty swept (docs/limits.md, PROTOCOL.md §8) - and never by the word
+    "PUMP" appearing in its label.  A drawing that reads a name to decide what to draw is
+    the same mistake this repository has made four times with sensor labels: the name is
+    what a user set, the type is what was measured.
+
+    The outlet is what tells it from a fan at 22 px: a fan's blades sit inside the ring, a
+    pump's ring has a stub leaving it tangentially, because that is how a volute pushes
+    water into the block.
+    """
+    cx, cy = x + w // 2, y + int(h * 0.54)
+    # the ring is inset by the height of the outlet, so the whole figure - volute and
+    # stub together - fits the declared box instead of leaning over its top edge
+    ring = min(w, h) // 2 - _ip(4)
+    d.ellipse([cx - ring, cy - ring, cx + ring, cy + ring], outline=ink, width=_ip(1.5))
+    for i in range(2):                                   # two broad vanes, 180 apart
+        a0 = i * 180.0 + 20.0
+        d.pieslice([cx - ring, cy - ring, cx + ring, cy + ring], start=a0,
+                   end=a0 + 96, fill=ink)
+    hub = _ip(2)
+    d.ellipse([cx - hub, cy - hub, cx + hub, cy + hub], outline=ink, width=_ip(1.4))
+    stub_w, stub_h = _ip(3), _ip(3.4)
+    top = cy - ring
+    d.rectangle([cx - _ip(1), top - stub_h, cx + stub_w, top], fill=ink)
+    d.rectangle([cx + stub_w, top - stub_h, x + w - _ip(2), top], outline=ink,
+                width=_ip(1.2))
+    return (x, y, x + w, y + h)
+
+
+#: A base figure, and the variant a machine's own report asks for instead.  Keyed by
+#: figure name -> reported type -> figure: nothing here looks at a label.
+ICON_VARIANTS = {"fan": {"Pump": "impeller"}}
+
+
+#: Which figure a row gets, by name.  A layout says `special: "icon"` and
+#: `xigma.icon: "<one of these>"`; the code theme calls the same table.  Kept as data
+#: because `--list-specials` prints its keys and a check walks it, and a name that is in
+#: the table but not drawable is a hole a reader would meet at draw time.
+ICONS = {"chip4": _ic_chip, "chip2": _ic_pkg, "card": _ic_card, "board": _ic_board,
+         "drive": _ic_drive, "dimm": _ic_dimm, "fan": _ic_fan, "impeller": _ic_impeller,
+         "gauge": _ic_gauge}
+
+#: The icon gutter of the `bars` block: rows are labelled from `BARS_LBL_X` (28) and their
+#: meters start at `BARS_BAR_X` (28), so the strip at the left edge is empty canvas and can
+#: hold a figure without touching a line of text.  `BARS_ICON_X` is the box's left edge and
+#: `BARS_ICON_BOX` its size; the ink these drawings lay down reaches a little past the box
+#: (the pins on a chip, the caps on a stick), which is why the clearance is measured from
+#: the shipped painter rather than computed from the box.
+BARS_ICON_X, BARS_ICON_BOX = 3, (22, 22)
+
+
+def row_icons() -> dict:
+    """Which figure each row gets, asked of the one module that defines it.
+
+    `themes.ROW_ICONS` is the table - keyed by the source a row's meter reads, including the
+    slot names this program answers.  `themes` imports `render`, so `render` must not import
+    `themes` at module level; the lookup happens here, at draw time, and that is the whole
+    trick: one definition, reachable whichever door the caller came in through.  A second
+    copy of this mapping inside the painter is the failure mode this repository keeps
+    being caught by - the two doors would each be right about a different theme.
+    """
+    from . import themes as _themes
+    return _themes.ROW_ICONS
+
+
+def figure_for(source: str, reported_type=None) -> str | None:
+    """Which figure a row gets, and the variant its own reported type asks for.
+
+    One function, asked by both doors: the painter knows the fan row it is drawing and its
+    `type`, and the layout file names the type's source (`Fan 2 Type`) and reads the same
+    value out of the table.  Resolving it in two places is how a pump would end up a rotor
+    on the glass and a volute in the file, or the other way round.
+    """
+    base = row_icons().get(str(source))
+    if base is None:
+        return None
+    if reported_type is None:
+        return base
+    return ICON_VARIANTS.get(base, {}).get(str(reported_type), base)
+
+
+def draw_icon(draw, name: str, x: float, y: float, w: float, h: float, ink,
+              frac: float | None = None):
+    """Draw one named figure at panel px, on the supersampled canvas `draw` owns."""
+    fn = ICONS.get(str(name))
+    if fn is None:
+        return None
+    x, y, w, h = _ip(x), _ip(y), _ip(w), _ip(h)      # every figure works in device px
+    if fn is _ic_chip:
+        return fn(draw, x, y, w, h, ink, sides=4)
+    if fn is _ic_fan:
+        return fn(draw, x, y, w, h, ink, blades=3)
+    if fn is _ic_gauge:
+        return fn(draw, x, y, w, h, ink, frac=0.5 if frac is None else frac)
+    return fn(draw, x, y, w, h, ink)
+
+
 def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
     """Row per reading with a meter: temps, load, memory, and four fan slots.
 
@@ -791,10 +1076,16 @@ def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
     # `themes.BARS_ROWS` is the row order this body is checked against, and it is spelled out
     # here in the same sequence rather than assembled by slices: the three temperatures, the two
     # drive slots, the two fan slots, the card's fan, then the three usage rows.
-    rows = [("CPU", cpu.get("temperature"), 30, 90, lambda v: f"{v:.0f}\u00b0C", True),
-            ("GPU", gpu.get("temperature"), 30, 90, lambda v: f"{v:.0f}\u00b0C", True),
+    # each row now names the source its meter reads (the seventh field), so the figure in
+    # the gutter comes from `themes.ROW_ICONS` - one table for both doors - and so the row
+    # strings this file is checked on can be compared against the layout table by name
+    # rather than by the order they happen to be drawn in.
+    rows = [("CPU", cpu.get("temperature"), 30, 90, lambda v: f"{v:.0f}\u00b0C", True,
+             "CPU Temperature", None),
+            ("GPU", gpu.get("temperature"), 30, 90, lambda v: f"{v:.0f}\u00b0C", True,
+             "GPU Temperature", None),
             ("BOARD", board.get("temperature"), 25, 80,
-             lambda v: f"{v:.0f}\u00b0C", True)]
+             lambda v: f"{v:.0f}\u00b0C", True, "Motherboard Temperature", None)]
     # the two drive slots, positional like the fan slots: `drives[i]`, and a slot past the
     # drives this box reports keeps its place and says so.  The label carries the controller
     # name, and slot 1 - the drive `/` sits on, by the sort in `sensors.drives()` - carries a
@@ -805,7 +1096,8 @@ def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
         nm = str((row or {}).get("name") or "")
         label = f"{nm[:8]} /" if (_slot == 0 and nm) else nm[:10]
         rows.append((label, (row or {}).get("temperature"), 25, 80,
-                     lambda v: f"{v:.0f}\u00b0C", row is not None))
+                     lambda v: f"{v:.0f}\u00b0C", row is not None,
+                     f"Disk {_slot + 1} Temperature", None))
     # the card's fan, on a 0..100 scale among the fan rows: the reading is a **duty percent**,
     # and on that scale because the RPM form does not exist on this box - NVML's
     # `nvmlDeviceGetFanSpeedRPM` refuses with "Argument version mismatch" under the 580.178.04
@@ -819,24 +1111,42 @@ def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
         fan = fans[slot] if slot < len(fans) else None
         rows.append((str((fan or {}).get("name") or f"FAN {slot + 1}")[:10],
                      (fan or {}).get("value"), 0, 3000, lambda v: f"{round(v)}",
-                     fan is not None))
-    rows.append(("Fan GPU", gpu.get("fan"), 0, 100, pct, True))
+                     fan is not None, f"Fan {slot + 1} Speed",
+                     (fan or {}).get("type")))
+    # the card's fan is not a tachometer row: nothing about it is typed by a machine, so
+    # it asks for the base rotor figure and no variant - the GPU's fan duty is a percent
+    # from NVML, and the figure is the same wheel either way
+    rows.append(("Fan GPU", gpu.get("fan"), 0, 100, pct, True, "GPU Fans Speed", None))
     rows += [
-            ("LOAD", cpu.get("load"), 0, 100, pct, True),
+            ("LOAD", cpu.get("load"), 0, 100, pct, True, "CPU Usage", None),
             # the number and the meter read different fields here, by design: the meter is the
             # division and the number is one side of it (`themes.BARS_ROWS` spells the same
             # split, and `xigma.showIf` is what says so in a file).  `gb` is the shared
             # spelling, applied to `used`, not to the fraction the row's `val` carries - a
             # mistake I made while introducing it, which printed `0.1 GB` for 10 240 MB and
             # showed up as an 831 px parity break at the first reading that has a GPU.
-            ("RAM", ram, 0, 100, lambda _v: gb(mem.get("used", 0)), True),
-            ("VRAM", gm, 0, 100, lambda _v: gb(gpu.get("memoryUsage", 0)), True)]
+            ("RAM", ram, 0, 100, lambda _v: gb(mem.get("used", 0)), True,
+             "RAM Rate", None),
+            ("VRAM", gm, 0, 100, lambda _v: gb(gpu.get("memoryUsage", 0)), True,
+             "GPU Memory Rate", None)]
     _title(img, BARS_TITLE_TEXT, x=BARS_TITLE_X, y=BARS_TITLE_Y,
            size=BARS_TITLE_F, width=BARS_TITLE_W, colour=fg)
     d = ImageDraw.Draw(img)
     y, span = BARS_Y0, BARS_SPAN
     row_h = min(BARS_ROW_MAX, max(BARS_ROW_MIN, span // max(len(rows), 1)))
-    for name, val, lo, hi, fmt, subject in rows:
+    for name, val, lo, hi, fmt, subject, src, vtype in rows:
+        # Draw order, and it is not cosmetic: the generated file lists this row's four
+        # widgets in the order icon, label, number, meter (`themes.bars_recipe`), and where
+        # two of them overlap the last one down wins.  Twenty pixels of difference between
+        # the doors - antialiased edges of a label over the lead of a die - was this
+        # ordering, not the geometry.  The code door now walks the same order as the file
+        # declares, and `tests/test_icons.py` compares the two doors' pixel boxes row by
+        # row so an edit that reorders one and not the other is a red run.
+        figure = figure_for(src, vtype)
+        if val is not None and figure:
+            frac = (val - lo) / (hi - lo)
+            draw_icon(d, figure, BARS_ICON_X, y - BARS_ICON_BOX[1] / 2,
+                      BARS_ICON_BOX[0], BARS_ICON_BOX[1], heat(frac), frac=frac)
         if subject:                             # the label belongs to the row's subject
             d.text((BARS_LBL_X * SS, y * SS), name, font=font(BARS_LBL_F), fill=mid,
                    anchor="lm")

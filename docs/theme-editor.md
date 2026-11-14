@@ -643,6 +643,32 @@ decision as "invent a repeat group"; the owner chose the smaller construct inste
 measuring what `bars` actually is justified that for a reason nobody had written down: the
 obstacle was never the row list.
 
+**Four doors for a `special` row, and what each one's fields mean.**  A `special` is drawn
+by code and placed by the file, and which **door** it goes through is what gives its fields
+their meaning: `line` (`layout.draw_special_line`) reads `x`,`y` with an anchor and ignores
+`width`; `pair` (`draw_special_pair`) reads `width` as the pitch between two figures and
+sizes both against `xigma.autoFitMax`; `values` (`draw_special_values`) reads `width` the
+same way but sizes the pair against the ring named in `xigma.fitArc`; and since 2026-11-14 a
+fourth, **`glyph`** (`layout.draw_special_glyph`) - the gutter figures of `bars` - where
+`x`,`y` is a box's corner and `width`/`height` its size, exactly like a `bar` row, with no
+anchor in sight.  The door is not inferred from a name table: each registered drawing
+carries a `door` marker, and `tests/test_specials.py` reads the function's own source and
+fails if the marker and the `layout.draw_special_*` call in the body disagree - and now also
+runs `--list-specials` and fails if the printed captions and the registry fall out of step,
+which is a defect that shipped silently once (adding the fourth door left that flag's
+caption table behind it, and it raised `KeyError: 'glyph'` while every check was green).
+A `glyph` row asks for **no font** (`needs_face = False`): it is geometry.  That matters
+because a `text` or `special` row whose family this box cannot resolve is *dropped* - the
+CI runner loses nine `simsun` widgets that way - and a figure that vanishes for an unrelated
+absence would be a hole with no reason beside it.  What a glyph row can also name is
+`xigma.iconVariant`: a **source**, not a value, so the figure can change shape according to
+what the machine reports - `Fan 2 Type` answering `Pump` draws a volute where a rotor would
+otherwise sit - and the resolution happens in the door, so the key is visible to the census
+that pairs extension keys with written reasons.  `xigma.` keys the pane will not yet edit:
+`iconVariant` is declared by the generator and shown by `--print-theme-fields` with its
+reason, and the row inspector offers the fields of the kind, not of the door - a limitation
+stated here rather than left to be discovered by someone hunting for the control.
+
 **The construct: optional fan slots, and no new structure.** `Fan 1` through `Fan 4`,
 each a row that draws only when that slot has a reading, and each with a `Fan N Name`
 source so the name printed is the box's own. The reason that is smaller than a repeat

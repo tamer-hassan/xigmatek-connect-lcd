@@ -1115,7 +1115,10 @@ What it does **not** do, said plainly: nothing is sent to the panel (PROTOCOL.md
 the panel is never handed a layout file), so what a save changes is what *this
 machine's* daemon draws next time it names that theme; a row can be added only as a copy
 of a row that already draws, removed down to but never including the last one, and
-reordered only through the list that *is* the draw order; a row's size changes only
+reordered only through the list that *is* the draw order - and one row of `bars` is
+four widgets since 2026-11-14 (figure, label, number, meter), so the reorder buttons walk
+**four** steps to pass a row, which the tests derive from the export rather than writing
+down; a row's size changes only
 through the keys its kind owns - there is no scale-everything handle - and a drag may be
 pulled onto a number this same file already uses, never onto a grid: the gcd of every
 declared `x` and of every declared `y` in the corpus is **1**, and only **27** of its

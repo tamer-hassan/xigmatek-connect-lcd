@@ -229,9 +229,14 @@ class PeekingAtAPinnedBody(PeekHarness):
         """`57°C` at the fixture, `104°C` at the pinned file: the note describes the picture, and
         the doors still write the file the edits move."""
         self.open_layout()
+        # a `data`/`text` row, not a gutter figure: since 2026-11-14 the block carries an
+        # icon widget that reads `CPU Temperature` too, and it comes *earlier* in the list -
+        # it paints a shape, so it has no line of text to compare and answering None is
+        # correct for it
         row = next(i for i, widget in enumerate(self.win.ed.widgets())
-                   if "Temperature" in str(((widget.get("property") or [{}])[0]).get("source")
-                                           or ""))
+                   if str(widget.get("type") or "") in ("data", "text")
+                   and "Temperature" in str(((widget.get("property") or [{}])[0]).get("source")
+                                            or ""))
         self.win.ed.select(row)
         fixtures.pump(0.2)
         self.assertEqual(self.win.ed.drawn_text(*self.win.ed.fixture())[0], "57°C",
@@ -270,9 +275,15 @@ class PeekingAtAPinnedBody(PeekHarness):
         self.assertEqual(body["cpu"]["temperature"], 104.0, body.get("cpu"))
         pinned, live = self.win._ed_notes, self.win.ed.paint(
             metrics=body, when=gui_edit.FIXTURE_WHEN, ink=self.win._ink())[1]
-        by_row = {ri: box for _kind, _what, box, ri in (live.get("boxes") or [])}
-        moved = sorted({ri for _kind, _what, box, ri in (pinned.get("boxes") or [])
-                        if ri in by_row and tuple(box) != tuple(by_row[ri])})
+        # A reported box may be None: a row whose reading this body cannot answer draws
+        # nothing, and since 2026-11-14 that includes the gutter figures.  It is not a
+        # mismatch to be compared, it is the absence the doors report in words.
+        def boxes(notes):
+            return {ri: tuple(box) for _kind, _what, box, ri in (notes.get("boxes") or [])
+                    if box is not None}
+        by_row, pinned_row = boxes(live), boxes(pinned)
+        moved = sorted({ri for ri, box in pinned_row.items()
+                        if ri in by_row and box != by_row[ri]})
         self.assertTrue(moved, "no row box moves between the fixture and a body 47 degrees "
                                "hotter: the marks could simply stay, and the refusal would be "
                                "superstition")

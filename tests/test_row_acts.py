@@ -81,14 +81,16 @@ class TheEnvelopeComesFromTheFiles(unittest.TestCase):
                     and field in (widget.get("property") or [{}])[0]}
 
     def test_every_row_of_every_layout_carries_the_same_five_keys(self):
-        # 185 -> 188 -> 191 -> 188 on 2026-11-14: `bars` gained a labelled drive row, that row
+        # 185 -> 188 -> 191 -> 188 -> 199 on 2026-11-14: `bars` gained a labelled drive row, that row
         # became two positional slots, and the block then came back down to eleven rows when
         # the owner's `Fan GPU` row took a fan slot's place instead of adding a twelfth.  It
         # lands on the same 188 it passed through an hour earlier, which is the point of
         # pinning a count rather than deriving one: three widgets' worth of block was traded,
-        # not grown.  Pinned rather than derived, because this is the count that says a layout
-        # grew.
-        self.assertEqual(len(self.rows), 188, f"{len(self.rows)} rows in "
+        # not grown - and then the gutter figures added eleven rows carrying an x and a y, all
+        # of them at one x (3), which is why the snap census's shared-column count moved from
+        # 92 to 103 while its gap histogram stayed empty at 1, 6 and 7 px.  Pinned rather than
+        # derived, because this is the count that says a layout grew.
+        self.assertEqual(len(self.rows), 199, f"{len(self.rows)} rows in "
                                               f"{len(self.editors)} layouts")
         odd = [widget for widget in self.rows
                if frozenset(widget) != frozenset(gui_edit.WIDGET_KEYS)]
@@ -371,12 +373,15 @@ class AVisibleReorderIsBuiltOnPurpose(unittest.TestCase):
         before, _notes = paint_of(copy.deepcopy(obj))
         before = before.convert("RGBA")
         trial = gui_edit.Editor(copy.deepcopy(obj), origin="check", name="bars")
-        # the two meters are not neighbours in the file - every row is label, number, meter -
-        # so the swap is the model's door walked three times, which is what the window's own
-        # reorder buttons do.  Asserting the pair's relative order changed is what keeps this
-        # from passing on a swap that moved the row somewhere else in the list.
+        # The two meters are not neighbours in the file: a row of `bars` is figure, label,
+        # number, meter - four widgets since 2026-11-14, three before it - so the swap is the
+        # model's door walked **one row's worth** of steps, which is what the window's own
+        # reorder buttons do.  The step count is derived from the export rather than written
+        # out: a literal here would have silently become wrong the day the block grew a
+        # column, which is precisely the failure this file exists to catch.
+        per_row = (len(obj["osd"]["widget"]) - 2) // len(themes.BARS_ROWS)
         trial.select(a)
-        for step in range(3):
+        for step in range(per_row):
             ok, said = trial.move_widget(+1)
             self.assertTrue(ok, f"step {step + 1} of the swap was refused: {said}")
         widgets_after = trial.widgets()
@@ -387,7 +392,7 @@ class AVisibleReorderIsBuiltOnPurpose(unittest.TestCase):
         self.assertLess(before_order.index(id_a), before_order.index(id_b),
                         "the fixture does not start with the first meter earlier in the list")
         self.assertGreater(after_order.index(id_a), after_order.index(id_b),
-                           f"three steps down the list did not put {id_a} after {id_b}: the door "
+                           f"{per_row} steps down the list did not put {id_a} after {id_b}: the door "
                            f"moved the row somewhere else ({after_order})")
         self.assertEqual(sorted(before_order), sorted(after_order),
                          "the swap lost or invented a row")
