@@ -1772,6 +1772,22 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     a record of that machine, not of the tree.  The census lines those runs
     printed are kept, because a census reads files in this repository and never
     the session.  The skip count on this bench moved from 3 to **4** with the
+    row reordering, and the extra skip is a result rather than a flake: the
+    review-door dependency check in `tests/test_bars_rows.py` has nothing to
+    exercise here now, because `bars` leaves no source unanswered on this box.
+
+    The count moved once more after that, to **598 over 54 files**: the gutter
+    figures - 16 checks in the new `tests/test_icons.py`, one door-marker check
+    in `tests/test_specials.py` and one mapping check the gate had to grow
+    because **two mutations cost nothing** (a variant resolved from the row's
+    label, and a CPU row given the GPU's figure).  On this bench that tree
+    measured **598 checks in 478.891 s**, OK, 4 skipped, no `ResourceWarning`
+    and no `Exception ignored` line, one run of the committed tree (`993e7d1`)
+    with no window open; GitHub #213 put the same tree at **484.161 s**, OK, 5
+    skipped, all jobs success.  The one file of difference in the count - 53 to
+    54 - is that new test file, and both tree doors say so: `grep -c` for the
+    test stanzas answers 598 over 54 files and the loader answers 598 over 54
+    modules.
 
     **Provenance, said plainly rather than papered over.**  The CI-hardening
     set - the checks job's 30 -> 45 minute cap, `tests/test_ci_workflow.py`,
@@ -1808,6 +1824,18 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     vendored library byte-identical to the installed copy; and the packaged
     `xigmaui` carries the new Apply door, read out of the unpacked file rather
     than assumed.
+
+    **#16** was cut from `993e7d1` and differs from #15 in **twelve** files:
+    five shipped modules (`xigmalcd/layout.py`, `main.py`, `render.py`,
+    `themes.py`, `xigmaui/edit.py`), the wheel's `METADATA`, `changelog.gz`,
+    `README.md` and four docs pages - the shape of an icon feature, which
+    touches the CLI's printed list, the inspector's field notes and the painter
+    as well as the drawing.  Read back out of the unpacked archives rather than
+    inferred: shipped Python identical to HEAD, no member newer than the
+    changelog stamp, `lintian` clean, the 146 MB vendored library identical to
+    the installed copy, and inside the package nine drawable figures, nine
+    `icon-*` specials and the 15-entry row table - the feature is in the
+    artefact, not only in the tree it was built from.
 
     The count is read off the tree as well as off the runner.  The command
     `grep -c "^    def test_" tests/*.py` answers 598 over 54 files, and
@@ -1881,8 +1909,9 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     and no cancellation - the cap letting a loaded run finish and report what
     the load did), 418.376 with 570 (#205, one failure, mine), 475.172 with 570
     (#206, the same failure on a prose-only head), 463.128 with 570 (#207,
-    green), 345.592 with 571 (#208, green, 5 skipped) and 486.841 with 581
-    (#211, green, 5 skipped).  #202 and #203 are the pair that
+    green), 345.592 with 571 (#208, green, 5 skipped), 486.841 with 581 (#211,
+    green, 5 skipped) and 484.161 with 598 (#213, green, 5 skipped).  #202 and
+    #203 are the pair that
     bounds a count again: thirteen more checks, 5.625 s more, on runners that
     took 449 s and 414 s of job for the same five steps.  **#204 and #205 are
     the two red ones and they are not the same story**: #204 took 1872.756 s of
