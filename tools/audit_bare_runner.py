@@ -57,6 +57,14 @@ LIVE_DOORS = ("collect", "fans", "drives", "disk", "motherboard", "motherboard_a
 #: Hand-kept, and `tests/test_bare_audit.py` checks each entry is still a real file.
 EXTRA_MODULES = (
     "tests.test_pump_speed",
+    # added 2026-11-14 after CI proved the need: `tests/test_bars_rows.py` never calls
+    # `sensors.collect()` itself, so the AST scan cannot see the live host it depends on - the
+    # dependency goes through `python -m xigmalcd --check-theme bars` in a **subprocess**, whose
+    # child reads this machine's sensors and prints `this machine answers:` / `and cannot:`.  A
+    # check there that compares those lines with a pinned body rather than with each other is a
+    # host assertion wearing a fixture's clothes, and it passed on this bench while failing on a
+    # runner with no GPU.  This is the case the tuple exists for.
+    "tests.test_bars_rows",
 )
 
 

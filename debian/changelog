@@ -1166,6 +1166,68 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     suite's GUI checks carry real per-window work, and a contended runner pays
     for all of it in series.
 
+  * Two red CI runs, two different causes, and neither one visible from this
+    bench.
+
+    **#204 was the slow runner again, this time with its consequence intact.**
+    The head was a prose-only commit, the step took **1872.756 s** where its
+    neighbours take ~420 s - the same shape as #202 attempt 1's 1762 s - and
+    because the checks job is capped at 45 minutes now rather than 30, the run
+    was not cancelled: it finished and reported what the load actually did.
+    Two failures, both in `tests/test_loop_counters.py`: the stub loop runs
+    `--fps 20 --duration 3` and refuses every 4th upload, and on that runner
+    three seconds bought **3 files**, so no 4th file ever arrived,
+    `raises` worked out to 0, and both refusal assertions failed with
+    "the case under test did not happen".  That is the same fault class as the
+    window-sizing flake from the CI bullet below, arriving in a different file:
+    a budget measured in wall-clock, asserted by a count.  The fix is to
+    measure the budget instead of fixing it: `setUpClass` now times **one real
+    `alpha` frame** through the door the loop uses and sizes the run for at
+    least `2 * EVERY + 4` frames at that rate - **0.023 s/frame here**, so the
+    floor of 3.00 s still applies and nothing changes locally; a machine at
+    ~1 s/frame gets 24 s, capped at 40 - and it prints what it measured.  The
+    floor assertion's message now carries the file count, the budget and the
+    log tail, so a run that is *still* too slow says so with numbers.
+
+    **#205 was my own new assertion, and it was a host claim wearing a
+    fixture's clothes.**  In the review-door class I had compared the door's
+    `cannot:` set against the answers of `fixtures.PARITY_CASES[0]` - i.e.
+    demanding that a name the *machine* cannot answer be absent from a *pinned*
+    body's answers.  On the runner there is no GPU, so `GPU Fans Speed` sits in
+    `cannot` while the fixture answers it, and both facts are true at once.  It
+    passed here for a worse reason than it failed there: the row order in the
+    bullet above left this box with **no unanswered source at all** under
+    `bars`, so `cannot` is empty and the intersection was empty whatever I had
+    written - the assertion was a tautology on the bench and a defect on the
+    runner.  What it asserts now is a relation inside the door's own output,
+    which holds whatever the machine's shape is: `asks == answers ∪ cannot`,
+    and `answers ∩ cannot == ∅`.  Not vacuous either - deleting one name from
+    the door's `this machine answers:` line makes the class fail (1 failure),
+    which is how the fix was checked rather than assumed.
+
+    **Widening the audit, and recording what widening it did not buy.**
+    `tools/audit_bare_runner.py` finds the tests that read the live host
+    through their AST, and `tests/test_bars_rows.py` is invisible to that scan
+    because its live dependency goes through a **subprocess**
+    (`python -m xigmalcd --check-theme bars`), where the child is the thing
+    that touches the sensors - so it joins `EXTRA_MODULES`, the tuple that
+    exists for exactly that case.  Once the calibration above called
+    `sensors.collect()`, the scan picked up `tests/test_loop_counters.py` on
+    its own.  The tally the tool prints moved 97 over 6 -> 134 over 7 ->
+    **139 checks over 8 modules**, 0 failures, 0 errors, 1 skipped.  The honest
+    limit: adding that module did **not** catch my bad assertion here, because
+    with no hole on this box the expression it computed was empty.  The audit
+    answers "does this check read the machine?", not "does this check compare
+    the right two things?" - and that second question is what #205 answered,
+    on a machine with a different shape.  A bench that has run out of holes is a
+    bench that stops exercising its own skip reporting; that is worth knowing
+    the same afternoon it becomes true rather than the next time CI says so.
+
+    Suite counts are unchanged by this fix (570 over 53 files, `grep -c` and
+    the loader both answering it): the review-door change replaced one
+    assertion with two relations and one helper, and the loop fix moved a
+    constant into a measurement.
+
   * `bars` re-ordered on the owner's request, which turned out to be a
     row-count decision.  Three changes in one sentence: the label `GPU FAN`
     becomes **`Fan GPU`**, to read like the rows it now sits with (`Fan CPU`,
@@ -1484,7 +1546,16 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     549 (#200), 414.204 with 555 (#202) and 419.829 with 568 (#203, the first
     run under the raised 45-minute cap).  #202 and #203 are the pair that
     bounds a count again: thirteen more checks, 5.625 s more, on runners that
-    took 449 s and 414 s of job for the same five steps.  The last
+    took 449 s and 414 s of job for the same five steps.  **#204 and #205 are
+    the two red ones and they are not the same story**: #204 took 1872.756 s of
+    step with 568 checks on a contended runner - the raised cap letting it
+    finish and report two `test_loop_counters.py` failures instead of being
+    killed at 30 minutes the way #202 attempt 1 was - and #205 took 418.376 s
+    with 570 checks, one failure, and that one was an assertion of mine that
+    compared a host's unanswered names against a pinned body.  The first is a
+    machine that needs a measured budget, the second a check that needs to
+    compare the right two things; neither was visible from this bench, which is
+    what a second machine is for.  The last
     several skip 4 rather than 3, the extra one being the glass ledger naming
     transcripts a runner with no panel has never made, and the 9 s between #178
     and #180 is what the six new checks cost: five of them run a shipped script

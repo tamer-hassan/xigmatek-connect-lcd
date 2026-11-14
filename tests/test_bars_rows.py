@@ -861,10 +861,31 @@ class TheReviewDoor(unittest.TestCase):
                           "the door reported no holes but never said so either")
         self.assertLessEqual(cannot, asked,
                              "the door named an unanswered source this file does not ask for")
-        self.assertFalse(cannot & set(s for s in asked if s in
-                                    (themes.values(fixtures.PARITY_CASES[0], WHEN)[0])),
-                         "a source the theme reports as unanswered is answered by the reading "
-                         "the export was painted with")
+        # The door's three lists have to agree with **each other**.  Nothing here may compare
+        # them with a pinned body: the lists come out of a subprocess that asked this machine's
+        # real sensors, so "a name the door cannot answer is one the fixture answers" is not a
+        # relation between two facts of the code but a demand that every host look like the
+        # fixture.  That is precisely the assertion I wrote on 2026-11-14, and it failed CI #204
+        # and #205 for that reason alone - a runner with no GPU puts `GPU Fans Speed` in
+        # `cannot` while `PARITY_CASES[0]` answers it, and both facts are true at once.
+        asks, answers, said = self.three_lists()
+        self.assertTrue(asks and answers,
+                        f"the door printed no asks/answers line to read: {self.out[:3]}")
+        self.assertEqual(answers | said, asks,
+                         f"the door's own accounting does not close: asks {len(asks)}, answers "
+                         f"{len(answers)}, cannot {len(said)}")
+        self.assertFalse(answers & said,
+                         f"a source is both answered and unanswered on this machine: "
+                         f"{sorted(answers & said)}")
+
+    def three_lists(self) -> tuple:
+        """(asks, answers, cannot) exactly as one run of the door reported them."""
+        def grab(needle: str) -> set:
+            line = next((ln for ln in self.out if needle in ln), "")
+            if needle not in line:
+                return set()
+            return {s.strip() for s in line.split(needle, 1)[1].split(",") if s.strip()}
+        return grab("this theme asks for:"), grab("this machine answers:"), grab("cannot:")
 
     def test_a_row_silenced_by_its_dependency_leaves_the_source_in_cannot_with_no_skip(self):
         """The relation the GitHub runner hit: a box with no GPU at all, `Used GPU Memory`
