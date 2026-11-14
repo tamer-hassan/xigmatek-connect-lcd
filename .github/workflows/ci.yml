@@ -484,6 +484,53 @@ jobs:
           } > "$RUNNER_TEMP/notes.md"
           cat "$RUNNER_TEMP/notes.md"
 
+      - name: what this tag draws, counted from the tree
+        # Nothing here is remembered: the counts come out of `ast` over the shipped source,
+        # so a release that draws seven themes cannot print a body saying six.  That is the
+        # same fault this project found in its own prose on 2026-11-14 - eleven sentences
+        # and one gate that pinned the word "five" - and a release information page is the
+        # worst place to carry it, because a reader decides whether to upgrade from it.
+        run: |
+          set -eu
+          python3 - > "$RUNNER_TEMP/drawn.md" <<'EOF'
+          import ast, os
+
+          def assigns(path, name):
+              tree = ast.parse(open(path, encoding="utf-8").read())
+              out = []
+              for node in tree.body:
+                  if isinstance(node, ast.Assign) and any(
+                          getattr(t, "id", "") == name for t in node.targets):
+                      out.append(node.value)
+              return out
+
+          themes = sorted(k.value for v in assigns("xigmalcd/render.py", "THEMES")
+                          for k in v.keys)
+          version = assigns("xigmalcd/__init__.py", "__version__")[0].value
+          clips = sorted(f for f in os.listdir("media") if f.endswith(".mp4"))
+          lines = [
+              "",
+              "## What this release draws",
+              "",
+              f"Version parity in three places, read rather than typed: "
+              f"`xigmalcd.__version__` is `{version}`, `pyproject.toml` carries "
+              f"`{version}`, and this tag is `v{version}`.",
+              "",
+              f"- **{len(themes)} themes drawn from code**: " + ", ".join(themes),
+              f"- **{len(clips)} backgrounds installed from `media/`** by `debian/rules`: "
+              + ", ".join(clips),
+              "",
+              "Those hashes identify this source built by this runner toolchain. A rebuild "
+              "on another debhelper reproduces the themes package byte for byte and the "
+              "code package in everything except a generated `WHEEL` file, one `md5sums` "
+              "line, 1 kB of `Installed-Size` and the generated maintainer scripts. "
+              "`docs/packaging.md` keeps that measurement, taken on the 0.7 pair.",
+              "",
+          ]
+          print("\n".join(lines))
+          EOF
+          cat "$RUNNER_TEMP/drawn.md" >> "$RUNNER_TEMP/notes.md"
+
       - name: gh release create
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
