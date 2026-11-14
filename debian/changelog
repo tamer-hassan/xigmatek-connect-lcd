@@ -1364,6 +1364,21 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     `tests/test_clip_db`) rather than retyped. Suite: **634 checks over 55
     test files**, both doors agreeing.
 
+  * A manifest read in the wrong form: my own smoke check failed CI #218.
+    CI #218 caught a bug in that very comparison, and it was mine: dpkg
+    writes its md5sums paths **relative to the filesystem root** -
+    `usr/share/xigmalcd/media/x.mp4`, no leading slash - while the filter I
+    wrote asked for `/usr/share/...`, so the manifest read as empty and the
+    assert came back `(14, 0, ...)`: fourteen clips installed, zero named
+    by the package, on an install that was entirely correct. The comparison
+    now happens in dpkg's form, and each installed clip is additionally
+    hashed against the digest dpkg recorded at install time - a claim about
+    this box's filesystem rather than about the archive. Run here against
+    the bench's currently installed (older) package: three named, three on
+    disk, all three digests matching; the fourteen-file case is the
+    runner's to prove, and this is the second time today that a claim about
+    an install could only be checked by the job that performs one.
+
   * The smoke test asserted a directory listing, not a rule.
 
     The smoke test asserted a directory listing, and CI #217 went red on a

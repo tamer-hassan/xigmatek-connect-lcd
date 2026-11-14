@@ -90,22 +90,32 @@ got = sorted(os.listdir(m.SYSTEM_MEDIA))
 # the whole set must equal is the package's own declaration, which dpkg recorded at install
 # time - a claim with a source, rather than one kept by hand here.
 assert set(want) <= set(got), (sorted(set(want) - set(got)), got)
-_declared = []
+_declared, _pairs = [], []
 try:
     with open("/var/lib/dpkg/info/xigmatek-connect-lcd.md5sums", encoding="utf-8") as _fh:
         for _line in _fh:
             _parts = _line.split(None, 1)
             if len(_parts) == 2:
                 _declared.append(_parts[1].strip())
+                _pairs.append((_parts[1].strip(), _parts[0].strip()))
 except OSError:
     pass
 if _declared:
-    _here = [os.path.join("/usr/share/xigmalcd/media", n) for n in got]
-    _said = sorted(x for x in _declared if x.startswith("/usr/share/xigmalcd/media/"))
-    assert _here == _said, (len(_here), len(_said),
-                            sorted(set(_here) ^ set(_said))[:4])
-    print(f"  media set    {len(got)} clips installed, and dpkg's own md5sums names "
-          f"{len(_said)} under that directory - they are the same list")
+    # dpkg records these paths **relative to /** - `usr/share/xigmalcd/media/x.mp4`, no
+    # leading slash - which is the form to compare in, not the absolute one.  The first cut
+    # of this comparison asked for an absolute prefix, found none, and CI #218 went red
+    # claiming `(14, 0, ...)`: fourteen files installed and a manifest read as if empty.
+    _here = sorted(f"usr/share/xigmalcd/media/{n}" for n in got)
+    _said = sorted(x for x in _declared if x.startswith("usr/share/xigmalcd/media/"))
+    assert _here == _said, (len(_here), len(_said), sorted(set(_here) ^ set(_said))[:4])
+    # and the digests dpkg wrote at install time still describe the bytes on disk: a claim
+    # about this box's filesystem, not about the archive
+    for _path, _digest in _pairs:
+        if _path.startswith("usr/share/xigmalcd/media/"):
+            _real = os.path.join("/", _path)
+            assert hashlib.md5(open(_real, "rb").read()).hexdigest() == _digest, _path
+    print(f"  media set    {len(got)} clips installed, dpkg's md5sums names {len(_said)} "
+          f"under that directory, and every one of them hashes to what dpkg recorded")
 else:
     print(f"  media set    {len(got)} clips installed (no dpkg manifest to compare "
           f"against on this box)")
