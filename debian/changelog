@@ -1,4 +1,31 @@
-xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
+xigmatek-connect-lcd (0.7) resolute; urgency=medium
+
+  * Released as `v0.7`, the sixth tag of this tree.
+
+    This stanza is the record of the work since `v0.6`. The stamp at the
+    foot of it is a packaging fact rather than a date: `dpkg-buildpackage`
+    takes `SOURCE_DATE_EPOCH` from that line and `dpkg-deb` clamps every
+    archive member to it, which is why a build on a runner and a build on
+    this bench can be expected to agree on bytes. The stamp reads Sat, 14
+    Nov 2026 15:45:33 +0200, deliberately in the past - `dpkg-deb` pulls
+    mtimes *down* to the epoch and leaves later ones alone, so a future
+    stamp lets each machine's wall clock into the archive and the hashes
+    stop identifying the source. `docs/packaging.md` keeps the digest
+    census of the pair, the tag's CI build against the builds made from
+    this tag on this bench, and that census lands as the commit after the
+    tag, as it did for 0.5 and 0.6: a digest written before the build that
+    produced it is a number nobody built.
+
+    Four doors on the one version, all read rather than remembered:
+    `pyproject.toml` `version = "0.7"`, `xigmalcd.__version__ = "0.7"`,
+    this stanza's `(0.7) resolute`, and the annotated tag `v0.7`. What the
+    release draws is six themes from code - `alpha`, `bars`, `birdseye`,
+    `clock`, `dual`, `gauge`, the third of those new - over fourteen
+    backgrounds in `media/`, three of them the vendor's bytes, one cut here
+    from a vendor clip, ten made by the maintainer. The offline suite at
+    this commit is 634 checks over 55 test files by both counters,
+    `grep -c` on the test stanzas and `unittest.TestLoader().discover`,
+    green on this bench and on the runner.
 
   * The offline checks move out of one shell file and into ordinary test files.
     `tools/selftest.sh` - 13,869 lines in 22 sections, grown over six cycles -
@@ -2590,7 +2617,7 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     are on one line now.
 
 
- -- Tamer Hassan <thameruddin@gmail.com>  Wed, 11 Nov 2026 22:05:00 +0200
+ -- Tamer Hassan <thameruddin@gmail.com>  Sat, 14 Nov 2026 15:45:33 +0200
 
 xigmatek-connect-lcd (0.6) resolute; urgency=medium
 
