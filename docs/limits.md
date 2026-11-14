@@ -208,6 +208,38 @@ What has been measured on glass, by whom, with how many frames - and what has no
   project states the numbers instead of the effect: `xigmaui` puts the measured size on
   every clip row and, for a file that is not 480×480, says under the list that its
   preview is a guess.
+
+* **The eleven backgrounds this repository carries that the vendor never shipped, measured
+  the same way as its own.** Two methods, both named, because they do not agree on purpose:
+  mean luma is over **every frame** of the file (`python3 tools/clip_luma.py --dir media`,
+  the door that also produced the entries in `main.CLIP_LUMA`), and motion is the mean
+  absolute grey difference between two frames half a loop apart (`/tmp` survey of all 44
+  vendor clips, the same figures that ranked that library). The pairing question is open:
+  six drawn themes name a backdrop today and these eleven name none of them.
+
+  | the file | frames | length | bytes | mean luma, every frame | motion, mid-loop |
+  |---|---|---|---|---|---|
+  | `AI_chip_black.mp4` | 360 | 6.00 s | 897 970 | 88.3 | 58.4 |
+  | `AI_chip_blue.mp4` | 345 | 5.75 s | 407 170 | 81.7 (brightest frame 159.3) | 81.5 |
+  | `AI_network.mp4` | 375 | 15.00 s | 1 683 651 | 37.6 | 27.1 |
+  | `cpu_processing.mp4` | 152 | 5.07 s | 638 956 | 89.2 | 44.8 |
+  | `interstellar.mp4` | 199 | 7.96 s | 1 269 262 | 20.3 | 11.9 |
+  | `matrix_binary.mp4` | 902 | 15.03 s | 2 655 470 | 22.2 | 35.0 |
+  | `matrix_black.mp4` | 299 | 10.00 s | 502 996 | 7.4 | 12.6 |
+  | `matrix_blue.mp4` | 150 | 5.00 s | 1 806 149 | 13.1 | 22.0 |
+  | `matrix_magenta.mp4` | 240 | 8.00 s | 1 624 475 | 45.2 | 43.2 |
+  | `water_splash.mp4` | 328 | 13.67 s | 3 522 068 | 45.4 | 34.0 |
+  | `theme_47-trimmed.mp4` | 168 | 8.40 s | 1 071 306 | 6.5 | 5.9 |
+
+  Two readings worth holding onto, because both contradict a name. **`AI_chip_black.mp4` is
+  the third-brightest file in the directory** (88.3 of 255, behind `cpu_processing.mp4` at
+  89.2 and the vendor's `theme_48.mp4` at 227.3), and `AI_chip_blue.mp4`'s brightest frame
+  reaches 159.3. `BRIGHT_LUMA` is 128, which is where white-on-white starts - and
+  `main._scrim_for` compares the **mean**, not the peak, so on that clip the automatic rule
+  stays at 0 while the busiest frames are the ones a reader would notice. `--scrim N` is the
+  override for a case like that. And `matrix_black.mp4`, at 7.4, is the second-darkest clip on the machine -
+  the darkest being `theme_47-trimmed.mp4` at 6.5, which is what `birdseye` is composited
+  over today. A picker that trusted these filenames would have picked the wrong two.
 ## The themes package: media and reference material, not a theme list
 
 * **The themes package is media and reference material, not a theme list.**
