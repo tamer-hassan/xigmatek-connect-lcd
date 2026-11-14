@@ -72,8 +72,12 @@ reasoning and `tests/test_icons.py` the checks.
 
 That second link is the repository's own file rather than an attachment, because a
 repo-path `.mp4` in markdown becomes an `<img>` no browser plays (recorded in
-`docs/limits.md`); the attachment rows above were uploaded by hand, and `birdseye`'s gets
-uploaded when the release is cut.  Its backdrop is also the one clip here that the vendor
+`docs/limits.md`); the attachment rows above were uploaded by hand, and the seventh could
+not be: GitHub's `user-attachments` upload endpoint answers **HTTP 500** to an API caller -
+tried twice, with and without the preview `Accept` header - so an inline seventh preview
+needs a person's drag into the web editor rather than a script. Until then the row above
+links the repository's own copy, and the same file is attached to the `v0.7` release
+(`birdseye-theme_47-trimmed.mp4`, 1 223 967 B), so it is downloadable from the release page.  Its backdrop is also the one clip here that the vendor
 did not ship as-is: `theme_47.mp4` opens on **17 still frames with a play button burned
 into the middle**, so the theme pairs with a cut copy in `media/` - 168 frames / 8.40 s,
 head centre-luma 1.53 against the original's 6.62, loop seam 5.572 against 5.917 - while

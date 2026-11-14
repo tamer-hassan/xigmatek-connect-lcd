@@ -350,6 +350,29 @@ packages, `cmp` clean. And zstd's threading is not the variable: `zstd -19 -T1` 
 
 So the rule is a check rather than a habit: `tests/test_debian_changelog.py` fails if the top
 `debian/changelog` entry is dated in the future, and the deb job prints the stamp it built
-from. The per-release digests - what each tag's CI build and the local rebuilds came out to -
+from.
+
+**And the rule is necessary, not sufficient: the toolchain is a second input, measured on
+the 0.7 release.** One tagged commit (`c8ffa29`), two machines, both running the same
+recipe: the GitHub runner on `ubuntu-26.04` and this bench on `26.10`. The themes package
+came out **byte-identical** - `79 932 856 B`, sha256 `204c7647a447450f…` on both sides,
+`cmp` clean. The code package did not: `21 578 396 B` / `fb2169110ff9141d…` from the runner
+against `21 577 030 B` / `317ba7f09b06a3ba…` from here. Unpacked and diffed, the gap is
+small and it is fully explained: **one installed file**, `xigmalcd-0.7.dist-info/WHEEL`,
+which the runner wrote and this bench's toolchain did not; `md5sums` differing by that one
+line; `control` differing by `Installed-Size: 22540` against `22539`, the 1 kB that file
+accounts for; and the two generated maintainer scripts, marked `dh_installsystemduser/
+13.31ubuntu1` there and `/14.5ubuntu1` here, with debhelper 14 moving the trixie unmask line
+inside an `if [ -z "$DPKG_ROOT" ]`. Nothing about the source differed: the two bench builds
+of the same tag (`#20` and `#21`, `dh_clean` then `dpkg-buildpackage -us -uc -b`) came out
+identical to each other, both tars, both control members, `cmp` clean.
+
+So a `.deb` hash identifies **this source built by this build toolchain**, and the hashes in
+a release's notes are the runner's. Rebuild 0.7 on a box with a different debhelper and the
+code package will differ in precisely the places above - a `WHEEL`, one `md5sums` line, one
+kilobyte of `Installed-Size`, two script bodies - while the themes package will match. The
+stamp rule is what keeps the clocks out of it; the package manager's version is what keeps
+the bytes from agreeing across machines, and that is stated here because the alternative is
+a maintainer diffing two archives hunting for a source difference that does not exist. The per-release digests - what each tag's CI build and the local rebuilds came out to -
 live in that release's own notes, which is where a dated figure belongs. This page keeps the
 rule, not the table.
