@@ -53,10 +53,12 @@ WIFI = 61                   # ath12k_hwmon, built hotter than everything in the 
 TSI = 67                    # AMD TSI Addr 98h: the CPU, in the same chip
 
 #: The three drives `make_tree` builds, in the order `sensors.drives()` must return them:
-#: **controller** order, while the walk visits `hwmon7` (`nvme2`) first.  Named rather than
-#: repeated as literals because `tests/test_blob_probe.py` asserts the same list from the other
-#: side - a probe's payload has to be the shipped one - and two files holding their own copy of
-#: the expectation is how the two would quietly stop meaning the same tree.
+#: the tree's own root drive first (`Built.ROOT`, which `fixtures.pin_hwmon` pins so the host's
+#: mount table cannot answer it), then the rest by **controller** - while the walk itself visits
+#: `hwmon7` (`nvme2`) first.  Named rather than repeated as literals because
+#: `tests/test_blob_probe.py` asserts the same list from the other side - a probe's payload has
+#: to be the shipped one - and two files holding their own copy of the expectation is how the
+#: two would quietly stop meaning the same tree.
 DRIVE_SLOTS = ("nvme0", "nvme1", "nvme2")
 DRIVE_TEMPS = (42, 32, 55)  # nvme0's composite, nvme1's composite, nvme2 with no composite
 DRIVE_KEYS = ("name", "sensors", "temperature")
@@ -117,14 +119,25 @@ def make_tree(root: str) -> str:
 
 
 class Built(unittest.TestCase):
+    """Every check under this class runs against the tree `make_tree` writes.
+
+    Which includes the mount table: the drive that holds `/` is what puts a row in slot 1, so
+    a built tree that left that question to the host would inherit the host's answer.  See
+    `fixtures.pin_hwmon` - and the four checks that went red on 2026-11-14 when this bench's
+    boot controller was renamed between boots, which is the failure mode that sentence is
+    written against.  `ROOT` is the drive this tree declares mounted; a check that wants a
+    different one says so by name rather than editing this constant.
+    """
+
+    ROOT = "nvme0"
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="xigma-hwmon-")
         pattern = make_tree(self.tmp.name)
-        self.real_glob = sensors.HWMON_GLOB
-        sensors.HWMON_GLOB = pattern
+        self.saved = fixtures.pin_hwmon(pattern, root=self.ROOT)
 
     def tearDown(self):
-        sensors.HWMON_GLOB = self.real_glob
+        fixtures.unpin_hwmon(self.saved)
         self.tmp.cleanup()
 
 
@@ -502,6 +515,33 @@ class TheDriveSlots(Built):
         self.assertEqual(plain[1:], ["nvme0", "nvme1"],
                          "the non-root drives are no longer in controller order behind it")
 
+
+    def test_a_renamed_boot_drive_moves_the_drive_not_the_rule(self):
+        """The exact shape of today's accident, gated instead of discovered.
+
+        On 2026-11-14 the bench came back with `/` on `nvme1` where it had been on `nvme0`:
+        the same physical disk (composite 40 against 29 for the other one, the same two
+        models), a different controller name, because the kernel enumerated the two PCIe
+        slots in the other order.  `bars` marks the boot drive by **position**, and this is
+        the case that rule exists for - so the ordering check has to run with the mount
+        pinned both ways, and the host's current answer belongs in the log.
+        """
+        self.assertEqual([d["name"] for d in sensors.drives()],
+                         ["nvme0", "nvme1", "nvme2"],
+                         "the built tree's own root (nvme0) did not take slot 1")
+        moved = fixtures.pin_hwmon(sensors.HWMON_GLOB, root="nvme1")
+        try:
+            self.assertEqual([d["name"] for d in sensors.drives()],
+                             ["nvme1", "nvme0", "nvme2"],
+                             "a boot that renamed the controllers moved the rule, not just "
+                             "the name")
+        finally:
+            fixtures.unpin_hwmon(moved)
+        real = sensors._read("/proc/mounts")
+        who = next((sensors.controller_of(ln.split()[0]) for ln in real.splitlines()
+                    if len(ln.split()) > 2 and ln.split()[1] == "/"), "")
+        print(f"  this machine: `/` answers controller {who!r} "
+              f"(the name moves between boots; slot 1 follows the filesystem, not the name)")
 
     def test_the_slots_answer_positionally_and_say_what_they_dont(self):
         from xigmalcd import themes

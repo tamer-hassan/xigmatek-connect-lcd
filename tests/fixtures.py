@@ -89,6 +89,35 @@ def need(*what: str) -> None:
                                 + " - the check that needs it is skipped, not silently passed")
 
 
+def pin_hwmon(pattern: str, root: str = "nvme0") -> tuple:
+    """Point the sensor walk at a constructed tree - and say which drive *that* tree boots from.
+
+    Both halves have to be pinned.  `sensors.HWMON_GLOB` decides which chips the walk sees,
+    while `sensors._root_controller()` reads this machine's `/proc/mounts` to decide which
+    of the drives takes slot 1.  A test that swaps only the glob is therefore not gating a
+    built tree: it is gating the built tree plus this box's mount table.  That distinction
+    stopped being theoretical on 2026-11-14, when the bench's boot controller came back
+    named `nvme1` instead of `nvme0` after a boot and four checks that believed they were
+    constructing their own machine (`tests/test_sensor_rules.py::TheDriveSlots`, two in
+    `tests/test_blob_probe.py`, and `tests/test_bare_audit.py`'s end-to-end run of the audit
+    over one of those files) failed on a name none of them had chosen.
+
+    Returns what to hand `unpin_hwmon`.  `root=""` is a real case: a machine whose mount
+    point will not match a chip at all, which is what makes the hottest-composite fallback in
+    `disk_temperature()` worth testing rather than assuming away.
+    """
+    from xigmalcd import sensors
+    saved = (sensors.HWMON_GLOB, sensors._root_controller)
+    sensors.HWMON_GLOB = pattern
+    sensors._root_controller = lambda: root
+    return saved
+
+
+def unpin_hwmon(saved) -> None:
+    from xigmalcd import sensors
+    sensors.HWMON_GLOB, sensors._root_controller = saved
+
+
 def tracked(*patterns: str) -> list:
     """The repository's own file list, as git knows it.
 

@@ -390,8 +390,14 @@ def drives(root: str | None = None) -> list[dict]:
     only to an `OS === "RTOS"` unit while this one reports Linux.
 
     `name` is the controller instance (`nvme0`), not the model string: it is short enough for a
-    10-character display cut, stable across boots, and the value a reader can match against
-    `/sys/class/nvme` and `lsblk`.  `temperature` is the whole degrees the drive reports about
+    10-character display cut, and the value a reader can match against `/sys/class/nvme` and
+    `lsblk`.  It is **not stable across boots**, and this bench disproved that claim about its
+    own stability on 2026-11-14: the same two disks, the same Kingston holding `/`, came back
+    enumerated the other way round, so `/` answered `nvme1` where it had answered `nvme0` the
+    day before.  That is exactly why the sort below keys slot 1 on the **filesystem** and not
+    on the name or the hwmon number, and why a built-tree check has to pin the mount as well as
+    the chip walk (`fixtures.pin_hwmon`, used by `tests/test_sensor_rules.py` and
+    `tests/test_blob_probe.py`).  `temperature` is the whole degrees the drive reports about
     itself - its `Composite` when it publishes one, else its hottest sensor - and `sensors`
     carries every published reading rounded, so a layout that wants the hotter raw probe can
     name it instead of quietly substituting one.
@@ -399,7 +405,9 @@ def drives(root: str | None = None) -> list[dict]:
     **Slot 1 is the drive that holds `/`.**  The order is root drive first, then the rest by
     controller - so a layout that draws `Disk 1` is drawing the same drive whose capacity the
     blob's `disk.total`/`disk.used` describe, and a boot drive can be marked by *position*
-    rather than by a rule two doors have to agree on.  That is not decoration: measured here,
+    rather than by a rule two doors have to agree on.  Position is what survives the name
+    moving: `nvme0` for the boot disk on 2026-11-13, `nvme1` on 2026-11-14, and slot 1 held the
+    same drive both times because it followed `/`.  That is not decoration: measured here,
     the second drive's composite (31 °C today) differs from the first's (41), so a walk-order
     list would put a different drive in slot 1 than the capacity numbers describe, and the
     check that pins this ordering is the one that fails when someone "simplifies" it back to

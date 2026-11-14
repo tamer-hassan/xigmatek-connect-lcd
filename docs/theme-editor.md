@@ -1323,10 +1323,14 @@ Two things had to be settled first, and only one of them was a design choice.
   no read-back for a `STATE` frame, and the only topic that would make the panel draw these
   numbers itself is `realtimeDisplay`, which ALPHA sends only to an `OS === "RTOS"` unit.
 * **Ordering, which the slots make load-bearing.**  `sensors.drives()` sorts **the drive under
-  `/` first**, then the rest by controller (`nvme0` before `nvme2`), never by the number the
-  kernel happened to give the hwmon directory - because a slot is a thing a layout names and a
-  reader expects to mean the same drive next boot.  Root-first is what lets a block mark the boot
-  drive by position (`layout.VENDOR_FORMAT["Disk 1 Name"]` prints `nvme0 /`, the other slots plain)
+  `/` first**, then the rest by controller (`nvme0` before `nvme2`, with the mount pinned - and
+  unpinned it is this box's answer, which was `nvme1` for the boot drive after the 2026-11-14
+  boot), never by the number the kernel happened to give the hwmon directory.  **The controller
+  name is not a promise about next boot**: this bench renamed its boot disk's controller from
+  `nvme0` to `nvme1` between two boots, same hardware, same partition.  Root-first ordering is
+  what makes that survivable - it is why a layout marks the boot drive by position
+  (`layout.VENDOR_FORMAT["Disk 1 Name"]` prints the mount's own drive with ` /` on the end, the
+  other slots plain)
   and what makes `Disk 1 Temperature` the same reading as the scalar `disk.temperature` whose
   capacity sits beside it - an equality a check now asserts, and it is not vacuous here: the
   second drive's composite is 31 °C against the first's 41.  The built tree in

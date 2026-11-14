@@ -78,8 +78,8 @@ class StubLink:
 
 
 class LoopCounters(unittest.TestCase):
-    #: The run's wall-clock budget, measured rather than fixed.  CI #204 is why.
-    BUDGET = 3.0
+    #: The run's size **in frames**.  CI #204 and CI #216 are why it is a count.
+    FRAMES = 2 * EVERY + 4        # three refusals, plus slack for the loop's own ramp
 
     @classmethod
     def setUpClass(cls):
@@ -87,41 +87,32 @@ class LoopCounters(unittest.TestCase):
         cls.sock = os.path.join(cls.tmp.name, "loop.sock")
         cls.real_link, cls.real_stdout, cls.real_stderr = daemon.Link, sys.stdout, sys.stderr
         StubLink.calls, StubLink.seen, StubLink.sock = 0, [], cls.sock
-        # How long does one frame cost **here**?  That is the only honest way to size the run:
-        # the loop paces to `--fps` but never sleeps past a frame it cannot draw, so the number
-        # of uploads it makes in a fixed `--duration` is a property of the machine, not of the
-        # code.  Measured on the bench this file was written on, three seconds buys twenty-odd
-        # frames; on the contended GitHub runner of CI #204 (a 1872.756 s step where its
-        # neighbours take ~420 s) the same three seconds bought **three** files, no fourth file
-        # ever arrived, and every assertion below about refusals failed because the case under
-        # test had not happened.  A budget that is timed by a clock and asserted by a count is a
-        # bet on the scheduler - the same fault fixed in `tests/test_window_sizing.py` an hour
-        # earlier, in a different file.  So the budget is calibrated from one real frame here,
-        # with the measurement printed rather than assumed.
-        one = cls.time_one_frame()
-        frames_wanted = 2 * EVERY + 4        # two refusals, plus slack for the loop's own ramp
-        cls.BUDGET = min(40.0, max(3.0, one * frames_wanted * 2.0))
-        print(f"  loop budget: one `alpha` frame costs {one:.3f} s here, so the stub run gets "
-              f"{cls.BUDGET:.2f} s - enough for at least {frames_wanted} frames at that rate")
+        # How many frames, not how many seconds.  The loop paces to `--fps` but never sleeps
+        # past a frame it cannot draw, so what a `--duration` buys is a property of the machine:
+        # CI #204 gave three seconds -> **three** uploads, no fourth file ever arrived, and
+        # every assertion below about refusals failed because the case under test had not
+        # happened.  This file then calibrated the budget from one timed `alpha` frame, and CI
+        # #216 falsified the calibration too - because an iteration is not a draw: it also
+        # samples the sensors, encodes, and hands the file to a stub link, and on a contended
+        # runner all of that together cost about a second a frame, which is 3 uploads again in
+        # the 3.00 s the calibration's floor allowed.  A duration with a count asserted against
+        # it is a bet on the scheduler either way - the same fault fixed in
+        # `tests/test_window_sizing.py`.  So the bound is `--frames`, the loop's own door, and
+        # the elapsed time below is printed and never asserted.
         daemon.Link = StubLink
         out, err = io.StringIO(), io.StringIO()
+        start = time.monotonic()
         sys.stdout, sys.stderr = out, err
         try:
             cls.rc = daemon.main(["--device", "/dev/xigma-stub", "--socket", cls.sock,
-                                  "--fps", "20", "--duration", f"{cls.BUDGET:g}",
+                                  "--fps", "20", "--frames", str(cls.FRAMES),
                                   "--no-state", "--no-mp4", "--theme", "alpha"])
         finally:
             sys.stdout, sys.stderr = cls.real_stdout, cls.real_stderr
         cls.log, cls.report = err.getvalue(), out.getvalue()
-
-    @classmethod
-    def time_one_frame(cls) -> float:
-        """Draw one frame through the door the loop uses, and report what it took."""
-        from xigmalcd import render, sensors
-        body = sensors.collect()
-        start = time.monotonic()
-        render.draw(dict(body, timestamp={}), "alpha")
-        return max(0.001, time.monotonic() - start)
+        cls.elapsed = time.monotonic() - start
+        print(f"  loop run: {cls.FRAMES} frames asked for, {StubLink.calls} uploads attempted, "
+              f"{cls.elapsed:.2f} s on this machine (printed: no check here reads that number)")
 
     @classmethod
     def tearDownClass(cls):
@@ -137,14 +128,15 @@ class LoopCounters(unittest.TestCase):
         tail = [line for line in self.report.splitlines() if "frames confirmed" in line]
         self.assertTrue(tail, self.report[-400:])
         got, attempted = (int(x) for x in re.match(r"(\d+)/(\d+)", tail[-1]).groups())
+        self.assertEqual(attempted, self.FRAMES,
+                         f"the loop drew {attempted} frames when asked for {self.FRAMES}: "
+                         "`--frames` is not the bound it claims to be, so nothing below this "
+                         "line is measuring the case it names")
         raises = StubLink.calls // EVERY
-        self.assertGreaterEqual(raises, 2, f"only {StubLink.calls} files went up in a "
-                                           f"{self.BUDGET:.2f} s run (every {EVERY}th refused), "
-                                           "so the case under test did not happen even though "
-                                           "the budget was measured from a timed frame here - "
-                                           "the machine is slower than the calibration frame "
-                                           "suggests, or the loop stopped early: "
-                                           + self.log[-200:])
+        self.assertGreaterEqual(raises, 2, f"{StubLink.calls} files went up in a run asked for "
+                                           f"{self.FRAMES} (every {EVERY}th refused by the "
+                                           "stub), so the refusal case under test did not "
+                                           "happen: " + self.log[-200:])
         self.assertEqual(attempted - got, raises, f"{got}/{attempted} against {raises} raises")
         self.assertEqual(self.log.count("! frame"), raises, self.log[-400:])
 

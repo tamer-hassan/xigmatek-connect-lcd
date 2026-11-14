@@ -177,6 +177,50 @@ class HeadlessBoundary(unittest.TestCase):
         del probe
 
 
+class TheFlagTableMatchesTheParser(unittest.TestCase):
+    """The page that lists the flags and the program that reads them are one set.
+
+    Found the hard way on 2026-11-14: adding `--frames` to `main.build_parser()` was done by
+    replacing the block of lines above it, and the replacement silently dropped
+    `ap.add_argument("--once", ...)`.  Every CLI test that passes `--once` would have gone red
+    - two of them did, in this very file's neighbours - but the flag list in docs/usage.md,
+    the systemd unit, the desktop entry and the window's own toggles were untouched, so the
+    damage looked like a broken test rather than a removed feature.  A documented flag that
+    the parser does not have is the same class of fault as a source with no painter and a
+    shape with no source, and it is gated the same way: both directions, with the exceptions
+    named.
+
+    49 flags are documented in `docs/usage.md`; the parser defines 52 options of which three
+    are argparse's own (`-h`, `--help`) plus whatever this check catches.  Printed, so the
+    page can quote the door rather than a number kept by hand.
+    """
+
+    def test_every_documented_flag_is_one_the_parser_takes(self):
+        import re
+        with open(os.path.join(fixtures.REPO, "docs", "usage.md"), encoding="utf-8") as fh:
+            rows = [ln for ln in fh.read().split("\n") if ln.startswith("| `")]
+        documented = set()
+        for ln in rows:
+            cell = ln.split("|")[1]
+            documented.update(re.findall(r"-{1,2}[a-z][a-z0-9-]*", cell))
+        from xigmalcd import main
+        known = {opt for act in main.build_parser()._actions for opt in act.option_strings}
+        print(f"  flag reconciliation: {len(documented)} documented, {len(known)} defined, "
+              f"{sorted(known - documented - {'-h', '--help'}) or 'none'} undocumented")
+        self.assertEqual(sorted(documented - known), [],
+                         f"{sorted(documented - known)} are documented but the parser does "
+                         "not take them - the page is describing a flag that no longer exists")
+        extra = sorted(known - documented - {"-h", "--help"})
+        self.assertEqual(extra, [],
+                         f"{extra} are accepted by the CLI and named nowhere in "
+                         "docs/usage.md: a flag nobody can read about is a flag nobody uses")
+        for must in ("--once", "--duration", "--frames", "--theme", "--list-themes"):
+            self.assertIn(must, known,
+                          f"`{must}` is gone from the parser: this is exactly the accident "
+                          "the class exists to catch")
+
+
+
 class TheMark(unittest.TestCase):
 
     """Both files come from one artwork, and both are the tool's output, byte for byte."""

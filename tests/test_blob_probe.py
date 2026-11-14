@@ -345,12 +345,15 @@ class TheBodies(unittest.TestCase):
         """
         tmp = tempfile.TemporaryDirectory(prefix="xigma-probe-rows-")
         pattern = make_tree(tmp.name)
-        real_glob = sensors.HWMON_GLOB
-        sensors.HWMON_GLOB = pattern
+        # the tree *and* the mount: `drives()` puts the drive holding `/` in slot 1, and a
+        # built tree that leaves that question to the host inherits the host's answer - four
+        # checks went red on 2026-11-14 that way, when this bench came back with its boot
+        # controller named `nvme1`.  See `fixtures.pin_hwmon`.
+        saved = fixtures.pin_hwmon(pattern, root="nvme0")
         try:
             rows = blob_probe.drive_rows()
         finally:
-            sensors.HWMON_GLOB = real_glob
+            fixtures.unpin_hwmon(saved)
             tmp.cleanup()
         self.assertEqual([r["name"] for r in rows], list(DRIVE_SLOTS),
                          f"the payload is not the shipped list: {rows}")
@@ -400,8 +403,10 @@ class TheShippedDoor(unittest.TestCase):
         """
         tmp = tempfile.TemporaryDirectory(prefix="xigma-probe-")
         pattern = make_tree(tmp.name)
-        real_glob = sensors.HWMON_GLOB
-        sensors.HWMON_GLOB = pattern
+        # the tree *and* the mount: `drives()` sorts the root drive into slot 1, and reading
+        # this box's `/proc/mounts` inside a built-tree check is what made four of them fail
+        # on 2026-11-14 when the bench's boot controller came back named `nvme1`
+        saved = fixtures.pin_hwmon(pattern, root="nvme0")
         try:
             rows = blob_probe.drive_rows()
             self.assertEqual(rows, sensors.drives(),
@@ -422,7 +427,7 @@ class TheShippedDoor(unittest.TestCase):
                              "slot 3 is not the third controller; the ordering above is "
                              "cosmetic and would not survive a boot")
         finally:
-            sensors.HWMON_GLOB = real_glob
+            fixtures.unpin_hwmon(saved)
             tmp.cleanup()
 
     def test_the_live_relation_holds_under_one_snapshot_of_sysfs(self):

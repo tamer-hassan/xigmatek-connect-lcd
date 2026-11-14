@@ -689,6 +689,12 @@ def build_parser() -> argparse.ArgumentParser:
                          "1 fps is what the vendor app does)")
     ap.add_argument("--duration", type=float, default=0,
                     help="stop after N seconds (0 = run forever)")
+    ap.add_argument("--frames", type=int, default=0, metavar="N",
+                    help="stop after N frames (0 = no limit) - the other way to bound a "
+                         "run, and the one a check wants: how many frames a given number "
+                         "of seconds buys is a property of the machine, while how many the "
+                         "loop drew is a property of the loop (CI #216 is the difference, "
+                         "see tests/test_loop_counters.py)")
     ap.add_argument("--once", action="store_true", help="push a single frame")
     ap.add_argument("--dry-run", metavar="DIR",
                     help="only write PNGs here, never touch the serial port")
@@ -1122,7 +1128,7 @@ def main(argv=None) -> int:
         os.makedirs(args.dry_run, exist_ok=True)
         deadline = time.monotonic() + args.duration if args.duration else 0
         n = 0
-        while True:
+        while True:                      # bounded by --frames as well as by --duration
             m = sample(args)
             png = _png(args, paint(args, m))
             path = os.path.join(args.dry_run, f"frame{n:04d}.png")
@@ -1130,7 +1136,8 @@ def main(argv=None) -> int:
                 fh.write(png)
             print(f"{path}  {len(png)} bytes")
             n += 1
-            if args.once or (deadline and time.monotonic() >= deadline):
+            if args.once or (deadline and time.monotonic() >= deadline) \
+                    or (args.frames and n >= args.frames):
                 return 0
             time.sleep(max(0.0, 1.0 / args.fps))
 
@@ -1351,7 +1358,8 @@ def main(argv=None) -> int:
                 bad = 0
             n += 1
             publish()
-            if args.once or (deadline and time.monotonic() >= deadline):
+            if args.once or (deadline and time.monotonic() >= deadline) \
+                    or (args.frames and n >= args.frames):
                 break
             time.sleep(max(0.0, started + 1.0 / args.fps - time.monotonic()))
         print(f"{ok}/{n} frames confirmed by the panel")

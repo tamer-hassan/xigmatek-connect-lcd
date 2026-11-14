@@ -1318,6 +1318,86 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     The name census moved 108 -> 119 source rows, 190 rows carrying at
     least one.
 
+  * Two gates that were bets on the machine, and the bench that called
+    them: the drive slots and the loop's budget.
+
+    The 630-check run at `1f4089a` came back with five failures, CI #216
+    with two, and none of them had anything to do with the clips or the
+    theme that were just committed. Both sets were pre-existing, and both
+    were the same mistake in different clothes: a check whose *input* is a
+    property of this machine while its *assertion* is written as if it were
+    a property of the code.
+
+    **The drive slots: a built tree that pinned the chip walk and inherited
+    the mount table.** `sensors.drives()` puts the drive holding `/` in
+    slot 1 and the rest in controller order - the positional rule `bars`
+    uses to mark the boot drive. The four checks that gate it (
+    `tests/test_sensor_rules.py::TheDriveSlots`, two sites in
+    `tests/test_blob_probe.py`, and `tests/test_bare_audit.py`'s end-to-end
+    run over one of those files) install a constructed hwmon tree by
+    swapping `sensors.HWMON_GLOB`, and asserted the order
+    `nvme0, nvme1, nvme2`. But `_root_controller()` - the half that decides
+    slot 1 - reads `/proc/mounts`, and the mount belongs to the machine
+    running the test. This bench came back from a boot with its two NVMe
+    controllers enumerated the other way round: the same Kingston disk, on
+    the same partition, answered `nvme1` where it had answered `nvme0` on
+    2026-11-13. The walk was pinned and the mount was not, so `drives()`
+    answered correctly - `nvme1, nvme0, nvme2` - against an expectation
+    that had quietly been this box's mount table all along. Fixed at the
+    root: `fixtures.pin_hwmon(pattern, root=...)` swaps both the glob and
+    `_root_controller`, `unpin_hwmon` restores them, and `Built` in
+    `tests/test_sensor_rules.py` plus the two built-tree sites in
+    `tests/test_blob_probe.py` use it.
+    `test_a_renamed_boot_drive_moves_the_drive_not_the_rule` is the new
+    gate: the same tree pinned first to `nvme0` and then to `nvme1`,
+    asserting the list reorders both ways, with this machine's current
+    answer printed as a labelled reading rather than asserted. Two claims
+    written before today were wrong, and they are corrected where they were
+    made instead of deleted: the `drives()` docstring called the controller
+    name stable across boots (it is not, which is precisely why the rule is
+    positional), and `docs/usage.md` and `docs/theme-editor.md` quoted
+    `Disk 1 Name` printing `nvme0 /` as a fact about the layout rather than
+    about one boot.
+
+    **The loop's budget: a duration, calibrated, still a duration.** CI
+    #204 failed `tests/test_loop_counters.py` because a 3.00 s stub run
+    bought three uploads on a contended runner and the case under test -
+    every fourth file refused - never happened. The fix then in place
+    calibrated the budget: time one `alpha` frame here, ask for enough
+    seconds for two refusals plus slack, floor 3.00 s, cap 40.00 s. CI #216
+    failed the same two checks the same way, at the same 3 uploads, because
+    **an iteration is not a draw**: the loop also samples the sensors,
+    encodes a PNG and hands the file to the stub link, and the calibration
+    measured none of that. A budget timed by a clock and asserted by a
+    count is a bet on the scheduler whoever times it, so the bound is now a
+    count: `main.build_parser()` gained `--frames N` (0 = no limit),
+    honoured in the frame loop and in the `--dry-run` loop, and the test
+    asks for `2 * EVERY + 4` = 12 frames and asserts the run drew exactly
+    12 - which is also what makes the new option a gated fact rather than a
+    convenience. Three refusals then arrive at calls 4, 8 and 12,
+    `REFUSE_GIVEUP` is 6 in a row so the run survives them, and the elapsed
+    figure (1.92 s here) is printed and read by no assertion.
+
+    **A dropped flag, and the reconciliation that now catches it.** Adding
+    `--frames` by replacing a block of `add_argument` lines silently
+    deleted `--once` - and the CLI's flag list in `docs/usage.md`, the
+    systemd unit, the desktop entry and the window's toggles were untouched
+    by the deletion, so it surfaced as two broken tests rather than as a
+    removed feature. `docs/usage.md` now documents `--frames`, and
+    `tests/test_launcher.py::TheFlagTableMatchesTheParser` reconciles the
+    table against the parser in both directions: every documented flag must
+    exist, every existing flag must be documented (argparse's own `-h` /
+    `--help` excepted, named as the exception in the code), and five flags
+    that must never vanish are asserted by name. Read off the tree as it
+    stands: 50 documented, 52 defined, none the other way round.
+
+    Cost: the loop test's stub run is now bounded by 12 frames instead of a
+    3.00 s budget; what it took here (1.92 s) is printed and asserted by
+    nothing, because the point of the change is that the number no longer
+    matters to the outcome. Suite: **632 checks over 55 test files**, and
+    the run that starts from this commit is the one that decides whether
+    both machines agree.
+
   * Ten backgrounds that are not the vendor's, installed as a set,
     measured, and pinned by digest.
 

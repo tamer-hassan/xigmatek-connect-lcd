@@ -74,7 +74,9 @@ before-and-after numbers and the reason for each tier are in
 [limits](limits.md).  A layout reaches them through the source names `Disk Temperature` (the
 mounted drive, the scalar the capacity numbers come from) and `Disk 1 Temperature` …
 `Disk 4 Temperature` with their `Disk N Name` partners - positional, and ordered so slot 1 is the
-drive under `/`, which is how `bars` marks it: `Disk 1 Name` prints `nvme0 /`, the others plain.
+drive under `/`, which is how `bars` marks it: `Disk 1 Name` printed `nvme0 /` on 2026-11-13
+and `nvme1 /` on 2026-11-14 - the same disk, renumbered by the kernel between boots - with the
+others plain.  It is the position that marks the boot drive, not the name.
 Since 2026-11-14 our own generated `bars` draws slots 1 and 2 of those; the vendored library
 names no storage metric at all.  The split is printed - `python3 -m unittest
 tests.test_row_notes` ends with **22 distinct `source` values across the 28 layouts, 15 of them
@@ -104,6 +106,7 @@ every source the block asks for is one this machine answers.
 | `-t, --theme NAME` | `alpha` (default), `gauge`, `dual`, `clock`, `bars`, `birdseye` - or one of ALPHA's own library themes by name (`Theme_07`, or its numeric id `1757491588804`, in any case: it is stored as the file spells it). The library themes are painted from their own copied layout files by `xigmalcd/layout.py`; see "ALPHA's layouts as a picture" below. `alpha` is the theme the vendor app currently has selected (`presetTheme[26]` in its `store.json`), redrawn from that file's own widget geometry, with a GPU-temperature column matched to the CPU one, a 30-100 °C gauge arc around each temperature (green through amber to red), a seconds clock and one fan figure under each temperature |
 | `-f, --fps N` | frames per second. 1 is the vendor app's rate and its write count. Higher rates are real, not wasted: the glass takes the newest frame it has committed, so the picture you see is up to one frame period old - the on-screen clock runs ~1 s behind at 1 fps and stops looking behind at 3 fps, and the panel accepted **361/361** frames in one 120 s window and **1173/1175** in a 400 s soak at 3 fps; the ringed `alpha` picture, which is the biggest frame this code sends (39 400-45 244 B), took 3 fps too - **91 of 91** in 30 s. Choose it for the write count you are willing to spend (86 400 uploads a day at 1 fps, 259 200 at 3) |
 | `--duration N` | stop after N seconds |
+| `--frames N` | stop after N frames.  The bound a check wants: what N seconds buys is a property of the machine (sensors, encode, pace), while N frames is a property of the loop - `tests/test_loop_counters.py` asks for 12 and asserts the loop drew 12 |
 | `--once` | push one frame and exit |
 | `--dry-run DIR` | render to PNGs in DIR, never touch the port (test a theme) |
 | `--bg clear\|black` | `clear` (default) draws on a transparent canvas, so the panel's own background layer keeps playing behind our glyphs - the way ALPHA's `.osd` files do, which paint 4.6 percent of their pixels. `black` fills the canvas opaquely, and that is **not** the same as an opaque frame: 3 of the five drawn themes (`alpha`, `dual`, `gauge`) paint their own translucent fills - a ring's track, the grey plate behind two figures - and PIL's `ImageDraw` replaces those pixels instead of blending them with the canvas, so they keep letting the stored background through even with `--bg black`. Two of them (`bars`, `clock`) declare nothing translucent and go opaque across the whole frame, and so does a layout theme, because there the plate is composited *under* the finished layer. `tests/test_conventions.py` derives the split from the exports' own colour keys and prints the leaking counts beside the machine rather than quoting them here |

@@ -326,7 +326,9 @@ What has been measured on glass, by whom, with how many frames - and what has no
    tier.
 * **`disk.temperature` was reporting the wrong drive, because it was reporting the coolest
    number on the machine.** `sensors.disk()` describes one drive with `total` and `used` -
-   `shutil.disk_usage("/")`, which on this box is `nvme0n1p6`, a Kingston SNV3S2000G - while
+   `shutil.disk_usage("/")`, which on this box is `nvme0n1p6`, a Kingston SNV3S2000G (read on
+   2026-11-13; **the next boot called that same partition `nvme1n1p6`**, the two controllers
+   enumerated in the other order, which is the fact the positional rule further down exists for) - while
    its temperature came from `min()` over **every** `temp*_input` of **every** disk chip: on
    2026-11-13 that was **31-33 °C**, the composite of `nvme1`, an MSI M461 that holds nothing
    the reader is being told about.  The rule is now: the drive the mount point names, and
@@ -516,8 +518,11 @@ What has been measured on glass, by whom, with how many frames - and what has no
    `sensors.drives()` publishes `drives[]` in the blob - one row per storage controller,
    `{name, temperature, sensors}` - and `themes.DISK_SLOTS` names them for layouts:
    `Disk 1 Temperature` … `Disk 4 Temperature` and `Disk 1 Name` … `Disk 4 Name`, indexed by
-   **controller** (`nvme0` before `nvme2`), not by whatever number the kernel happened to give
-   the hwmon directory.  Measured twice here on 2026-11-13, forty minutes apart: `nvme0` at
+   **controller** (`nvme0` before `nvme2` - with the mount pinned to `nvme0`, which every
+   built-tree check now does through `fixtures.pin_hwmon`; unpinned, the answer is this box's
+   `/proc/mounts`, and on 2026-11-14 that said `nvme1`), not by whatever number the kernel
+   happened to give the hwmon directory.  Measured twice here on 2026-11-13, forty minutes
+   apart: `nvme0` at
    **41 °C** with published sensors `[41, 52, 68]`, then at **45 °C** with `[45, 57, 68]`, and
    `nvme1` 31 °C then 33 °C - the drives warm while the box works, which is exactly why these
    are printed by `tools/fanscan.py` rather than quoted as a figure a reader has to trust.  So a
