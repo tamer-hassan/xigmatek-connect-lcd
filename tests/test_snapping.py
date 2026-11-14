@@ -24,6 +24,7 @@ no line answers for it, which is the only way two rows can end up 1 px apart on 
 from __future__ import annotations
 
 import copy
+import math
 import os
 import unittest
 
@@ -125,6 +126,35 @@ class TheFilesLineUpOrTheyDoNot(unittest.TestCase):
         print(f"  snap census: {len(rows)} rows carry an x or y across {len(self.objects)} "
               f"layouts; {share_x} hold an x a peer in the same file holds, {share_y} do the "
               f"same with y; {same} pairs of rows hold one number between them")
+
+    def test_the_corpus_has_no_grid_to_snap_to(self):
+        """The other half of the pages' claim: these files have **no grid**, so a snap that
+        landed on a tidy multiple would be this program inventing a rule the vendor never wrote.
+
+        Measured with `math.gcd` over every declared coordinate, and printed, because
+        docs/gui.md carried the second figure - "27 of 191" - as prose with no command behind
+        it, and it went stale the same day the row census did.  A number a page quotes and no
+        door reprints is a number that quietly stops being true.
+        """
+        xs = [row[1] for row in self.declared if row[1] is not None]
+        ys = [row[2] for row in self.declared if row[2] is not None]
+        gx = xs[0]
+        for v in xs[1:]:
+            gx = math.gcd(gx, v)
+        gy = ys[0]
+        for v in ys[1:]:
+            gy = math.gcd(gy, v)
+        self.assertEqual((gx, gy), (1, 1),
+                         f"the corpus's coordinates now share a divisor ({gx}/{gy}): there is a "
+                         "grid in these files, and the snap's 2 px reach needs re-arguing "
+                         "against it")
+        on16 = sum(1 for v in xs if v % 16 == 0)
+        self.assertLess(on16, len(xs) // 2,
+                        "most of the declared x values sit on a 16 px lattice now: the "
+                        "'no grid to snap to' sentence below has to be re-read")
+        print(f"  grid census: gcd over {len(xs)} declared `x` and {len(ys)} declared `y` values "
+              f"is {gx}/{gy}; {on16} of the `x` values are multiples of 16 "
+              f"({len(self.declared)} rows carry an x or a y)")
 
     def test_two_pixels_is_a_break_in_the_histogram_not_a_point_on_a_slope(self):
         """The two shape claims, not just the totals: nothing sits one pixel from a peer's number,

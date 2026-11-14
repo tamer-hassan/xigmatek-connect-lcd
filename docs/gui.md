@@ -616,9 +616,9 @@ commonly gets wrong:
 
 * **A drag can be pulled onto a number this same file already uses, 2 px at most.** The lines are
   the layout's own, and the reach comes out of counting them rather than out of taste: of the
-  **191** rows that carry an `x` or a `y` in the **28** layouts this pane can open, **95** hold
-  an `x` that another row of the same file holds exactly and **48** do the same with `y`, which
-  is **426** pairs of rows holding one number between them.  The rest are apart on purpose: the
+  **188** rows that carry an `x` or a `y` in the **28** layouts this pane can open, **92** hold
+  an `x` that another row of the same file holds exactly and **46** do the same with `y`, which
+  is **369** pairs of rows holding one number between them.  The rest are apart on purpose: the
   nearest other row's `x` is 1 px away for **0** of those rows, 2 px away for **12**, and 3 px
   away for **4**, and nothing at all sits 6 or 7 px off.  So 2 px is the break between "this file
   means these two to line up" and "these two are spaced", and that is `edit.Editor.SNAP_PX`.  Three
@@ -628,13 +628,17 @@ commonly gets wrong:
   suite re-counts it wherever it runs, and prints what it counted:
   `python3 -m unittest tests.test_snapping` ends with the row/pair totals, the nearest-peer gap
   histogram and the pulled-at-1/2/3-px percentages this page quotes (measured 2026-11-14:
-  191 / 95 / 48 / 426, gaps {0: 95, 2: 12, 3: 4, 4: 14, 5: 4}, and 10 / 12 / 58 %).  The
+  188 / 92 / 46 / 369, gaps {0: 92, 2: 12, 3: 4, 4: 14, 5: 4}, and 11 / 12 / 57 %).  The
   thresholds - nothing at 1, 6 or 7 px, and 2 px strictly less grabby than 3 - are what the
   checks assert; the counts above them are a record with a command attached, because the row
-  total moved twice in one day (185 -> 188 -> 191, as `bars` took a drive row and then two
-  positional slot rows on 2026-11-14) while the shape of the histogram did not move at all, and
-  the 11% / 12% / 57% the prose carries above those figures became 10 / 12 / 58 at 191 rows -
-  the same two rows landing in the same column, changing a percentage by a point.  What a row *presents* on the glass is a different kind of
+  total moved four times in one day (185 -> 188 -> 191 -> 188, as `bars` took a drive row, that
+  row became two positional slots, and the block then gave a fan slot back to `Fan GPU`) while
+  the shape of the histogram did not move at all - and the percentages moved with the divisor
+  alone: 11 / 12 / 57 at 188 rows, 10 / 12 / 58 at 191, the same two rows landing in the same
+  column and shifting a percentage by a point.  The same pass now prints a **grid census** as
+  well - gcd 1 over 188 declared `x` and 188 declared `y` values, **27** of the `x` values a
+  multiple of 16 - which is the claim the paragraph below leans on and used to be prose with no
+  door behind it.  What a row *presents* on the glass is a different kind of
   figure - it follows the face the layout is drawn in - so the drawn census the same pass reports
   (how many pairs of drawn boxes already share an alignment number, how many box centres sit on the
   middle) is printed by `tests/test_snapping.py` on the machine it ran on, and no page quotes it as one number.
@@ -662,7 +666,7 @@ commonly gets wrong:
   not a number rows line up on.
 * **How a row gets off a line, and what a snap never touches.** A line the row was already sitting
   on is not offered back to it: `snap_move` is given the anchor the drag *started* from, and the
-  rule in the door is "the line you left is not a line".  With 95 of 191 rows parked on a column
+  rule in the door is "the line you left is not a line".  With 92 of 188 rows parked on a column
   their own file already uses, that is what makes a 2 px drag away from a shared column stick - and
   it is why there is no Shift to hold and no checkbox to remember.  While a pull is on, the pane
   draws that line end to end across the glass in a colour the marks layer owns, and the note line
@@ -877,11 +881,13 @@ commonly gets wrong:
   documented figure in this repo was read at (CPU 57.0 °C, GPU 47.0 °C, 2026-02-17
   09:30:12), and that fixture is shaped like a machine: it answers **15** of the **19** sources the
   five generated layouts ask, the **4** it leaves being the `Fan 3`/`Fan 4` slots past its two
-  reported tachometers. Widening that census to all **28** layouts the pane can open: **106**
-  rows carry a `source` - the `data` rows and the `bar` and `arc` rows that read a percentage -
-  between them asking **21** distinct names, of which that dict answers **16** and leaves **5**
-  with no value: the pump and `Fan 3`/`Fan 4`'s name and speed, the slots a Windows fan array
-  filled and no Linux machine will. The line under the picture says what it drew (`pane: pinned
+  reported tachometers - and **20 of 20** today, since the fixture grew a `drives` section and
+  `bars` stopped asking the `Fan 3`/`Fan 4` names it had no way to answer.  Widening that census
+  to all **28** layouts the pane can open: **108** rows carry a `source` - the `data` rows and
+  the `bar` and `arc` rows that read a percentage - between them asking **22** distinct names,
+  of which that dict answers **21** and leaves **1** with no value: `Pump Speed`, on purpose,
+  because the fixture's fan rows carry no `type` saying `Pump` while nine vendored layouts ask
+  it anyway - the one hole worth leaving visible in a body everything else is measured against. The line under the picture says what it drew (`pane: pinned
   fixture | this machine: …`) because a preview that moved with the sensors would make it
   impossible to tell an edit from a temperature. Because both doors read that one dict, a generated layout and
   the theme it was generated from put down the same picture here: zero differing pixels for
@@ -1113,7 +1119,8 @@ reordered only through the list that *is* the draw order; a row's size changes o
 through the keys its kind owns - there is no scale-everything handle - and a drag may be
 pulled onto a number this same file already uses, never onto a grid: the gcd of every
 declared `x` and of every declared `y` in the corpus is **1**, and only **27** of its
-**191** declared `x` values are multiples of 16, so these files have no grid to snap to
+**188** declared `x` values are multiples of 16 - both of those figures printed by
+`python3 -m unittest tests.test_snapping`, which ends with the grid census - so these files have no grid to snap to
 and this program does not invent one and call it the vendor's.  Nothing about a row's
 *position* is guessed at either: the editor draws from the pinned fixture unless the reader
 chooses another body on the knob above the picture, and the marks always belong to the frame

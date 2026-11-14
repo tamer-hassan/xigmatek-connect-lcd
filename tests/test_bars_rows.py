@@ -208,7 +208,10 @@ class TheBodyItself(unittest.TestCase):
         self.assertEqual(self.src.count("gb("), 2,
                          "the RAM and VRAM numbers must format through the one `gb` function - "
                          "and pass it the field they print, not the fraction their meter uses")
-        self.assertEqual(ROWS_TOTAL, 12, ROWS_TOTAL)
+        self.assertEqual(ROWS_TOTAL, 11, ROWS_TOTAL)
+        self.assertLessEqual(ROWS_TOTAL, 12,
+                             "the block has grown past the canvas's ceiling; see "
+                             "test_the_next_row_past_the_eleven_would_fit_and_the_one_after")
         self.assertEqual(len(themes.BARS_ROWS), len(themes.BARS_FIXED_ROWS)
                          + len(themes.BARS_DISK_ROWS) + len(themes.BARS_FAN_ROWS),
                          "the row table is no longer the sum of its three parts")
@@ -238,29 +241,42 @@ class WhatTheGlassHolds(unittest.TestCase):
         none = slots_with_ink(render.draw(ALL_SIX, "bars", bg=render.OVERLAY))
         six = slots_with_ink(render.draw(dict(ALL_SIX, fans=FANS_SIX), "bars",
                                          bg=render.OVERLAY))
-        answered_rows = sum(1 for r in themes.BARS_ROWS if r[0] is not None) \
-            + len(themes.BARS_DISK_ROWS)
-        self.assertEqual(none, [True] * answered_rows + [False] * render.BARS_SLOTS,
+        # Written out position by position, because the positions are the claim: this box's
+        # body answers the three temperatures, both drive slots, `Fan GPU` and the three usage
+        # rows, and it reports no tachometer at all - so the two fan slots (indices 5 and 6)
+        # are the holes.  A formula that puts every hole at the end stopped being true the day
+        # the owner asked for the fan group in the middle of the block.
+        want_here = [True, True, True,                  # CPU, GPU, BOARD
+                     True, True,                        # both drive slots
+                     False, False,                      # the two fan slots
+                     True,                              # Fan GPU
+                     True, True, True]                   # LOAD, RAM, VRAM
+        self.assertEqual(len(want_here), ROWS_TOTAL, "the pattern and the table disagree")
+        self.assertEqual(none, want_here,
                          "a box with no fans no longer reserves the slots it is not drawing")
         self.assertEqual(six, [True] * ROWS_TOTAL,
-                         "the fifth fan onward is not being kept out of the reserved slots")
+                         "the third fan onward is not being kept out of the reserved slots")
 
     def test_a_row_below_a_missing_reading_keeps_its_place(self):
         """The compaction that was removed on purpose: with three of the labelled rows
         unanswered, the rows that are drawn stay in their slots rather than closing up.
 
         Spelled out row by row rather than derived, because this is the check that catches a
-        reordering: the order is CPU, GPU, BOARD, DISK, LOAD, RAM, VRAM, then the four fan
-        slots, and `PARTIAL` answers the first two, the load, and nothing else.
+        reordering.  The order since 2026-11-14 is CPU, GPU, BOARD, the two drive slots, the
+        two fan slots, `Fan GPU`, then LOAD, RAM, VRAM, and `PARTIAL` answers two temperatures
+        and the load and nothing else - so the holes sit in the middle of the block as well as
+        at the end, which is the shape the old pattern could not express.
         """
         got = slots_with_ink(render.draw(PARTIAL, "bars", bg=render.OVERLAY))
         # CPU and GPU answer; BOARD, both drive slots, RAM and VRAM do not (PARTIAL has no
         # `drives` section at all, which is also a real shape: a kernel with no disk driver).
-        want = ([True, True, False,                    # CPU, GPU, GPU FAN
-                 False,                               # BOARD
-                 False, False,                        # both drive slots
-                 True, False, False,                   # LOAD, RAM, VRAM
-                 ] + [False] * render.BARS_SLOTS)
+        want = [True, True,                            # CPU, GPU
+                False,                                 # BOARD
+                False, False,                          # both drive slots
+                False, False,                          # both fan slots (PARTIAL has no `fans`)
+                False,                                 # Fan GPU: a GPU, no `fan` field
+                True, False, False]                    # LOAD answers, RAM/VRAM do not
+        assert len(want) == 11, want
         self.assertEqual(len(want), ROWS_TOTAL, "the hand-written pattern and the table disagree")
         self.assertEqual(got, want, (got, "rows below a missing reading closed up again"))
 
@@ -701,7 +717,7 @@ class TheGpuFanRow(unittest.TestCase):
         self.assertIn("GPU Fans Speed", got["missing"], got["missing"])
         index = [i for i, r in enumerate(themes.BARS_ROWS) if r[1] == "GPU Fans Speed"][0]
         drawn = rows_by_slot(body).get(index, [])
-        self.assertIn(("label", "GPU FAN"), drawn,
+        self.assertIn(("label", "Fan GPU"), drawn,
                       f"the label belongs to the row's subject, so it draws anyway: {drawn}")
         self.assertFalse([t for kind, t in drawn if kind == "value"],
                          f"a box with no fan reading printed a number: {drawn}")
@@ -731,10 +747,22 @@ class TheGpuFanRow(unittest.TestCase):
         the end of the block.  Measured off the table, because a row inserted at the end of
         the list would keep every count in this file correct and still read wrong."""
         labels = [r[0] for r in themes.BARS_ROWS]
-        self.assertEqual(labels[:4], ["CPU", "GPU", "GPU FAN", "BOARD"], labels)
-        self.assertEqual(labels[6:9], ["LOAD", "RAM", "VRAM"], labels)
-        self.assertEqual([r[0] for r in themes.BARS_ROWS if r[0] is None], [None] * 5,
-                         "five slot rows: two drives then three fans")
+        self.assertEqual(labels[:3], ["CPU", "GPU", "BOARD"], labels)
+        self.assertEqual(labels[7:], ["Fan GPU", "LOAD", "RAM", "VRAM"], labels)
+        self.assertEqual([r[0] for r in themes.BARS_ROWS if r[0] is None], [None] * 4,
+                         "four slot rows: two drive slots then two fan slots, in the middle")
+        # The owner's reason for the order, taken out of the **drawing** rather than the table:
+        # given a body that reports two tachometers named the way this box names them, the fan
+        # group must read `Fan CPU`, `CPU PUMP`, `Fan GPU`, with no hole between them.
+        body = dict(ALL_SIX, fans=[{"name": "Fan CPU", "value": 1650, "type": "Fan"},
+                                   {"name": "CPU PUMP", "value": 2450, "type": "Pump"}])
+        rows = rows_by_slot(body)
+        group = [next((t for kind, t in rows.get(i, []) if kind == "label"), None)
+                 for i in (5, 6, 7)]
+        self.assertEqual(group, ["Fan CPU", "CPU PUMP", "Fan GPU"],
+                         f"the fan group as drawn: {group}; full block {labels}")
+        self.assertTrue(all(not r[0] for r in themes.BARS_ROWS[5:7]),
+                        "the two rows above `Fan GPU` are the reserved fan slots")
 
 
 class TheKeyThatNamesTheDependency(unittest.TestCase):
@@ -799,8 +827,17 @@ class TheReviewDoor(unittest.TestCase):
         return asked, deps, guarded
 
     def cannot_and_skipped(self) -> tuple:
+        """The two lists the review door prints - **either of which may be empty**.
+
+        Until 2026-11-14 this box always had a hole (`Fan 3`, `Fan 4`), and the helper parsed
+        the `cannot:` line as if a theme must have one.  It does not: the block now draws two
+        fan slots and this machine reports two tachometers, so the door prints no `cannot:`
+        line at all and says `skipped: nothing`.  Requiring that line would have made the
+        helper assert the defect rather than report the machine.
+        """
         line = next((ln for ln in self.out if "cannot:" in ln), "")
-        cannot = {s.strip() for s in line.split("cannot:", 1)[1].split(",") if s.strip()}
+        cannot = ({s.strip() for s in line.split("cannot:", 1)[1].split(",") if s.strip()}
+                  if "cannot:" in line else set())
         row = next(ln for ln in self.out if " boxes," in ln)
         tail = row.split("skipped:", 1)[1] if "skipped:" in row else ""
         skipped = set() if not tail.strip() or tail.strip() == "nothing" else \
@@ -812,11 +849,22 @@ class TheReviewDoor(unittest.TestCase):
 
     def test_every_skip_reason_is_a_reading_a_face_or_a_dependency(self):
         asked, _deps, _guarded = self.asked_deps_guarded()
-        _cannot, skipped = self.cannot_and_skipped()
+        cannot, skipped = self.cannot_and_skipped()
         odd = [n for n in skipped
                if not (n.startswith("showIf:") or n.startswith("font:") or n in asked)]
         self.assertEqual(odd, [], "the review door reported something that is neither a reading "
                                   f"this file asks for, nor a dependency, nor a face: {odd}")
+        # the emptiness has to be the door's own claim, not a parse that missed a line
+        if not cannot and not skipped:
+            print("  review door: this machine answers every source `bars` asks for")
+            self.assertIn("skipped: nothing", "\n".join(self.out),
+                          "the door reported no holes but never said so either")
+        self.assertLessEqual(cannot, asked,
+                             "the door named an unanswered source this file does not ask for")
+        self.assertFalse(cannot & set(s for s in asked if s in
+                                    (themes.values(fixtures.PARITY_CASES[0], WHEN)[0])),
+                         "a source the theme reports as unanswered is answered by the reading "
+                         "the export was painted with")
 
     def test_a_row_silenced_by_its_dependency_leaves_the_source_in_cannot_with_no_skip(self):
         """The relation the GitHub runner hit: a box with no GPU at all, `Used GPU Memory`
@@ -889,16 +937,74 @@ class TheBlockStopsBeforeTheClock(unittest.TestCase):
               f"clock ink from y={clock_top} -> {margin} px of air; {len(themes.BARS_ROWS)} rows "
               f"at pitch {pitch}")
 
-    def test_a_thirteenth_row_would_not_fit_and_says_so(self):
-        """The ceiling, printed rather than assumed: what the next row would cost."""
+    def test_the_clock_anchor_prints_where_its_room_runs_out(self):
+        """Two census mutations cost nothing, and the reason is a measurement, not an excuse.
+
+        Moving the clock back to y=452 costs **0** failing checks, and thinning the meter track
+        to 4 px at this pitch costs **0** too: at eleven rows the block is one row shorter than
+        the canvas permits, so there is slack in both numbers.  Slack that nobody has located is
+        slack that gets mistaken for a guard that stopped working, so this finds the boundary by
+        moving the clock anchor down toward the block and reporting the last y the margin rule
+        still accepts.  The shipped anchor stays at y=458 - where the twelve-row block *needed*
+        it, and where the owner's glass has it today - and this says how far it could move.
+        """
+        body = dict(ALL_SIX, fans=FANS_SIX,
+                    drives=[{"name": "nvme0", "temperature": 44, "sensors": [44]},
+                            {"name": "nvme1", "temperature": 33, "sensors": [33]}])
+        real_xy, real_wh = render.BARS_CLOCK_XY, render.BARS_BAR_WH
+        pitch = pitch_of()
+        last = render.BARS_Y0 + (len(themes.BARS_ROWS) - 1) * pitch
+        margins = {}
+        try:
+            for y in (440, 444, 448, 450, 452, 454, 456, 458, 460):
+                render.BARS_CLOCK_XY = (240, y)
+                render.BARS_BAR_WH = (0, 0)
+                try:
+                    text_only = set(self.ink_rows(render.draw(dict(body, timestamp={}), "bars")))
+                finally:
+                    render.BARS_BAR_WH = real_wh
+                full = self.ink_rows(render.draw(dict(body, timestamp={}), "bars"))
+                below = [v for v in full if v > last + 11]
+                meter = [v for v in below if v not in text_only]
+                later = [v for v in below if v > max(meter)] if meter else []
+                margins[y] = (later[0] - max(meter) - 1) if later and meter else None
+        finally:
+            render.BARS_CLOCK_XY, render.BARS_BAR_WH = real_xy, real_wh
+        ok = [y for y, m in margins.items() if m is not None and m >= 2]
+        self.assertTrue(ok, "no clock anchor in the swept range clears the 2 px floor")
+        lowest = min(ok)
+        print(f"  clock anchor margins: " +
+              ", ".join(f"y={y}:{margins[y]}px" for y in sorted(margins)))
+        print(f"  the floor bites above y={lowest - 4}: the shipped anchor is y={real_xy[1]}, "
+              f"so {real_xy[1] - lowest} px of slack is permitted by the geometry and taken by "
+              "nobody")
+        self.assertGreaterEqual(real_xy[1], lowest,
+                                "the shipped clock anchor sits where the margin rule refuses it")
+        self.assertGreaterEqual(margins[real_xy[1]], 2,
+                                "the shipped anchor no longer clears its own floor")
+
+    def test_the_next_row_past_the_eleven_would_fit_and_the_one_after_that_would_not(self):
+        """The ceiling, printed rather than assumed: what each row would cost.
+
+        The block draws **eleven** rows today and the canvas allows **twelve**, so there is one
+        row of headroom left and it is reserved by choice, not by geometry: filling it with the
+        third fan slot would put a blank row between two fan rows that both have readings on
+        this box.  The print below is what a reader weighs that decision against - pitch, the
+        last row's centre, and where its meter ink lands relative to the clock's, which this
+        file's other check measures rather than computes.
+        """
         span, y0 = render.BARS_SPAN, render.BARS_Y0
-        for n in (11, 12, 13, 14):
+        for n in (10, 11, 12, 13):
             pitch = min(render.BARS_ROW_MAX, max(render.BARS_ROW_MIN, span // n))
             last = y0 + (n - 1) * pitch
             print(f"  {n} rows -> pitch {pitch}, last centre {last}, meter to "
                   f"{last + render.BARS_BAR_DY + render.BARS_BAR_WH[1] // 2}, canvas {render.H}")
-        self.assertEqual(len(themes.BARS_ROWS), 12,
-                         "the row count moved; the ceiling claim above needs re-reading")
+        self.assertEqual(len(themes.BARS_ROWS), 11,
+                         "the row count moved; the headroom claim above and every pixel window "
+                         "in this file follow it")
+        self.assertLess(len(themes.BARS_ROWS), 13,
+                        "the block reached a thirteenth row: pitch falls to 29 and the 2 px "
+                        "clearance rule is what refuses it, so this check is the trip wire")
 
 
 class TheRowsDoNotRunIntoEachOther(unittest.TestCase):

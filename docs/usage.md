@@ -77,7 +77,7 @@ mounted drive, the scalar the capacity numbers come from) and `Disk 1 Temperatur
 drive under `/`, which is how `bars` marks it: `Disk 1 Name` prints `nvme0 /`, the others plain.
 Since 2026-11-14 our own generated `bars` draws slots 1 and 2 of those; the vendored library
 names no storage metric at all.  The split is printed - `python3 -m unittest
-tests.test_row_notes` ends with **24 distinct `source` values across the 28 layouts, 17 of them
+tests.test_row_notes` ends with **22 distinct `source` values across the 28 layouts, 15 of them
 asked only by a generated export**, the four disk pairs and the GPU-fan row among them - so this
 page points at the door that counts them instead of carrying the number.
 
@@ -87,8 +87,13 @@ from `nvidia-smi`'s `fan.speed` for as long as the NVIDIA path has existed.  Its
 percent** - NVML's RPM call refuses on this box and no GPU here publishes a tachometer, both
 measured and recorded in [limits](limits.md) - so `bars` draws `34%` on a 0..100 meter beside the
 card's temperature, and a box with no such reading reports the row unanswered rather than
-printing `0%`.  `Fan 4 Speed`/`Fan 4 Name` stay in the vocabulary for layouts you write even
-though `bars` no longer reserves that slot: twelve rows is the ceiling the canvas gives it.
+printing `0%`.  The row is labelled **`Fan GPU`** since the owner asked it to sit with the fan
+rows rather than under the GPU temperature - the label is ours to spell, the source name is the
+vendor's.  `Fan 3 Speed`/`Fan 3 Name` and `Fan 4 ...` stay in the vocabulary for layouts you
+write even though `bars` draws two slots: **twelve rows is the ceiling the canvas gives it, and
+the block draws eleven** - docs/limits.md has the pitch arithmetic for both numbers.
+On this bench that closes the last hole: the review door now says `skipped: nothing`, because
+every source the block asks for is one this machine answers.
 
 ## Options
 
@@ -278,17 +283,18 @@ claim:
   is printed by the gate itself - `python3 -m unittest tests.test_export_parity` ends with
   one line per theme giving widgets, characters and the lit-pixel count down each door -
   and as measured on 2026-11-14: `clock` 3 widgets and 1 448 characters, `gauge` 5 and
-  2 314, `dual` 10 and 4 677, `alpha` 12 and 6 312, `bars` **38 and 16 800**.  That pair
-  moved three times in one day - 32 and 14 121, then 35 and 15 434 with one drive row, then 38
-  and 16 787 when the row became two positional slots, and the present figure when a `GPU FAN`
-  row went in **in place of** the fourth fan slot, which left the widget count where it was:
-  one triple out, one in. Each is byte-identical
+  2 314, `dual` 10 and 4 677, `alpha` 12 and 6 312, `bars` **35 and 15 497**.  That pair moved
+  four times in one day - 32 and 14 121, then 35 and 15 434 with one drive row, then 38 and
+  16 787 when that row became two positional slots, then 16 800 when a `GPU FAN` row replaced
+  the fourth fan slot (the widget count unchanged: one triple out, one in), and the present
+  figure when the owner re-ordered the block to eleven rows and the third fan slot went back to
+  being a name rather than a row. Each is byte-identical
   between two exports in the same run. The parity gate paints each one both ways -
   through `render.py` and through `layout.draw_theme` - on every reading that answers what
   the theme asks: **zero differing pixels, worst channel delta 0**, at 25 530 / 25 343 lit
   pixels for `clock`, 20 608 / 21 391 for `gauge`, 40 006 / 41 842 for `dual`, 40 426 /
-  39 186 for `alpha` and 76 189 / 74 451 for `bars`, the other four `bars` cases being
-  16 072 / 20 968 / 11 184 at 0 px difference as well - `bars` agrees at all five cases,
+  39 186 for `alpha` and 70 207 / 68 916 for `bars`, the other three `bars` cases being
+  15 974 / 20 870 / 11 086 at 0 px difference as well - `bars` agrees at all five cases,
   the other three themes part company on the readings that leave a whole group out, and
   the gate prints every case with its diff so the sentence cannot be read as five zeroes
   for every theme.
@@ -330,8 +336,9 @@ claim:
   driven to a diff of 0 is not shipped, and all five clear that bar today. `alpha` had to
   earn its keys to get there; `bars` had to change its own drawing first, because its row
   count and pitch were functions of whatever `sensors` answered - no fixed widget list can
-  say where a row goes when the theme moves it - so it reserves four fan slots and lets a row
-  with no reading keep its place, and its memory rows needed a key the vendor's schema never
+  say where a row goes when the theme moves it - so it reserves its slots by position (four fan
+  names answered, two drawn; four drive names answered, two drawn) and lets a row with no
+  reading keep its place, and its memory rows needed a key the vendor's schema never
   had, `xigma.showIf`, for a meter that divides two readings beside a number that prints one
   (docs/theme-editor.md).
 * **Nothing in the CLI writes a theme today.** The writer is in the library -

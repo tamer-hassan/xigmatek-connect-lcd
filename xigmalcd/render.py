@@ -731,13 +731,16 @@ BARS_LBL_F, BARS_VAL_F, BARS_CLOCK_F = 18, 20, 28
 BARS_CLOCK_XY, BARS_CLOCK_ANCHOR = (240, 458), "mm"
 BARS_TITLE_TEXT, BARS_TITLE_X, BARS_TITLE_Y = "SYSTEM MONITOR", 240, 30
 BARS_TITLE_F, BARS_TITLE_W = 24, 440        # the ceiling and the width `_fit` walks
-#: Fan slots drawn by the block: **three**, while `themes.FAN_SLOTS` answers four names.  The
-#: row count is a ceiling, not a preference - twelve rows at a 32 px pitch is as far down the
-#: canvas as this block goes (docs/limits.md: a thirteenth computes pitch 29, which the 2 px
-#: inter-row clearance rule refuses, and the last row's meter ink already ends at y=442 with
-#: the clock's ink beginning at y=446) - so the GPU-fan row the owner asked for on 2026-11-14
-#: took the fourth slot's place rather than adding one.
-BARS_SLOTS = 3
+#: Fan slots drawn by the block: **two**, while `themes.FAN_SLOTS` answers four names.  The
+#: twelve-row figure is a ceiling, not a target - at a 32 px pitch that is as far down the
+#: canvas as the block goes (docs/limits.md: a thirteenth computes pitch 29, which the 2 px
+#: inter-row clearance rule refuses, and the twelfth row's meter ink ends at y=442 with the
+#: clock's ink beginning at y=446) - and the owner's 2026-11-14 row order sits **under** it at
+#: eleven, which costs a slot and buys a 34 px pitch.  The reason for the drop is on the glass
+#: rather than in the arithmetic: this box reports two tachometers, so a third reserved slot
+#: would have drawn a blank row between `CPU PUMP` and `Fan GPU`, a hole between two rows that
+#: both have readings.  A box with three or four tachometers shows only its first two here.
+BARS_SLOTS = 2
 
 
 def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
@@ -785,15 +788,11 @@ def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
     # reported a row at that position.  Same split the layout file makes - a literal `text`
     # row for the fixed labels, a `data` row on `Fan N Name` for the slots - which is what
     # lets one drawing and one file agree at every reading.
+    # `themes.BARS_ROWS` is the row order this body is checked against, and it is spelled out
+    # here in the same sequence rather than assembled by slices: the three temperatures, the two
+    # drive slots, the two fan slots, the card's fan, then the three usage rows.
     rows = [("CPU", cpu.get("temperature"), 30, 90, lambda v: f"{v:.0f}\u00b0C", True),
             ("GPU", gpu.get("temperature"), 30, 90, lambda v: f"{v:.0f}\u00b0C", True),
-            # the card's fan, on a 0..100 scale: the reading is a **duty percent**, and it is
-            # on that scale because the RPM form does not exist on this box - NVML's
-            # `nvmlDeviceGetFanSpeedRPM` refuses with "Argument version mismatch" under the
-            # 580.178.04 driver and no GPU publishes a tachometer (docs/limits.md, measured).
-            # `gpu_fan_figure` below has spelled the same field `GPU FAN 34%` for `dual` since
-            # 0.4; `themes.BARS_FIXED_ROWS` pairs the vendor's source name with it.
-            ("GPU FAN", gpu.get("fan"), 0, 100, pct, True),
             ("BOARD", board.get("temperature"), 25, 80,
              lambda v: f"{v:.0f}\u00b0C", True)]
     # the two drive slots, positional like the fan slots: `drives[i]`, and a slot past the
@@ -807,6 +806,21 @@ def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
         label = f"{nm[:8]} /" if (_slot == 0 and nm) else nm[:10]
         rows.append((label, (row or {}).get("temperature"), 25, 80,
                      lambda v: f"{v:.0f}\u00b0C", row is not None))
+    # the card's fan, on a 0..100 scale among the fan rows: the reading is a **duty percent**,
+    # and on that scale because the RPM form does not exist on this box - NVML's
+    # `nvmlDeviceGetFanSpeedRPM` refuses with "Argument version mismatch" under the 580.178.04
+    # driver and no GPU here publishes a tachometer (docs/limits.md, measured).  Its label is
+    # spelled `Fan GPU` to read like the rows above it; `themes.BARS_FAN_GPU_ROW` pairs the
+    # vendor's source name (`gpuFansSpeed`) with the field, and `gpu_fan_figure` below has
+    # spelled the same field `GPU FAN 34%` for `dual` since 0.4 - a different theme's figure,
+    # left as it is because its pair is `CPU FAN 1957 RPM` and the two were measured together.
+    fans = m.get("fans") or []
+    for slot in range(BARS_SLOTS):
+        fan = fans[slot] if slot < len(fans) else None
+        rows.append((str((fan or {}).get("name") or f"FAN {slot + 1}")[:10],
+                     (fan or {}).get("value"), 0, 3000, lambda v: f"{round(v)}",
+                     fan is not None))
+    rows.append(("Fan GPU", gpu.get("fan"), 0, 100, pct, True))
     rows += [
             ("LOAD", cpu.get("load"), 0, 100, pct, True),
             # the number and the meter read different fields here, by design: the meter is the
@@ -817,12 +831,6 @@ def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
             # showed up as an 831 px parity break at the first reading that has a GPU.
             ("RAM", ram, 0, 100, lambda _v: gb(mem.get("used", 0)), True),
             ("VRAM", gm, 0, 100, lambda _v: gb(gpu.get("memoryUsage", 0)), True)]
-    fans = m.get("fans") or []
-    for slot in range(BARS_SLOTS):
-        fan = fans[slot] if slot < len(fans) else None
-        rows.append((str((fan or {}).get("name") or f"FAN {slot + 1}")[:10],
-                     (fan or {}).get("value"), 0, 3000, lambda v: f"{round(v)}",
-                     fan is not None))
     _title(img, BARS_TITLE_TEXT, x=BARS_TITLE_X, y=BARS_TITLE_Y,
            size=BARS_TITLE_F, width=BARS_TITLE_W, colour=fg)
     d = ImageDraw.Draw(img)

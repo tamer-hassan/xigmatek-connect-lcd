@@ -1166,6 +1166,129 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     suite's GUI checks carry real per-window work, and a contended runner pays
     for all of it in series.
 
+  * `bars` re-ordered on the owner's request, which turned out to be a
+    row-count decision.  Three changes in one sentence: the label `GPU FAN`
+    becomes **`Fan GPU`**, to read like the rows it now sits with (`Fan CPU`,
+    `CPU PUMP`) rather than like the temperature heading it used to sit under;
+    the row moves **under** those two; and LOAD/RAM/VRAM go to the bottom, so
+    the block reads temperature, storage, fans, usage.  The label is ours to
+    spell, the *source* stays the vendor's - `GPU Fans Speed`, its editor
+    vocabulary's `gpuFansSpeed` - and `dual`'s figure is left exactly as it is
+    (`GPU FAN 34%`), because that string was measured off glass as the partner
+    of `CPU FAN 1957 RPM`, and changing one half of a measured pair is how a
+    theme starts disagreeing with the record.
+
+    **The order cost a slot, and the owner decided that rather than me
+    noticing it afterwards.**  With three reserved fan slots, this box - two
+    tachometers - would have drawn the blank third row *between* two rows that
+    both have readings: `Fan CPU`, `CPU PUMP`, [blank], `Fan GPU`.  So the
+    block went to **eleven** rows with **two** fan slots
+    (`themes.FAN_SLOTS[:2]`, `render.BARS_SLOTS` 4 -> 2).  The twelve-row
+    ceiling from the bullet above stands as a fact about the canvas; the theme
+    now chooses to sit one row under it, and what that buys is a **34 px
+    pitch** instead of 32 - 384 // 11, with the clamp's own ceiling at 56 px,
+    so the division decides it rather than a wish - with the span, the 6 px
+    track and the clock's y all unchanged.  Measured at eleven rows with every
+    slot answered: last row centre y=412, its meter ink to **y=430**, the
+    clock's ink from **y=446**, **15 px of air**, floor 2.  The cost: a box
+    with three or four tachometers shows only its first two fan rows under
+    this theme, while all four `Fan N` name pairs stay answered for layouts
+    you write.  The gain on this machine is a number worth more than the row
+    it gave up - **`bars` now asks for nothing this box cannot answer**, and
+    the review door says `skipped: nothing` where it used to name `Fan 3 Name,
+    Fan 3 Speed`.  At the editor's pinned fixture the same door paints
+    **35 of 35** widgets with `missing: []`.
+
+    The row is deliberately **not** a fan slot, on the same ground this file
+    took for the drive rows: a slot row's label is a reading (`Fan N Name`) and
+    its number is that same entry of `fans[]`, while this row's label is a
+    literal and its number is `gpu.fan`, a non-positional field.  Appending the
+    GPU fan to `fans[]` would put two RPM figures and one duty percent in the
+    same array - a units collision waiting for a layout to draw it.
+
+    Checks: `tests/test_bars_rows.py` 36 -> **37**.  The hand-written row
+    patterns are restated for eleven positions, because the pattern that put
+    every hole at the end of the block stopped being expressible once a hole
+    could sit in the middle of it.  The order is pinned as a **drawn** pattern
+    rather than a table slice: given a body that names its fans the way this box
+    does, the painter must put out `["Fan CPU", "CPU PUMP", "Fan GPU"]` at rows
+    5, 6 and 7 - a row placed by slicing `BARS_ROWS` is a claim about
+    arithmetic, and the owner asked for a claim about the glass.  A new check
+    prints the clock anchor's slack: margins of 0, 1, 5, 7, 9, 11, 13, 15 and
+    17 px at y=440 through 460, so the floor bites above y=444 and the shipped
+    anchor at y=458 sits on **10 px** of slack the geometry permits and nobody
+    has spent.
+
+    Two faults of mine in this sitting, both worth the record.  The first: the
+    review door's helper parsed the `cannot:` line unconditionally, so the
+    moment this box stopped having a hole two checks **errored** instead of
+    failing - a helper that requires a hole is quietly asserting the defect.  It
+    now tolerates either answer and asserts the door's own `skipped: nothing`
+    wording, so the emptiness is the report's claim rather than a parse that
+    missed a line.  The second is worse, because the wrong answer looked like a
+    finding.  Two census mutations - the clock back to y=452, and the meter
+    track 6 px -> 4 px at this pitch - came back costing **0** failing checks.
+    I did not trust that, and the sweep script I wrote to double-check it
+    reported that the shipped margin check rejected y=452.  That was the
+    script's bug, not the suite's: it captured the meter-suppressed frame once,
+    at the shipped anchor, and compared frames drawn at swept anchors against
+    it.  The census was right and my check of the census was wrong, so the
+    boundary now lives in the suite as a printed check instead of in a
+    throwaway.  And a `str.replace` with no assert silently changed nothing on a
+    docs line ("38 widgets") for a whole pass: the mutation driver has refused
+    unmatched needles since #202 for exactly this reason, and the rule does not
+    stop at drivers.
+
+    Figures, every one from a run rather than from this page.  `bars`: **35
+    widgets**, **15 497 characters**, byte-stable between exports; parity 0 px
+    and worst channel 0 at all five readings - **70 207 / 68 916 / 15 974 /
+    20 870 / 11 086** lit px; **69 131 px** at the editor's fixture with 35 of
+    35 drawn, and **69 390 px** on this machine's live readings, both doors.
+    `--check-theme bars`: 35 boxes, 69 413 lit px, `skipped: nothing`.  Row
+    census **147** `text`/`data` rows over 28 layouts, 138 twins, **9** skipped,
+    28 caveats, with one reason left: `Pump Speed` in nine vendored layouts.
+    Source census **22** distinct `source` values, **15** asked only by a
+    generated export.  Two new prints, because two pages were quoting figures no
+    door re-printed - one of them now also a check, so the figure cannot go
+    stale again without a red run: `tests/test_row_notes.py` ends with a **name
+    census** -
+    108 source rows, 21 distinct `content` literals over 71 rows, 43 names in
+    the union, 179 rows carrying at least one - and `tests/test_snapping.py`
+    with a **grid census**: gcd 1 over 188 declared `x` and 188 declared `y`
+    values, 27 of the `x` values a multiple of 16.  That last pair is what the
+    2 px snap argument leans on - asserted there as well as printed, so the
+    gcd and the multiple-of-16 count cannot drift without a red run - and the
+    page had been carrying "27 of 191" while the row total moved, with nothing
+    noticing.  The snap census now reads
+    **188 / 92 / 46 / 369** with gaps {0: 92, 2: 12, 3: 4, 4: 14, 5: 4} - the
+    shape unchanged for the fourth census running - and pulls at **11 / 12 /
+    57 %**, the percentages moved by the divisor alone.  Ink moves **24** glyph
+    roles of 35 widgets; `tests/test_row_acts.py` counts **188** rows, the same
+    figure it passed through an hour earlier, because three widgets were traded
+    rather than added.  `tools/audit_bare_runner.py` is unchanged at 97 checks
+    over 6 modules.
+
+    Docs: docs/theme-editor.md's claim that the editor's fixture answers **16 of
+    the 20** sources the exports ask is corrected to **20 of 20**, with the
+    history of how it closed, and its enumeration of the names the 28 layouts
+    ask for is rewritten from the print - including what is **not** in it now.
+    `Disk 3`/`Disk 4`, `Fan 3`/`Fan 4` and the scalar `Disk Temperature` are
+    answered names that no layout on the canvas asks for, and the gap between
+    the vocabulary's 38 names and the corpus's 22 is where a shape with no
+    source used to hide.  docs/limits.md carries the supersession of its own
+    twelve-row/32 px arithmetic rather than a silent rewrite, and docs/gui.md,
+    docs/usage.md and docs/themes.md point at the three prints instead of
+    carrying their numbers.
+
+    Twenty-seven mutations against this block now: 33, 30, 15, 10, 2, 31, 20, 3,
+    8, 12, 13, **0**, **1**, **0**, 21, 7, 6, 13, 31, 32, 30, 2, 6, **25**,
+    **22**, **15**, **18**.  Four are new with the order: the usage rows moved
+    back above the fan group -> 25; the fan row moved back under the GPU
+    temperature in the table -> 22; the code door spelling the label the old
+    way while the table says `Fan GPU` -> 15; the label changed in the table
+    alone -> 18.  The two zeroes are the clock anchor and the 4 px track, and
+    the check above says where each of them stops being free.
+
   * `bars` draws the card's fan, and the reason it never had one was a shape
     with no source behind it.  The owner's report on 2026-11-14 was "bars is
     missing GPU Fan", and the reading was not missing: `sensors` has filled

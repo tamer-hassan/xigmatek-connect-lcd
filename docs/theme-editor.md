@@ -687,7 +687,9 @@ eyeball, not by a check.
 The per-machine cost this document recorded an hour ago shrinks with it: the pitch no longer
 depends on this box's fan inventory, and what still varies per box is which slots draw.
 
-**The sources are in** (2026-11-09): `themes.BARS_ROWS` named all ten rows then (twelve today)
+**The sources are in** (2026-11-09): `themes.BARS_ROWS` named all ten rows then (eleven today,
+drawn in the owner's 2026-11-14 order: three temperatures, two drive slots, two fan slots,
+`Fan GPU`, then the three usage rows)
 in the order the
 drawing lays them out - label, meter source, number source, scale - and `themes.values()`
 answers them. Three of the rows are per-sensor fan slots, drawn from four that the vocabulary
@@ -745,7 +747,7 @@ what keeps that from being a claim.
 What `tests/test_bars_rows.py` holds, all of it measured: an `ImageDraw.text` spy runs
 while the frame is painted, and the label-and-value strings it captures equal, row for
 row, what `layout.text_for` produces from `themes.BARS_ROWS` - over four boxes and every
-row of the table, twelve today - and the rows the sources answer are the rows ink lands in. The generated
+row of the table, eleven today - and the rows the sources answer are the rows ink lands in. The generated
 file's row count, kinds and `y` values are compared against `BARS_ROWS` and the `BARS_*`
 constants rather than against remembered numbers, `xigma.showIf` appears on exactly the
 two rows whose number and meter read different sources, and the review door's skip list
@@ -766,11 +768,14 @@ painted `bars` with 14 of its 32 rows against a code drawing of 26, and `alpha`'
 missing from one door and `--%` in the other: 4 587 px at one clock instant.
 
 So the preview was fixed by fixing the fixture, not the layout.  `edit.FIXTURE` answers
-**16 of the 20 sources** the five exports ask today - the count moved from 15 of 19 when `bars`
-took its drive row on 2026-11-14 and the fixture grew a `disk` section to answer it - and the
-four it leaves are `Fan 3`/`Fan 4` name and speed, the
-slots past the two tachometers this shape reports, empty in **both** doors, which is `bars`'s
-reserved-slots rule being visible rather than hidden.  Three claims about it are held in
+**20 of the 20 sources** the five exports ask today, and it did not always: 15 of 19 while
+`bars` had no drive row at all, 16 of 20 when that row arrived, and the count only closed on
+2026-11-14 when the fixture grew a `drives` section and `bars` stopped asking `Fan 3`/`Fan 4`
+names it had no way to answer.  Those two fan pairs stay in the vocabulary - four `Fan N` pairs
+are answered, two are drawn, because reserving a third slot would have put a blank row between
+`CPU PUMP` and `Fan GPU` on this box - and a preview whose rows are all filled is the point:
+the reserved-slots rule is still visible where a real machine has a hole, and `--check-theme
+bars` on this bench now says `skipped: nothing` rather than naming two.  Three claims about it are held in
 `tests/test_fixture_shape.py`:
 
 * **every key is a key a box reports.**  The group-and-field set is checked against the
@@ -783,11 +788,12 @@ reserved-slots rule being visible rather than hidden.  Three claims about it are
 * **the two doors put down the same pixels.**  All five themes at that fixture, at seven ink
   choices: zero differing pixels, worst channel 0.  Measured through the pane's own door
   (`Editor.paint(*Editor.fixture(), ink=...)`), not a hand-built call - and the row counts
-  with it, in `bars`: **35 of its 38 widgets** at the completed fixture today, against the 32 of
-  38 with one drive row and two fan slots drawn, the 29 of 35 one drive row gave, the 26 of 32
-  measured when that rule was written, and the 14 of 32 the stale dict produced - a 34 362 px
-  difference between those last two 2026-11-12 frames (61 790 lit px against 28 860).  Today the
-  same door lays 69 229 lit px, and `themes.parity("bars",
+  with it, in `bars`: **35 of its 35 widgets** at the completed fixture today - every row
+  answered, nothing skipped - against the 35 of 38 with the fan row replacing a slot, the 32 of
+  38 with one drive row and two fan slots drawn, the 29 of 35 measured when that rule was
+  written, and the 14 of 32 the stale dict produced - a 34 362 px difference between those last
+  two 2026-11-12 frames (61 790 lit px against 28 860).  Today the same door lays 69 131 lit px,
+  and `themes.parity("bars",
   edit.FIXTURE, edit.FIXTURE_WHEN)` prints the pair with the pixel diff - which is the form these
   pages use now, because the row count moved three times in one day and a count copied by hand is
   a count that goes wrong.
@@ -1305,18 +1311,27 @@ every layout and taking the `source` values:
 * the 23 pickable files alone name **7**, which is what `--list-themes` prints as "sources the
   pickable set asks for";
 * the **28** layouts a reader can actually pick on a clean `$XDG_CONFIG_HOME` - those 23 files
-  plus the 5 exports this repo draws out of code - name **21** distinct sources over **106**
-  source rows, and **20** more `content` literals if the fixed texts are counted with them
-  (41 in the union; 176 rows carrying at least one).
+  plus the 5 exports this repo draws out of code - name **22** distinct sources over **108**
+  source rows, and **21** more `content` literals if the fixed texts are counted with them
+  (43 in the union; 179 rows carrying at least one).  Those five figures are printed, not
+  recited: `python3 -m unittest tests.test_row_notes` now ends with a **name census** line next
+  to the source census, and it moved when `bars` grew a `Fan GPU` row and dropped a fan slot
+  (21/106/20/41/176 -> 22/108/21/43/179 in one commit) - which is the reason the door exists.
 
 The earlier figure this page and the changelog carried said "30 `source`/`content` names across
 the 28 files", and it was neither of those counts - corrected the same evening it was written,
 and the rule is here so the next reader reproduces the number instead of trusting either.  What
 the disk slots rest on is the qualitative half, which all three sets agree on: **not one** of the
-12, the 7 or the 21 is storage-shaped.  Printed rather than recited, the 21 are: CPU Frequency,
-CPU Temperature, CPU Usage, Date, the eight `Fan 1`-`Fan 4` Name/Speed slots, GPU Memory Rate, GPU
-Temperature, GPU Usage, Motherboard Temperature, Pump Speed, RAM Rate, Time, Used GPU Memory and
-Used RAM.  The 12 differ from those by dropping the fan slots the refused files never reach and
+12, the 7 or the 22 is storage-shaped.  Printed rather than recited - and this is the list the
+print gives today, so a reader who doubts the count runs the door rather than trusting the
+sentence: CPU Frequency, CPU Temperature, CPU Usage, Date, `Disk 1 Name`, `Disk 1 Temperature`,
+`Disk 2 Name`, `Disk 2 Temperature`, `Fan 1 Name`, `Fan 1 Speed`, `Fan 2 Name`, `Fan 2 Speed`,
+`GPU Fans Speed`, `GPU Memory Rate`, `GPU Temperature`, `GPU Usage`, `Motherboard Temperature`,
+`Pump Speed`, `RAM Rate`, `Time`, `Used GPU Memory`, `Used RAM`.  Note what is **not** in it:
+`Disk 3`/`Disk 4` and `Fan 3`/`Fan 4` are answered names that no layout on this canvas asks for
+any more - `bars` draws two slots of each kind - and so is `Disk Temperature`, the scalar.  That
+is the difference between the vocabulary (`themes.source_names()`, 38 names) and the corpus
+(22), and the gap is where a shape-with-no-source used to hide.  The 12 differ from those by dropping the fan slots the refused files never reach and
 adding four the pickable set never names - `CPU Power`, `GPU Power`, `Upload Speed`, `Week`.
 
 The other change in this stretch is a rule the owner chose over the one I had written: within a

@@ -282,13 +282,18 @@ DERIVED = {
 #: answered like any other missing reading, with the reason printed rather than a zero painted
 #: in its place.
 #:
-#: **Four in the vocabulary, three drawn by `bars`.**  The block's ceiling is twelve rows at a
-#: 32 px pitch (docs/limits.md has the arithmetic: a thirteenth computes pitch 29, which the
-#: 2 px inter-row clearance rule refuses, and there is no air left under the block either -
-#: last meter ink y=442, clock ink from y=446).  Adding the owner's GPU-fan row on
-#: 2026-11-14 therefore had to trade a row, and the trade chosen was the fourth fan slot: this
-#: box reports two tachometers, so the slot was blank on the glass anyway, and the name stays
-#: in the vocabulary for a layout of yours that has four.
+#: **Four in the vocabulary, two drawn by `bars`.**  The block's ceiling is **twelve** rows -
+#: docs/limits.md has the arithmetic, and it does not move: at a 32 px pitch a thirteenth row
+#: computes pitch 29, which the 2 px inter-row clearance rule refuses, and the twelfth row's
+#: meter ink ends at y=442 with the clock's ink beginning at y=446.  `bars` draws **eleven**
+#: today, which buys a 34 px pitch instead of a 32 and leaves the roomier block 18 px clear of
+#: the clock.  Why eleven and not twelve: the owner asked on 2026-11-14 for the GPU fan row to
+#: sit *under the fan rows*, and this box reports two tachometers - so a third reserved slot
+#: would have drawn a blank row in the middle of the fan group, between `CPU PUMP` and
+#: `Fan GPU`.  A hole you can see between two rows that both have readings is worse than a row
+#: nobody here can fill, and the name stays answered for a layout of yours that has the fan.
+#: A box with three or four tachometers sees only its first two under this theme; that is the
+#: whole cost, and it is stated in `render.BARS_SLOTS` as well as here.
 FAN_SLOTS = tuple((f"Fan {i} Speed", f"Fan {i} Name") for i in range(1, 5))
 
 #: The per-drive slots, indexed the same way the fan slots are: position in the `drives` list
@@ -311,22 +316,39 @@ DISK_SLOTS = tuple((f"Disk {i} Temperature", f"Disk {i} Name") for i in range(1,
 #: table, because `tests/test_bars_rows.py` compares it row for row against the
 #: strings `render`'s own drawing writes and the ink it leaves, and `bars_recipe()` will
 #: build its rows out of it rather than a second copy of it.
-BARS_FIXED_ROWS = (
+#: The rows with a literal label, in the order they are drawn *relative to each other*: the
+#: three temperatures first, then the card's fan among the fan rows, then the three usage
+#: meters at the bottom.  `BARS_ROWS` below is the drawn order including the slot rows; this
+#: tuple is what the checks count as "the labelled rows", so its length is the number of rows
+#: whose label never depends on a reading.
+BARS_TEMP_ROWS = (
     ("CPU", "CPU Temperature", "CPU Temperature", 30, 90),
     ("GPU", "GPU Temperature", "GPU Temperature", 30, 90),
-    # the card's fan, beside the card's temperature: the label is literal, the meter and the
-    # number read one source (`gpu.fan`), and the scale is 0..100 because the reading is a
-    # duty percentage, not RPM - a percent on an RPM scale would be the same class of lie as
-    # the `15 GB`-at-97% row this file fixed on 2026-11-14.  The name is the vendor's
-    # (`gpuFansSpeed`, PROTOCOL.md §10); the row is ours, and `layout.FORMATS_MEASURED` says
-    # which shapes are measured off the vendor's picture.  Added on the owner's request
-    # 2026-11-14, in the place the fourth fan slot used to hold: twelve rows is the ceiling.
-    ("GPU FAN", "GPU Fans Speed", "GPU Fans Speed", 0, 100),
     ("BOARD", "Motherboard Temperature", "Motherboard Temperature", 25, 80),
+)
+#: The card's fan, printed **`Fan GPU`** to read like the rows it now sits among (`Fan CPU`,
+#: `CPU PUMP`) rather than like the temperature heading it used to sit under.  The label is
+#: ours to spell; the *source* is the vendor's own name for this metric (`gpuFansSpeed`,
+#: PROTOCOL.md §10), and the scale is 0..100 because the reading is a duty percentage, not RPM
+#: - a percent on the fan slots' 0..3000 track would be the same class of lie as the `15 GB`
+#: at 97 % row this file fixed the same day.  `layout.FORMATS_MEASURED` says which shapes are
+#: measured off the vendor's picture, and this is not one of them.
+#:
+#: Note what this row is **not**: it is not a fan *slot*.  A slot row's label is a reading
+#: (`Fan N Name`) and its number is that same row of `fans[]`; this row's label is a literal
+#: and its number is `gpu.fan`, a non-positional field.  That is the same split this file
+#: refused for the drive rows, and it is why the GPU fan cannot simply be appended to
+#: `fans[]`: an array with two RPM figures and one duty percent in it is a units collision
+#: waiting for a layout to draw it.
+BARS_FAN_GPU_ROW = ("Fan GPU", "GPU Fans Speed", "GPU Fans Speed", 0, 100)
+#: The three usage rows: CPU load, then the two memory pairs.  Moved to the end of the block
+#: on 2026-11-14 at the owner's request, so the block reads temperature, storage, fans, usage.
+BARS_USAGE_ROWS = (
     ("LOAD", "CPU Usage", "CPU Usage", 0, 100),
     ("RAM", "RAM Rate", "Used RAM", 0, 100),
     ("VRAM", "GPU Memory Rate", "Used GPU Memory", 0, 100),
 )
+BARS_FIXED_ROWS = (BARS_TEMP_ROWS + (BARS_FAN_GPU_ROW,) + BARS_USAGE_ROWS)
 #: The two drive slots.  Like the fan slots these are **positional and reserved**: the row is
 #: `drives[i]`, its number is that drive's own temperature and its label is that drive's name,
 #: and a box with one drive reports the second slot unanswered rather than drawing a hole or
@@ -338,13 +360,17 @@ BARS_FIXED_ROWS = (
 #: one is how the two come to mean different drives on a different box.
 BARS_DISK_ROWS = tuple((None, temp, temp, 25, 80) for temp, _name in DISK_SLOTS[:2])
 
-BARS_FAN_ROWS = tuple((None, speed, speed, 0, 3000) for speed, _name in FAN_SLOTS[:3])
+BARS_FAN_ROWS = tuple((None, speed, speed, 0, 3000) for speed, _name in FAN_SLOTS[:2])
 
-#: Twelve rows, and the count is the invariant rather than the order: the four labelled rows
-#: that come before the drive slots (CPU, GPU, GPU FAN, BOARD), the two drive slots, then
-#: LOAD/RAM/VRAM, then the three fan slots `bars` reserves.  A row inserted anywhere above the
-#: slots moves their ink but not their meaning, because a slot is named by source, not by y.
-BARS_ROWS = (BARS_FIXED_ROWS[:4] + BARS_DISK_ROWS + BARS_FIXED_ROWS[4:] + BARS_FAN_ROWS)
+#: **Eleven rows, drawn in this order**: the three temperatures, the two drive slots, the two
+#: fan slots, `Fan GPU`, then LOAD/RAM/VRAM.  The count is the invariant this file's checks
+#: pin, the order is the owner's 2026-11-14 request, and both are stated once here: a row
+#: inserted above the slots moves their ink but not their meaning, because a slot is named by
+#: source, not by y.  Eleven is under the block's twelve-row ceiling on purpose - see
+#: `BARS_FAN_ROWS` and docs/limits.md for the pitch arithmetic that made the third fan slot
+#: cheaper to drop than to leave blank in the middle of a group of rows that do have readings.
+BARS_ROWS = (BARS_TEMP_ROWS + BARS_DISK_ROWS + BARS_FAN_ROWS
+             + (BARS_FAN_GPU_ROW,) + BARS_USAGE_ROWS)
 
 #: Which reading prints a slot row's label, given the source its meter reads - the fan slots and
 #: the drive slots in one map, because the recipe and the tests must not each carry their own

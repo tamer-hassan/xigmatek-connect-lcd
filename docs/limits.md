@@ -369,27 +369,50 @@ What has been measured on glass, by whom, with how many frames - and what has no
    the fan slots' 0..3000 track would have filled 1 % of the meter with a fan at a third of its
    range, which is the `15 GB`-at-97 % defect in a different row.  One shared spelling for both
    doors: `render.pct`, referenced by `layout.VENDOR_FORMAT` as `_pct` and called by
-   `theme_bars` for `LOAD` and `GPU FAN`, replacing a `f"{v:.0f}%"` that agreed by coincidence.
-   **The row cost a slot, and the arithmetic said so before the code did.** Twelve rows at a 32 px
-   pitch is the block's ceiling (the paragraph above: a thirteenth computes pitch 29, which the
-   2 px clearance rule refuses, and the last row's meter ink already ends at y=442 with the
-   clock's ink at y=446).  Three placements were measured and put to the owner - trade a fan
-   slot, keep four slots and thin the meter to 4 px at pitch 29, or pair the fan into the GPU
-   row's number column; the owner chose the first.  So `bars` reserves **three** fan slots while
-   the vocabulary still answers four (`themes.FAN_SLOTS[:3]`, and `render.BARS_SLOTS` went 4 ->
-   3), which costs a box with four tachometers its fourth row and costs this box nothing: the
-   slot drew no label, no number and no meter here for a week.  The trade is stated in
-   `themes.py` where a reader will meet it, and one check pins the two halves together
-   (`len(BARS_FAN_ROWS) == render.BARS_SLOTS`) because a second copy of a slot count is how the
-   doors would drift: a mutation setting `BARS_SLOTS` back to 4 costs **36** failing checks.
-   Geometry otherwise unchanged: twelve rows, pitch 32 px, 6 px track, last meter ink y=442,
-   clock ink from y=446, 3 px of air.  `bars` is still **38 widgets** (one triple in, one triple
-   out) at **16 800 characters**, parity 0 px and worst channel 0 at all five readings -
-   **76 189 / 74 451 / 16 072 / 20 968 / 11 184** lit px down each door - 69 229 px at the
-   editor's pinned fixture with **35 of 38** widgets drawn, and 69 479 px on this machine's live
-   readings.  The row census moved 138 twins / 11 skipped / 28 caveats (was 136 / 13 / 27: the
-   `Fan 4` pair stopped being a row), and the snap census did not move at all - 191 rows, 95
-   sharing an `x`, 48 a `y`, 426 pairs, gaps {0: 95, 2: 12, 3: 4, 4: 14, 5: 4}.
+   `theme_bars` for `LOAD` and the fan row, replacing a `f"{v:.0f}%"` that agreed by
+   coincidence.
+   **The row cost a slot, and the arithmetic said so before the code did.** **Twelve** rows at a
+   32 px pitch is the block's ceiling (the paragraph above: a thirteenth computes pitch 29, which
+   the 2 px clearance rule refuses, and at twelve the last row's meter ink ends at y=442 with the
+   clock's ink beginning at y=446 - 3 px of air).  Three placements were measured and put to the
+   owner - trade a fan slot, keep the slots and thin the meter to 4 px at pitch 29, or pair the
+   fan into the GPU row's number column; the owner chose the first, and it landed as three fan
+   slots at twelve rows.
+   **The same day the owner re-ordered the block**, and the row count came down to **eleven**:
+   `Fan GPU` - relabelled from `GPU FAN`, to read like the rows it sits with - goes **under**
+   `Fan CPU` and `CPU PUMP` rather than under the GPU temperature, and LOAD/RAM/VRAM go to the
+   bottom.  That order leaves a third reserved fan slot as a blank row *between* two fan rows
+   that both have readings on this box, and a hole you can see in the middle of a group is worse
+   than a row this machine cannot fill: so `bars` reserves **two** fan slots
+   (`themes.FAN_SLOTS[:2]`, `render.BARS_SLOTS` 4 -> 2) and the block draws eleven rows.  The
+   ceiling is unchanged as a fact about the canvas; the theme chose to sit one row under it,
+   which buys a **34 px pitch** (the clamp's own ceiling for this span is 56 px, so the pitch is
+   the division, not a wish) and leaves the last row's meter ink at y=430, **15 px** clear of the
+   clock's ink at y=446 - measured by `TheBlockStopsBeforeTheClock`, floor 2 px, printing the
+   pitch and centre for ten, eleven, twelve and thirteen rows so the headroom is visible.
+   What it costs, stated: a box with three or four tachometers shows only its first two fan rows
+   under `bars`; the four `Fan N` name pairs stay answered in the vocabulary for layouts you
+   write, and one check pins the two halves together (`len(BARS_FAN_ROWS) == render.BARS_SLOTS`)
+   because a second copy of a slot count is how the doors drift - a mutation setting
+   `BARS_SLOTS` back to 4 while the table draws two costs **36** failing checks.  What it buys on
+   the glass is one number worth more than the row it gave up: with two slots drawn, **this
+   machine answers every source `bars` asks for**, and the review door now says
+   `skipped: nothing` where it used to name `Fan 3 Name, Fan 3 Speed` (and before that the
+   `Fan 3`/`Fan 4` pair).  Row order, from the table: CPU, GPU, BOARD, the two drive slots, the
+   two fan slots, `Fan GPU`, LOAD, RAM, VRAM - pinned in `tests/test_bars_rows.py` as a
+   *drawn* pattern, `["Fan CPU", "CPU PUMP", "Fan GPU"]` read out of the painter with a body
+   that names its fans the way this box names them, because a fan row placed by a table slice
+   is a claim about arithmetic and the owner asked for a claim about the glass.
+   Figures as re-printed after the move: `bars` is **35 widgets** at **15 497 characters**,
+   parity 0 px and worst channel 0 at all five readings - **70 207 / 68 916 / 15 974 / 20 870 /
+   11 086** lit px down each door - 69 131 px at the editor's pinned fixture with **35 of 35**
+   widgets drawn and no missing source, 69 390 px on this machine's live readings, and 35 boxes /
+   69 413 lit px through `--check-theme bars`.  The row census prints 147 `text`/`data` rows over
+   28 layouts, 138 twins, **9** skipped, 28 caveats, and the only reason left is `Pump Speed` in
+   nine vendored layouts; the source census 22 distinct `source` values, 15 asked only by a
+   generated export; the snap census **188 / 92 / 46 / 369** with gaps
+   {0: 92, 2: 12, 3: 4, 4: 14, 5: 4} and pulls at 11 / 12 / 57 %; ink moves **24** glyph roles of
+   35 widgets.  Every one of those came out of a run rather than out of this page.
    Twenty-one mutations against this block now, nine of them about the fan row: the source
    pairing removed (the original defect) -> **21**; the row's scale moved to RPM in the table ->
    7; the same scale moved in the code door only -> 6; the file door's percent sign dropped ->
@@ -432,9 +455,9 @@ What has been measured on glass, by whom, with how many frames - and what has no
    `Disk 1 Name`/`Disk 1 Temperature` and `Disk 2 Name`/`Disk 2 Temperature` - so the first two
    slots are on the glass under that theme, and slots 3 and 4 stay in the vocabulary for layouts
    you write.  No vendored file asks for any of these names: the source census that
-   `python3 -m unittest tests.test_row_notes` prints counts **24 distinct `source` values across
+   `python3 -m unittest tests.test_row_notes` prints counts **22 distinct `source` values across
    the 28 layouts**, none of them storage-shaped in a vendored file, and the four disk pairs our
-   own generated `bars` asks for are among the 17 asked only by a generated export.
+   own generated `bars` asks for are among the 15 asked only by a generated export.
  * **The blob tolerates what the vendor never sent - asked directly three times on 2026-11-13.**
    One session, five `STATE all 1` bodies: the control in the vendor's shape; the control plus
    a fan row typed `"Pump"`; the control plus a new top-level `drives` key; both changes
@@ -1400,7 +1423,10 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   pair, y=442 and y=446, which is the number that matters.)  So the span grew instead of the meter being
   thinned - 320 -> 352 for one drive row, then 352 -> **384** for two, with the clock moved from
   y=452 to y=458 to keep the margin - and the pitch stayed 32 px at twelve rows, the track stayed
-  6 px, and the inter-row clearances are 3 px above a meter and 4 below.
+  6 px, and the inter-row clearances are 3 px above a meter and 4 below.  (Superseded the same
+  day, by the paragraph below this one: the block now draws **eleven** rows, and an eleven-row
+  block across the same 384 px span computes a 34 px pitch.  The span, the 6 px track and the
+  clock's y are what did **not** move.)
   The margin under the last row is now measured too, because at twelve rows there is not much of
   it: `TheBlockStopsBeforeTheClock` in `tests/test_bars_rows.py` draws the block with **every slot
   answered** - the case that has never been drawn here, since this box leaves two fan slots empty
@@ -1418,15 +1444,18 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   stale clip failed. Nothing does that now: the six video files are 0.7's deliberate
   gap, and `ffprobe` plus `du -b` are the doors to re-measure them at (docs/tools.md).
   The sources followed on 2026-11-09, and so did the file: `themes.BARS_ROWS` names the
-  rows - **twelve today**, seven fixed readings, three per-sensor fan slots and two per-drive
-  slots, the last two added on 2026-11-14 (see the pitch arithmetic above).  Five of them are
-  slot pairs (`Fan N Speed`/`Fan N Name`, `Disk N Temperature`/`Disk N Name`) - which the
+  rows - **eleven today**, seven labelled readings and four slot pairs, and the row count is
+  what moved on 2026-11-14: a drive row made it eleven, two positional drive slots made it
+  twelve, and the owner's `Fan GPU` row plus a dropped fan slot brought it back to eleven, at a
+  34 px pitch (see the pitch arithmetic above, and the paragraph after it for the ceiling that
+  twelve still is).  Four of them are slot pairs (`Fan N Speed`/`Fan N Name`,
+  `Disk N Temperature`/`Disk N Name`) - which the
   vendor's own vocabulary has no word for, since it offers the aggregates `cpuFansSpeed`
   "CPU Fans Speed" and `gpuFansSpeed` "GPU Fans Speed" and never a row per tachometer
   (PROTOCOL.md 10) - while `RAM Rate` and `Used RAM` come out of that record's `RAMRate` and
   `UsedRAM`.  Of those two aggregates the GPU one is now paired with a field and drawn as a row,
   and the CPU one is the single name in `layout.VENDOR_FORMAT` with a shape and no source, said
-  out loud in `tests/test_bars_rows.py`; and `themes.bars_recipe()` generates the 38 widgets
+  out loud in `tests/test_bars_rows.py`; and `themes.bars_recipe()` generates the 35 widgets
   out of that table and the `BARS_*`
   constants. It is pixel-identical to `render.py` at every reading
   `tests/test_bars_rows.py` and `tests/test_export_parity.py` give it, answered and

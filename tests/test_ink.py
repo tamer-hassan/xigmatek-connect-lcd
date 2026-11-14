@@ -181,12 +181,14 @@ class InkThroughTheFileDoor(unittest.TestCase):
                               f"an ink moved a graphic's colour ({key}), not a glyph's")
         moved = sum(1 for a, b in zip(keyed(base, "textColor"), keyed(inked, "textColor"))
                     if a != b)
-        # 26 today: the heading, the clock, one label per row (literal for the fixed rows,
-        # a reading for the six slot rows) and one number per row.  It moved 22 -> 24 -> 26 as
-        # the drive row appeared and then became two positional slots.  A widget count derived
-        # from the table and a glyph count pinned like this one meet in the middle, and the
-        # difference between them is exactly the meter tracks.
-        self.assertEqual(moved, 26, "the glyph roles an ink may move are no longer 26 of "
+        # 24 today: the heading, the clock, one label per row (literal for the seven labelled
+        # rows, a reading for the four slot rows) and one number per row.  It moved
+        # 22 -> 24 -> 26 -> 24 as the drive row appeared, became two positional slots, and then
+        # gave one slot back to the owner's `Fan GPU` row - the same figure as two steps ago, by
+        # arithmetic rather than by luck: eleven rows, one of them a replacement.  A widget
+        # count derived from the table and a glyph count pinned like this one meet in the
+        # middle, and the difference between them is exactly the meter tracks.
+        self.assertEqual(moved, 24, "the glyph roles an ink may move are no longer 24 of "
                                     f"{len(base['osd']['widget'])} widgets")
         self.assertEqual(moved + sum(1 for w in base["osd"]["widget"] if w["type"] == "bar"),
                          len(base["osd"]["widget"]),

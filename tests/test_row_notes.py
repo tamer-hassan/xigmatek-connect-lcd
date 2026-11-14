@@ -158,6 +158,25 @@ class WhatARowPaints(unittest.TestCase):
         print(f"  source census: {len(asked)} distinct `source` values over "
               f"{len(self.editors)} layouts; {len(ours)} asked only by a generated export: "
               + ", ".join(ours))
+        # ...and the two sets docs/theme-editor.md counts beside that one: source *rows*
+        # rather than names, and the `content` literals a layout prints that are not readings.
+        source_rows = 0
+        literals: set = set()
+        literal_rows = 0
+        for editor in self.editors:
+            for widget in editor.widgets():
+                props = widget.get("property") or [{}]
+                src = props[0].get("source")
+                txt = props[0].get("content")
+                if src:
+                    source_rows += 1
+                if txt and not src:
+                    literals.add(str(txt))
+                    literal_rows += 1
+        print(f"  name census: {source_rows} source rows; {len(literals)} distinct "
+              f"`content` literals over {literal_rows} rows; "
+              f"{len(set(asked) | literals)} names in the union, "
+              f"{source_rows + literal_rows} rows carrying at least one")
 
 
 class AFormatBothDoors(unittest.TestCase):

@@ -115,7 +115,7 @@ asserted here:
   `CPU Usage` 15, `Time` 11, `Pump Speed` 9, `GPU Usage` 6, `GPU Temperature` 3,
   `CPU Frequency` 2.  The vocabulary this program answers is wider than what the library
   asks, and the split is printed rather than typed: `python3 -m unittest tests.test_row_notes`
-  ends with a source census - **24 distinct `source` values over the 28 layouts, 17 of them asked
+  ends with a source census - **22 distinct `source` values over the 28 layouts, 15 of them asked
   only by a generated export** - while the vocabulary this program *answers* is wider still at
   **38 names** through `themes.source_names()`.  Nine of those are storage-shaped and asked by
   nothing in the vendored library: `Disk Temperature` (→ `disk.temperature`, the composite of the
