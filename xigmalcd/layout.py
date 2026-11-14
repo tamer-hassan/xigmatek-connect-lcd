@@ -28,7 +28,7 @@ import json
 from PIL import Image, ImageDraw, ImageFont
 
 from .render import (A26_FAN_F, A26_FAN_MAX_W, A26_TVAL_F, SS, _FONT_GLOBS,
-                     fan_figures, gb, heat, value_pair)
+                     fan_figures, gb, heat, pct, value_pair)
 
 # Fonts the layouts name, and what this machine has.  No Microsoft fonts are
 # installed here, so every one of these is a substitution; Liberation Sans is
@@ -103,8 +103,10 @@ def rgba(text: str) -> tuple:
 # means: the layouts do not say and no baked PNG of ours has settled it, so the
 # entry is a choice made here and drawn as such - it is never put on the wire as
 # though it were the vendor's.
-def _pct(v):
-    return f"{int(round(v))}%"
+#: One spelling of a percentage, shared with the code door (`render.pct`): the file door used
+#: to keep its own copy while `theme_bars` wrote `f"{v:.0f}%"` inline, and "they happen to
+#: agree" is not a gate.
+_pct = pct
 
 
 def _deg(v):
@@ -132,8 +134,16 @@ VENDOR_FORMAT = {
     # names these had were ours.  Note what that vocabulary does *not* offer: a row per fan
     # sensor.  It has one aggregate CPU-fan metric and one GPU-fan metric, which is why
     # `bars`'s per-sensor rows need source names the vendor never had (docs/theme-editor.md).
+    # `CPU Fans Speed` has a shape and **no source entry**: the vendor offers the name, but
+    # nothing in its record says how the aggregate combines several tachometers (sum? the
+    # maximum? a mean?), and inventing one is the kind of unmeasured claim this repo refuses,
+    # so the shape waits and `tests/test_bars_rows.py` prints the gap instead of hiding it.
     "CPU Fans Speed": lambda v: f"{int(round(v))}",
-    "GPU Fans Speed": lambda v: f"{int(round(v))}",
+    # the card's fan, in the unit the reading actually has on Linux: a duty percent (see
+    # `themes.SOURCES["GPU Fans Speed"]` and docs/limits.md - NVML's RPM call refuses here).
+    # `render.gpu_fan_figure` has drawn this field as `GPU FAN 34%` for `dual` since 0.4, and
+    # `bars` draws it as its own row since 2026-11-14, at `34%`.
+    "GPU Fans Speed": _pct,
     # `bars`'s rows, and the rule `tests/test_bars_rows.py` holds them to: every
     # answer this program can give has a display shape here, so a text row can never
     # reach the painter and die for want of one.  The two gigabyte shapes are what the

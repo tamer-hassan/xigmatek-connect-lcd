@@ -225,6 +225,20 @@ SOURCES = {
     "GPU Power": ("gpu", "power"),                  # ours
     "CPU Frequency": ("cpu", "speedAverage"),        # ours
     "GPU Frequency": ("gpu", "speed"),               # ours: unused by the shipped library
+    # The card's own fan, under **the vendor's name for it**: `gpuFansSpeed` "GPU Fans Speed"
+    # is in the metric vocabulary read out of ALPHA's uncompiled renderer bundle (PROTOCOL.md
+    # §10, 2026-11-06), and the field it answers - `gpu.fan` - is in the body the vendor's own
+    # capture carries, documented there as a percent.  A display shape for this name has existed
+    # in `layout.VENDOR_FORMAT` since 0.5 and a source entry did not, so a theme asking the
+    # vendor's name for a GPU fan got nothing at all: that is the whole of the owner's
+    # "bars is missing GPU Fan" report, and `tests/test_bars_rows.py` now refuses the
+    # shape-with-no-source state on principle rather than by noticing again.
+    # Unit, already measured (docs/limits.md): NVML's `nvmlDeviceGetFanSpeedRPM` is present in
+    # this 580.178.04 driver and refuses with "Argument version mismatch", and no GPU on this
+    # box publishes a tachometer - `nvidia` has no hwmon chip, `amdgpu` here has freq/in/power/
+    # temp only - so the number is a **duty percent**, 0..100, not RPM.  `render.gpu_fan_figure`
+    # has spelled the same field `GPU FAN 34%` for `dual` since 0.4; this pairs the name.
+    "GPU Fans Speed": ("gpu", "fan"),
     "Download Speed": ("network", "download"),       # ours: unused by the shipped library
     "Upload Speed": ("network", "upload"),           # ours
     "Memory Usage": ("memory", "load"),              # ours: unused by the shipped library
@@ -260,25 +274,35 @@ DERIVED = {
 }
 
 
-#: The per-sensor fan rows `bars` draws, and the reason they are ours to name: the vendor's
-#: editor offers no fan per sensor at all, only the aggregate `cpuFansSpeed` "CPU Fans Speed"
+#: The per-sensor fan names this program answers - four pairs, `Fan 1 Speed`/`Fan 1 Name`
+#: through `Fan 4`, positional into `sensors.fans()`.  They are ours to name: the vendor's
+#: editor offers no fan per sensor at all, only the aggregates `cpuFansSpeed` "CPU Fans Speed"
 #: and `gpuFansSpeed` "GPU Fans Speed" (PROTOCOL.md 10), while this theme paints one row per
-#: tachometer with that sensor's own name beside it.  The slots are positional, in the order
-#: `sensors` reports the rows and `theme_bars` reserves them - `fans[0]` through
-#: `fans[render.BARS_SLOTS - 1]` - and a name that no such row carries is answered like any
-#: other missing reading, with the reason printed rather than a zero painted in its place.
-FAN_SLOTS = tuple((f"Fan {i} Speed", f"Fan {i} Name")
-                  for i in range(1, render.BARS_SLOTS + 1))
+#: tachometer with that sensor's own name beside it.  A slot past what the box reports is
+#: answered like any other missing reading, with the reason printed rather than a zero painted
+#: in its place.
+#:
+#: **Four in the vocabulary, three drawn by `bars`.**  The block's ceiling is twelve rows at a
+#: 32 px pitch (docs/limits.md has the arithmetic: a thirteenth computes pitch 29, which the
+#: 2 px inter-row clearance rule refuses, and there is no air left under the block either -
+#: last meter ink y=442, clock ink from y=446).  Adding the owner's GPU-fan row on
+#: 2026-11-14 therefore had to trade a row, and the trade chosen was the fourth fan slot: this
+#: box reports two tachometers, so the slot was blank on the glass anyway, and the name stays
+#: in the vocabulary for a layout of yours that has four.
+FAN_SLOTS = tuple((f"Fan {i} Speed", f"Fan {i} Name") for i in range(1, 5))
 
 #: The per-drive slots, indexed the same way the fan slots are: position in the `drives` list
-#: `sensors.drives()` builds, ordered by controller (`nvme0` before `nvme2`), not by the order
-#: the kernel numbered the hwmon directories.  Four of them, because that is how many rows a
-#: `bars`-shaped layout has room for and because a fifth slot would be a number of drives this
-#: program has never seen on a panel-bound machine.  A machine with more drives still puts them
-#: all on the wire - `drives[]` is the list, the names are a window onto the first four - and a
-#: machine with fewer reports the slot unanswered, in words, like every other hole here.
-#: No shipped layout asks for any of these names; the section they read from is one the panel
-#: was measured to accept rather than one the vendor sent (PROTOCOL.md §8).
+#: `sensors.drives()` builds - **the drive under `/` first**, then the rest by controller
+#: (`nvme0` before `nvme2`), never the number the kernel gave the hwmon directory.  Root-first
+#: is what makes slot 1 mean the boot drive by rule, and so what lets `bars` mark it by
+#: position (see `layout.VENDOR_FORMAT["Disk 1 Name"]`).  Four of them, because that is how
+#: many rows a `bars`-shaped layout has room for and a fifth slot would be a number of drives
+#: this program has never seen on a panel-bound machine.  A machine with more drives still puts
+#: them all on the wire - `drives[]` is the list, the names are a window onto the first four -
+#: and a machine with fewer reports the slot unanswered, in words, like every other hole here.
+#: Our own generated `bars` draws the first two as of 2026-11-14; no **vendored** file asks
+#: for any of these names, and the section they read from is one the panel was measured to
+#: accept rather than one the vendor sent (PROTOCOL.md §8).
 DISK_SLOTS = tuple((f"Disk {i} Temperature", f"Disk {i} Name") for i in range(1, 5))
 
 #: `bars`'s rows in the order the drawing lays them out: the label it prints - a literal for
@@ -290,19 +314,19 @@ DISK_SLOTS = tuple((f"Disk {i} Temperature", f"Disk {i} Name") for i in range(1,
 BARS_FIXED_ROWS = (
     ("CPU", "CPU Temperature", "CPU Temperature", 30, 90),
     ("GPU", "GPU Temperature", "GPU Temperature", 30, 90),
+    # the card's fan, beside the card's temperature: the label is literal, the meter and the
+    # number read one source (`gpu.fan`), and the scale is 0..100 because the reading is a
+    # duty percentage, not RPM - a percent on an RPM scale would be the same class of lie as
+    # the `15 GB`-at-97% row this file fixed on 2026-11-14.  The name is the vendor's
+    # (`gpuFansSpeed`, PROTOCOL.md §10); the row is ours, and `layout.FORMATS_MEASURED` says
+    # which shapes are measured off the vendor's picture.  Added on the owner's request
+    # 2026-11-14, in the place the fourth fan slot used to hold: twelve rows is the ceiling.
+    ("GPU FAN", "GPU Fans Speed", "GPU Fans Speed", 0, 100),
     ("BOARD", "Motherboard Temperature", "Motherboard Temperature", 25, 80),
     ("LOAD", "CPU Usage", "CPU Usage", 0, 100),
     ("RAM", "RAM Rate", "Used RAM", 0, 100),
     ("VRAM", "GPU Memory Rate", "Used GPU Memory", 0, 100),
 )
-#: The drive row, kept apart from the six so a reader can see what was added and why: its
-#: label is literal like the fixed rows (it names a *subject*), and its number and meter read
-#: `disk.temperature` - the scalar that describes the same drive as the `total` and `used`
-#: already in the blob - rather than a positional `Disk 1 Temperature`.  Pairing a positional
-#: name with a non-positional number in one row is how a row starts meaning two different
-#: drives on two different boxes.  Added 2026-11-14 on the owner's request; the 25..80 scale
-#: mirrors `BOARD`'s, and like `BOARD`'s it is this repo's choice, not measured off the
-#: vendor's overlay (`layout.FORMATS_MEASURED` stays at four, and `--check-theme` says so).
 #: The two drive slots.  Like the fan slots these are **positional and reserved**: the row is
 #: `drives[i]`, its number is that drive's own temperature and its label is that drive's name,
 #: and a box with one drive reports the second slot unanswered rather than drawing a hole or
@@ -314,8 +338,13 @@ BARS_FIXED_ROWS = (
 #: one is how the two come to mean different drives on a different box.
 BARS_DISK_ROWS = tuple((None, temp, temp, 25, 80) for temp, _name in DISK_SLOTS[:2])
 
-BARS_ROWS = (BARS_FIXED_ROWS[:3] + BARS_DISK_ROWS + BARS_FIXED_ROWS[3:]
-             + tuple((None, speed, speed, 0, 3000) for speed, _name in FAN_SLOTS))
+BARS_FAN_ROWS = tuple((None, speed, speed, 0, 3000) for speed, _name in FAN_SLOTS[:3])
+
+#: Twelve rows, and the count is the invariant rather than the order: the four labelled rows
+#: that come before the drive slots (CPU, GPU, GPU FAN, BOARD), the two drive slots, then
+#: LOAD/RAM/VRAM, then the three fan slots `bars` reserves.  A row inserted anywhere above the
+#: slots moves their ink but not their meaning, because a slot is named by source, not by y.
+BARS_ROWS = (BARS_FIXED_ROWS[:4] + BARS_DISK_ROWS + BARS_FIXED_ROWS[4:] + BARS_FAN_ROWS)
 
 #: Which reading prints a slot row's label, given the source its meter reads - the fan slots and
 #: the drive slots in one map, because the recipe and the tests must not each carry their own
@@ -1862,25 +1891,31 @@ def alpha_recipe() -> dict:
 
 
 def bars_recipe() -> dict:
-    """`bars` as a layout: ten rows of label, number and meter, a heading, a clock line.
+    """`bars` as a layout: twelve rows of label, number and meter, a heading, a clock line.
 
     The last of the five, and the one whose obstacle was not the schema but the drawing:
-    `theme_bars` reserves four fan slots and lets a row with no reading keep its place
-    (2026-11-08, docs/limits.md), so the block carries the same ten rows - and therefore the
-    same pitch, `BARS_SPAN // (6 + 4)` - on every machine, and a file can say where each row
-    goes.  The rows come from `BARS_ROWS` and the geometry from `render.BARS_*`: no number
-    here is a retyped copy of one the drawing already names.
+    `theme_bars` reserves its slots - two drive and three fan since 2026-11-14, four fan before
+    that - and lets a row with no reading keep its place (2026-11-08, docs/limits.md), so the
+    block carries the same twelve rows - and therefore the same pitch, `BARS_SPAN //
+    len(BARS_ROWS)`, **32 px** - on every machine, and a file can say where each row goes.  The
+    rows come from `BARS_ROWS` and the geometry from `render.BARS_*`: no number here is a
+    retyped copy of one the drawing already names.  Twelve is also the ceiling: a thirteenth
+    computes pitch 29, which the 2 px inter-row clearance rule refuses, and the last row's meter
+    ink already ends 3 px above the clock's.
 
-    Three things the vendor's `bar` widget cannot say, which this file says anyway:
+    Four things the vendor's `bar` widget cannot say, which this file says anyway:
 
     * **One row, two readings.** The two memory rows divide a *percentage* for the meter and
       print *gigabytes* beside it (`RAM Rate` and `Used RAM`, `GPU Memory Rate` and `Used GPU
       Memory`), because that is what the theme draws, and a meter and a number describing one
       sensor at two scales is not a shape the shipped vocabulary has.
-    * **A label that is a reading.** The four fan rows print `Fan N Name` - whatever this box
-      calls that tachometer, cut to the same 10 characters the drawing cuts.  The vendor's
-      editor offers the aggregates `cpuFansSpeed` "CPU Fans Speed" and `gpuFansSpeed` "GPU
-      Fans Speed", never a row per sensor (PROTOCOL.md 10), so it never needed a name for one.
+    * **A label that is a reading.** The three fan rows print `Fan N Name` - whatever this box
+      calls that tachometer, cut to the same 10 characters the drawing cuts, and four such names
+      are answered even though the block draws three.  The vendor's editor offers the aggregates
+      `cpuFansSpeed` "CPU Fans Speed" and `gpuFansSpeed` "GPU Fans Speed", never a row per
+      sensor (PROTOCOL.md 10), so it never needed a name for one - and of those two aggregates
+      the GPU one is now a row of this block, paired with `gpu.fan` (see
+      `themes.SOURCES["GPU Fans Speed"]` for why its number is a duty percent, not RPM).
     * **A dependency a row can state.** The two memory number rows carry `xigma.showIf`
       naming the meter's source: their own field answers even where the meter's division
       cannot be made - a GPU reporting `memoryUsage` with no `dedicatedTotal`, which an

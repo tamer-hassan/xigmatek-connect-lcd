@@ -139,6 +139,25 @@ class WhatARowPaints(unittest.TestCase):
         print(f"  row census: {rows} `text`/`data` rows over {len(self.editors)} layouts; "
               f"{twins} twins, {skipped} skipped, {caveats} caveats; reasons: "
               + ", ".join(f"{k} {v}" for k, v in sorted(reasons.items())))
+        # The same census one level up: which `source` names the layouts in this program ask
+        # for, and how many of them only **our own** generated exports ask.  docs/usage.md and
+        # docs/limits.md quote a figure from this line, which is why the line exists: the last
+        # time the number was retyped by hand it had already moved (the disk names went from
+        # "asked by nothing" to "asked by `bars`" inside one commit).
+        asked: dict = {}
+        for editor in self.editors:
+            for widget in editor.widgets():
+                src = (widget.get("property") or [{}])[0].get("source")
+                if src:
+                    asked.setdefault(src, set()).add(editor.name)
+        generated = {e.name for e in self.editors if getattr(e, "origin", None) == "check"}
+        self.assertGreaterEqual(len(generated), 4,
+                                f"only {sorted(generated)} of these editors are marked as "
+                                "generated exports: the split below would be counting nothing")
+        ours = sorted(name for name, who in asked.items() if who <= generated)
+        print(f"  source census: {len(asked)} distinct `source` values over "
+              f"{len(self.editors)} layouts; {len(ours)} asked only by a generated export: "
+              + ", ".join(ours))
 
 
 class AFormatBothDoors(unittest.TestCase):

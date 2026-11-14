@@ -1052,7 +1052,15 @@ needed. Read out of the installed app at `Program Files/ALPHA/resources/app.asar
   `UsedRAM`, `availableRAM`, disk and network entries (the same list localised into zh-CN
   and zh-TW in the same bundle, `main-6b4df013.js`). Its own monitor page renders those two
   fan rows with the unit `RPM` (`Index-9579526f.js`), so fan speed is a first-class reading
-  in this product - the app gets it from the machine, never from the panel;
+  in this product - the app gets it from the machine, never from the panel.  Worth separating
+  two things that record holds: the *name* `gpuFansSpeed` and the *unit* `RPM`.  The field the
+  vendor puts on the wire for it is `gpu.fan`, documented below as a percent, and on Linux that
+  is all there is - NVML's RPM call (`nvmlDeviceGetFanSpeedRPM`) refuses under the 580.178.04
+  driver installed on this bench with `Argument version mismatch`, and no GPU here publishes a
+  tachometer at all.  So this program pairs the vendor's name with the vendor's field and prints
+  a percent (`themes.SOURCES["GPU Fans Speed"]`, docs/limits.md); `cpuFansSpeed` has no entry
+  beside it, because nothing in the vendor's record says how several tachometers combine into
+  one aggregate and inventing the rule would be a claim rather than a reading;
 * the fan names in the compiled main process (`out/main/index.jsc`, read as string
   constants): `sysinfoStatus:fans` and friends (`sysinfoStatus:cpu`, `:gpu`, `:mem`,
   `:network`, `:disk`, `:all`) are renderer-to-main IPC topics for the **host's** sensor

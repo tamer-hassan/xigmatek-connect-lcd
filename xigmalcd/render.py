@@ -438,6 +438,20 @@ def gb(mb) -> str:
         return "--"
 
 
+def pct(v) -> str:
+    """A percentage in the one spelling both doors use: `34%`.
+
+    `layout.VENDOR_FORMAT` referenced its own local copy of this until 2026-11-14 while
+    `theme_bars` wrote `f"{v:.0f}%"` inline; the two happened to agree, which is the kind of
+    fact that stops agreeing the day someone changes one of them.  Same rule as `gb` above:
+    one function, referenced by the file door and called by the code door.
+    """
+    try:
+        return f"{int(round(float(v)))}%"
+    except (TypeError, ValueError):
+        return "--"
+
+
 def pct_pair(part: dict, numerator: str, denominator: str):
     """One pair of reported fields as a percentage, or None where there is no pair.
 
@@ -717,7 +731,13 @@ BARS_LBL_F, BARS_VAL_F, BARS_CLOCK_F = 18, 20, 28
 BARS_CLOCK_XY, BARS_CLOCK_ANCHOR = (240, 458), "mm"
 BARS_TITLE_TEXT, BARS_TITLE_X, BARS_TITLE_Y = "SYSTEM MONITOR", 240, 30
 BARS_TITLE_F, BARS_TITLE_W = 24, 440        # the ceiling and the width `_fit` walks
-BARS_SLOTS = 4
+#: Fan slots drawn by the block: **three**, while `themes.FAN_SLOTS` answers four names.  The
+#: row count is a ceiling, not a preference - twelve rows at a 32 px pitch is as far down the
+#: canvas as this block goes (docs/limits.md: a thirteenth computes pitch 29, which the 2 px
+#: inter-row clearance rule refuses, and the last row's meter ink already ends at y=442 with
+#: the clock's ink beginning at y=446) - so the GPU-fan row the owner asked for on 2026-11-14
+#: took the fourth slot's place rather than adding one.
+BARS_SLOTS = 3
 
 
 def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
@@ -767,6 +787,13 @@ def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
     # lets one drawing and one file agree at every reading.
     rows = [("CPU", cpu.get("temperature"), 30, 90, lambda v: f"{v:.0f}\u00b0C", True),
             ("GPU", gpu.get("temperature"), 30, 90, lambda v: f"{v:.0f}\u00b0C", True),
+            # the card's fan, on a 0..100 scale: the reading is a **duty percent**, and it is
+            # on that scale because the RPM form does not exist on this box - NVML's
+            # `nvmlDeviceGetFanSpeedRPM` refuses with "Argument version mismatch" under the
+            # 580.178.04 driver and no GPU publishes a tachometer (docs/limits.md, measured).
+            # `gpu_fan_figure` below has spelled the same field `GPU FAN 34%` for `dual` since
+            # 0.4; `themes.BARS_FIXED_ROWS` pairs the vendor's source name with it.
+            ("GPU FAN", gpu.get("fan"), 0, 100, pct, True),
             ("BOARD", board.get("temperature"), 25, 80,
              lambda v: f"{v:.0f}\u00b0C", True)]
     # the two drive slots, positional like the fan slots: `drives[i]`, and a slot past the
@@ -781,7 +808,7 @@ def theme_bars(m, clock=True, bg=OVERLAY, ink=None):
         rows.append((label, (row or {}).get("temperature"), 25, 80,
                      lambda v: f"{v:.0f}\u00b0C", row is not None))
     rows += [
-            ("LOAD", cpu.get("load"), 0, 100, lambda v: f"{v:.0f}%", True),
+            ("LOAD", cpu.get("load"), 0, 100, pct, True),
             # the number and the meter read different fields here, by design: the meter is the
             # division and the number is one side of it (`themes.BARS_ROWS` spells the same
             # split, and `xigma.showIf` is what says so in a file).  `gb` is the shared
@@ -1247,7 +1274,7 @@ def gpu_fan_figure(m) -> str:
     out along with the figures.
     """
     fan = (m.get("gpu") or {}).get("fan")
-    return f"GPU FAN {round(fan)}%" if fan else "GPU FAN --"
+    return f"GPU FAN {pct(fan)}" if fan else "GPU FAN --"
 
 
 THEMES = {"gauge": theme_gauge, "dual": theme_dual, "clock": theme_clock,

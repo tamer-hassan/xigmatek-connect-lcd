@@ -66,11 +66,18 @@ jobs:
   checks:
     name: the checks, no panel
     runs-on: ubuntu-26.04
-# The timeouts are four times what the jobs take on a runner, read out of GitHub's own
-# durations rather than guessed at, so a slow machine still passes and a job that cannot
-# reach the network fails in minutes instead of holding a runner for GitHub's six-hour
-# default.
-    timeout-minutes: 30
+# The timeouts are read out of GitHub's own durations rather than guessed at, so a slow
+# machine still passes and a job that cannot reach the network fails in minutes instead of
+# holding a runner for GitHub's six-hour default.  The checks job used to carry 30 minutes,
+# four times the 405-465 s the job normally takes - and that margin turned out to be almost
+# exactly one bad runner.  CI #202 attempt 1 ran on a loaded machine: the `tests/` step alone
+# took 1762 s (against 406, 406, 412 and 415 s for the same work in its neighbours), the job
+# reached 1816 s, and the suite was cancelled with one GUI check failing under the load.  The
+# same commit re-ran green in 414.2 s.  So the budget is 45 minutes now: about six times a
+# normal run, and comfortably above the 30-minute worst attempt observed, so a slow runner
+# costs patience rather than a red tick - while a job that cannot reach the network still
+# stops in three quarters of an hour instead of six.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
 

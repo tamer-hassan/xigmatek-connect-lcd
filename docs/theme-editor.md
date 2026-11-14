@@ -666,12 +666,16 @@ place. No static file - fan slots or repeat group - can put a row where such a d
 move it.
 
 So the decision had a second half, and it is built now: **`theme_bars` lays out the same rows on
-every machine** - six fixed readings plus six reserved slots taken by position (four fan, two
-drive), **twelve** as of 2026-11-14 - which keeps the pitch at 32 px everywhere, on any hardware,
-because twelve rows is the ceiling the reservation implies.  Holding that pitch cost span
-320 -> 352 -> **384** and the clock line moving from y=452 to y=458; docs/limits.md has the
-arithmetic, the clearance measurements, and the 3 px of air left between the last row's meter and
-the clock's ink, which is now a floor a check enforces rather than a fact this page asserts. and **a row with no reading keeps its place**: it is not drawn, and the
+every machine** - seven fixed readings plus five reserved slots taken by position (three fan,
+two drive), **twelve** as of 2026-11-14 - which keeps the pitch at 32 px everywhere, on any
+hardware, because twelve rows is the ceiling the reservation implies: a thirteenth computes pitch
+29, which the 2 px inter-row clearance rule refuses, and the last row's meter ink already ends at
+y=442 with the clock's ink beginning at y=446.  Holding that pitch cost span 320 -> 352 ->
+**384** and the clock line moving from y=452 to y=458; docs/limits.md has the arithmetic, the
+clearance measurements, and the 3 px of air between the last row's meter and the clock's ink,
+which is now a floor a check enforces rather than a fact this page asserts.  The ceiling is why
+the owner's GPU-fan row went in **in place of** the fourth fan slot rather than beside it: the
+vocabulary answers four `Fan N` pairs, the block draws three. and **a row with no reading keeps its place**: it is not drawn, and the
 advance happens anyway. That is the rule the 27 library layouts already follow and the
 hole-that-says-what-it-is rule docs/themes.md states. `bars` is this project's own drawing
 rather than a reproduction of a vendor frame, so nothing measured off glass is invalidated by
@@ -686,8 +690,13 @@ depends on this box's fan inventory, and what still varies per box is which slot
 **The sources are in** (2026-11-09): `themes.BARS_ROWS` named all ten rows then (twelve today)
 in the order the
 drawing lays them out - label, meter source, number source, scale - and `themes.values()`
-answers them. Four are per-sensor fan slots (`Fan 1 Speed`..`Fan 4 Speed`, `Fan 1 Name`..
-`Fan 4 Name`), which the vendor's vocabulary has no word for: it offers `cpuFansSpeed`
+answers them. Three of the rows are per-sensor fan slots, drawn from four that the vocabulary
+answers (`Fan 1 Speed`..`Fan 4 Speed`, `Fan 1 Name`..`Fan 4 Name`), which the vendor's vocabulary
+has no word for: it offers the aggregates `cpuFansSpeed` and `gpuFansSpeed` - and the second of
+those is a row of this block since 2026-11-14, paired with `gpu.fan` and printed as a duty
+percent (docs/limits.md has why it is not RPM), while the first is the one name in
+`layout.VENDOR_FORMAT` that has a shape and no source, pinned as an exception by
+`tests/test_bars_rows.py` so nobody meets it as a silence again.
 "CPU Fans Speed" and `gpuFansSpeed` "GPU Fans Speed", aggregates only, never a row per
 tachometer (PROTOCOL.md 10) - and the two RAM names come straight out of that record
 (`RAMRate`, `UsedRAM`), spelled in the display style this tree already uses. Where a reading
@@ -774,10 +783,11 @@ reserved-slots rule being visible rather than hidden.  Three claims about it are
 * **the two doors put down the same pixels.**  All five themes at that fixture, at seven ink
   choices: zero differing pixels, worst channel 0.  Measured through the pane's own door
   (`Editor.paint(*Editor.fixture(), ink=...)`), not a hand-built call - and the row counts
-  with it, in `bars`: **32 of its 38 rows** at the completed fixture today, against the 29 of 35
-  one drive row gave, the 26 of 32 measured when that rule was written, and the 14 of 32 the stale
-  dict produced - a 34 362 px difference between those last two 2026-11-12 frames (61 790 lit px
-  against 28 860).  Today the same door lays 63 284 lit px, and `themes.parity("bars",
+  with it, in `bars`: **35 of its 38 widgets** at the completed fixture today, against the 32 of
+  38 with one drive row and two fan slots drawn, the 29 of 35 one drive row gave, the 26 of 32
+  measured when that rule was written, and the 14 of 32 the stale dict produced - a 34 362 px
+  difference between those last two 2026-11-12 frames (61 790 lit px against 28 860).  Today the
+  same door lays 69 229 lit px, and `themes.parity("bars",
   edit.FIXTURE, edit.FIXTURE_WHEN)` prints the pair with the pixel diff - which is the form these
   pages use now, because the row count moved three times in one day and a count copied by hand is
   a count that goes wrong.

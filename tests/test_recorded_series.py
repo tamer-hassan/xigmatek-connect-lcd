@@ -150,12 +150,17 @@ class RecordedSeries(unittest.TestCase):
     def test_every_bar_row_this_box_could_have_is_answered_at_every_sample(self):
         """The rule that makes the `bars` clip durable rather than lucky.
 
-        `themes.bars_recipe()` builds the labelled rows - the six fixed readings and the drive
-        row that went in on 2026-11-14 - and then the reserved fan slots.  A slot past the
+        `themes.bars_recipe()` builds the labelled rows - the seven fixed readings since the
+        GPU-fan row went in on 2026-11-14 - and then the reserved drive and fan slots.  A slot past the
         reported count has no subject, and a row with no subject draws empty in the old drawing
         and the new one alike - so the changes that move rows with no subject, or a pair that
         cannot be divided, cannot move a frame of this clip.  What has to hold is that every row
         this recording could have had gets a reading at every one of its twelve samples.
+
+        And this is the check that says the GPU fan row is not a coin flip on a quiet
+        afternoon: the twelve recorded samples answer `gpu.fan` at **34, 34, 34, 34, 35, 35,
+        35, 35, 34, 34, 34, 34** percent, so a row for it is answered across a whole
+        recording rather than at one reading chosen because it answered.
 
         Rows are told apart by **shape**, not by offset.  The previous version sliced
         `BARS_ROWS[len(fixed):]` and called everything past the six a fan slot, which is how an
@@ -164,11 +169,13 @@ class RecordedSeries(unittest.TestCase):
         """
         labelled = [row for row in themes.BARS_ROWS if row[0] is not None]
         slots = [row for row in themes.BARS_ROWS if row[0] is None]
-        slots = [r for r in themes.BARS_ROWS if r[0] is None]
         self.assertEqual(len(labelled), len(themes.BARS_FIXED_ROWS),
                          f"{len(labelled)} labelled rows: only the fixed readings carry a literal "
                          "label now, the drive slots name theirs by reading")
-        self.assertEqual(len(slots), len(themes.FAN_SLOTS) + len(themes.BARS_DISK_ROWS),
+        # `BARS_FAN_ROWS`, not `FAN_SLOTS`: the vocabulary answers four fan names while the
+        # block draws three of them, and a check that counted the vocabulary would be
+        # measuring a row nobody draws (docs/limits.md has the 12-row ceiling behind that).
+        self.assertEqual(len(slots), len(themes.BARS_FAN_ROWS) + len(themes.BARS_DISK_ROWS),
                          f"{len(slots)} slot rows: the split by shape has to agree with the "
                          "recipe, or this check counts a different block than the one drawn")
         gaps = []

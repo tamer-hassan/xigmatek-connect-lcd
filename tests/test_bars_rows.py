@@ -29,7 +29,13 @@ Six rules:
 * a box that answers nothing draws no row at all (and the title and the clock line are not counted
   as rows);
 * every `source` name this program can answer has a display shape in `layout.VENDOR_FORMAT`, so a
-  text row can never reach the painter and die for want of one.
+  text row can never reach the painter and die for want of one - **and the converse**, because
+  that direction was unguarded and cost the owner a GPU-fan row: a name with a shape and no
+  entry in `themes.SOURCES` is a hole with no reason next to it, which is how `GPU Fans Speed`
+  sat formatted-but-unaskable from 0.5 until 2026-11-14;
+* a row's number and its meter describe the same reading at the same scale, so a figure cannot
+  sit beside a track that means something else (`15 GB` at 97 % and a percent on an RPM scale
+  are the two shapes this took).
 
 The pixel counts in the slot census are thresholds with a margin, not exact figures: text in the
 value column measures 100 px or more of alpha there, the faint tail of the meter above it never
@@ -38,6 +44,7 @@ the answer alone, which is the point of counting it that way.
 """
 from __future__ import annotations
 
+import copy
 import datetime
 import inspect
 import unittest
@@ -56,9 +63,12 @@ PITCH_RULE = "row_h = min(BARS_ROW_MAX, max(BARS_ROW_MIN, span // max(len(rows),
 SLOT_MARKERS = ('for slot in range(BARS_SLOTS)', '(fan or {}).get("value")',
                 'str((fan or {}).get("name") or f"FAN {slot + 1}")[:10]')
 
-#: A body that answers all six fixed rows and reports no tachometer at all.
+#: A body that answers every labelled row and reports no tachometer at all.  `gpu.fan` is a
+#: duty percent (NVML's unit, PROTOCOL.md §10) and it belongs here for the same reason the
+#: drive rows do: a labelled row the body does not answer is a hole this file would then be
+#: measuring, not a reading.
 ALL_SIX = {"cpu": {"temperature": 57.0, "load": 62.0},
-           "gpu": {"temperature": 47.0, "load": 22.0, "memoryUsage": 4096,
+           "gpu": {"temperature": 47.0, "load": 22.0, "fan": 34.0, "memoryUsage": 4096,
                    "dedicatedTotal": 8192},
            "motherboard": {"temperature": 51.0}, "disk": {"temperature": 44.0},
            "drives": [{"name": "nvme0", "temperature": 44, "sensors": [44, 55, 68]},
@@ -185,16 +195,34 @@ class TheBodyItself(unittest.TestCase):
         and one expression the slot loop reuses.  An eighth labelled row, or a slot drawn by its
         own copy of the formatter, changes that count - and the pitch census below would then be
         counting a different number of rows."""
-        # four lambdas for the labelled rows (CPU, GPU, BOARD, LOAD - the two gigabyte rows
-        # share `render.gb` rather than each carrying their own copy), plus one per slot loop.
-        self.assertEqual(self.src.count("lambda v:"), len(themes.BARS_FIXED_ROWS) - 2 + 2,
-                         f"{self.src.count('lambda v:')} formatters in the body")
+        # What each labelled row's number is spelled by, counted out of the body: three
+        # temperature lambdas (CPU, GPU, BOARD) and two slot loops (drive, fan) carry their own
+        # `lambda v:` - five - while two rows print through `pct` (LOAD, GPU FAN) and two through
+        # `gb` (RAM, VRAM) rather than each copying the shape.  The number is derived from the
+        # table on purpose: a row that stops sharing the function shows up here as a count.
+        self.assertEqual(self.src.count("lambda v:"), 5,
+                         f"{self.src.count('lambda v:')} own-copy formatters in the body")
+        self.assertEqual(self.src.count("pct, True)"), 2,
+                         "the two percentage rows (LOAD, GPU FAN) must format through the one "
+                         "`render.pct` both doors share")
         self.assertEqual(self.src.count("gb("), 2,
                          "the RAM and VRAM numbers must format through the one `gb` function - "
                          "and pass it the field they print, not the fraction their meter uses")
         self.assertEqual(ROWS_TOTAL, 12, ROWS_TOTAL)
+        self.assertEqual(len(themes.BARS_ROWS), len(themes.BARS_FIXED_ROWS)
+                         + len(themes.BARS_DISK_ROWS) + len(themes.BARS_FAN_ROWS),
+                         "the row table is no longer the sum of its three parts")
         self.assertEqual(len(themes.BARS_DISK_ROWS), len(themes.DISK_SLOTS[:2]),
                          "the drive slots in the block and in the vocabulary moved apart")
+        # the fan trade, stated where it can be seen: four names answered, three rows drawn, and
+        # the number of rows is what the 12-row ceiling is made of
+        self.assertEqual(len(themes.FAN_SLOTS), 4, "the fan vocabulary itself moved")
+        self.assertEqual(len(themes.BARS_FAN_ROWS), render.BARS_SLOTS,
+                         f"the table reserves {len(themes.BARS_FAN_ROWS)} fan slots and the "
+                         f"painter draws {render.BARS_SLOTS}")
+        self.assertEqual(len(themes.BARS_FIXED_ROWS), 7,
+                         "a labelled row joined or left the fixed set: the pitch census and the "
+                         "block's ceiling below are both stated in terms of this count")
 
 
 class WhatTheGlassHolds(unittest.TestCase):
@@ -228,12 +256,38 @@ class WhatTheGlassHolds(unittest.TestCase):
         got = slots_with_ink(render.draw(PARTIAL, "bars", bg=render.OVERLAY))
         # CPU and GPU answer; BOARD, both drive slots, RAM and VRAM do not (PARTIAL has no
         # `drives` section at all, which is also a real shape: a kernel with no disk driver).
-        want = ([True, True, False,                   # CPU, GPU, BOARD
+        want = ([True, True, False,                    # CPU, GPU, GPU FAN
+                 False,                               # BOARD
                  False, False,                        # both drive slots
-                 True, False, False,                  # LOAD, RAM, VRAM
+                 True, False, False,                   # LOAD, RAM, VRAM
                  ] + [False] * render.BARS_SLOTS)
         self.assertEqual(len(want), ROWS_TOTAL, "the hand-written pattern and the table disagree")
         self.assertEqual(got, want, (got, "rows below a missing reading closed up again"))
+
+    def test_the_shared_bodies_are_still_whole_when_everything_else_ran(self):
+        """A cheap end-of-file guard, and it has already paid for itself.
+
+        The bodies above are module-level and shared: `dict(ALL_SIX)` copies the outer mapping
+        and nothing else, so a check that mutates `body["gpu"]` mutates every later check's
+        idea of this box.  Writing that bug took three passes to understand - two unrelated
+        rows went blank in checks that run after the one that did it, because unittest orders
+        classes alphabetically - so the fix is not only the `copy.deepcopy` in the check that
+        had it, but a guard that any check which breaks the shared bodies is caught here as
+        well, whoever it was.
+        """
+        vals, gone = themes.values(ALL_SIX, WHEN)
+        unlabelled = [src for _l, src, _t, _lo, _hi in themes.BARS_FIXED_ROWS if src not in vals]
+        self.assertEqual(unlabelled, [],
+                         f"ALL_SIX no longer answers the labelled rows it is meant to answer: "
+                         f"{unlabelled} - a check somewhere reached into this body")
+        pvals, _pgone = themes.values(PARTIAL, WHEN)
+        readings = [k for k in pvals if k not in themes.CLOCKED]
+        self.assertEqual(sorted(readings), ["CPU Temperature", "CPU Usage", "GPU Temperature"],
+                         f"PARTIAL is the body with three readings and no board, no drives and "
+                         f"no memory pair: {sorted(readings)}")
+        self.assertNotIn("GPU Fans Speed", pvals,
+                         "PARTIAL is the body with a GPU and no fan reading; if it grows one, "
+                         "the unanswered-row checks above stop measuring what they claim")
 
     def test_a_box_that_answers_nothing_draws_no_row(self):
         self.assertEqual(slots_with_ink(render.draw({"cpu": {}, "timestamp": {}}, "bars",
@@ -291,6 +345,45 @@ class TheDisplayShapes(unittest.TestCase):
         self.assertGreater(len(layout.VENDOR_FORMAT), len(themes.source_names()),
                            "the table has no more shapes than there are sources, so it is "
                            "probably not covering the fan names any more")
+
+
+    def test_no_display_shape_waits_without_a_source(self):
+        """The other direction, and the one that was missing when the GPU fan went unseen.
+
+        `layout.VENDOR_FORMAT` has carried a shape for `GPU Fans Speed` - the vendor's own
+        name, read out of its renderer bundle - since 0.5, and `themes.SOURCES` had no entry
+        for it, so a theme asking that name got **nothing**: not an error, not a hole with a
+        reason beside it, just a row that never appeared.  The owner asked on 2026-11-14 why
+        `bars` had no GPU fan; the reading had been on the wire for years (`gpu.fan`, 34-35 %
+        across the twelve recorded samples in `docs/videos/readings-2026-11-08.json`) and so
+        had the shape.  Only the pairing was missing, and no check looked that way.
+
+        So: any name with a display shape must be askable, and an exception has to be listed
+        here with the reason - which is the only place a reader will look.
+        """
+        unaskable = sorted(set(layout.VENDOR_FORMAT) - set(themes.source_names()))
+        self.assertEqual(unaskable, ["CPU Fans Speed"],
+                         f"{unaskable}: shape without a source.  A name the painter can format "
+                         "but `themes.values()` cannot answer is an invisible hole")
+        # ...and the one exception is the honest kind: the vendor offers the aggregate, nothing
+        # in its record says how several tachometers combine into one number, and inventing an
+        # aggregation rule is not a measurement.
+        self.assertIn("CPU Fans Speed", layout.VENDOR_FORMAT,
+                      "the exception this check pins has itself gone away: then the assertion "
+                      "above has to stop allowing it")
+        self.assertNotIn("CPU Fans Speed", themes.SOURCES,
+                         "the aggregate now has a source: say what rule combines the tachometers")
+
+    def test_the_vendors_fan_names_are_pairable_or_say_which_one_is_not(self):
+        """Both fan aggregates, in one look: one pairs with a field, one does not, and the
+        reason is in the source rather than in a comment nobody reads."""
+        self.assertEqual(themes.SOURCES["GPU Fans Speed"], ("gpu", "fan"),
+                         "the name is the vendor's and so is the field: PROTOCOL.md §10's "
+                         "field table spells `gpu.fan` a percent")
+        self.assertEqual(sorted(k for k in themes.SOURCES if "Fans Speed" in k),
+                         ["GPU Fans Speed"],
+                         "the fan aggregates this program answers moved; the check above "
+                         "needs its exception list re-read")
 
 
 def slot_of(label: str) -> int:
@@ -537,6 +630,111 @@ class TheMemoryRows(unittest.TestCase):
         rows = rows_by_slot(dict(ALL_SIX, memory={"used": 0, "total": 0}))
         self.assertEqual(rows.get(slot_of("RAM")), [("label", "RAM")],
                          "a zero denominator drew a RAM row")
+
+
+class TheGpuFanRow(unittest.TestCase):
+    """The row the owner asked for on 2026-11-14: the card's fan, in the unit it has.
+
+    Three things to hold, and each of them is a way this kind of row has gone wrong before in
+    this file: the number must agree with the meter standing beside it (the `15 GB` at 97 %
+    defect), the scale must be the reading's own rather than the neighbouring rows' (a percent
+    on the fan slots' 0..3000 track would read as a fan that never speeds up), and a box with
+    no such reading must report the row unanswered instead of drawing `0%` - which on a GPU is
+    the difference between "silent at idle" and "this card has no fan sensor".
+    """
+
+    def test_the_percent_agrees_with_its_own_meter(self):
+        used = 34
+        vals, _gone = themes.values({"gpu": {"fan": used}}, WHEN)
+        shown = layout.text_for("GPU Fans Speed", vals["GPU Fans Speed"])
+        self.assertEqual(shown, "34%", shown)
+        row = [r for r in themes.BARS_ROWS if r[1] == "GPU Fans Speed"]
+        self.assertEqual(len(row), 1, row)
+        _label, _meter, _text, lo, hi = row[0]
+        self.assertEqual((lo, hi), (0, 100),
+                         "the row's meter scale moved off a percentage: `gpu.fan` is a duty "
+                         "percent, and on the fan slots' 0..3000 scale 34 % would fill 1 % of "
+                         "the track - the same two-halves-of-one-row disagreement as `15 GB`")
+        fraction = (used - lo) / (hi - lo)
+        self.assertLess(abs(float(shown.rstrip("%")) / 100 - fraction), 0.01,
+                        f"{shown} against a meter at {fraction:.3f}")
+        # and what the wrong scale would have printed, kept visible: 34 on 0..3000 is a
+        # fraction of 0.011, three orders of magnitude from the number beside it
+        wrong = (used - 0) / (3000 - 0)
+        self.assertGreater(fraction - wrong, 0.03,
+                           "this check stopped guarding the scale mix-up it was written for")
+
+    def test_the_row_reads_the_same_field_the_dual_theme_figures(self):
+        """One field, spelled two ways by two themes, and neither may invent a unit.
+
+        `render.gpu_fan_figure` has drawn `GPU FAN 34%` under the GPU temperature in `dual`
+        since 0.4; the `bars` row prints `34%` beside a percentage meter.  Both come out of
+        `gpu.fan`, and a change to the source pairing moves both - which is what this pins,
+        because two unit stories for one field is how a row starts lying.
+        """
+        body = {"gpu": {"fan": 34}}
+        vals, _gone = themes.values(body, WHEN)
+        self.assertEqual(layout.text_for("GPU Fans Speed", vals["GPU Fans Speed"]), "34%")
+        self.assertEqual(render.gpu_fan_figure(body), "GPU FAN 34%")
+        self.assertTrue(render.gpu_fan_figure(body).endswith(layout.text_for(
+            "GPU Fans Speed", vals["GPU Fans Speed"])),
+            "the two figures no longer end in the same spelling of the same reading")
+        # no reading at all: `dual` says so in words, `bars` leaves the number out
+        self.assertEqual(render.gpu_fan_figure({"gpu": {}}), "GPU FAN --")
+
+    def test_a_box_with_no_gpu_fan_reports_the_row_unanswered(self):
+        """An integrated-GPU box (no `nvidia-smi`, no fan in the `amdgpu` hwmon here) has a
+        label and no number, and both doors agree about it at 0 px."""
+        # `copy.deepcopy`, not `dict()`: a shallow copy shares the `gpu` dict with the
+        # module-level body, so deleting a key here deleted it from every later check in the
+        # file too.  That is how this was found - the GPU-fan row went blank in two unrelated
+        # checks that run after this one, because unittest orders classes alphabetically and
+        # `TheGpuFanRow` came first.
+        body = copy.deepcopy(ALL_SIX)
+        del body["gpu"]["fan"]
+        _vals, gone = themes.values(body, WHEN)
+        self.assertIn("GPU Fans Speed", gone,
+                      "the row should be reported unanswered, with the reason")
+        got = themes.parity("bars", dict(body, timestamp={}), WHEN)
+        self.assertEqual((got["diff_px"], got["worst_channel_delta"]), (0, 0),
+                         f"a missing fan split the doors: {got}")
+        self.assertIn("GPU Fans Speed", got["missing"], got["missing"])
+        index = [i for i, r in enumerate(themes.BARS_ROWS) if r[1] == "GPU Fans Speed"][0]
+        drawn = rows_by_slot(body).get(index, [])
+        self.assertIn(("label", "GPU FAN"), drawn,
+                      f"the label belongs to the row's subject, so it draws anyway: {drawn}")
+        self.assertFalse([t for kind, t in drawn if kind == "value"],
+                         f"a box with no fan reading printed a number: {drawn}")
+        img = render.draw(dict(body, timestamp={}), "bars", bg=render.OVERLAY)
+        self.assertFalse(slots_with_ink(img)[index],
+                         "the value column has ink where no reading was reported")
+        self.assertTrue(slots_with_ink(img)[index + 1],
+                        "the row below a missing reading closed up")
+
+    def test_the_zero_that_is_a_reading_still_prints(self):
+        """`fan: 0` is a reading - a card held at zero duty - and prints `0%` with an empty
+        track.  `dual`'s figure treats 0 as no reading (`GPU FAN --`), and that difference is
+        deliberate and stated here rather than left to drift: a row with a meter has a scale
+        that says 0, a figure made of words has no such place to put it."""
+        vals, gone = themes.values({"gpu": {"fan": 0, "temperature": 40}}, WHEN)
+        self.assertIn("GPU Fans Speed", vals, gone)
+        self.assertEqual(layout.text_for("GPU Fans Speed", vals["GPU Fans Speed"]), "0%")
+        drawn = rows_by_slot(dict(ALL_SIX, gpu={"fan": 0}))   # replaces, does not mutate
+        index = [i for i, r in enumerate(themes.BARS_ROWS) if r[1] == "GPU Fans Speed"][0]
+        self.assertEqual([t for kind, t in drawn.get(index, []) if kind == "value"], ["0%"],
+                         drawn.get(index))
+        self.assertEqual(render.gpu_fan_figure({"gpu": {"fan": 0}}), "GPU FAN --",
+                         "the two themes' zero rule moved; the sentence above has to follow")
+
+    def test_the_row_sits_where_its_subject_is(self):
+        """Ordering is a claim too: the fan row belongs under the card's temperature, not at
+        the end of the block.  Measured off the table, because a row inserted at the end of
+        the list would keep every count in this file correct and still read wrong."""
+        labels = [r[0] for r in themes.BARS_ROWS]
+        self.assertEqual(labels[:4], ["CPU", "GPU", "GPU FAN", "BOARD"], labels)
+        self.assertEqual(labels[6:9], ["LOAD", "RAM", "VRAM"], labels)
+        self.assertEqual([r[0] for r in themes.BARS_ROWS if r[0] is None], [None] * 5,
+                         "five slot rows: two drives then three fans")
 
 
 class TheKeyThatNamesTheDependency(unittest.TestCase):

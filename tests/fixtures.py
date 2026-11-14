@@ -171,7 +171,10 @@ SESSION_WHEN = datetime.datetime(2026, 11, 8, 3, 40, 0)
 #: section: the parity check reported `['Disk Temperature', 'Disk Temperature']` - number and
 #: meter, from both doors - and was right to.
 PARITY_CASES = ({"cpu": {"temperature": 57, "load": 62},
-                 "gpu": {"temperature": 47, "load": 22, "memoryUsage": 2_100_000,
+                 # `fan` is a duty percent (NVML/`nvidia-smi` unit, PROTOCOL.md §10's field
+                 # table); `bars` draws it since 2026-11-14, so a complete case has to answer it
+                 # or the row reads as a hole in the fixture rather than a full block
+                 "gpu": {"temperature": 47, "load": 22, "fan": 34, "memoryUsage": 2_100_000,
                          "dedicatedTotal": 8_000_000},
                  "motherboard": {"temperature": 41},
                  "disk": {"temperature": 41, "total": 786, "used": 73},
@@ -183,7 +186,10 @@ PARITY_CASES = ({"cpu": {"temperature": 57, "load": 62},
                           {"value": 800, "name": "Fan Pump"},
                           {"value": 640, "name": "Fan Chassis 2"}]},
                 {"cpu": {"temperature": 100, "load": 0},
-                 "gpu": {"temperature": 100, "load": 0, "memoryUsage": 0,
+                 # the extreme case keeps its `fan: 0`, and `0%` is a reading here, not an
+                 # absence: the row prints `0%` with an empty track, exactly as the RAM row
+                 # does with `used: 0` two lines below
+                 "gpu": {"temperature": 100, "load": 0, "fan": 0, "memoryUsage": 0,
                          "dedicatedTotal": 8_000_000},
                  "motherboard": {"temperature": 0},
                  "disk": {"temperature": 80, "total": 786, "used": 73},

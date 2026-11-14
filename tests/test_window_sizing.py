@@ -57,6 +57,38 @@ class SizedWindow(fixtures.FreshConfigRoot):
         fixtures.pump(0.3)
         self.addCleanup(fixtures.close_window, self.win)
 
+    def settle_until_stable(self, tries: int = 60, sample=None) -> tuple:
+        """Pump the loop until the state an assertion is about to read stops moving.
+
+        `settle()` below is a bet on the scheduler: it pumps a fixed wall-clock budget and
+        hopes the layout work is done by then.  That bet is what made this file's narrow-end
+        check fail on CI #202 - whose checks step ran 1762 s against the 406-412 s of its
+        three neighbours, a loaded runner at roughly four times the pace - while the same
+        check passes on this bench in 37 s.  Nothing about the geometry changed between
+        those two machines; the events had simply not been processed yet when the
+        assertion read them.
+
+        So the resize-dependent checks wait on the **state the assertion asks about**
+        (`split.sizes()` unchanged across two consecutive samples), bounded by `tries`, and
+        hand back the number of pumps it took so the difference between machines is a
+        measured figure rather than a mystery.
+        """
+        read = sample or (lambda: list(self.win.split.sizes()))
+        last, stable, pumps = None, 0, 0
+        state = read()
+        for _ in range(tries):
+            fixtures.pump(0.03)
+            pumps += 1
+            state = read()
+            if state == last:
+                stable += 1
+                if stable >= 2:
+                    return state, pumps
+            else:
+                stable = 0
+            last = state
+        return state, pumps
+
     def settle(self, passes: int = 12) -> None:
         """Let `_pane_floors` finish.
 
@@ -281,7 +313,7 @@ class TheSizingRule(SizedWindow):
         """The responsive half, at the narrow end: the field grid reflows to fewer columns, the
         pane's floor comes down with it, and no column is left travelling sideways to be read."""
         self.win.resize(700, 600)
-        self.settle(20)
+        _sizes, _pumps = self.settle_until_stable()
         self.assertGreaterEqual(self.win.width(), self.win.minimumWidth())
         self.assertGreaterEqual(self.win.height(), self.win.minimumHeight())
         self.assertLess(self.win._ed_cols, 3, "the form kept three columns of rows in a window "
@@ -301,8 +333,7 @@ class TheSizingRule(SizedWindow):
         self.settle()
         small = self.win.split.sizes()
         self.win.resize(3840, 2160)
-        self.settle(20)
-        big = self.win.split.sizes()
+        big, _pumps = self.settle_until_stable()
         for index, (a, b) in enumerate(zip(small, big)):
             with self.subTest(column=index):
                 self.assertGreaterEqual(b, a, f"{small} -> {big}: column {index} lost width "
@@ -310,18 +341,40 @@ class TheSizingRule(SizedWindow):
         self.assertGreater(sum(big) - sum(small), 1500,
                            f"{small} -> {big}: a 3840 px window did not pass its width on")
 
+    def test_the_state_wait_settles_inside_its_budget_and_says_what_it_cost(self):
+        """A wait on state is only better than a fixed bet if it is bounded - and the bound
+        should be a number a reader can compare across machines.
+
+        Printed here on purpose: how many 0.03 s pumps each resize needs to stop moving.  On
+        this bench the answer is small; the value of the line is that a loaded runner reports
+        its own, and the difference between a slow machine and a broken test stops being a
+        guess.
+        """
+        for target in ((700, 600), (3840, 2160)):
+            with self.subTest(window=target):
+                self.win.resize(*target)
+                _state, pumps = self.settle_until_stable()
+                print(f"  settle after resize{target}: {pumps} pump(s), "
+                      f"{pumps * 0.03:.2f} s of event loop")
+                self.assertLessEqual(pumps, 60,
+                                     f"a resize to {target} had not stopped moving after "
+                                     f"{pumps} pumps: the state being waited on is not "
+                                     "converging, and the check that follows is reading a "
+                                     "transient layout")
+                self.assertGreaterEqual(pumps, 3,
+                                        "the sampler never saw two consecutive equal states, "
+                                        "so this wait measured nothing")
+
     def test_the_field_grid_holds_exactly_the_columns_the_column_can_afford(self):
         """`_ED_COL_PX` is not a wish: the grid asks the pane how much it has and divides, and the
         number of columns it lands on is the claim.  At 4k that is three; at the minimum, one."""
         self.win.resize(app.MIN_WIDTH, app.MIN_HEIGHT)
-        self.settle(16)
-        narrow = self._cols_and_width()
+        narrow, _p1 = self.settle_until_stable(sample=self._cols_and_width)
         self.assertEqual(narrow[1], max(1, min(3, narrow[0] // app.Window._ED_COL_PX)),
                          f"a {narrow[0]} px controls column asked for {narrow[1]} columns")
         self.assertLessEqual(narrow[1], 3, "the grid took more columns than it promises to take")
         self.win.resize(3840, 2160)
-        self.settle(20)
-        wide = self._cols_and_width()
+        wide, _p2 = self.settle_until_stable(sample=self._cols_and_width)
         self.assertEqual(wide[1], 3, f"a {wide[0]} px column took {wide[1]} columns of rows")
         self.assertGreater(wide[1], narrow[1],
                            f"{narrow} -> {wide}: the form did not reflow into the extra width, "
@@ -336,7 +389,7 @@ class TheSizingRule(SizedWindow):
         """`_ED_COL_PX` is a claim about what three columns need, so at the widest window the row
         host must not ask for more than three of them."""
         self.win.resize(3840, 2160)
-        self.settle(20)
+        self.settle_until_stable(sample=lambda: self.win._ed_cols)
         self.assertEqual(self.win._ed_cols, 3, "the row host is not showing three columns, so "
                                               "this check would measure nothing")
         host = self.win._ed_host

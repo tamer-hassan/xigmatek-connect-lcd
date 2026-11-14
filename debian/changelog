@@ -1113,38 +1113,205 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     last binding.  It is gone, and one definition of each chip list is now
     what the module has.
 
+  * A cancelled CI run, what it actually measured, and two rules taken from
+    it.  CI #202 attempt 1 was cancelled: the checks job ran 1816 s against
+    its 30-minute cap, and its `tests/` step alone took **1762 s** where the
+    same work took 406, 406, 412 and 415 s in the four neighbouring runs -
+    about 4.2x slower, with no single stall longer than 25 s anywhere in the
+    step (measured by scanning the log's inter-line gaps), i.e. a uniformly
+    loaded runner rather than one hung test.  One GUI check failed under that
+    load.  Attempt 2, same commit, came back green: **555 checks in
+    414.204 s**, skipped=4, all jobs success.
+
+    Two responses, both measured rather than shrugged at.
+
+    *The check that failed was making a bet on the scheduler.* The window-
+    sizing suite waits after a resize with `settle(passes)`, which pumps the
+    Qt event loop for a fixed wall-clock budget and then asserts geometry.  On
+    this bench the state it waits for settles in **3 pumps (0.09 s)** - printed
+    now by a new check, because that number was previously an assumption - so
+    the fixed bet looked safe and only fails on a machine that slow.  Four
+    resize-dependent checks now wait on the **state** instead
+    (`settle_until_stable`, which samples until the splitter or the field grid
+    stops changing, bounded at 60 pumps, and returns what it cost), and the new
+    check asserts the bound is met and the sampler actually converged - an
+    unbounded wait is as useless as a fixed one.
+
+    *The budget was one bad runner wide.* 30 minutes was described in the
+    workflow as "four times what the job takes", and the observed worst was
+    1816 s: four times, with 2% to spare.  The checks job is capped at **45
+    minutes** now, with those figures in the comment above it, and
+    `tests/test_ci_workflow.py` (four checks, new) reads the workflow by
+    indentation - no YAML dependency, because pyyaml is not one this project
+    declares - and holds three things: every job declares a timeout at all,
+    the checks budget covers the observed worst without becoming permission to
+    hang, and the comment beside the number still carries the measurements.
+    Four mutations counted: the deb job's timeout removed -> 1; the checks
+    budget tidied back to 30 -> 1; the figures stripped from the comment -> 1;
+    a job added without a timeout -> 2.  The first attempt at that census
+    reported **0 failures**, and the cause was the driver, not the code: the
+    needle did not match the file, so the mutation never happened.  The driver
+    now asserts each needle occurs exactly once before trusting a count.
+
+    What is **not** claimed: a cause for the slow runner, or a leak.  The log's
+    cleanup line - `Terminate orphan process: pid (3837) (python3)` and
+    `(16141) (ffmpeg)` - is what cancellation looks like when the suite is
+    killed mid-decode: every `ffmpeg` call in this codebase goes through
+    `subprocess.run`, which waits, so a live ffmpeg at that moment is a child
+    of the still-live suite, not a runaway.  Why that runner was 4.2x slow is
+    unknown and stays unknown; what was in reach was the flake it exposed and
+    the margin that turned a slow machine into a red tick.  Worth noting for
+    scale: the window's own thumbnail pass is a documented cost - 115 clips,
+    115 `ffmpeg` seeks, **12.7 s** to populate, recorded in `app.py` - so the
+    suite's GUI checks carry real per-window work, and a contended runner pays
+    for all of it in series.
+
+  * `bars` draws the card's fan, and the reason it never had one was a shape
+    with no source behind it.  The owner's report on 2026-11-14 was "bars is
+    missing GPU Fan", and the reading was not missing: `sensors` has filled
+    `gpu.fan` from `nvidia-smi --query-gpu=fan.speed` for as long as the NVIDIA
+    path has existed, and the twelve recorded samples in
+    `docs/videos/readings-2026-11-08.json` answer it at 34, 34, 34, 34, 35, 35,
+    35, 35, 34, 34, 34, 34 %.  What was missing was the pairing.
+    `layout.VENDOR_FORMAT` has carried a display shape for the vendor's own name
+    `GPU Fans Speed` (its editor vocabulary's `gpuFansSpeed`, PROTOCOL.md §10)
+    since 0.5 while `themes.SOURCES` had no entry of that name, so a theme
+    asking the vendor for a GPU-fan row got nothing: no error, no skipped-row
+    note, just a row that was never there.  The gate now looks that way too
+    (`test_no_display_shape_waits_without_a_source`), with one name pinned as an
+    exception and a reason in the source: `CPU Fans Speed` has a shape and no
+    source, because nothing in the vendor's record says how several tachometers
+    combine into an aggregate and inventing the rule would be a claim, not a
+    reading.
+
+    **The unit is a duty percent, and that is measured.** NVML's
+    `nvmlDeviceGetFanSpeedRPM` exists in the 580.178.04 driver on this bench and
+    refuses with "Argument version mismatch"; no GPU here publishes a
+    tachometer at all (`nvidia` has no hwmon chip, this `amdgpu` publishes
+    `freq1`/`in0`/`in1`/`power1`/`temp1` only, and all ten live `fan*_input`
+    files belong to `nct6687`); and PROTOCOL.md §10's own field table spells
+    `gpu.fan` a percent.  So the row's meter is 0..100 like LOAD/RAM/VRAM
+    and its number prints `34%`.  On the fan slots' 0..3000 track, 34 would
+    have filled 1 % of a meter for a fan sitting at a third of its range -
+    the same disagreement as the `15 GB` at 97 % defect of the previous
+    bullet, in another row.  A check holds the
+    two halves of the row to one fraction and asserts the RPM scale **would**
+    disagree by more than 0.03, and both doors now spell a percentage through
+    one function, `render.pct`: the file door references it as `_pct`, the code
+    door calls it for LOAD and GPU FAN, replacing an inline `f"{v:.0f}%"` that
+    agreed with the file only by coincidence.  `dual`'s `GPU FAN 34%` figure
+    shares it too, so one field cannot grow two unit stories.
+
+    **The row cost a slot, and the arithmetic said so before the code did.**
+    Twelve rows at a 32 px pitch is the block's ceiling: a thirteenth computes
+    pitch 29, which the 2 px inter-row clearance rule refuses, and the last
+    row's meter ink already ends at y=442 with the clock's ink beginning at
+    y=446.  Three placements were measured and put to the owner - trade a fan
+    slot, keep four slots and thin the track to 4 px at pitch 29, or pair the
+    fan into the GPU row's number column - and the owner chose the first.  So
+    `bars` reserves **three** fan slots (`themes.BARS_FAN_ROWS`,
+    `render.BARS_SLOTS` 4 -> 3) while the vocabulary still answers four pairs,
+    and the trade costs this box nothing: the fourth slot had drawn no label,
+    no number and no meter here for a week.  `len(BARS_FAN_ROWS) ==
+    render.BARS_SLOTS` is pinned, because a second copy of a slot count is how
+    the doors drift: setting `BARS_SLOTS` back to 4 while the table draws three
+    costs **36** failing checks.  Geometry otherwise unchanged - twelve rows,
+    pitch 32, 6 px track, 3 px of air under the last meter.
+
+    Figures, printed rather than retyped: `bars` is still **38 widgets** (one
+    triple in, one out) at **16 800 characters**, byte-stable between exports;
+    parity is 0 px and worst channel 0 at all five readings - 76 189 / 74 451 /
+    16 072 / 20 968 / 11 184 lit px - 69 229 px at the editor's pinned fixture
+    with **35 of 38** widgets drawn, and 69 479 px down both doors on this
+    machine's live readings, which now write `CPU 62°C | GPU 42°C | GPU FAN 34%
+    | BOARD 41°C | nvme0 / 42°C | nvme1 30°C | LOAD 3% | RAM 82.5 GB | VRAM
+    15.6 GB | Fan CPU 1694 | CPU PUMP 2448`.  `--check-theme bars` says 35
+    boxes, 69 180 lit px, and cannot: Fan 3 Name, Fan 3 Speed.  The row census
+    moved with it - 149 rows, **138** twins, **11** skipped, **28** caveats (was
+    136 / 13 / 27: the `Fan 4` pair stopped being a row) - and the snap census
+    did not move at all: 191 rows, 95 sharing an `x`, 48 a `y`, 426 pairs, gaps
+    {0: 95, 2: 12, 3: 4, 4: 14, 5: 4}.  Ink still moves 26 glyph roles of 38
+    widgets.
+
+    A new print, because two pages were carrying a number nobody could re-read:
+    `python3 -m unittest tests.test_row_notes` now ends with a **source
+    census** - 24 distinct `source` values over the 28 layouts, 17 of them
+    asked only by a generated export.  docs/themes.md said "37 names" and
+    "eight of them asked by nothing", and both were wrong in the same
+    direction: 38 names, nine storage-shaped.  docs/usage.md, docs/limits.md,
+    docs/themes.md, docs/theme-editor.md and docs/gui.md now point at that
+    print, and PROTOCOL.md §10 separates the vendor's *name* for a GPU fan from
+    the vendor's *unit* for it, which is the distinction this row turns on.
+    Stale prose in the shipped library went too: `themes.bars_recipe()`'s own
+    docstring still described "ten rows", a pitch of `BARS_SPAN // (6 + 4)` and
+    "Three things the vendor's `bar` widget cannot say" above **four** bullets.
+
+    Checks: `tests/test_bars_rows.py` 28 -> **36**.  Five for the row (the
+    number against its own meter and scale, one field spelled the same by two
+    themes, a box with no fan reading reporting the row unanswered at 0 px
+    between doors with its label still drawn, `fan: 0` printing `0%` while
+    `dual` says `GPU FAN --`, and the row sitting under the card's temperature
+    rather than at the end of the block); two for the shape/source pairing; one
+    guard of a kind this file had none of, described below.
+    `tests/test_recorded_series.py` carries the 12-sample fan reading in its own
+    docstring, because that check exists to make the block's rows durable
+    across a recording rather than lucky at one instant.
+
+    One fault of mine, recorded because the way it surfaced is the lesson: the
+    new check that deleted `gpu.fan` to build an integrated-GPU body wrote
+    `dict(ALL_SIX)` - a **shallow** copy, sharing the inner `gpu` dict with the
+    module-level body - so it deleted the key out of every later check's idea of
+    this machine, and two unrelated checks went blank because unittest orders
+    classes alphabetically and `TheGpuFanRow` came first.  Fixed with
+    `copy.deepcopy`, and now also caught whoever does it by
+    `test_the_shared_bodies_are_still_whole_when_everything_else_ran`, which
+    asserts the shared bodies still answer what they are documented to answer.
+
+    Twenty-one mutations against this block now, nine of them about the fan
+    row: source pairing removed (the original defect) -> **21**; the row's
+    scale moved to RPM in the table -> 7; the same scale in the code door only
+    -> 6; the file door's percent sign dropped -> 13; the code door loses the
+    row -> 33; the table loses it -> 33; the painter keeps four slots -> 36; the
+    fan vocabulary shrinks with the block -> 2; `pct` loses its unit -> 6.  The
+    twelve carried by the previous bullet are unchanged in kind: 37, 31, 15,
+    10, 2, 3, 8, 12, 13, 1, 13, 33, 24.
+
   * The suite's figures, re-read rather than inherited.  This bench, one run
     of the committed tree with nothing else in flight,
     `python3 -W error::ResourceWarning -m unittest discover -s tests`:
-    **555 checks in 52 files in 464.529 s**, OK, 3 skipped - one of them the
+    **560 checks in 53 files in 462.727 s**, OK, 3 skipped - one of them the
     tray check naming the host it needs - and no `ResourceWarning` printed at
     all now that `setUp` closes its own file.
 
     The count is read off the tree as well as off the runner.  The command
-    `grep -c "^    def test_" tests/*.py` answers 555 over 52 files, and
-    `unittest.TestLoader().discover("tests")` answers 555 over 52 modules, the
-    same numbers the runner prints.  What the count has been at each step
-    of this stretch, in one place rather than in nine: 549 over 52 (the drive
-    row, the census prints and the quoted-span gate), 546 over 52 (the
-    bare-runner audit), 547 over 52 (the chipset ruling, one check added to
-    `tests/test_sensor_rules.py`), 536 over 51 (the disk slots and the probe's
-    shipped-payload binding), 526 over 51 (the probe tool's boundaries), 525
-    and 524 over 51, 511 and 510 over 50 (the sensor rules, and the fix to a
-    check that read the wrong mount table), 496 over 49 (the pump rule) and 485
-    over 48 (before it).  Those deltas are the checks each step added, not
-    drift.
+    `grep -c "^    def test_" tests/*.py` answers 560 over 53 files, and
+    `unittest.TestLoader().discover("tests")` answers 560 over 53 modules, the
+    same numbers the runner prints.  What the count has been at each step of
+    this stretch, in one place rather than in eleven, newest first: 555 over
+    52 (both drive slots in `bars`, the gigabyte row, the census prints and
+    the quoted-span gate), 549 over 52 (the drive row and its prints), 547
+    over 52 (the chipset ruling, one check added to
+    `tests/test_sensor_rules.py`), 546 over 52 (the bare-runner audit), 536
+    over 51 (the disk slots and the probe's shipped-payload binding), 526
+    over 51 (the probe tool's boundaries), 525 and 524 over 51, 511 and 510
+    over 50 (the sensor rules, and the fix to a check that read the wrong
+    mount table), 496 over 49 (the pump rule) and 485 over 48 (before it).
+    Those deltas are the checks each step added, not drift.
 
     A count carried in prose is a count that goes stale quietly, so the things
     that move now print themselves.  `tools/audit_bare_runner.py` read 95
     checks over 6 modules one commit and 96 the next, because a check went
     into `tests/test_sensor_rules.py` in between - nothing about the audit
-    changed - and docs/tools.md and docs/theme-editor.md say "it prints its own
-    tally" instead of carrying either number.  `tests/test_row_notes.py` prints
-    its row census (147 rows, 134 twins, 13 skips today) and
-    `tests/test_snapping.py` prints its totals, its gap histogram and its
-    percentages (188 / 92 / 46 / 369; gaps {0: 92, 2: 12, 3: 4, 4: 14, 5: 4};
-    11 / 12 / 57 %), which is how a reader tells a shape that held (the
-    histogram, unchanged by a row insertion) from a total that moved.
+    changed - and it reads 97 over 6 now that `tests/test_ci_workflow.py`
+    joined that set, all three of those figures printed by the tool rather
+    than kept by this page; docs/tools.md and docs/theme-editor.md say "it
+    prints its own tally" instead of carrying any of them.
+    `tests/test_row_notes.py` prints its row census (149 rows, 136 twins, 13
+    skips today) and `tests/test_snapping.py` prints its totals, its gap
+    histogram and its percentages (191 / 95 / 48 / 426; gaps {0: 95, 2: 12,
+    3: 4, 4: 14, 5: 4}; 10 / 12 / 58 %), which is how a reader tells a shape
+    that held (the histogram, unchanged by two rows inserted into the same
+    columns) from a total that moved.
 
     Three whole-suite logs from these days name nothing and are kept only as
     the lesson.  Two ran while a mutation sweep was rewriting
@@ -1169,8 +1336,8 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     (#189), 351.145 with 510 (#190, one failure), 460.228 with 511 (#191, one
     error), 339.250 with 525 (#192, green and powerless), 431.661 with 526
     (#193), 460.878 with 526 (#194, one failure), 405.906 with 536 (#195, green
-    and lucky), 405.166 with 546 (#196), 403.049 with 547 (#197) and 410.181
-    with 549 (#200).  The last
+    and lucky), 405.166 with 546 (#196), 403.049 with 547 (#197), 410.181 with
+    549 (#200) and 414.204 with 555 (#202).  The last
     several skip 4 rather than 3, the extra one being the glass ledger naming
     transcripts a runner with no panel has never made, and the 9 s between #178
     and #180 is what the six new checks cost: five of them run a shipped script
@@ -1183,8 +1350,18 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     because it changed no count: a prose-only push, and it ran those same 547
     checks in 462.593 s against #197's 403.049 s - 59.544 s apart on trees whose
     only difference was sentences.  #200 then ran the 549 of this commit in
-    410.181 s.  So a pair of these numbers can bound a count and nothing else,
-    which is why the list is kept and no check reads it.  #190 came back red
+    410.181 s.  #202 ran 555 in 414.204 s, and is in the series for a reason
+    the others are not: its **first attempt, on the same commit**, spent 1762 s
+    in the `tests/` step and reached 1816 s of job before the 30-minute cap
+    cancelled it, against 406, 406, 412 and 415 s for that step in its four
+    neighbours - no single gap of 25 s or more anywhere in the log, so a
+    uniformly loaded runner rather than one hung test, and the only sample here
+    that says something about the machine rather than the tree.  It is kept
+    with the failure it induced, not instead of it.  So a pair of these numbers
+    can bound a count and nothing else, which is why the list is kept and no
+    check reads it - the figures a check *does* read are the ones copied next to
+    the budget in `.github/workflows/ci.yml`, held there by
+    `tests/test_ci_workflow.py`.  #190 came back red
     rather than slow (510 in 351.145 s, one failure, and the failure was a new
     check reading the host it ran on); #191 was red one level down, and #192
     green without ever reaching the shape that broke it.  A sample is not added

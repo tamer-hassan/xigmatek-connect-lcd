@@ -21,6 +21,32 @@ offline checks in `tests/`, run by the standard library, with no panel in sight 
 `.deb` job `needs` that job, so a tree that fails a check never produces a package
 (`.github/workflows/ci.yml`).
 
+That checks job has a `timeout-minutes` of its own, and the number is read off GitHub's
+durations rather than chosen: it normally runs 405-465 s, so it was capped at 30 minutes -
+"four times", with 2% to spare. CI #202 showed what that margin bought. Attempt 1 ran on a
+loaded runner: the `tests/` step alone took **1762 s** against the 406, 406, 412 and 415 s of
+its four neighbours, the job reached 1816 s, and GitHub cancelled it with one GUI check red.
+Attempt 2, *the same commit*, finished green in **414.204 s**. Nothing about the geometry
+differed between the two machines, so the cap is 45 minutes now - about six times a normal
+run and comfortably above the worst attempt seen - and `tests/test_ci_workflow.py` holds the
+file to that: every job declares a timeout (without one, GitHub's default is six hours, so a
+job that cannot reach the network holds a runner for six hours before saying so), the checks
+budget covers the observed worst without becoming permission to hang, and the comment next to
+the number still carries 1762 / 1816 / 414.2, because a budget raised without its reason gets
+"tidied" back down.
+
+The check that failed under that load was itself the lesson: `tests/test_window_sizing.py`
+waited after a resize with `settle(passes)`, a fixed wall-clock pump of the Qt event loop,
+then asserted geometry. Measured on this bench the splitter stops moving after **3 pumps
+(0.09 s)**, which is why the bet held for 550-odd checks and broke on a machine running 4.2x
+slow. Four resize-dependent checks now wait on the *state the assertion reads*
+(`settle_until_stable`, bounded at 60 pumps, returning what it cost), and a check asserts the
+bound is met and the sampler converged - an unbounded wait is as useless as a fixed bet.
+What is *not* claimed anywhere here is a cause for that slow runner, or a leak: the cleanup
+lines naming an orphaned `python3` and `ffmpeg` are what cancellation looks like when a suite
+is killed mid-decode, because every `ffmpeg` call in this codebase goes through
+`subprocess.run`, which waits.
+
 That list is `debian/control`'s own Build-Depends plus `devscripts` (where
 `dpkg-buildpackage` and `lintian` come from) and `build-essential`, which
 debian/control deliberately does not name - an archive builder is assumed to have it -

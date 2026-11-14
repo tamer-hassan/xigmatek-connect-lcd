@@ -114,9 +114,12 @@ asserted here:
 * **7 metric names over those 23, in 82 widgets' worth of counts**: `CPU Temperature` 17,
   `CPU Usage` 15, `Time` 11, `Pump Speed` 9, `GPU Usage` 6, `GPU Temperature` 3,
   `CPU Frequency` 2.  The vocabulary this program answers is wider than what the library
-  asks - **37 names** through `themes.source_names()` - and eight of them are asked by nothing in
-  the vendored library: `Disk Temperature` (→ `disk.temperature`, the composite of the drive that
-  holds `/`) and the four positional pairs `Disk 1 Temperature`/`Disk 1 Name` …
+  asks, and the split is printed rather than typed: `python3 -m unittest tests.test_row_notes`
+  ends with a source census - **24 distinct `source` values over the 28 layouts, 17 of them asked
+  only by a generated export** - while the vocabulary this program *answers* is wider still at
+  **38 names** through `themes.source_names()`.  Nine of those are storage-shaped and asked by
+  nothing in the vendored library: `Disk Temperature` (→ `disk.temperature`, the composite of the
+  drive that holds `/`) and the four positional pairs `Disk 1 Temperature`/`Disk 1 Name` …
   `Disk 4 Temperature`/`Disk 4 Name`, which index the `drives` list `sensors.drives()` publishes -
   **the drive under `/` first**, then the rest by controller, so slot 1 is the boot drive whatever
   number the kernel gave its hwmon directory, and `Disk 1 Name` prints it with a trailing slash.
@@ -124,7 +127,12 @@ asserted here:
   storage reading at all**, so these names and their display shapes are this repo's, and slots 3
   and 4 exist so a layout of **yours** can put a further drive on the glass (docs/limits.md has the
   rules, the measured numbers and the
-  probe that made the extra blob section permissible).  Whether any of them is missing from a given machine is a per-machine
+  probe that made the extra blob section permissible).  One more name belongs to the vendor
+  rather than to us - `GPU Fans Speed`, its editor vocabulary's `gpuFansSpeed` - and it too is
+  asked by no vendored file, while our own `bars` has drawn it since 2026-11-14 at
+  `34%`: `themes.SOURCES` pairs it with `gpu.fan` and the scale is a duty percent, not RPM
+  (docs/limits.md, and the check that refuses a display shape with no source behind it).
+  Whether any of them is missing from a given machine is a per-machine
   question, and since 2026-11-13 the only one that can be is `Pump Speed`: it is answered by a
   fan row whose `type` is `Pump` (`themes.FAN_TYPED`), and this bench has one - the channel that
   came alive when the AIO's block cable went into `PUMP_SYS1`, steady at 2459-2469 RPM while its

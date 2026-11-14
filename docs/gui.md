@@ -463,23 +463,28 @@ commonly gets wrong:
   `python3 -m unittest tests.test_row_notes` ends with on 2026-11-14:
 
   ```
-  row census: 149 `text`/`data` rows over 28 layouts; 136 twins, 13 skipped, 27 caveats;
-  reasons: Fan 3 Name 1, Fan 3 Speed 1, Fan 4 Name 1, Fan 4 Speed 1, Pump Speed 9
+  row census: 149 `text`/`data` rows over 28 layouts; 138 twins, 11 skipped, 28 caveats;
+  reasons: Fan 3 Name 1, Fan 3 Speed 1, Pump Speed 9
   ```
 
   On CI's runner the count is one row lower, because that image has no CJK face for the
   vendor's `simsun` rows to resolve: **131 of 145** twins identical, recorded on 2026-11-13.
-  The 149-vs-145 shift is this page's own change (two drive slot rows and their names), and
-  no CI reading at 149 rows has been taken yet - so the honest reading of that pair is that the runner's
-  figure predates the row, not that it is 133 today.  The 13 that paint nothing here (14 there) are rows
-  the painter skips too, each with the reason the model gives: `Pump Speed` in **9**
-  layouts, the `Fan 3`/`Fan 4` slots this box reports no tachometer for, and on the
-  runner the rows whose family has no file to open.  Those are counts at the editor's
+  The 149-vs-145 shift is this page's own change (the two drive slot rows and their names, and
+  the `GPU FAN` row that went in beside them), and no CI reading at 149 rows has been taken yet -
+  so the honest reading of that pair is that the runner's figure predates those rows, not that
+  the twin count is 138 today.  The 11 that paint nothing here are rows the painter skips too,
+  each with the reason the model gives: `Pump Speed` in **9** layouts, and the one `Fan 3` pair
+  this box reports no third tachometer for - `Fan 4` left the skipped list on 2026-11-14 for the
+  uninteresting reason that `bars` stopped reserving that slot (docs/limits.md has the 12-row
+  ceiling and the trade), while the name is still answered for layouts you write.  On the
+  runner there are further skips, the rows whose family has no file to open.  Those are counts at the editor's
   pinned pair, which carries the vendor's two rows (`Fan CPU`, `Fan System 5`) and no
   pump row on purpose: at this machine's **live** readings the same nine rows draw, since
   2026-11-13, from the channel pinned as the pump (docs/limits.md, PROTOCOL.md §8).
-  **23** of the painted lines are
-  spelled by a shape the file itself declares unmeasured (**22** there). Punch a hole in
+  **28** of the painted lines are
+  spelled by a shape the file itself declares unmeasured - one more than the 27 measured an hour
+  earlier the same day, the new one being `GPU Fans Speed`, whose percent shape this repo owns
+  even though the **name** is the vendor's. Punch a hole in
   the readings and both doors answer the same way: `bars`' RAM row depends on `RAM Rate`,
   spelled from `memory.used` / `memory.total`; with the total gone the model says so, the
   painter records `showIf:RAM Rate`, and the `GPU Memory Rate` row beside it still paints.

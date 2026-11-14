@@ -76,8 +76,19 @@ mounted drive, the scalar the capacity numbers come from) and `Disk 1 Temperatur
 `Disk 4 Temperature` with their `Disk N Name` partners - positional, and ordered so slot 1 is the
 drive under `/`, which is how `bars` marks it: `Disk 1 Name` prints `nvme0 /`, the others plain.
 Since 2026-11-14 our own generated `bars` draws slots 1 and 2 of those; the vendored library
-names no storage metric at all, and of the 21 distinct `source` values across the 28 layouts,
-the four disk names are the only ones any generated export asks for.
+names no storage metric at all.  The split is printed - `python3 -m unittest
+tests.test_row_notes` ends with **24 distinct `source` values across the 28 layouts, 17 of them
+asked only by a generated export**, the four disk pairs and the GPU-fan row among them - so this
+page points at the door that counts them instead of carrying the number.
+
+The card's fan travels the same way, under **the vendor's own name**: `GPU Fans Speed`
+(`gpuFansSpeed` in its editor vocabulary) pairs with `gpu.fan`, which `sensors` has been filling
+from `nvidia-smi`'s `fan.speed` for as long as the NVIDIA path has existed.  Its unit is a **duty
+percent** - NVML's RPM call refuses on this box and no GPU here publishes a tachometer, both
+measured and recorded in [limits](limits.md) - so `bars` draws `34%` on a 0..100 meter beside the
+card's temperature, and a box with no such reading reports the row unanswered rather than
+printing `0%`.  `Fan 4 Speed`/`Fan 4 Name` stay in the vocabulary for layouts you write even
+though `bars` no longer reserves that slot: twelve rows is the ceiling the canvas gives it.
 
 ## Options
 
@@ -267,14 +278,17 @@ claim:
   is printed by the gate itself - `python3 -m unittest tests.test_export_parity` ends with
   one line per theme giving widgets, characters and the lit-pixel count down each door -
   and as measured on 2026-11-14: `clock` 3 widgets and 1 448 characters, `gauge` 5 and
-  2 314, `dual` 10 and 4 677, `alpha` 12 and 6 312, `bars` **38 and 16 787**.  That pair
-  moved twice in one day - 32 and 14 121, then 35 and 15 434 with one drive row, then the
-  present count when the row became two positional slots. Each is byte-identical
+  2 314, `dual` 10 and 4 677, `alpha` 12 and 6 312, `bars` **38 and 16 800**.  That pair
+  moved three times in one day - 32 and 14 121, then 35 and 15 434 with one drive row, then 38
+  and 16 787 when the row became two positional slots, and the present figure when a `GPU FAN`
+  row went in **in place of** the fourth fan slot, which left the widget count where it was:
+  one triple out, one in. Each is byte-identical
   between two exports in the same run. The parity gate paints each one both ways -
   through `render.py` and through `layout.draw_theme` - on every reading that answers what
   the theme asks: **zero differing pixels, worst channel delta 0**, at 25 530 / 25 343 lit
   pixels for `clock`, 20 608 / 21 391 for `gauge`, 40 006 / 41 842 for `dual`, 40 426 /
-  39 186 for `alpha` and 76 253 / 74 864 for `bars` - `bars` agrees at all five cases,
+  39 186 for `alpha` and 76 189 / 74 451 for `bars`, the other four `bars` cases being
+  16 072 / 20 968 / 11 184 at 0 px difference as well - `bars` agrees at all five cases,
   the other three themes part company on the readings that leave a whole group out, and
   the gate prints every case with its diff so the sentence cannot be read as five zeroes
   for every theme.
