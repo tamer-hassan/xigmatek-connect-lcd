@@ -1166,6 +1166,76 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     suite's GUI checks carry real per-window work, and a contended runner pays
     for all of it in series.
 
+  * `Apply these settings` now carries the background too, unless the
+    reader has said otherwise, and the README says out loud that the panel
+    runs headless.
+
+    **The button change** is the owner's request: pressing Apply and then
+    hunting for a second button is three clicks to change one picture, so
+    Apply sends the selected clip as well as the seven settings - **unless
+    "keep my background" is ticked**, which is the reader's own veto over
+    anything moving the stored layer, and unless the display's own record
+    says that clip is already what the panel holds. Six branches, each said
+    out loud in the log and each held by a check: the ordinary send
+    (settings, then the upload, naming both the picked clip and the one the
+    ring says was last accepted); the ring that has never shown an accept,
+    where the window sends rather than assumes the layer is already right;
+    the clip that is already stored, where no bytes go over the port and
+    the log says so instead of leaving a silence that reads as a failure;
+    keep ticked, naming the box that stopped it; no selection at all; and
+    the refused case - the loop holds one action slot, so an upload can be
+    turned away, and the window now quotes the display's own
+    `already queued: ...` words rather than staying quiet. That last branch
+    is the one my own census found: swallowing the refusal cost 0 failures
+    until the check existed, which is how this repository keeps discovering
+    that a branch nobody asserts is a branch nobody notices going silent.
+
+    One door, not two: Apply calls the clips box's `queue` , and both read
+    `protocol.MEDIA_GAP` and `protocol.MEDIA_CHUNK` from the protocol
+    module rather than carrying literals - a check counts those uses (two
+    each) and refuses a wire literal, and a check on `self.panel.queue(`
+    keeps exactly one direct port route in the window. Seven mutations
+    against the rule, counted as failing check-runs: the keep-box guard
+    ignored -> 1; uploading a clip the panel already stores -> 1; the
+    upload door removed (the old button) -> 4; an empty selection treated
+    as a clip -> 1; the knobs copied as literals -> 1; the refusal
+    swallowed again -> 1; the log naming no clip -> 2.
+
+    `docs/gui.md` carries the six-branch table, and the earlier story about
+    three picks that never moved the glass is kept with its design sentence
+    marked superseded rather than rewritten - the readout that story
+    produced is the part that still matters. Two cost figures are labelled
+    as records of the build that measured them (
+    `the six settings commands and a title in 0 ms` , and
+    `six socket commands, in 1 ms` ), because Apply can now queue a file
+    too and that is queued rather than waited on, so it is not inside
+    either figure.
+
+    **The README's second claim, measured.** The front page now says
+    plainly that `xigmalcd` runs on its own - a systemd user unit, no
+    desktop, no Qt - and that `xigmaui` is a client of it rather than part
+    of it. Three checks in `tests/test_launcher.py` back that rather than a
+    grep: no module under `xigmalcd/` names a GUI toolkit (read out of the
+    ASTs, with `PIL` and `serial` asserted present so the walk is not
+    reading an empty set), the window does import PyQt6 so the first check
+    is measuring a real boundary, and all **8** daemon modules import under
+    an interpreter hook that refuses any Qt module - with the same hook
+    shown stopping `xigmaui.app` in the same run, so the pass is not an
+    artefact of a hook that never fires.
+
+    One hazard that probe turned up, recorded because it will bite the next
+    module-walking check: `pkgutil.iter_modules` lists `__main__` , and
+    importing `xigmalcd.__main__` runs the program - the probe opened the
+    port and failed with `no reply for request 3` against the panel, on a
+    bench where the real service already holds that port. That is how
+    `python3 -m xigmalcd` works, and it is a fact about the module rather
+    than a defect, so the probe excludes `__main__` and says why in the
+    line that does it.
+
+    Checks: `tests/test_display_remote.py` 6 -> **13** and
+    `tests/test_launcher.py` 12 -> **15**; the suite count moves to **581
+    over 53 files**, which both tree doors confirm.
+
   * Two red CI runs, two different causes, and neither one visible from this
     bench.
 
@@ -1561,15 +1631,16 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     the changelog), which is the shape of the two commits between them.
 
     The count is read off the tree as well as off the runner.  The command
-    `grep -c "^    def test_" tests/*.py` answers 571 over 53 files, and
-    `unittest.TestLoader().discover("tests")` answers 571 over 53 modules; the
+    `grep -c "^    def test_" tests/*.py` answers 581 over 53 files, and
+    `unittest.TestLoader().discover("tests")` answers 581 over 53 modules; the
     runner's own number for that tree comes from the next pair of runs, this
     bench and GitHub's, and is written in beside it rather than predicted here.
     What the count has been at each step of
     this stretch, kept in one list rather than scattered through the entry,
-    newest first: 571 over
-    53 (the isolation guard's diagnosis put under test, on a passing suite), 570
-    over 53 (`Fan GPU` moved into the fan group, and the grid census became a
+    newest first: 581 over 53 (Apply carrying the background: seven checks on
+    the branches, three on the headless boundary), 571 over 53 (the isolation
+    guard's diagnosis put under test, on a passing suite), 570 over 53
+    (`Fan GPU` moved into the fan group, and the grid census became a
     check),
     568 over
     53 (the GPU-fan row: five checks for the row, two for the pairing gate in

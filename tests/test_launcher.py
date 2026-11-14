@@ -101,8 +101,84 @@ class DesktopEntry(unittest.TestCase):
             got = fixtures.run("desktop-file-validate", path)
             self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
 
+class HeadlessBoundary(unittest.TestCase):
+    """The README's claim that the panel runs without a desktop, measured rather than asserted.
+
+    `xigmalcd` is the program that owns the port and draws the frames; `xigmaui` is a client of
+    it.  That is not a style rule, it is a dependency fact a reader can be burned by: an install
+    on a headless box (a server, a seat with no X or Wayland session, a minimal system with no
+    `python3-pyqt6`) has to work, and the only way to keep it working is to hold the boundary
+    where a later convenience could break it.
+
+    Three checks, each measuring a different thing: the import graph of the daemon package, the
+    same graph for the window (so the first check is not passing because nothing was read), and
+    importing every daemon module **with Qt made unavailable at import time**, which is the
+    closest this suite can come to a machine that never installed PyQt6.
+    """
+
+    GUI = ("PyQt5", "PyQt6", "PySide2", "PySide3", "PySide6", "tkinter", "wx", "kivy")
+
+    def imports_of(self, package: str) -> set:
+        """Top-level module names imported by every file under `package`, read out of the AST."""
+        import ast
+        found = set()
+        for entry in sorted(os.listdir(os.path.join(fixtures.REPO, package))):
+            if not entry.endswith(".py"):
+                continue
+            path = os.path.join(fixtures.REPO, package, entry)
+            for node in ast.walk(ast.parse(fixtures.read(os.path.join(package, entry)))):
+                if isinstance(node, ast.Import):
+                    found.update(a.name.split(".")[0] for a in node.names)
+                elif isinstance(node, ast.ImportFrom) and not node.level and node.module:
+                    found.add(node.module.split(".")[0])
+            del path
+        return found
+
+    def test_the_daemon_package_names_no_toolkit_at_all(self):
+        got = sorted(self.imports_of("xigmalcd") & set(self.GUI))
+        self.assertEqual(got, [], f"the daemon now imports {got}: a headless install cannot "
+                                  "run it, which is what the README promises")
+        # non-vacuity: the walk read real imports, and the two it should find are these
+        third_party = {"PIL", "serial"}
+        self.assertTrue(third_party <= self.imports_of("xigmalcd"),
+                        sorted(self.imports_of("xigmalcd")))
+
+    def test_the_window_is_the_half_that_needs_the_toolkit(self):
+        self.assertIn("PyQt6", self.imports_of("xigmaui"),
+                      "the window no longer imports Qt, so the check above is measuring a "
+                      "boundary that has moved - re-read the README before trusting it")
+
+    def test_every_daemon_module_imports_with_qt_absent_from_the_interpreter(self):
+        """Import the whole daemon with a hook that refuses any Qt module.
+
+        A grep says no file names PyQt6; this says the package still *loads* when the toolkit is
+        not there, which is the property a headless machine cares about.
+        """
+        probe = (
+            "import sys\n"
+            "class NoQt:\n"
+            "    def find_module(self, name, path=None): return None\n"
+            "    def find_spec(self, name, path=None, target=None):\n"
+            "        if name.split('.')[0] in ('PyQt5','PyQt6','PySide2','PySide6','shiboken2',"
+            "'shiboken6'):\n"
+            "            raise ImportError(f'{name} is not installed on this machine')\n"
+            "        return None\n"
+            "sys.meta_path.insert(0, NoQt())\n"
+            "import importlib, pkgutil, xigmalcd\n"
+            "mods = [m.name for m in pkgutil.iter_modules(xigmalcd.__path__)\n"
+            "        if m.name != '__main__']   # __main__ runs the CLI when imported\n"
+            "for m in mods: importlib.import_module('xigmalcd.' + m)\n"
+            "print(len(mods), 'modules', ','.join(sorted(mods)))\n"
+        ).replace("\\n", "\n")
+        got = fixtures.run(sys.executable, "-c", probe)
+        self.assertEqual(got.returncode, 0,
+                         f"the daemon does not import without Qt: {got.stderr[-500:]}")
+        self.assertIn("modules", got.stdout, got.stdout)
+        del probe
+
 
 class TheMark(unittest.TestCase):
+
     """Both files come from one artwork, and both are the tool's output, byte for byte."""
 
     def test_the_png_is_a_mark_and_not_a_plate(self):

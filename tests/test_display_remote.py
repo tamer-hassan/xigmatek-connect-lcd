@@ -19,7 +19,9 @@ Two more claims worth their lines:
 """
 from __future__ import annotations
 
+import inspect
 import os
+import re
 import tempfile
 import time
 import unittest
@@ -87,6 +89,140 @@ class DisplayHarness(fixtures.FreshConfigRoot):
     def logs(self) -> str:
         return "\n".join(self.win._log_lines)
 
+
+
+class ApplyCarriesTheBackground(DisplayHarness):
+    """`Apply these settings` and the stored layer: what the button sends, and what it refuses to.
+
+    Changed on 2026-11-14 at the owner's request - the second click on "Send this background to
+    the panel" is folded into Apply, but **only while \"keep my background\" is unticked**, because
+    that box is the reader's own veto over anything moving the stored layer.  Four of the six
+    checks here are about the branches where nothing is sent: a button that uploads on one
+    machine and not another, without saying so, is worse than one that never uploads.
+
+    Everything is read from the display's side - `Control.take()` is what the frame loop would
+    find - so these checks ask \"did an action reach the queue\", not \"did the window print a
+    sentence\".  The log lines are asserted too, because a silent skip and a silent refusal look
+    identical to a reader who is not watching the ring.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.other = os.path.join(fixtures.REPO, "media", "Theme_11.mp4")
+        self.same = os.path.join(fixtures.REPO, "media", "Theme_25.mp4")
+        for path in (self.other, self.same):
+            if not os.path.exists(path):
+                self.skipTest(f"no {os.path.basename(path)} in this checkout to select")
+        self.win.mp4 = self.other
+
+    def pending(self):
+        """The action the loop would find if it asked - the only honest yes/no here."""
+        return self.ctl.take()
+
+    def test_apply_uploads_the_selected_clip_when_the_box_is_unticked(self):
+        self.win.keep_clip = False
+        self.win._stored_bg = "theme_47.mp4"       # the ring says a different layer is stored
+        self.assertIsNone(self.pending(), "the harness began with something already queued")
+        self.win.btn_apply.click()
+        got = self.pending()
+        self.assertIsNotNone(got, f"nothing reached the loop: {self.logs()[-400:]}")
+        kind, path = got
+        self.assertEqual(kind, "upload", got)
+        self.assertEqual(os.path.basename(str(path)), "Theme_11.mp4", got)
+        said = self.logs()
+        self.assertIn("the background goes with them: Theme_11.mp4", said, said[-400:])
+        self.assertIn("theme_47.mp4", said,
+                      "the log never named the layer the panel was holding")
+        self.assertIn("queued for its frame loop", said,
+                      "the queue answer came from the display's door, not a sentence of ours")
+
+    def test_the_box_stops_the_upload_and_says_which_box_stopped_it(self):
+        # the checkbox itself, not the handler: a click emits the signal the window is wired
+        # to, so this is the state a reader actually leaves the box in
+        self.win.chk_keep.setChecked(True)
+        self.assertTrue(self.win.keep_clip, self.win.chk_keep.text())
+        fixtures.pump(0.05)
+        self.assertIsNone(self.pending(), "toggling the box queued something on its own")
+        self.win.btn_apply.click()
+        self.assertIsNone(self.pending(),
+                          'an upload went out while "keep my background" was ticked')
+        self.assertIn("your background stayed", self.logs(),
+                      "Apply moved the settings and left the reader to infer why the layer "
+                      "did not follow")
+
+    def test_no_bytes_go_when_the_panel_already_holds_that_very_clip(self):
+        self.win.keep_clip = False
+        self.win.mp4 = self.same
+        self.win._stored_bg = os.path.basename(self.same)
+        self.win.btn_apply.click()
+        self.assertIsNone(self.pending(),
+                          "the button pushed a file over a port that already stores it")
+        self.assertIn("already stores Theme_25.mp4", self.logs(), self.logs()[-400:])
+
+    def test_an_unread_ring_sends_rather_than_guessing_that_it_is_already_right(self):
+        """A window that has seen no accept cannot claim the layer is in place.
+
+        The empty `_stored_bg` is the state a freshly opened window is in, and the two ways out
+        (send, or stay quiet and say nothing) both have to be refused in code: the first is what
+        the button does, and the second is the silence this repository keeps calling a defect.
+        """
+        self.win.keep_clip = False
+        self.win._stored_bg = ""
+        self.win.btn_apply.click()
+        got = self.pending()
+        self.assertIsNotNone(got, "with nothing read from the ring, the button stayed quiet")
+        self.assertIn("no accept from the display yet", self.logs(), self.logs()[-400:])
+
+    def test_nothing_is_sent_when_the_clips_box_holds_no_selection(self):
+        self.win.keep_clip = False
+        self.win.mp4 = ""
+        self.win.btn_apply.click()
+        self.assertIsNone(self.pending(), "an empty selection became an empty upload")
+        self.assertIn("nothing is selected in the clips box", self.logs(), self.logs()[-400:])
+
+    def test_a_refused_upload_is_reported_in_the_display_s_own_words(self):
+        """The loop holds one action slot, so an upload can be refused - and a refusal over
+        this socket has to arrive as the display's sentence, not as silence between two of ours.
+
+        The window's own line says Apply tried; the display's line says why it did not land.
+        Both are asserted, because the reason is the actionable half: "already queued: X" names
+        what is in front of this upload, and a paraphrase of it throws that away.
+        """
+        self.win.keep_clip = False
+        self.win._stored_bg = "theme_47.mp4"
+        self.ctl._queue("frame", None)          # whatever the loop was already going to do
+        self.win.btn_apply.click()
+        got = self.pending()
+        self.assertEqual(got, ("frame", None),
+                          f"Apply displaced an action already queued for the loop: {got}")
+        said = self.logs()
+        self.assertIn("the background goes with them: Theme_11.mp4", said, said[-400:])
+        self.assertIn("the display would not queue Theme_11.mp4", said, said[-400:])
+        self.assertIn("already queued", said,
+                      "the display's own reason did not survive into the window's log")
+
+    def test_both_upload_doors_read_the_wire_knobs_from_one_place(self):
+        """Apply calls the clips box's own queue rather than carrying a second copy of a write.
+
+        The gap and chunk are measured wire facts held in `xigmalcd/protocol.py`; a second
+        literal in the window is how a measured number becomes a preference someone later
+        tunes.  Counted out of the shipped source, not asserted as a rate.
+        """
+        whole = inspect.getsource(app.Window)
+        apply_body = inspect.getsource(app.Window._apply_to_display)
+        self.assertEqual(whole.count("protocol.MEDIA_GAP"), 2,
+                         f"{whole.count('protocol.MEDIA_GAP')} uses of the measured gap: the "
+                         "clips box and Apply are meant to read one source, not two copies")
+        self.assertEqual(whole.count("protocol.MEDIA_CHUNK"), 2,
+                         "the chunk size is likewise asked from one place by both doors")
+        # Apply goes through the same door, and there is exactly one such door per kind
+        self.assertIn('self.queue("upload"', apply_body.replace("\n", " ").replace("( ", "("),
+                      "Apply uploads by its own route rather than the clips box's")
+        self.assertEqual(len(re.findall(r"gap=0\.0\d+|chunk=1000\b", whole)), 0,
+                         "a wire literal has appeared in the window beside the protocol name")
+        self.assertEqual(len(re.findall(r"self\.panel\.queue\(", whole)), 1,
+                         f"a second direct port route appeared: the window is meant to have "
+                         "one place where it talks to the port itself")
 
 class WindowDrivingADisplay(DisplayHarness):
     def test_the_window_finds_the_display_and_reads_its_published_counters(self):

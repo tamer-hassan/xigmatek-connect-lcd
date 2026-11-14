@@ -56,11 +56,14 @@ so this window has two roles and picks one at startup by looking:
   button (`panel.py`).  Nothing reaches the panel without a deliberate click.
 
 The second bullet is why the buttons say what they say.  A clip picked in the
-list is only a *selection* until the upload button is pressed, and the window
-now reports which of the two the panel is holding: the daemon keeps the last
-six things it did on the port, and this window shows that ring, so "I chose it"
-and "the panel stores it" cannot be confused the way they were on the bench
-(docs/gui.md's walk-through, and the limits write-up).
+list is a *selection*, and it reaches the panel on either of two doors now:
+`Send this background to the panel` on its own, or `Apply these settings`,
+which takes the selected clip with it unless the reader has ticked "keep my
+background" - the box that says nothing should move the stored layer.  Either
+way the window reports which of the two states the panel is holding: the daemon
+keeps the last six things it did on the port, and this window shows that ring,
+so "I chose it" and "the panel stores it" cannot be confused the way they were
+on the bench (docs/gui.md's walk-through, and the limits write-up).
 """
 from __future__ import annotations
 
@@ -1013,10 +1016,12 @@ class Window(QMainWindow):
         self.btn_apply.setShortcut(QKeySequence("Ctrl+Return"))
         self.btn_apply.setToolTip(
             "send the theme, clock size, canvas, scrim, fans and fps on this "
-            "window to the display that is running. Nothing on this window "
-            "changes the glass until you press it - and the background clip is "
-            "not one of these settings: that goes with the button in the clips "
-            "box, because it overwrites what the panel stores")
+            "window to the display that is running, and - unless \"keep my "
+            "background\" is ticked - the clip selected in the clips box too, "
+            "when the display has not already put that one on the panel. "
+            "Nothing on this window changes the glass until you press it. The "
+            "background is a file that overwrites what the panel stores, so "
+            "the box is what decides whether this button touches it.")
         self.btn_apply.clicked.connect(self._apply_to_display)
         rowe.addWidget(self.btn_apply)
         llay.addLayout(rowe)
@@ -4492,6 +4497,15 @@ class Window(QMainWindow):
                               f"queued for its frame loop, which is the only "
                               f"thing holding the port. Its list under 'The "
                               f"running display' says when it landed")
+                else:
+                    # A refusal is never reported as silence - the rule this
+                    # repository states for the socket in docs/usage.md, and the
+                    # case that matters most since Apply started sending the
+                    # background too: the loop holds one action slot, so an
+                    # upload that did not go is a thing the reader has to be
+                    # told, not a gap between two log lines that read as success.
+                    self._log(f"the display would not queue {self._queued_bg}: "
+                              f"{rep.get('error') or rep or 'no reason came back'}")
                 self._refresh_clip_state()
                 return
             if kind == "reset":
@@ -4716,20 +4730,42 @@ class Window(QMainWindow):
             "fans": self.fanline.isChecked(),
             "fps": self.d_fps.value(),
         })
-        # and what it deliberately left alone, said out loud.  A background is
-        # not one of these settings - it is a file that overwrites what the
-        # panel stores - so Apply never sends one, and on the bench that
-        # distinction read as a broken picker: a clip selected in the list, Apply
-        # pressed, and the glass going on drawing over the old picture.
-        if applied:
-            want = os.path.basename(self.mp4)
-            if self._stored_bg and self._stored_bg != want:
-                self._log(f"settings sent; the background did not go with them. "
-                          f"The panel stores {self._stored_bg} and this window "
-                          f"has {want} selected: the clips box sends it (Ctrl+Shift+U)")
-            elif self._stored_bg == want:
-                self._log(f"settings sent; the panel already stores {want}, so "
-                          f"the layer under the frame stayed as it was")
+        # and what it did with the background, said out loud in every branch.  Since
+        # 2026-11-14 Apply also sends the clip this window has selected - the owner asked to
+        # save the second click on "Send this background to the panel" - but **only when
+        # "keep my background" is unticked**, because that box is the reader's own answer to
+        # "should anything move my layer?", and a button honouring it is a button that
+        # respects the one control meant to stop it.  The third branch is the boring one that
+        # matters: when the display's ring already says the panel stores this clip, no bytes
+        # go over the wire for a picture that is already there, and the log says why nothing
+        # happened rather than leaving a silence to be read as a failure.
+        if not applied:
+            return
+        want = os.path.basename(self.mp4) if self.mp4 else ""
+        if self.keep_clip:
+            self._log('settings sent; your background stayed. "keep my background" is '
+                      f'ticked, so Apply will not overwrite what the panel stores'
+                      + (f" - untick it, or send {want} from the clips box "
+                         "(Ctrl+Shift+U), if you meant this one" if want else ""))
+        elif not want:
+            self._log("settings sent; no background was sent either, because nothing is "
+                      "selected in the clips box")
+        elif self._stored_bg == want:
+            self._log(f"settings sent; the panel already stores {want}, so the layer under "
+                      "the frame stayed as it was and no bytes went over the port")
+        else:
+            self._log(f"settings sent, and the background goes with them: {want}"
+                      + (f" (the display's own record says it last accepted "
+                         f"{self._stored_bg})" if self._stored_bg
+                         else " (this window has seen no accept from the display yet, so it "
+                              "sends rather than assumes the layer is already right)"))
+            # the clips box's own door, called rather than duplicated: one route to an
+            # upload, the same measured gap/chunk from `protocol`, and the same rule that
+            # the frame loop - not the socket - is what owns the port and reports the
+            # verdict back through the ring
+            self.queue("upload", path=self.mp4,
+                       gap=protocol.MEDIA_GAP, chunk=protocol.MEDIA_CHUNK,
+                       fans=self.fanline.isChecked())
 
     # ---- tray ------------------------------------------------------------
     def _build_tray(self) -> None:

@@ -14,6 +14,20 @@ PNG frames. Verified on real hardware (Connect 360, firmware `V1.2.3`): handshak
 metrics blob and picture upload all work from Kubuntu — the drawn frame is what the
 display shows.
 
+**It runs headless, and the window is optional.** The program that owns the panel is
+`xigmalcd`: it opens the serial port, reads the sensors, draws the frames and uploads
+them, and the install ships a systemd **user** unit for it — so `systemctl --user start
+xigmalcd.service` on a machine with no desktop, no X or Wayland session and no Qt
+installed is the entire setup. That package imports exactly two third-party modules,
+Pillow and pyserial, and no GUI toolkit at all; `tests/test_launcher.py` holds the
+boundary both ways — it imports every `xigmalcd` module under a hook that refuses PyQt,
+and it shows the same hook stopping the window, so the claim is measured and not a grep.
+`xigmaui`, the Qt 6 window, is a **client** of that daemon over a control socket
+(`docs/usage.md`, "Two processes, one port"): close it, or never install
+`python3-pyqt6`, and the glass keeps drawing. What the window adds is choosing — theme,
+background, rate, ink, the vendor's own 27 layouts in an editor — and reading back what
+the display says it put on the panel, which this hardware cannot be asked about.
+
 **Unofficial, and it says so.** Nothing here is affiliated with, endorsed by or
 approved by XIGMATEK; `Xigmatek`, `Connect` and `ALPHA` are their owner's names. The
 code — `xigmalcd/`, `xigmaui/`, `tools/`, `install/` — is GPL-3.0-or-later (`LICENSE`),
@@ -80,8 +94,15 @@ transparent frames: a layout file is never sent, because this firmware does not 
 
 ## The window
 
+Optional, and a client: `python3 -m xigmaui` needs PyQt6 (`sudo apt install
+python3-pyqt6`), the daemon needs neither a display server nor Qt, and closing the
+window changes nothing on the glass.
+
 The same controls in a Qt application: pick a theme, pick a background from every clip
 the machine can find, watch the preview, put one frame or the whole loop on the glass.
+`Apply these settings` reaches both halves of the picture now - the display's settings
+and, unless you have ticked "keep my background", the clip selected in the list, sent
+only when the panel is not already storing that one (docs/gui.md has the six branches).
 And because this panel cannot be asked what it is showing, the window says what it
 *knows*: the background the running display reported putting there, and the last six
 things it did on the port. Three columns — preview, controls, clip library — with an
@@ -170,15 +191,18 @@ sudo apt install ./xigmatek-connect-lcd_*_all.deb ./xigmatek-connect-lcd-themes_
 # 3. the udev rule is installed but not read yet - replug, or:
 sudo udevadm control --reload-rules && sudo udevadm trigger --action=change
 # 4. the install *enables* the unit and does not start it:
-systemctl --user start xigmalcd.service
-xigmaui                                     # the window; needs `sudo apt install python3-pyqt6`
+systemctl --user start xigmalcd.service    # this alone drives the glass - no desktop needed
+xigmaui                                    # optional window; needs `sudo apt install python3-pyqt6`
 ```
 
 That gives `/usr/bin/xigmalcd`, `/usr/bin/xigmaui` and `/usr/bin/xigmalcd-reset`, a
 udev rule that makes the port a user-owned `/dev/xigmatek-lcd` and keeps ModemManager
 off it, and a user unit whose `ExecStart` is `--theme alpha --fps 2` with no reset
-permission. The second package is the vendor's own theme library and is optional on
-purpose. Two things about that unit are worth knowing on day one: the install enables it
+permission. Both optionality claims are deliberate: the second package is the vendor's
+own theme library, and the window is a client of the unit rather than part of it - stop
+`xigmaui` and the panel keeps drawing, because the frames belong to `xigmalcd`. Change
+what is drawn without the window by editing the unit's `--theme`
+(`systemctl --user edit xigmalcd`, then `daemon-reload` and `restart`). Two things about that unit are worth knowing on day one: the install enables it
 in systemd's **global user** scope (`/etc/systemd/user/default.target.wants`, so for every
 user's next login - taking that back is `sudo systemctl --global disable xigmalcd`), and an
 **upgrade** while you are logged in has been seen to start the display on its own three

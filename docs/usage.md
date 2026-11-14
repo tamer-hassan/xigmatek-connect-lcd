@@ -474,7 +474,9 @@ exercises the socket end to end: bounds, the one-slot queue, the `.zip` refusal,
 the `reset` refusal, junk from a client, a second daemon refused on a live socket,
 a failed run leaving no socket behind, and the window driving a display over a
 real socket with the serial layer absent. Cost, measured there: the window's
-Apply button, six socket commands, in **1 ms** - a control command never waits on
+Apply button, six socket commands at the time it was measured (seven settings
+commands today, and since 2026-11-14 the button can also **queue** a background upload,
+which is not waited on and so is not inside that figure), in **1 ms** - a control command never waits on
 the panel, because the daemon's server thread only touches in-process state.
 
 The gap worth knowing about: **nothing here has been run for hours.** Five 520 s windows

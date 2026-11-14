@@ -1297,12 +1297,37 @@ The bench found the cost of not having that readout, and it is worth writing dow
 because it looked like a broken feature rather than a missing label: a background
 was picked from the list **three times**, three different clips, and the panel kept
 drawing the picture it already had. Nothing on screen said why. What had actually
-happened is that `Apply these settings` had been pressed each time, and Apply sends
-the settings - on that build six of them, theme, clock size, canvas, scrim, fans, fps,
-and the text colour since - and *never a file*, by
-design, because a background upload overwrites what the panel stores and only the
-guarded factory reset undoes that. Picking a row is a selection; the clips box is
-what sends it. Three things came out of that afternoon, all in the window now:
+happened is that `Apply these settings` had been pressed each time, and Apply sent
+the settings - six on that build, theme, clock size, canvas, scrim, fans, fps, and the
+text colour since - and *never a file*, by design at the time, because a background
+upload overwrites what the panel stores and only the guarded factory reset undoes that.
+Picking a row was a selection; the clips box was what sent it.
+
+**That design changed on 2026-11-14**, at the owner's request: pressing Apply and then
+hunting for the second button is three clicks to change one picture, so Apply now takes
+the selected clip with it - **unless "keep my background" is ticked**, which is the
+reader's own veto over anything moving the stored layer, and unless the display's own
+record already says that clip is what the panel holds. The story above is kept because
+what it produced is still the part that matters: the readout that keeps "I picked this"
+and "the panel stores this" apart. Six branches, all said out loud in the log, and each
+one held by a check in `tests/test_display_remote.py`:
+
+| state when Apply is pressed | what goes over the socket | what the log says |
+|---|---|---|
+| keep unticked, a clip selected, the panel stores a different one | the seven settings, then the upload | `settings sent, and the background goes with them: X (the display's own record says it last accepted Y)`, then the display's `queued for its frame loop` |
+| keep unticked, a clip selected, the ring has never shown an accept | the same, upload included | `... this window has seen no accept from the display yet, so it sends rather than assumes the layer is already right` |
+| keep unticked, the panel already stores that clip | the seven settings, **no bytes** | `the panel already stores X, so the layer under the frame stayed as it was and no bytes went over the port` |
+| keep **ticked** | the seven settings, no upload | `your background stayed. "keep my background" is ticked ...` naming the box that stopped it |
+| nothing selected in the clips box | the seven settings, no upload | `no background was sent either, because nothing is selected in the clips box` |
+| the loop's one action slot already full | settings; the upload refused | our line, then **the display's own words**, `already queued: ...`, quoted rather than paraphrased |
+
+One design point worth the sentence: Apply calls the clips box's own `queue` door rather
+than carrying a second upload path, and both read the measured wire knobs -
+`protocol.MEDIA_GAP`, `protocol.MEDIA_CHUNK` - from the protocol module, so there is one
+copy of each number in the window. A check counts those uses, and mutating either to a
+literal fails it (7 mutations counted against this rule: 1, 1, 4, 1, 1, 1, 2 failures).
+
+Three things came out of that afternoon, all in the window now:
 the one state line, the ring, and Apply saying out loud which background it left
 alone. The author's own `~/.config/xigmaui/config.json` at 07:33 holds
 `clip: /usr/share/xigmalcd/themes/alpha/clips/theme_47.mp4` and `clock_size: 30`,
@@ -1546,7 +1571,7 @@ What those four windows measured, counters and notices only:
 | phase | what the panel answered |
 |---|---|
 | the loop drawing | four 520 s windows at 1 fps, one process each. In the fourth one a **second process** ran `python3 -m xigmalcd --status` against the running display and printed its counters - `24/24 frames confirmed, 0 refused` - without the reader ever opening the port; in the first three that phase was mis-wired to the driver's own socket read, see below |
-| Apply | the six settings commands and a title in **0 ms**, all four times; the counters said `showing gauge` from the next poll on and stayed `gauge` for the rest of each run |
+| Apply | the six settings commands and a title in **0 ms**, all four times - a record of the 0.4 build, whose Apply sent no file; since 2026-11-14 the button may also queue an upload, which is queued rather than waited on, so it is not inside that measurement; the counters said `showing gauge` from the next poll on and stayed `gauge` for the rest of each run |
 | `pause` | **0** frames and **0** confirmed uploads moved in 20 s, in all four runs, while the session the process held aged from 48 s to 64 s (and to 69 s by the time the next phase asked for a frame); the counters read `paused gauge` throughout |
 | `frame` while paused | **+1** upload, still `paused=True`, in all four runs - and it renewed on the way: `~ session restored` at 15:43:00 / 15:52:46 / 16:03:51 / 16:15:56. Runs 2-4 also carry the daemon's own note `resumed after 69 s idle: session renewed`; run 1's log has that note for its `resume` (15:43:04) but not for this forced frame, and nothing in the tree records what changed between those two runs, so run 1's evidence is the restored-session line plus counters reading `session 1 uploads / 4 s` right after a session that had aged to 69 s. A `frame` is not a `resume` |
 | `resume` | 1 re-handshake each time, then 20 uploads |
