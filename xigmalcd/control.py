@@ -224,11 +224,12 @@ class Control:
         (docs/themes.md).  The window's own picker stays on the drawn set for now: a
         layout has no preview path there yet, and docs/theme-editor.md keeps that plan.
 
-        The count in the refusal is read off `render.THEMES` instead of written into the
-        sentence.  It used to say "the five drawn here" and then print a list of six,
-        because `birdseye` joined the set on 2026-11-14 and the prose did not move with
-        the registry: a door that names its own list cannot be allowed to disagree with
-        it, and a seventh theme would have made the same sentence wrong again.
+        The count in the refusal is read off `render.THEMES` rather than written into the
+        sentence, because sentence and registry drifted apart on 2026-11-14 when `birdseye`
+        joined the set: the old literal (count-claim-history: it named five, printed six) is
+        kept here only as the reason for the rule.  A door that names its own list cannot be
+        allowed to disagree with it, and any new theme would have made that sentence wrong
+        again without anyone deciding to write a wrong sentence.
         """
         from . import render, themes
         name = str(value or "")

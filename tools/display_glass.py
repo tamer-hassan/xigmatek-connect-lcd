@@ -257,7 +257,7 @@ def main(argv=None) -> int:
     def apply_file() -> None:
         """A layout that only a **saved file** answers, named over the socket.
 
-        `apply` above sends one of the five names this repo draws out of `render.py`.  This
+        `apply` above sends one of the names this repo draws out of `render.py`.  This
         sends a name that exists nowhere except as JSON in the one writable theme directory -
         the state a person reaches with `save as your copy` in the window, or `themes.save`
         from a script.  The loop reads it back through `themes.resolve` and `themes.paint`,

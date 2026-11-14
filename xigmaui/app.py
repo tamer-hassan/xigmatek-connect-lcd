@@ -1076,7 +1076,7 @@ class Window(QMainWindow):
         self.theme.setToolTip(
             "the drawings `xigmalcd` renders itself, from live sensor readings. "
             "The vendor's layouts are not in this list on purpose: this combo picks "
-            "what the *loop* draws from this machine's readings, and the five are what "
+            "what the *loop* draws from this machine's readings, and the drawn names are what "
             "`render.py` draws from them. The daemon does draw 23 of the library "
             "layouts - `xigmalcd --theme Theme_07`, and `--list-themes` prints the set "
             "with the four refused for their canvas and any file with nothing in it to "
@@ -1097,7 +1097,7 @@ class Window(QMainWindow):
         # footnote is a bad trade.  The full explanation is the combo's tooltip (set
         # just above) and docs/themes.md, which is what the parenthetical points to.
         vendor = QLabel(
-            "the five are what this window draws; 23 of the package's layouts reach "
+            "the drawn set is what this window draws; 23 of the package's layouts reach "
             "the daemon by name instead (docs/themes.md)")
         vendor.setWordWrap(True)
         vendor.setStyleSheet("color:#888;font-style:italic;")
@@ -1349,7 +1349,7 @@ class Window(QMainWindow):
         self.ed_save.setToolTip(
             "write this layout to ~/.config/xigmalcd/themes/<name>.json - the one place "
             "an edited theme lives, and the file `--theme <name>` finds first. The two "
-            "vendor trees are refused, and so are the five drawn-from-code names: a "
+            "vendor trees are refused, and so are the drawn-from-code names: a "
             "saved `gauge.json` would be a second `theme_gauge` (docs/limits.md)")
         self.ed_save.clicked.connect(self._editor_save)
         self.ed_revert = QPushButton("revert")
@@ -1532,7 +1532,7 @@ class Window(QMainWindow):
             "file goes under the preview, and the row is marked for you.  Ticked: the clip "
             "under the preview stays wherever you left it, and a layout that names another "
             "one says so in the note line and the log instead of moving it.  Nothing else "
-            "in the window ticks this box. Each of the five themes this repo draws from "
+            "in the window ticks this box. Each of the themes this repo draws from "
             "`render.py` names the backdrop its own published picture sits over "
             "(`themes.CODE_CLIPS`), so they pair as well; a layout you authored yourself "
             "names none, and with one of those open the pairing has nothing to do "
@@ -1545,7 +1545,7 @@ class Window(QMainWindow):
             "a vendor layout names one background clip in its own file, and the window "
             "follows that pairing unless you tick \"keep my background\" here.  This puts "
             "the layout's own clip back and unticks the box, so it follows again from now "
-            "on. Each of the five themes this repo draws from `render.py` names the "
+            "on. Each of the themes this repo draws from `render.py` names the "
             "backdrop its own published picture sits over, so they pair as well; a layout "
             "you authored yourself names none, and with one of those open the pairing has "
             "nothing to do (docs/themes.md, PROTOCOL.md \u00a711)")
@@ -1978,7 +1978,7 @@ class Window(QMainWindow):
             # the only thing that can move a pixel.
             #
             # `ink` goes to the same door the code drawing uses, and only `Editor.paint`
-            # decides whether it can be honoured: for one of the five names generated from
+            # decides whether it can be honoured: for one of the names generated from
             # `render.py` the theme has a declared skin and the preview follows the
             # reader's colour, for a vendored or saved file the colours are the file's.
             # Both halves of that are measured, not asserted - `tests/test_ink.py` paints
@@ -2538,7 +2538,7 @@ class Window(QMainWindow):
         """Follow the background a layout names, unless the "keep my background" box is on.
 
         One rule, said out loud in every branch, because the interesting part is the case
-        where it does nothing: the five themes drawn from `render.py` declare no clip at
+        where it does nothing: the themes drawn from `render.py` declare no clip at
         all, and a clip the box does not have is a fact the reader needs, not a silence.
         """
         clip, why = themes.pair(name)
@@ -3114,7 +3114,7 @@ class Window(QMainWindow):
         self.ed = ed
         # A vendor layout carries its own background; follow it while the background has
         # not been chosen by hand.  This is the only place the pairing is *driven*: the
-        # theme combo above lists the five drawn themes, which declare none.
+        # theme combo above lists the drawn themes, which declare none.
         self._apply_pair(ed.name)
         self._ed_set_enabled(True)
         self.ed_undo.setEnabled(False)
@@ -3662,7 +3662,7 @@ class Window(QMainWindow):
         """The colour dialog, for the row that asked - the window's one colour route.
 
         The ink of the *theme* has its own row above (and moves `render.SKIN` for the
-        five drawn themes); this one writes this widget's own key, which is what a
+        drawn themes); this one writes this widget's own key, which is what a
         layout file spells.  The value goes in as `#rrggbb` and comes back as
         `rgba(r, g, b, 1)` because `layout.rgba` reads nothing else - `edit.set` says
         that conversion out loud rather than doing it quietly.
@@ -3862,8 +3862,8 @@ class Window(QMainWindow):
         The door is not new; the handle was.  `control.Control._set_theme` has taken both
         halves of the vocabulary since 0.4 - it refuses only a name that `render.THEMES`
         lacks *and* `themes.resolve` answers None for - while the window's only route to it
-        was the theme combo, which lists `sorted(render.THEMES)`: five entries, against the
-        28 the editor can open.  Measured on 2026-11-11: with the editor open on `Theme_01`,
+        was the theme combo, which lists `sorted(render.THEMES)`: (count-claim-history) five
+        entries there, against the layouts the editor could open.  Measured on 2026-11-11: with the editor open on `Theme_01`,
         pressing `Apply these settings` sent `theme='alpha'`, and the 23 layouts this program
         paints only from a file - plus any copy of your own - had no route to the glass in
         this window at all.
@@ -3872,7 +3872,7 @@ class Window(QMainWindow):
         carries `status["theme"]` (PROTOCOL.md §11: no readback of pixels, but settings come
         back), and the box counts come from the **loop's own door** for a name that resolves to
         a file - `themes.paint`, the function that will draw the next frame on that panel - and
-        from `Editor.paint` for one of the five names this repo draws from code, which has no
+        from `Editor.paint` for one of the names this repo draws from code, which has no
         file to resolve.  Against the same file at the pinned fixture: the two frames this
         window is standing between.  Drawn first, before the command goes: a count that failed
         should not be able to leave the panel changed and the window silent.
@@ -3888,7 +3888,7 @@ class Window(QMainWindow):
         """
         if self.ed is None:
             self._log("nothing to apply: the layout box holds nobody. Pick one above, or "
-                      "use the theme box's `Apply these settings` for the five this "
+                      "use the theme box's `Apply these settings` for the themes this "
                       "program draws from code")
             return
         if not self.daemon.present:
@@ -3987,13 +3987,14 @@ class Window(QMainWindow):
             return
         shown = str((rep.get("status") or {}).get("theme") or name)
         if rec is None:
-            # one of the five this program draws from code: the theme box names the same
+            # one of the themes this program draws from code: the theme box names the same
             # thing, and two controls that disagree about what the panel draws are worse
             # than either one, so make them agree instead of leaving the reader to notice
             if self.theme.currentText() != name:
                 self.theme.setCurrentText(name)
             self._log(f"panel draws {shown} (its own status says so). That is one of the "
-                      f"five this program draws from `render.py`, so the theme box's picker "
+                      f"{len(render.THEMES)} this program draws from `render.py`, so the "
+                      f"theme box's picker "
                       f"names it too, and its `Apply these settings` reaches the same door")
         else:
             self._log(f"panel draws {shown} (its own status says so), from "
@@ -4014,7 +4015,8 @@ class Window(QMainWindow):
     def _refused_layout(self, name: str, rep: dict) -> None:
         """The display said no to a name this window resolves, so its words are the report.
 
-        Reported 2026-11-11: the five code-drawn names applied, `Theme_*` did not.  Both
+        Reported 2026-11-11 (count-claim-history): the five code-drawn names applied,
+        `Theme_*` did not.  Both
         shapes of door were read side by side before a line here was written.  This tree's
         `xigmalcd.control.Control._set_theme` answers `ok=True` for `Theme_01`, `Theme_07`,
         the numeric id `1757491588804` and a copy written into a temp user root, and refuses
@@ -4022,7 +4024,8 @@ class Window(QMainWindow):
         searched, in the order `themes.roots()` gives them: your copies first, then the
         checkout, then `/usr/share/xigmalcd/themes/alpha`.  The other door is what
         `git show v0.3:xigmalcd/control.py` shows: `if name not in render.THEMES`, and a
-        refusal naming the five drawn names and no directory at all.  The installed 0.3
+        refusal naming the drawn names of that build (count-claim-history) and no
+        directory at all.  The installed 0.3
         package ships no `xigmalcd/themes.py`, so that build has nothing to resolve a
         layout with.  The same
         press means different things against different displays, so this says both
@@ -4036,7 +4039,7 @@ class Window(QMainWindow):
         self._log(f"the display's own words: {rep.get('error') or 'it gave no reason'}")
         self._log(
             "two possibilities, and those words say which.  (a) that display is older than "
-            "this window's layout door: the socket's `theme` command took only the five "
+            "this window's layout door: the socket's `theme` command took only the drawn names "
             "names this program draws from `render.py` until 0.4, and a refusal that lists "
             "exactly those five and names no directory is that door.  Which display is "
             "running: the packaged service starts `/usr/bin/xigmalcd`, out of the installed "

@@ -48,7 +48,7 @@ FONTS = {
         "bold": "/usr/share/fonts/**/NotoSansCJK-Bold.ttc",
     },
 
-    # The face this program's own five themes are drawn with, spelled out of
+    # The face this program's own themes are drawn with, spelled out of
     # render._FONT_GLOBS rather than guessed at: an exported built-in layout names
     # this family instead of borrowing a vendor one that happens to resolve to the
     # same file on this box.  The parity gate in `tests/test_export_parity.py` is what

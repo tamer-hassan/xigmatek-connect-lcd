@@ -128,7 +128,10 @@ class SpokenForNames(unittest.TestCase):
     def test_each_refusal_comes_back_with_its_own_words(self):
         """Nine refusals, nine phrases.  A single generic "invalid name" would let four different
         mistakes look identical to a reader who has to fix one of them."""
-        cases = (("gauge", "one of the five"), ("../escape", "path element"),
+        # the drawn-set phrase is asked of the registry too: pinning the word "five" here
+        # is how a stale sentence got past the file that owns it
+        cases = (("gauge", f"one of the {len(themes.EXPORTS)} themes"),
+                 ("../escape", "path element"),
                  (".hidden", "leading dot"), ("bad.json", "suffix"),
                  ("x" * (themes.NAME_LIMIT + 1), "longer than"), ("a/b", "path element"),
                  (SOURCE, "not a free name"), (SOURCE.lower(), "not a free name"),

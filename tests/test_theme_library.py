@@ -95,6 +95,75 @@ class TheDrawnSetCountsItself(unittest.TestCase):
             self.assertIn(name, listed,
                           f"`--theme`'s help does not name `{name}`: {listed[:160]}")
 
+    def test_the_two_prose_doors_count_their_own_registry(self):
+        """`themes.why_not` and the writer's reserved-name refusal, asked of the doors.
+
+        Both sentences used to carry the number five in their literal text.  Today they are
+        f-strings over `render.THEMES`, so the claim is the registry's rather than a writer's
+        memory - and a seventh theme is the test: nothing here may say "five" or "six".
+        """
+        n = len(render.THEMES)
+        reason = themes.why_not("gauge")
+        print(f"  why_not('gauge'): {reason}")
+        self.assertIn(f"one of the {n} this program draws itself", reason, reason)
+        try:
+            themes._safe_name("bars")
+        except ValueError as exc:
+            said = str(exc)
+            print(f"  saving over a drawn name: {said[:120]}")
+            self.assertIn(f"one of the {n} themes drawn from render.py", said, said)
+        else:
+            self.fail("_safe_name accepted a drawn theme name: the reserved-name rule is off")
+        for claim in (" the five ", " the six ", " five themes", " six themes"):
+            self.assertNotIn(claim, reason.lower(), f"{claim!r} hardcoded in {reason}")
+
+    def test_no_shipped_line_states_the_drawn_sets_size_without_saying_so(self):
+        """A count of the drawn set, written into a comment, is a claim about a registry.
+
+        Scans the shipped modules for a number-word standing next to the language of the
+        drawn set (`drawn`, `generated`, `render.py`, `this program draws`, `theme combo`,
+        `code-drawn`) and refuses it unless the same line either reads the number off the
+        registry or carries the marker `count-claim-history`, which is how a sentence about
+        what an older build said stays in the file honestly.  This is not pedantry about
+        prose: `birdseye` arrived on 2026-11-14 and left eleven such sentences behind across
+        `xigmaui/app.py`, `xigmaui/edit.py`, `xigmalcd/themes.py`, `xigmalcd/layout.py`,
+        `xigmalcd/control.py` and `tools/display_glass.py`, two of them inside strings a user
+        reads, one of them promising that a saved `Theme_07` was refused because of "the five
+        names" when six had been drawn for a week.
+        """
+        import re
+        # The number-words that could be *this set's* size, and only next to language about
+        # the drawn themes themselves.  Kept narrow on purpose: "four" also counts fan slots,
+        # "five" counts the parity cases and the text-composite specials, and a rule that
+        # flags those would be answered by a pile of exemptions rather than by a better rule.
+        number = re.compile(r"\b(three|four|five|six|seven)\b")
+        about = re.compile(r"(themes drawn|drawn themes|generated themes|theme names|"
+                           r"drawn-from-code|names generated|code-drawn|theme combo|"
+                           r"this program draws|themes this repo|list of)", re.I)
+        marker = "count-claim-history"
+        offenders = []
+        scanned = 0
+        for path in ("xigmalcd/themes.py", "xigmalcd/control.py", "xigmalcd/main.py",
+                     "xigmalcd/render.py", "xigmalcd/layout.py", "xigmaui/app.py",
+                     "xigmaui/edit.py", "tools/display_glass.py"):
+            text = fixtures.read(path)
+            scanned += len(text.split("\n"))
+            for lineno, line in enumerate(text.split("\n"), 1):
+                if not number.search(line) or not about.search(line):
+                    continue
+                if marker in line:
+                    continue
+                # a line that *derives* the count is stating the registry, not remembering it
+                if "len(render.THEMES)" in line or "len(themes.EXPORTS)" in line \
+                        or "len(EXPORTS)" in line:
+                    continue
+                offenders.append((path, lineno, line.strip()[:88]))
+        print(f"  scanned {scanned} lines of shipped code for a number-word standing "
+              f"next to the drawn set: {len(offenders)} unmarked claims")
+        self.assertEqual(offenders, [],
+                         f"{len(offenders)} lines state the drawn set's size from memory: "
+                         + "; ".join(f"{p}:{n} {t!r}" for p, n, t in offenders[:6]))
+
     def test_the_list_door_prints_the_header_it_draws(self):
         """`--list-themes`'s own header line, read from the door rather than quoted."""
         import contextlib
@@ -140,8 +209,15 @@ class Selection(unittest.TestCase):
         self.assertIsNone(themes.resolve(self.reject[0]["name"]))
         self.assertIn("ratio 4:3", themes.why_not(self.reject[0]["name"]))
         self.assertIsNone(themes.resolve("gauge"))
-        self.assertIn("five", themes.why_not("gauge"),
-                      "one of the five generated themes is not a file, and the reason should say so")
+        # and the count in that reason comes from the registry, not from this file: the
+        # assertion used to read `assertIn("five", ...)`, which is a check that pins a
+        # number to a set that is allowed to grow - exactly what
+        # `test_no_shipped_line_states_the_drawn_sets_size_without_saying_so` below now
+        # refuses, and the reason that check was written.
+        n = len(render.THEMES)
+        self.assertIn(f"one of the {n} this program draws itself", themes.why_not("gauge"),
+                      "a drawn theme is not a file, and the reason should say which set it "
+                      "belongs to, counted off that set")
 
     def test_the_sources_the_library_asks_for_are_the_ones_this_program_has(self):
         """Two different questions, and 2026-11-13 pulled them apart.

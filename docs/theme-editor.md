@@ -250,7 +250,8 @@ drives it under a temp `XDG_CONFIG_HOME`, so every save, revert and refusal belo
 somewhere that cannot touch the reader's own `~/.config`. The window's group is a shell
 over that model, and the checks say so in counts.
 
-* **Opening writes nothing.** 3 library layouts and 5 generated ones opened, and
+* **Opening writes nothing.** 3 library layouts and every generated one (five then, six
+  today) opened, and
   the user theme directory still holds 0 files. This was not the first version: an
   earlier `open_theme` copied the file on open, which left a shadow of `Theme_28` behind
   whenever a later assertion failed - and a shadow is not inert, because `--theme
@@ -287,7 +288,8 @@ over that model, and the checks say so in counts.
   answers "does memory disagree with the file?", not "was anything typed?", so it is
   derived from two snapshots rather than a counter.
 * **The rows do not lie about the model.**  Counted by `tests/test_editor.py` rather than
-  remembered here: the layout combo offers 28 names (5 generated + 23 files); a `bar` widget gets
+  remembered here: the layout combo offers 29 names today (6 generated + 23 files; it was
+  28 when the drawn set was five); a `bar` widget gets
   **15** rows - **11** keys the painter reads for that kind plus **4** of our own; an `x`
   of 9999 sits in the spinbox, refused in words while the picture stays put; and the one
   library layout that carries an `arc` shows `(not set)` in its `arcPaint` row rather

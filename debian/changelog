@@ -1318,6 +1318,52 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     The name census moved 108 -> 119 source rows, 190 rows carrying at
     least one.
 
+  * A remembered count in shipped prose, and the gate that had pinned it.
+
+    Eleven sentences in shipped code still described the drawn set as five,
+    and one of them was a gate that *demanded* the stale word. `birdseye`
+    joined `render.THEMES` today and nothing moved the prose with it:
+    `themes.why_not` answered a drawn name with
+    `one of the five this program draws itself`, and the layout writer's
+    reserved-name refusal said
+    `is one of the five themes drawn from render.py` - both strings a user
+    reads, both naming a set of six for a day. The rest sat in comments and
+    tooltips in `xigmaui/app.py`, `xigmaui/edit.py`, `xigmalcd/layout.py`,
+    `xigmalcd/control.py` and `tools/display_glass.py`. The two strings now
+    take their number from the registry ( `len(render.THEMES)` ), which is
+    what makes them true for the next theme as well as this one; the nine
+    comments and tooltip lines lost the number instead, because the count
+    adds nothing to a sentence that is only naming the set. Read back from
+    the doors: `why_not('gauge')` answers
+    `one of the 6 this program draws itself` and `_safe_name('bars')`
+    refuses with `'bars' is one of the 6 themes drawn from render.py`. The
+    gate is
+    `test_no_shipped_line_states_the_drawn_sets_size_without_saying_so`: a
+    number-word standing next to language about the drawn themes must
+    either read the registry on the same line or carry the marker
+    `count-claim-history`, which is how a sentence about what an older
+    build printed stays in the file honestly rather than being deleted.
+    Three lines are so marked today - the control refusal's own history,
+    the 2026-11-11 hardware report, and the v0.3 door quoted in
+    `xigmaui/app.py`. The scan is deliberately narrow: `four` also counts
+    fan slots, `five` counts the parity cases and the text-composite
+    figures, and a rule that caught those would be answered by exemptions
+    rather than by a better phrase. Printed: 15 167 lines of shipped code
+    scanned, 0 unmarked claims. And the part that stung: the reason this
+    went unnoticed for a day is that `tests/test_theme_library.py`
+    contained `assertIn("five", why_not("gauge"))` - a check that pinned
+    the remembered number, so the sentence could not have been found wrong
+    by the very file that owns it. That assertion now asks for the
+    registry's own count, and the new behavioural check in the same class
+    asks the two prose doors directly. The pages that quote counts got the
+    same treatment in the other direction: `docs/gui.md` and
+    `docs/theme-editor.md` said 28 layouts where the editor now opens 29
+    (23 selectable vendor files plus the six drawn ones), and the
+    window-sizing sweep's rows are annotated as the set they were measured
+    over with the door that re-runs them ( `tests/test_window_sizing`,
+    `tests/test_clip_db`) rather than retyped. Suite: **634 checks over 55
+    test files**, both doors agreeing.
+
   * The smoke test asserted a directory listing, not a rule.
 
     The smoke test asserted a directory listing, and CI #217 went red on a

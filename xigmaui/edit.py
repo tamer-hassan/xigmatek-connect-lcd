@@ -13,7 +13,7 @@ invented here:
 
 * **The vendor's files are never what changes.**  `open_theme` only reads; the single
   writer is `themes.save`, which puts the layout under `~/.config/xigmalcd/themes`
-  and refuses both vendor trees and the five drawn-from-code names.  `themes.resolve`
+  and refuses both vendor trees and the drawn-from-code names.  `themes.resolve`
   is user-first, so from that moment `--theme` means your copy.  `open_path` opens a
   layout file at a path no root answers - and keeps both rules: it writes nothing, and
   a save from that buffer still goes to the one writable directory, never to the file
@@ -251,7 +251,7 @@ def _overlaps(box: tuple, others: list) -> bool:
 
 
 #: The five keys that every one of the **185** widget rows in the **28** layouts this
-#: editor opens carries - measured over the 23 vendor files and the 5 generated exports,
+#: editor opens carries - measured over the vendor files this machine can select and the
 #: re-counted from the files by `tests/test_row_acts.py` rather than remembered here: one
 #: distinct key
 #: set, `id`, `layerIndex`, `property`, `type`, `widgetContent`, and `property` a
@@ -333,7 +333,7 @@ class Editor:
         # file.  It is what decides whether the window's text colour may move the
         # preview at all: a layout's colours are its own (`layout.py` says so at the top
         # of the module, and it is why a vendored theme looks the same here as in the
-        # vendor's app), while one of the five names this repo draws from `render.py` has
+        # vendor's app), while one of the names this repo draws from `render.py` has
         # a *declared* skin - `render.SKIN` - that `themes.with_ink` can move.
         self.theme = theme
         # a vendor file's top-level `id` is a number (the theme id), so the *name* is
@@ -375,7 +375,7 @@ class Editor:
         the loop draws.  A name that has already been edited resolves to the copy, which
         is the point: reopening continues rather than starting over.
 
-        One of the five drawn from code is generated instead (`themes.export`), because
+        One of the drawn-from-code names is generated instead (`themes.export`), because
         there is no file for it and there will not be one: a saved `gauge.json` would be
         a second source of truth for `render.theme_gauge` (docs/limits.md).
         """
@@ -474,7 +474,7 @@ class Editor:
         """Write the edited layout into the user directory, canonically and atomically.
 
         `themes.save` is the only writer here, and it raises for the names it will not
-        take: the two vendor trees, and the five drawn-from-code names - a saved
+        take: the two vendor trees, and the drawn-from-code names - a saved
         `gauge.json` would be a second `theme_gauge` to disagree with `render.theme_gauge`
         (docs/limits.md).  A refusal comes back as (None, the reasons), because a window
         should print that sentence rather than unwind through it, and the checks can then
@@ -579,7 +579,7 @@ class Editor:
         `--theme <id>`.  From here the editor is editing the new copy; the old one is just
         another layout, and the note says which file is which.
 
-        A layout that never had a file - one of the five drawn from `render.py` - gets its
+        A layout that never had a file - one drawn from `render.py` - gets its
         first one here, and that is not the thing the save button refuses: what is refused
         is a `gauge.json` that would be a second source of truth for `theme_gauge`.  A file
         called `my-gauge.json` is a layout of its own, and `--theme gauge` still draws the
@@ -1939,7 +1939,7 @@ class Editor:
         `fan-figures` on the panel while this pane went on drawing them.
 
         `ink` is the window's text colour, and it is honoured **only while this editor
-        holds a generated layout** - one of the five names this repo draws from code.  It
+        holds a generated layout** - one of the names this repo draws from code.  It
         goes in by copying the object and moving its glyph colours
         (`themes.with_ink`), never by editing `self.obj`: the file a save would write
         keeps its own colours, and a reader's colour choice is a property of this view.
@@ -2212,7 +2212,7 @@ _NOT_A_LINE = {
 #: at (docs/limits.md), so an edit shown here is judged against the picture the docs
 #: describe rather than against whatever this machine is doing right now.
 #:
-#: Its **shape is a machine's**, and that is not incidental.  The five generated layouts
+#: Its **shape is a machine's**, and that is not incidental.  The generated layouts
 #: ask 19 sources between them; the numbers below answer 15 of them - the same 15 a box
 #: with two reported tachometers answers, leaving `Fan 3`/`Fan 4` slots empty in **both**
 #: doors, which is the reserved-slots rule of `bars` being visible rather than hidden.

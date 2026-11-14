@@ -419,7 +419,11 @@ class ApplyingALayoutToADisplay(DisplayHarness):
         self.assertEqual(self.win.theme.currentText(), generated,
                          "the theme box and the display disagree about what is drawn, which is "
                          "the state the log claims to have avoided")
-        self.assertIn("one of the five this program draws from `render.py`", said, said[-400:])
+        # the count in that sentence comes from the registry on both sides of the door:
+        # an earlier version of this line pinned the word "five", so a sixth drawn theme
+        # could only ever have made it red for the wrong reason
+        self.assertIn(f"one of the {len(render.THEMES)} this program draws from "
+                      f"`render.py`", said, said[-400:])
         self.assertIsNone(themes.resolve(generated),
                           "a generated name resolved to a file, so the two branches of this "
                           "button are being driven blind")
@@ -444,7 +448,8 @@ class ApplyingALayoutToADisplay(DisplayHarness):
                       "the window paraphrased the display's refusal instead of quoting it - and "
                       "the difference between the two reasons lives in those words")
         self.assertIn(f"the panel kept {kept}: {name} did not reach it", said, said[-400:])
-        for phrase in ("two possibilities, and those words say which", "took only the five",
+        for phrase in ("two possibilities, and those words say which",
+                       "took only the drawn names",
                        "until 0.4", "names no directory is that door",
                        "the packaged service starts `/usr/bin/xigmalcd`",
                        "`xigmalcd --list-themes`", "save as your copy",
