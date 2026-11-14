@@ -1627,7 +1627,17 @@ rather than a memory: this bench now carries `xigmatek-connect-lcd 0.6` and
 `xigmatek-connect-lcd-themes 0.6`, which can only be a build of this tree - `git tag -l`
 stops at v0.5 and the 0.6 stanza still reads UNRELEASED, so there is no published 0.6
 for apt to have found - and the display holding the port is `/usr/bin/python3
-/usr/bin/xigmalcd --theme alpha --fps 2`. That installed `xigmaui` predates the button -
+/usr/bin/xigmalcd --theme alpha --fps 2`.
+
+That reading has been overtaken twice, and both times by the same instrument: `dpkg-query`
+on this bench now answers `xigmatek-connect-lcd 0.7` and `xigmatek-connect-lcd-themes 0.7`
+(installed 14:59:01 on 2026-11-14, per `/var/log/dpkg.log`), the tags reach `v0.7`, and the
+0.6 stanza is published. The 0.7 now on this machine was built from `e1f95c3`, two prose
+commits before the release stamp, so its `changelog.gz` is a little older than the tree it
+sits in - which is worth saying because the identity claim that matters was checked
+independently of it: `cmp` against `git show HEAD:...` finds the installed `themes.py`,
+`render.py`, `control.py`, `main.py`, `layout.py`, `sensors.py`, `app.py`, `edit.py` and
+`clips.py` byte-identical to this repository. That installed `xigmaui` predates the button -
 its `app.py` holds no `ed_apply_panel` - so the control being pressed is this checkout's
 window, talking to an installed display over the socket, which is exactly the pairing
 the version boundary above warns about. What the pair of answers shows is the boundary
