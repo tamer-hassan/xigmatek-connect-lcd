@@ -26,7 +26,7 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
 | what did the vendor app itself actually send? | `tools/log_timeline.py LOG`, `tools/capdump.py`, `tools/vendor_capture.py` | ALPHA's 6-17 MB logs folded into a request sequence, the Windows IRP captures parsed without a Windows box, and the `.osd` payloads taken back out of them |
 | the panel is white from the first second | `xigmalcd-reset --yes` (installed) / `tools/reset_panel.py --yes` (checkout) | the vendor's `recovery`, byte-identical to the frame in its own log; the only repair for fields stuck at `2147483647` |
 | what would a frame look like, with no panel in the loop? | `python3 -m xigmalcd --dry-run DIR`, `tools/previews.py`, `tools/preview_gif.py` | PNGs on disk from the same render path; a preview composites over the shipped clip the way the panel composites |
-| could a generated layout draw one of our five themes instead? | `tools/knobmap.py` | per option, per theme: the best edit of that theme's own export, and the pixels between the two doors. 28 of the 37 pairs land at 0 px; the other 9 are far from 0, and `tests/test_knobmap.py` holds that split, the counts and the floor being ignored |
+| could a generated layout draw one of our six themes instead? | `tools/knobmap.py` | per option, per theme: the best edit of that theme's own export, and the pixels between the two doors. 28 of the 37 pairs land at 0 px; the other 9 are far from 0, and `tests/test_knobmap.py` holds that split, the counts and the floor being ignored |
 | the README's previews move, and how would I make another? | `tools/preview_gif.py --clip CLIP --theme T --series FILE --no-gif` (README's set: `--scale 480 --frames 240 --gif-fps 20-or-24 --crf 20 --no-gif`) | the preview pane's composite as a 10-12 s H.264 MP4 — the shape the README links, uploaded through GitHub's editor because an `.mp4` written into markdown becomes an `<img>` nothing plays; with `--series FILE` or `--live-seconds N` every reading in it comes from a recorded `sensors.collect()` series, so the digits, meters and clock move; it prints the bytes, the frame count and length as the written file reports them, how many passes of the clip that is, and the min→max of what it drew |
 | what does the window look like, and does the README's picture match the code? | `tools/screenshot.py` | `docs/screenshot-xigmaui.png`: the real Qt window, offscreen, with a port path that does not exist so nothing on the glass is touched |
 | dragging a row in the editor's pane is slow — what does a move cost, and what is it paying for? | `tools/dragcost.py`, `--session` for the reader's own saved session | a real `QMouseEvent` drag through the pane's own handlers: per-move mean/median/worst, the split by call, and the counts (`layout.py` source reads, `ffprobe`/`ffmpeg`/`sensors` spawns, tick paints) that `tests/test_canvas.py` asserts |
@@ -71,7 +71,7 @@ all). Both spellings are the same code, `xigmalcd/reset.py`, and you invoke it b
   `test_specials.py` (what a layout file is allowed to name, held to the pixels it claims),
   `test_theme_library.py` and `test_library_draw.py` (which layouts this canvas selects and
   what they paint), `test_export_parity.py`, `test_knobmap.py`, `test_theme_files.py` and
-  `test_editor.py` (the five generated themes, and the layout editor's model),
+  `test_editor.py` (the generated themes, and the layout editor's model),
   `test_media_roots.py` and `test_clip_db.py` (where a clip name resolves, and the dedup
   rule), `test_settings.py`, `test_packaging.py`, `test_packaging_parity.py`,
   `test_debian_changelog.py`, `test_launcher.py`, `test_launch_unit.py`, `test_no_serial.py`,
@@ -343,7 +343,7 @@ these knobs interact in ways nobody guesses right:
   drawn colour still within 1/255 at 480 px; 64 colours is where ink starts moving at
   320 px (7/255); dither off is ~10 % smaller and bands the gradients; `stats_mode=diff`
   measured 2-3 % *bigger* here. For MP4 the equivalent knobs are `--crf` and `--preset`:
-  crf 20 / medium on the five previews measured 214 KB - 1.93 MB (the spread is the
+  crf 20 / medium on the seven previews measured 214 KB - 1.93 MB (the spread is the
   background: `Theme_30.mp4` moves 0.46 of a mean-absolute step over 3 s, `theme_52.mp4`
   moves 7.41), and crf 18 / slow is about 40 % bigger.
   * **delays are quantised - GIF only.** A 6 fps GIF is 12 frames at a **170 ms** delay,
@@ -393,7 +393,7 @@ of the same animation.
   structure: every signature option is a row or an unread note (the unread list re-derived
   here with `ast`, so the tool cannot quietly drop an option and make the map look clean),
   exactness is binary with a 900 px floor taken from the run, and the reader's ink and the
-  default transparent canvas are exact for all five.  It also routes each option out of
+  default transparent canvas are exact for every drawn theme.  It also routes each option out of
   `main._theme_kwargs` with `ast`, because an option in a signature is not a flag: `big` is a
   *size* with no CLI route.  The same reconciliation is what found `theme_clock` taking a
   `clock` argument its body never read, so `--no-clock` moved that theme 0 px; the body

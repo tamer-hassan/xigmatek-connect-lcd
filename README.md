@@ -36,7 +36,7 @@ as such wherever they appear ("Licence", at the end).
 
 ## What it draws
 
-Five themes, each drawn over a *different* clip from the vendor's own library, and filmed
+Six themes, each drawn over a *different* clip from the vendor's own library, and filmed
 moving: the digits, the meters and the clock on the glass all change as you watch. What
 they show is recorded, not invented — `docs/videos/readings-2026-11-08.json` holds 12
 real `sensors.collect()` readings, one per second, taken on the author's bench while
@@ -66,9 +66,20 @@ reasoning and `tests/test_icons.py` the checks.
 |---|---|
 | https://github.com/user-attachments/assets/598e1e53-1775-407b-bd25-576b55082bd6 | https://github.com/user-attachments/assets/57e582b7-73c5-42b1-9437-9ede6cf18f18 |
 
-| `clock` over `Theme_07.mp4` | |
+| `clock` over `Theme_07.mp4` | `birdseye` over `theme_47-trimmed.mp4` |
 |---|---|
-| https://github.com/user-attachments/assets/ce8cab80-2125-4011-b44a-9a4e19a08ca3 | |
+| https://github.com/user-attachments/assets/ce8cab80-2125-4011-b44a-9a4e19a08ca3 | [docs/videos/birdseye-theme_47-trimmed.mp4](docs/videos/birdseye-theme_47-trimmed.mp4) |
+
+That second link is the repository's own file rather than an attachment, because a
+repo-path `.mp4` in markdown becomes an `<img>` no browser plays (recorded in
+`docs/limits.md`); the attachment rows above were uploaded by hand, and `birdseye`'s gets
+uploaded when the release is cut.  Its backdrop is also the one clip here that the vendor
+did not ship as-is: `theme_47.mp4` opens on **17 still frames with a play button burned
+into the middle**, so the theme pairs with a cut copy in `media/` - 168 frames / 8.40 s,
+head centre-luma 1.53 against the original's 6.62, loop seam 5.572 against 5.917 - while
+the vendor's file stays byte-identical to its own manifest entry.  `tests/test_birdseye.py`
+measures all of that, including the vendor's hash, so "we copied it and cut it, we did not
+edit it" is a check and not a promise.
 
 `clock` runs over a bright clip (mean luma 176 of 255), which is why its lettering
 carries a dark plate behind it — the same rule the window applies, described in
@@ -129,7 +140,7 @@ with this machine's live readings in the preview:
 
 Behind the `advanced controls` switch sit the panel's own `conn 1` report and the guarded
 factory reset. Open in the controls column, always, is a row that opens one of the vendor's
-layout files — or one of the five themes generated from our own drawing code — and edits
+layout files — or one of the six themes generated from our own drawing code — and edits
 the fields this program's painter actually reads, with the picture under the preview
 redrawn from the file as it changes. The rows themselves too: a row can be added —
 always a copy of a row this program already draws, never a table of defaults — removed,
@@ -155,6 +166,8 @@ behind `advanced controls`, the panel's own report and the guarded factory reset
 theme picker, the text-colour row and the layout editor in the middle, and the background
 clip library on the right, one row per distinct file: 40 rows from the 46 mp4 files this
 repository tracks](docs/screenshot-xigmaui.png)
+
+*(both figures are the walk from before this repository's `media/` grew twice on 2026-11-14: `theme_47-trimmed.mp4` in this change and ten of the owner's own clips in the one after it; `xigmaui.clips.list_clips()` prints the current count)*  
 
 These two are the same window at the two settings of its `advanced controls` switch, and
 all three pictures here come from one command: `tools/screenshot.py`, which builds the real

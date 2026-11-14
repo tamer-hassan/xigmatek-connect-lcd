@@ -624,7 +624,7 @@ def one_frame(link, metrics, args, push_state=False) -> tuple[int, str, str]:
 
 
 def theme_name(value: str) -> str:
-    """Validate `--theme`: one of the five drawn here, or a pickable library layout.
+    """Validate `--theme`: one of the drawn themes, or a pickable library layout.
 
     A refused name is answered with the reason rather than with the whole vocabulary:
     four of the 27 copied layouts are refused for the canvas they declare, and a file with
@@ -651,8 +651,13 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("-d", "--device", help="serial port (default: first ttyACM)")
     ap.add_argument("-b", "--baud", type=int, default=115200)
     ap.add_argument("-t", "--theme", default="alpha", metavar="THEME", type=theme_name,
-                    help="picture to draw: one of the five this program draws itself "
-                         "(alpha, bars, clock, dual, gauge - default alpha, the theme "
+                    # the count and the names are read off the registry rather than
+                    # written out here: this string listed five names and called them
+                    # "the five" until `birdseye` arrived, and a reader following it
+                    # would have been told a set that did not exist
+                    help=f"picture to draw: one of the {len(render.THEMES)} this program "
+                         f"draws itself ({' '.join(sorted(render.THEMES))} - default "
+                         "alpha, the theme "
                          "the vendor app currently has selected, redrawn from its "
                          "stored geometry with a second temperature inside a gauge "
                          "arc, clock and fan figures added) - or one of ALPHA's own "
@@ -825,7 +830,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--list", action="store_true",
                     help="list candidate serial ports and exit")
     ap.add_argument("--export-theme", metavar="NAME",
-                    help="print the generated layout for one of the five themes this "
+                    help=f"print the generated layout for one of the "
+                         f"{len(render.THEMES)} themes this "
                          "program draws itself, as JSON on stdout: the same file shape "
                          "ALPHA's library uses, so it can be read back, edited, and "
                          "drawn by the same code. Generated on demand and never "
@@ -849,7 +855,8 @@ def build_parser() -> argparse.ArgumentParser:
                          "our own themes that stay code-drawn and take their position, "
                          "size and colour from a layout")
     ap.add_argument("--list-themes", action="store_true",
-                    help="list every theme `--theme` can be given: the five drawn "
+                    help=f"list every theme `--theme` can be given: the "
+                         f"{len(render.THEMES)} drawn "
                          "from render.py, then ALPHA's 1:1 layouts with their widget "
                          "counts and where each file came from, then the layouts "
                          "refused and why. No port is opened")

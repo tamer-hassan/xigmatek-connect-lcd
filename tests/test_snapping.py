@@ -81,6 +81,12 @@ class TheFilesLineUpOrTheyDoNot(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.objects = layouts_with_copies()
+        # The vendor's files and this program's generated ones are two corpora with two
+        # different stories to tell, and one check (the gap histogram below) used to mix
+        # them.  Their ids separate them cleanly: every layout this repository generates is
+        # `xigma-<theme>`, and none of the copied ones is.
+        cls.ours = {i for i, obj in enumerate(cls.objects)
+                    if str(obj.get("id") or "").startswith("xigma-")}
         cls.declared = []                      # (layout index, x, y)
         for index, obj in enumerate(cls.objects):
             for x, y in declared(obj):
@@ -161,9 +167,19 @@ class TheFilesLineUpOrTheyDoNot(unittest.TestCase):
         and nothing sits 6 or 7 px away either.  That gap is why "2 px" separates 'this file means
         these two to line up' from 'these two are spaced', and why 3 px would argue with the person
         dragging."""
+        # ...and only the vendor's rows.  The 2 px argument was measured off ALPHA's files
+        # - "nothing sits 1 px from a peer's number, and nothing at 6 or 7 either" - and
+        # adding this program's own `birdseye` layout filled the 6 px hole with five rows,
+        # which is not a counter-example to the argument about the vendor's conventions:
+        # the numbers involved are the **corners of boxes** (an icon's box top sits 6 px
+        # from the meter's top because the icon is 20 px tall and the bar is 8), not
+        # anchors two rows were meant to share.  Keeping the two corpora in one histogram
+        # was the mistake; a generated layout's own grid is checked separately below.
         distances = {}
-        rows = self.declared
-        for k in range(len(rows)):
+        rows = [row for row in self.declared if row[0] not in self.ours]
+        for k, row in enumerate(self.declared):
+            if row[0] in self.ours:
+                continue
             gap = self.nearest_own_number(k, 1)
             if gap is not None:
                 distances[gap] = distances.get(gap, 0) + 1
@@ -174,8 +190,50 @@ class TheFilesLineUpOrTheyDoNot(unittest.TestCase):
         # the histogram the page reads the 2 px break out of, printed so the figures in
         # docs/gui.md name a command rather than a snapshot
         near = {k: v for k, v in sorted(distances.items()) if k <= 5}
-        print(f"  nearest-peer x gap, {len(rows)} rows: {near} px; "
+        print(f"  nearest-peer x gap, {len(rows)} vendor rows (the {len(self.ours)} "
+              f"generated layouts are excluded here and counted below): {near} px; "
               f"nothing at 1, 6 or 7 px is the claim")
+
+    def test_no_two_numbers_of_our_own_layouts_land_one_pixel_apart(self):
+        """What a generated layout does have to guarantee - and it is not the vendor's rule.
+
+        The 2 px threshold was argued from the vendor's files: their rows either share a
+        column exactly (0 px) or are spaced by 2..5 px, with nothing at 1, 6 or 7, so 2 px
+        sits in a real break in the distribution.  This program's own layouts do not
+        participate in that argument - `bars` puts an icon box at x=3, its labels at 28 and
+        its values at 452, and `birdseye` mixes a 30 px usage pitch with box corners 6 px
+        apart, which is what filled the vendor histogram's 6 px hole the moment the layout
+        was added.  Box corners are not anchors: a 20 px icon and an 8 px meter starting 6
+        px apart means nothing about intent.
+
+        So the claim kept for our own files is the narrow one that does mean something:
+        no two numbers in one generated layout sit exactly 1 px apart.  That distance has
+        no interpretation - it is not alignment (0) and not spacing (>= 2), it is a
+        near-collision, and it is what a copied-and-nudged coordinate leaves behind.
+        """
+        chosen = {f"xigma-{name}" for name, origin in themes.GEOMETRY_ORIGIN.items()
+                  if origin == "chosen here"}
+        self.assertEqual(len(chosen), 2, sorted(chosen))
+        checked = 0
+        for index, obj in enumerate(self.objects):
+            ident = str(obj.get("id"))
+            if ident not in chosen:
+                continue
+            checked += 1
+            for axis, label in ((1, "x"), (2, "y")):
+                values = sorted({row[axis] for row in self.declared
+                                 if row[0] == index and row[axis] is not None})
+                gaps = [b - a for a, b in zip(values, values[1:])]
+                self.assertTrue(gaps, f"{ident} declares no {label} pairs to compare")
+                print(f"  own-grid, {ident:16s} {label}: {len(values)} distinct values, "
+                      f"closest pair {min(gaps)} px apart")
+                self.assertGreaterEqual(min(gaps), 2,
+                                        f"{ident} has two {label} numbers 1 px apart "
+                                        f"({values}): a near-collision, neither alignment "
+                                        "nor spacing")
+        self.assertEqual(checked, len(chosen),
+                         f"{sorted(chosen)} are declared as grids of our own, but only "
+                         f"{checked} of them are in this corpus")
 
     def test_three_pixels_is_more_grabbable_than_two_on_this_corpus(self):
         """The prose says a 3 px reach would pull rows onto columns they do not mean; that has to

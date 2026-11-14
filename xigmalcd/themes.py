@@ -259,6 +259,14 @@ SOURCES = {
     # shaped like `CPU Temperature` and `Motherboard Temperature`; no shipped layout asks for
     # it, and `draw_theme` reports its shape as one of this repo's choices.
     "Disk Temperature": ("disk", "temperature"),
+    # how busy the drive under `/` was over the last interval - a field the vendor's schema
+    # already carries (`"disk":{...,"load":20,"activity":0,...}`, PROTOCOL.md §10) and that
+    # `sensors.disk()` has filled from `/proc/diskstats` since it was written, though no
+    # theme ever asked for it.  `birdseye`'s DISK bar is the first row to do so: on this
+    # bench it reads 0.3 % at idle and moves when a copy starts, where the sibling field
+    # `disk.load` (iowait %) sits at 0.0 on a machine with fast NVMe and would show a dead
+    # bar.  Both are on the wire; the theme says which one it means.
+    "Disk Activity": ("disk", "activity"),
 }
 
 #: Sources whose number comes out of two reported fields rather than one, spelled as a pair
@@ -708,7 +716,8 @@ def draw(obj: dict, metrics: dict, when=None, scrim: int = 0) -> tuple:
 #: Not a vendor record - the vendor library holds no page for a theme it did not draw -
 #: and not a guess either: these are the clips this project's own published pictures are
 #: composited over.  The README's five MP4s are named `<theme>-<clip>.mp4` for it
-#: (`alpha-Theme_25.mp4`, `gauge-3.mp4`, ...), and docs/limits.md's census table prints a
+#: (`alpha-Theme_25.mp4`, `birdseye-theme_47-trimmed.mp4`, ...), and docs/limits.md's
+#: census table prints a
 #: row per file with that clip's measured luma.  `tests/test_theme_library.py` derives this
 #: mapping back out of those file names on every run and fails if it disagrees, so the
 #: pairing here cannot drift away from the pictures a reader judges the themes by - which
@@ -717,7 +726,21 @@ def draw(obj: dict, metrics: dict, when=None, scrim: int = 0) -> tuple:
 #: `main.media_roots()` - the same lookup the window and the loop share - which that same
 #: file checks on a bare checkout with nothing installed.
 CODE_CLIPS = {"alpha": "Theme_25.mp4", "gauge": "3.mp4", "dual": "Theme_30.mp4",
-              "clock": "Theme_07.mp4", "bars": "theme_52.mp4"}
+              "clock": "Theme_07.mp4", "bars": "theme_52.mp4",
+              # not a vendor file: ours, cut from the vendor's `theme_47.mp4` because that
+              # clip opens on **17 still frames with a play button burned into the middle**
+              # (frames 0-16 at 20 fps, 0.85 s; the centre reads 6.63 luma through them and
+              # 1.53 from the first moving frame on - measured frame by frame, and confirmed
+              # by eye on a contact sheet).  `birdseye` carries fourteen readings plus a
+              # header, so it needs the darkest, quietest ground the library can offer: a
+              # survey of all 44 clips puts `theme_47` at mean luma 6.6 of 255 with motion
+              # 5.62, and only three files in the library are darker.  Cutting the head left
+              # 168 frames / 8.40 s, 1 071 306 B against the original's 1 211 106 B, and the
+              # loop seam measured *better* afterwards (mean abs difference of first frame
+              # against last: 5.533 trimmed against 5.859 original).  The vendor's file is
+              # untouched - it is evidence, hashed in the library's own manifest - so the
+              # cut copy ships beside it in `media/`, labelled as what it is.
+              "birdseye": "theme_47-trimmed.mp4"}
 
 
 def pair(name: str) -> tuple:
@@ -728,7 +751,7 @@ def pair(name: str) -> tuple:
     * A vendor layout declares exactly one clip in `background.mediaFile` - 23 of the
       library's 27 do, and the 23 values are distinct (`scan()` keeps the field for that
       reason, and `--list-themes` prints it).
-    * One of the five themes this program draws itself names the clip its own published
+    * One of the six themes this program draws itself names the clip its own published
       picture sits over (`CODE_CLIPS`), which is why picking `gauge` in the window's
       layout dropdown moves the preview the same way picking `Theme_07` does.
 
@@ -2007,6 +2030,56 @@ def alpha_recipe() -> dict:
     }
 
 
+# ------------------------------------------------------------ birdseye --
+#: The three sections of the bird's-eye panel, and the rows inside each.  One definition
+#: on purpose: `render.theme_birdseye` asks for these at draw time and `birdseye_recipe()`
+#: emits from them, so the code and the file cannot disagree about what a section holds.
+#: (This is the mistake `bars` still carries - its rows are spelled twice, once in
+#: `BARS_ROWS` and once as literals inside `theme_bars` - and it took a parity test to
+#: notice.  A new theme should not repeat it.)
+#:
+#: A row is `(label, source, lo, hi, figure)`.  **`label` of None means the label is a
+#: reading**: the two tachometer dials are named by `Fan 1 Name`/`Fan 2 Name`, exactly as
+#: the fan slots in `bars` are, so a machine whose cooler calls its pump something else
+#: prints what that machine says - and a row that names no reading prints its own word.
+#: The scales are the ones `bars` uses for the same readings (temperatures 30..90 and
+#: 25..80, tachometers 0..3000 RPM, a card's fan 0..100 duty %), because a dial that
+#: quietly invents a third scale for a reading is how two themes end up meaning different
+#: things by the same needle position.
+BIRDSEYE_SECTIONS = (("TEMPERATURES", 50), ("COOLING", 182), ("USAGE", 310))
+BIRDSEYE_DIALS = (
+    (("CPU", "CPU Temperature", 30, 90, "chip4"),
+     ("GPU", "GPU Temperature", 30, 90, "card"),
+     ("BOARD", "Motherboard Temperature", 25, 80, "board")),
+    ((None, "Fan 1 Speed", 0, 3000, "fan"),
+     (None, "Fan 2 Speed", 0, 3000, "fan"),
+     ("Fan GPU", "GPU Fans Speed", 0, 100, "fan")),
+)
+#: The usage column.  Five bars, each with a figure beside its label: the CPU and GPU
+#: bars wear the same die and card as the temperature dials above them (they are the
+#: same two devices, seen from a different angle), DISK the drive, RAM the stick and
+#: VRAM the package.
+#:
+#: All five scales are 0..100 and all five numbers are percent, measured through
+#: `layout.text_for`: `RAM Rate` 67 % for 84 480 of 126 155 MB, `GPU Memory Rate` 97 %
+#: for 15 952 of 16 376 MB.  That is a deliberate difference from `bars`, whose memory
+#: rows print `used / total` in gigabytes beside a meter that divides the same two
+#: fields.  `bars` therefore needs `xigma.showIf` on those number rows - the number
+#: reads one side of a division the meter owns, and when the divisor is missing (an
+#: integrated GPU answers `memoryUsage` and nothing else) it must be silenced with the
+#: meter, not left printing a bare figure.  **This theme has no such row**: each of its
+#: five numbers asks the same source as the meter behind it, so the hole is already
+#: reported once, by the source, and a `showIf` naming the row's own source would be a
+#: second entry for one hole.  `tests/test_birdseye.py` counts them: zero.
+BIRDSEYE_BARS = (
+    ("CPU", "CPU Usage", 0, 100, "chip4"),
+    ("GPU", "GPU Usage", 0, 100, "card"),
+    ("DISK", "Disk Activity", 0, 100, "drive"),
+    ("RAM", "RAM Rate", 0, 100, "dimm"),
+    ("VRAM", "GPU Memory Rate", 0, 100, "chip2"),
+)
+
+
 def bars_recipe() -> dict:
     """`bars` as a layout: twelve rows of label, number and meter, a heading, a clock line.
 
@@ -2121,12 +2194,153 @@ def bars_recipe() -> dict:
     }
 
 
-EXPORTS = {"alpha": alpha_recipe, "bars": bars_recipe, "clock": clock_recipe,
-           "dual": dual_recipe, "gauge": gauge_recipe}
+def birdseye_recipe() -> dict:
+    """`birdseye` as a layout: two rows of dials, a column of bars, figures beside them.
+
+    Every element of the file is something the schema can already say, which is the point:
+    the rings are `arc` rows with `xigma.arcPaint: "render"` and a named `heat` ramp (the
+    same convention `gauge` and `dual` declare, and the same one whose two rasters differ
+    by 164 to 6 989 pixels if you copy the vendor's instead - docs/limits.md), the meters
+    are `bar` rows with `xigma.barPaint: "render"`, the figures are `special` glyph rows
+    through the fourth door, the captions and dial names are `text`, the readings are
+    `data` on a source, and the hairlines are the vendor's own `line` kind - four of which
+    the copied library already carries as decoration, so a rule that names no source is
+    nothing new here.  What it does **not** use is `xigma.showIf`: no row of this panel
+    prints a reading other than the one its own shape is built from, which is the
+    opposite of `bars`, and `tests/test_birdseye.py` holds the export to that.
+
+    Two numbers the layout has to carry that the painter would otherwise keep to itself:
+    each dial declares `minValue`/`maxValue`, because the ring's sweep is a reading over a
+    scale and a reader choosing a theme should be able to see the scale; and the two
+    tachometer dials declare their *name* as a `data` row on `Fan N Name`, so the file says
+    out loud that those labels are the machine's words and not ours.
+    """
+    out = [
+        widget("xigma-birdseye-title", "text", {
+            "x": render.BIRDSEYE_TITLE_XY[0], "y": render.BIRDSEYE_TITLE_XY[1],
+            "content": "BIRDSEYE", "fontFamily": "dejavu",
+            "fontSize": render.BIRDSEYE_TITLE_F, "bold": True,
+            "textColor": rgba_str(render.SKIN["birdseye"][2]),
+            "xigma": {"anchor": "lm"}}, 0),
+        widget("xigma-birdseye-clock", "data", {
+            "x": render.BIRDSEYE_CLOCK_XY[0], "y": render.BIRDSEYE_CLOCK_XY[1],
+            "source": "Time", "fontFamily": "dejavu",
+            "fontSize": render.BIRDSEYE_CLOCK_F, "bold": True,
+            "textColor": rgba_str(render.SKIN["birdseye"][1]),
+            "xigma": {"anchor": "rm"}}, 1),
+    ]
+    for caption, cy in BIRDSEYE_SECTIONS:
+        out.append(widget(f"xigma-birdseye-cap-{caption.lower()}", "text", {
+            "x": 16, "y": cy, "content": caption, "fontFamily": "dejavu",
+            "fontSize": render.BIRDSEYE_CAP_F, "bold": True,
+            "textColor": rgba_str(render.DIM),
+            "xigma": {"anchor": "lm"}}, len(out)))
+        out.append(widget(f"xigma-birdseye-rule-{caption.lower()}", "line", {
+            # `width`/`height`, not `sizeWidth`: measured off the vendor's own overlay, a
+            # `line`'s stroke is the declared rect and `height` *is* its thickness
+            # (`layout.line_rect`, docs/limits.md has the pixel walk), so this is the
+            # vendor's vocabulary rather than the `arc` box convention two keys above
+            "x": render.BIRDSEYE_RULE_X, "y": cy - render.BIRDSEYE_RULE_H // 2,
+            "width": render.BIRDSEYE_RULE_W, "height": render.BIRDSEYE_RULE_H,
+            "lineColor": rgba_str(render.BIRDSEYE_RULE)}, len(out)))
+    for row, entries in enumerate(BIRDSEYE_DIALS):
+        cy = render.BIRDSEYE_DIAL_CY[row]
+        for col, (label, src, lo, hi, _figure) in enumerate(entries):
+            cx = render.BIRDSEYE_DIAL_CX[col]
+            outer = render.BIRDSEYE_DIAL_R + render.BIRDSEYE_DIAL_W
+            slug = src.lower().replace(" ", "-")
+            out.append(widget(f"xigma-birdseye-{slug}-ring", "arc", {
+                "x": cx - outer, "y": cy - outer,
+                "sizeWidth": 2 * outer, "sizeHeight": 2 * outer,
+                "radius": render.BIRDSEYE_DIAL_R, "width": render.BIRDSEYE_DIAL_W,
+                "angleStart": 50, "angleEnd": 310,
+                "bgColor": rgba_str(render.BIRDSEYE_TRACK),
+                "startColor": rgba_str(render.CYAN), "endColor": rgba_str(render.RED),
+                "minValue": lo, "maxValue": hi, "source": src,
+                "xigma": {"arcPaint": "render", "colourRamp": "heat"}}, len(out)))
+            out.append(widget(f"xigma-birdseye-{slug}-value", "data", {
+                "x": cx, "y": cy - 7, "source": src, "fontFamily": "dejavu",
+                "fontSize": render.BIRDSEYE_DIAL_VAL_F, "bold": True,
+                "textColor": rgba_str(render.WHITE),
+                "xigma": {"anchor": "mm"}}, len(out)))
+            # a slot dial's name is a reading like `bars`'s slot labels: `Fan N Name`, and
+            # when the machine reports no such row there is no label to print, so the row
+            # is reported unanswered rather than drawn as a guess
+            name_src = SLOT_NAMES[src] if label is None else None
+            out.append(widget(f"xigma-birdseye-{slug}-name", "data" if name_src else "text", {
+                "x": cx, "y": cy + 26,
+                **({"source": name_src} if name_src else {"content": label}),
+                "fontFamily": "dejavu", "fontSize": render.BIRDSEYE_DIAL_NAME_F,
+                "bold": True, "textColor": rgba_str(render.DIM),
+                "xigma": {"anchor": "mm"}}, len(out)))
+    for i, (label, src, lo, hi, figure) in enumerate(BIRDSEYE_BARS):
+        y = render.BIRDSEYE_ROW_Y0 + i * render.BIRDSEYE_ROW_PITCH
+        slug = src.lower().replace(" ", "-")
+        out.append(widget(f"xigma-birdseye-{slug}-icon", "special", {
+            "name": f"icon-{figure}", "x": render.BIRDSEYE_ICON_X,
+            "y": y - render.BIRDSEYE_ICON_BOX[1] / 2,
+            "width": render.BIRDSEYE_ICON_BOX[0], "height": render.BIRDSEYE_ICON_BOX[1],
+            "source": src, "minValue": lo, "maxValue": hi,
+            "xigma": {"colourRamp": "heat"}}, len(out)))
+        out.append(widget(f"xigma-birdseye-{slug}-label", "text", {
+            "x": render.BIRDSEYE_LBL_X, "y": y, "content": label,
+            "fontFamily": "dejavu", "fontSize": render.BIRDSEYE_BAR_LBL_F, "bold": True,
+            "textColor": rgba_str(render.DIM),
+            "xigma": {"anchor": "lm"}}, len(out)))
+        out.append(widget(f"xigma-birdseye-{slug}-meter", "bar", {
+            "x": render.BIRDSEYE_BAR_X, "y": y - render.BIRDSEYE_BAR_H // 2,
+            "width": render.BIRDSEYE_BAR_W, "height": render.BIRDSEYE_BAR_H,
+            "cornerRadius": 0, "bgColor": rgba_str(render.BIRDSEYE_TRACK),
+            "startColor": rgba_str(render.CYAN), "endColor": rgba_str(render.RED),
+            "minValue": lo, "maxValue": hi, "source": src,
+            "xigma": {"barPaint": "render", "colourRamp": "heat"}}, len(out)))
+        # no `xigma.showIf` on any row of this column, and the reason is in the table
+        # comment above: the number and the meter ask the *same* source here, so an
+        # unanswered reading is reported once by name.  `bars` gates its memory numbers
+        # because they print one side of a division the meter owns; copying that key onto
+        # a row that depends on nothing but itself would only double the report
+        number = {"anchor": "rm"}
+        out.append(widget(f"xigma-birdseye-{src.lower().replace(' ', '-')}-value",
+                          "data", {
+                "x": render.BIRDSEYE_VAL_X, "y": y, "source": src,
+                "fontFamily": "dejavu", "fontSize": render.BIRDSEYE_BAR_VAL_F,
+                "bold": True,
+                "textColor": rgba_str(render.WHITE), "xigma": number}, len(out)))
+    return {
+        "id": "xigma-birdseye", "ratio": NEED_RATIO,
+        "width": render.W, "height": render.H,
+        "background": {"mediaFile": CODE_CLIPS["birdseye"], "overlay": 0},
+        "osd": {"widget": out},
+        "xigma": {"generatedBy": "themes.birdseye_recipe",
+                  "note": "birdseye: six dials in two sections, five usage bars with "
+                          "figures beside the labels; generated from the same tables the "
+                          "painter draws",
+                  "version": __import__("xigmalcd").__version__},
+    }
+
+
+EXPORTS = {"alpha": alpha_recipe, "bars": bars_recipe, "birdseye": birdseye_recipe,
+           "clock": clock_recipe, "dual": dual_recipe, "gauge": gauge_recipe}
+
+#: Where each generated theme's **placement numbers** came from - a question a check now
+#: asks, because "these files sit on a grid" is only true of the layouts whose grid we
+#: chose.  `alpha`, `gauge`, `dual` and `clock` reproduce positions measured off ALPHA's own
+#: baked overlays (docs/limits.md has the pixel walks: a ring centre at 236, an arc's ink
+#: ending at x=367 for a box at x=107), and a 1 px gap between two of their numbers is a
+#: measurement of somebody else's picture, not sloppiness.  `bars` and `birdseye` are laid
+#: out on grids this program picked, so their numbers must divide.
+GEOMETRY_ORIGIN = {
+    "alpha": "measured off ALPHA's frames",
+    "gauge": "measured off ALPHA's frames",
+    "dual": "measured off ALPHA's frames",
+    "clock": "measured off ALPHA's frames",
+    "bars": "chosen here",
+    "birdseye": "chosen here",
+}
 
 
 def export(name: str) -> dict:
-    """Generate the layout for one of the five, on demand. Not written to disk here."""
+    """Generate the layout for one of the six, on demand. Not written to disk here."""
     try:
         return EXPORTS[name]()
     except KeyError:

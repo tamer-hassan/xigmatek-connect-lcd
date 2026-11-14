@@ -1318,9 +1318,209 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     The name census moved 108 -> 119 source rows, 190 rows carrying at
     least one.
 
-  * `Apply these settings` now carries the background too, unless the
-    reader has said otherwise, and the README says out loud that the panel
-    runs headless.
+  * A sixth theme, `birdseye`: six dials in two sections, five usage meters
+    with figures, and a background this repository cut for the purpose.
+
+    Requested by the owner: a Temperatures section with CPU, GPU and Board
+    gauges, a Cooling section with `Fan CPU`, `CPU PUMP` and `Fan GPU`
+    gauges, a Usage section below them with CPU Usage, GPU Usage, Load, RAM
+    and VRAM as bars carrying a figure beside each label, and a pairing
+    with a suitable animation from the vendor's library. What was built is
+    46 widgets in both doors: a header ( `BIRDSEYE` at the left, the clock
+    at the right), three section captions each with a `line` rule beside
+    it, six dials of (arc, number, name) on a 260-degree sweep, and five
+    usage rows of (figure, label, meter, number) on a 30 px pitch. The
+    theme is generated from **one table per section** (
+    `themes.BIRDSEYE_DIALS`, `BIRDSEYE_BARS`, `BIRDSEYE_SECTIONS`) which
+    the painter reads at draw time through `render._birdseye_tables()`.
+    That is a deliberate departure from `bars`, whose rows exist twice -
+    once in `themes.BARS_ROWS`, once as literals inside `theme_bars` - held
+    equal by a test only after a year of parity misses; a new theme should
+    not repeat the mistake on purpose.
+
+    **"Load" needed a definition, and the two candidates are both vendor
+    fields.** The owner's list has CPU Usage *and* Load, but in this
+    program `cpu.load` and `cpu.usage` are the same number (5.9 both, this
+    minute), so a fifth bar labelled LOAD would be a duplicate.
+    `sensors.disk()` already fills two of the vendor's own storage fields:
+    `disk.activity`, the fraction of the interval the device holding `/`
+    was busy (from `/proc/diskstats` field 10), and `disk.load`, iowait
+    percentage from `/proc/stat`. Chosen: ** `activity` **, because it
+    moves where the other does not - 0.3 % at idle and 22 % while a copy
+    runs, against iowait pinned at 0.0 on a machine with fast NVMe, which
+    would show a dead bar at the moment a reader wants to know whether
+    storage is doing anything. That choice is recorded in `themes.SOURCES`
+    next to the field, asserted by name in `tests/test_birdseye.py`, and
+    the check refuses a silent swap to `Disk Load`.
+
+    **The background is a copy, not an edit.** The owner asked for
+    `theme_47.mp4` without the still frames that open it. Those files are
+    evidence: `themes/alpha/manifest.json` lists 125 copied paths with a
+    byte count and a sha256 each, and the whole point of that record is
+    that any claim about a vendor frame can be re-checked by someone else.
+    So the cut lives in `media/theme_47-trimmed.mp4` and the vendor's file
+    is untouched - and a check proves both halves: the original's digest
+    still matches its manifest entry (and its byte count its file size),
+    and the paired asset's digest is **different** from the original's,
+    which is what "copied and cut" means in bytes rather than in prose. The
+    cut is measured, not eyeballed: the original's first **17 frames**
+    (0.85 s at 20 fps) read a centre luma of 6.62 against 1.53 from the
+    first moving frame on - a play button burned into the middle -
+    confirmed on a contact sheet and then matched to the frame; the copy is
+    168 frames / 8.40 s / 1 071 306 B against the original's 185 / 9.25 s /
+    1 211 106 B; and the loop seam got *better*, mean absolute grey
+    difference of first frame against last at 5.572 against 5.917. Choosing
+    it was a survey, not a preference: all 44 vendor clips measured for
+    mean luma and motion, and `theme_47` sits at 6.6 luma with three darker
+    files in the library - `birdseye` carries fourteen readings plus a
+    header, so it needs the darkest quiet ground available - which the
+    render's own scrim rule confirmed: `scrim 0`, no plate needed.
+
+    **Adding the theme falsified a claim this project had been making
+    generally.** `tests/test_snapping.py` asserts that nothing in the
+    corpus sits 1, 6 or 7 px from a row's own peer number - the
+    distribution the 2 px snap threshold was argued from - and counting all
+    29 layouts, `birdseye` put five rows at exactly 6 px. They are not
+    alignment claims: the numbers involved are **box corners** (a 20 px
+    figure and an 8 px meter starting 6 px apart), not anchors two rows
+    were meant to share. Keeping both corpora in one histogram was the
+    mistake. So the vendor's rows are measured by that histogram on their
+    own (123 rows, {0: 36, 2: 10, 3: 4, 4: 13, 5: 4}, nothing at 1, 6 or 7
+    px), and our generated files are held to the rule that does mean
+    something for a layout we placed ourselves: **no two numbers in one of
+    our files sit exactly 1 px apart** - neither alignment nor spacing,
+    just a near-collision a copied-and-nudged coordinate leaves behind.
+    `bars` clears it by 25 px on x and 11 on y, `birdseye` by 2 and 4.
+    Which themes that rule applies to is not inferred:
+    `themes.GEOMETRY_ORIGIN` declares, per generated theme, whether its
+    placement numbers were `chosen here` or `measured off ALPHA's frames`,
+    because a 1 px gap in a reproduction is a measurement of somebody
+    else's picture, and the check would otherwise be refusing the evidence
+    it was built to protect.
+
+    **Parity caught one real defect and one near-miss.** The near-miss:
+    `birdseye` 's rings first disagreed with the file by 156 px in exactly
+    one dial, and it was neither geometry nor colour but **z-order** - the
+    painter drew each dial's name before its ring, the file declares ring,
+    number, name, and the second tachometer's name ( `Fan System`, ten
+    characters) crosses the ring band while the shorter ones do not. Draw
+    order is a rule and has to be written down once. The real one: my own
+    `gauge()` call and `layout.draw_arc` land one unit apart in blue across
+    the sweep's early segments - a rounding of `heat`, not a different
+    drawing - so the theme's rings are now drawn **through the `arc`
+    door**, with the same property dict the generated file carries. The
+    convention does not go unwatched: `gauge` and `dual` still draw their
+    rings through `render.gauge` and are matched pixel for pixel against
+    their files (0 px at every reading), and `tests/test_conventions.py`
+    compares the two ring conventions head to head (164 / 3 366 / 3 889 / 6
+    989 differing pixels). What this theme refuses is a second copy of a
+    shared shape argued about later.
+
+    A rule the figures feature had to bend for this theme:
+    `xigma.iconVariant` used to let the source table override the figure a
+    row declared, which breaks the moment one source means two subjects -
+    `CPU Usage` is a **dial** in `bars` (the LOAD row) and a **utilisation
+    bar** in `birdseye`. So the declared `special` name is now
+    authoritative and a variant is asked for only when the row names a
+    source to ask it of: the file says what it means, and the table
+    supplies a default where a row does not care.
+
+    Gates: `tests/test_birdseye.py`, **23 checks** - both doors at 0 px on
+    a full body, a one-fan/no-card body and a CPU-only body; the export's
+    structure counted by kind (13 `text`, 14 `data`, 6 `arc`, 5 `bar`, 3
+    `line`, 5 `special`) and addressed by widget id, because in this file
+    `CPU Temperature` is a ring, a number and a meter at once, and the word
+    `CPU` is both a dial's name and a bar's label; every dial's number and
+    name measured inside its own ring; no dial's box overlapping a
+    neighbour's; the report's shape, counted per hole (a dial is two rows a
+    reader can see missing, a usage row is two, and the `special` figure
+    row says nothing because it also draws nothing - on a card-less body 3
+    of the 5 usage rows answer and only those carry ink in the figure box);
+    the usage column's gutters measured as ink in both doors - the figure
+    inside its declared box, the label starting clear of that box (6 px of
+    gutter today), the number clear of a meter drawn full (15 px),
+    row-to-row ink gaps of 12, 16, 17 and 14 px; the column's ceiling
+    computed from the theme's own numbers rather than asserted from prose
+    (135 px of room from y=334 on a 30 px pitch holds exactly five rows,
+    which is why the column has five, with 15 px below the last box); each
+    section hairline measured as a hairline, in a window grown 6 px around
+    it, because a rule that lands on the dials it heads has stopped
+    labelling them; the paired asset's frames, duration, canvas and digest;
+    the play button measured at the original's head and its absence at the
+    cut's; the loop seam; the vendor file still matching its own manifest
+    entry's hash and byte count; the disk-field choice and the refusal of
+    its sibling; and the census, printed: 46 boxes, 19 985 characters in
+    the generated file, parity 0 px at all five fixture readings - 55 735 /
+    55 298 / 16 197 / 19 699 / 12 706 lit px down each door. The overlay's
+    own lit count moves between runs (42 702, 42 716, 42 727 here) because
+    the on-glass clock prints the live second, and it is quoted as a range
+    for that reason rather than pinned to a number that is not stable.
+
+    Two bugs in my own checks, both worth recording.
+    `ffprobe -show_entries stream=a,b` returns fields in **its** order, not
+    the order asked, so zipping the request against the reply reported 480
+    frames for a 168-frame file; the helper now asks for the names back (
+    `key=value` per line) and fails loudly on a missing one. And three
+    `open()` calls in the new file leaked handles, which under
+    `-W error::ResourceWarning` is a failing suite - the same class the
+    `setUp` fix last week was about, caught here by the suite rather than
+    by me.
+
+    **The mutation census caught a false justification of mine sitting in
+    shipped code.** Breaking `birdseye` twelve ways and counting what its
+    gates notice - the dial name drawn before its ring again: 10 failures;
+    pairing with the vendor file instead of the cut copy: 2; the DISK row
+    reading a temperature where it reads a busy percent: 2; a fourth dial
+    in a three-across row: 26; a section's rule turned into a text row: 26;
+    the figure's box slid from x=6 to x=14, into the label column: 0; the
+    usage pitch cut from 30 to 29: 0; grown to 36: 5; cut to 22: 1; the
+    meter widened 20 px into the numbers: 1; a caption moved nine pixels
+    down onto the dial row under it: 1; an `xigma.showIf` gate added to the
+    memory numbers: 2. Two zeroes, and they are different kinds of zero.
+    The pitch is honest: at 29 px the column keeps 9 px between rows, a
+    sixth bar still does not fit, and no rule is broken, so no rule should
+    pretend one is - the same constant costs 5 in one direction and 1 in
+    the other, which is what makes the 0 a measurement rather than a gap.
+    The figure box is a gap, and closing it is what found the lie:
+    `birdseye_recipe` put `xigma.showIf` on its two memory number rows,
+    naming the meter's own source, under a comment claiming the dependency
+    had to be named or the two doors would part company at a GPU reporting
+    `memoryUsage` with no `dedicatedTotal`. Copying that key from `bars`
+    made it inert, because in this theme the number asks the **same**
+    source as the meter behind it: an unanswered reading is already
+    reported once by that source, and a gate on it adds a second entry for
+    one hole. The key is gone, and so is the claim - replaced by a check
+    that counts the gated rows in this export (0) against the gated rows in
+    `bars` (2, where the number really does print one side of the
+    division), and by a check that no hole is shadowed as a `showIf:`
+    entry. Two more of my own sentences went the same way when measured:
+    the table comment above `BIRDSEYE_BARS` said the two memory rows'
+    numbers are gigabytes and that their scale differs from the other three
+    (measured through `layout.text_for`: 67 % for 84 480 of 126 155 MB and
+    97 % for 15 952 of 16 376 MB - percent, all five scales 0..100), and
+    this entry said a hole is reported once (it is reported by every row a
+    reader can see missing, twice for a dial and twice for a usage row, and
+    the `special` figure row says nothing - which is what `bars` has always
+    done, and is now pinned by count instead of assumed).
+
+    Pins and pages: the corpus is 245 rows across 29 layouts (was 199
+    across 28), the source census 23 distinct names, the name census 149
+    source rows / 233 rows carrying at least one, and the published-video
+    set is **seven files, 6 342 946 B** (the seventh rendered from the same
+    12-sample series as the others, 240 frames at 20 fps, and `CODE_CLIPS`
+    is derived back out of those file names by
+    `tests/test_theme_library.py`, which is what makes the pairing claim
+    re-checkable rather than asserted). The suite counts **627 checks over
+    55 test files** - 622 while I was writing this entry, then five more
+    checks for the sixth theme's fallout: three that hold the shipped words
+    to the registry and two that hold the walked theme set to it. Two stale
+    figures in the pages were caught on the way - `docs/limits.md` and
+    `docs/usage.md` were still quoting `bars` at 35 widgets / 15 497
+    characters, a reading that the gutter column had already moved to 46
+    and 19 890 - and both now carry a note saying which figures were taken
+    when, instead of a silent overwrite. * `Apply these settings` now
+    carries the background too, unless the reader has said otherwise, and
+    the README says out loud that the panel runs headless.
 
     **The button change** is the owner's request: pressing Apply and then
     hunting for a second button is three clicks to change one picture, so

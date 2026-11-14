@@ -4,8 +4,8 @@
 the vendor library and the file model under `~/.config/xigmalcd/themes`, `--list-themes`
 and `--check-theme` print what it finds with the counts, `--theme <background name>`
 selects a layout, the canvas refusal comes from each file's own `ratio` field, and the
-same names work over the control socket. All five drawn themes (`alpha`, `bars`, `clock`,
-`dual`, `gauge`) generate to layouts that paint *exactly* what `render.py` paints - zero
+same names work over the control socket. All six drawn themes (`alpha`, `bars`, `birdseye`,
+`clock`, `dual`, `gauge`) generate to layouts that paint *exactly* what `render.py` paints - zero
 differing pixels and a worst channel of 0 on every reading that answers what they ask -
 which `tests/test_export_parity.py` holds. The editor is `xigmaui/edit.py`, a model with
 no Qt in it, and the window's layout-editor row and the canvas in the preview pane are
@@ -38,6 +38,8 @@ the two (docs/limits.md).
    There is no multi-row table UI: the row set is what the inspector reads, and
    `--print-theme-fields` is what makes it reviewable in a log rather than only on screen.
 2. **Our five themes become exportable data**: `--export-theme NAME` writes
+   *(five themes when this stage was written; `birdseye` made the set six on 2026-11-14,
+   and the stage is the same stage: every one of them exports and is checked both ways)*
    vendor-shape JSON on demand. The export is *generated and checked*, never committed -
    a committed copy of `gauge.json` goes stale the first time anyone edits
    `theme_gauge`, and this repo has already recorded a comparison that failed because a
@@ -71,7 +73,7 @@ the two (docs/limits.md).
   records, read out of the app's `themeUtil-*.js` renderer bundle, seven kinds -
   `text` (text-node), `data` (number-text-node), `arc` (doughnut-node), `bar`
   (process-bar-node), `chart` (chart-node), `img`, `line`. The layouts use five, and
-  `xigmalcd/layout.py` paints all five.
+  `xigmalcd/layout.py` paints all six.
 
 ## The library as data, counted
 
@@ -189,7 +191,7 @@ nothing in it is written outside that directory.
   reading was missing.
 * **What is refused, in words** (`validate` returns `(hard, soft)`; hard raises on save,
   soft comes back with the path and is printed): writing anywhere but the user root, a
-  name that is one of the five drawn from `render.py` (a saved `gauge.json` would be a
+  name that is one of the six drawn from `render.py` (a saved `gauge.json` would be a
   second source of truth for `render.theme_gauge` - exactly what the export design exists
   to avoid), a name with a path separator or a leading dot, an empty `osd.widget` list,
   and a `property` with more than one entry - because `draw_theme` reads only
@@ -317,8 +319,8 @@ naming: a copy renamed, a second copy written under a new name, both taking a fr
 so one `--theme <id>` never answers two files, and a name rule shared by every door that
 invents one (`themes.new_name`) - it refuses a name any layout answers today, by name,
 by case-fold, or by id, which is what `resolve()` actually matches. The bullets and
-every digit they hold are in docs/gui.md. The window's theme combo still lists the five, because
-those are the five whose per-theme options and ink the row under that picker edits; a
+every digit they hold are in docs/gui.md. The window's theme combo still lists the six, because
+those are the six whose per-theme options and ink the row under that picker edits; a
 layout reaches the glass from the editor's box, by `apply to the panel`, and the display
 answers with the name it is drawing so the window can show that rather than remember it.
 
@@ -480,20 +482,28 @@ because `layout` already imports `render` and not the other way round; an unknow
 back in `notes["missing"]` as `special:<name>`, so a typo in a layout is reported instead of
 drawn as something else.
 
-With those in place, all five generate: `clock` 3 and 1 448 characters, `gauge` 5 and 2
-314, `dual` 10 and 4 677, `alpha` 12 and 6 312, `bars` **35 and 15 434** - each
+With those in place all six generate; as re-printed on 2026-11-14 by
+`python3 -m unittest tests.test_export_parity`: `clock` 3 and 1 448 characters, `gauge` 5
+and 2 314, `dual` 10 and 4 677, `alpha` 12 and 6 312, `bars` **46 and 19 890**, `birdseye`
+**46 and 19 985** - each
 byte-identical across two exports in one run - and `python3 -m unittest
 tests.test_export_parity` prints the whole census, per case, with its diff.  Measured
 2026-11-14, the two doors agree at **zero** differing pixels and worst channel delta 0 on
 every reading that answers what the theme asks, and the cases where they part are named
-rather than left out of the list: `clock` agrees at all five (25 530 / 25 343 / 22 944 /
-25 010 / 21 003 lit px) and `bars` at all five (69 996 / 68 610 / 15 655 / 20 551 /
-10 767); `gauge` at four of five (20 608 / 21 391 / 20 498 / 20 743, and the fifth 17 451
-against 4 319); `dual` at three (40 006 / 41 842 / 31 338); `alpha` at two (40 426 /
-39 186, then 9 174 px apart at each of the last three).  Those gaps are the known
-asymmetry, not a regression: with no `gpu` section to read, the code drawing keeps the
-widget and prints `--%`, while the file has no source to name and reports the row as
-skipped - so a page that claimed five zeroes for every theme would be quoting a fiction,
+rather than left out of the list - the six-theme print of 2026-11-14, every number in it
+lifted from that run: `clock` agrees at all five cases (25 530 / 25 343 / 22 944 / 25 010 /
+21 003 lit px), `bars` at all five (74 125 / 72 814 / 16 283 / 21 558 / 11 086) and
+`birdseye` at all five (55 735 / 55 298 / 16 197 / 19 699 / 12 706); `gauge` at four (20 608
+/ 21 391 / 20 498 / 20 743, and the fifth 17 451 against 4 319, 13 133 px apart); `dual` at
+three (40 006 / 41 842 / 31 338, with 29 228 against 18 743 and 27 388 against 6 409);
+`alpha` at two (40 891 / 39 186, then 9 174 px apart at each of the last three).  Those gaps
+are the known asymmetry, not a regression: with no `gpu` section to read, the code drawing
+keeps the widget and prints `--%`, while the file has no source to name and reports the row
+as skipped.  `bars` and `birdseye` have no such parting, and the reason is a design choice
+rather than luck: both doors drop a row whose *reading* is gone (a dial with no needle, a
+meter with no value) and keep the row whose *subject* is present (the label `GPU`, which is a
+part of the panel), so there is nothing left for the two doors to disagree about - so a page
+that claimed five zeroes for every theme would be quoting a fiction,
 and the print says which cases are which.  This passage's previous `bars` pair, 76 916 /
 76 022, had been stale since the meter track went 10 px -> 6 px: a loss of ink with a gain
 (a new row) inside it, which no gate would have caught by itself. The diff is taken
@@ -573,6 +583,14 @@ closed it is a claim about this source and not a memory of it.
 | theme | what it took, or what is missing | why it is a decision, not a lookup |
 |---|---|---|
 | `alpha` | **exported 2026-11-08:** 12 rows, 6 312 characters, **zero differing pixels** | every item on the derived list landed as a row: the two `temp_arc` rings as `arc` widgets with `xigma.arcPaint: render` and the ramp as `xigma.colourStops` (the three stops come out of `A26_ARC_LO`/`MID`/`HI`, which is the spelling `tests/test_conventions.py` checks against `render.temp_colour` at all 100 sampled positions); the two usage bars as `bar` widgets with `xigma.barPaint: hbar`, the case a vendor `bar` cannot spell, since it declares one flat fill and `render.hbar` gradients per **column** - measured at 28 device-px pairs and 7 at 1x at zero pixels against `render.hbar`; the three pairs of lettering as `special` rows (`fan-figures`, `temp-values`, `temp-labels`), because each pair shares one text size that only the drawing can decide; the usage labels and percentages as `text`/`data` rows, which need nothing joint; and the clock line as a `data` row with `xigma.format` and a width to fit to. The rows were each measured against `theme_alpha`'s own drawing before any of them was assembled (docs/limits.md), which is why the assembled frame reaches zero on the first try rather than after a week of chasing seams |
+| `birdseye` | **a second theme built from the same parts, 2026-11-14:** six dials in two
+sections (arc + number + name each), five usage meters with a `special` figure beside every
+label, three section captions with `line` rules, and a background of this repository's own
+making - a 168-frame cut of the vendor's `theme_47.mp4`, whose first 17 frames carry a play
+button at the centre (measured: head centre-luma 6.62 against the cut's 1.53).  Its geometry
+is declared `chosen here` in `themes.GEOMETRY_ORIGIN`, which is what lets
+`tests/test_snapping.py` hold its numbers to a lattice rule the vendor's own files are not
+held to |
 | `bars` | **the shape was found by measuring, 2026-11-08:** optional fan slots (`Fan 1` through `Fan 4`), and one change to our own drawing - written out under "The last theme, and the shape it turned out to need" |
 
 **The second schema question `alpha` raised was joint text sizing, and it was measured
@@ -633,7 +651,7 @@ held to the same standard as our own themes. That is stage 4's premise, demonstr
 stage early.
 
 The plan's rule holds while all of this happens: **an export that cannot be driven to a zero
-diff is not shipped**, and `tests/test_export_parity.py` puts all five through the two
+diff is not shipped**, and `tests/test_export_parity.py` puts all six through the two
 doors, with each one's pixel diff counted at every reading it can be given.
 
 ### The last theme, and the shape it turned out to need
@@ -794,7 +812,8 @@ painted `bars` with 14 of its 32 rows against a code drawing of 26, and `alpha`'
 missing from one door and `--%` in the other: 4 587 px at one clock instant.
 
 So the preview was fixed by fixing the fixture, not the layout.  `edit.FIXTURE` answers
-**20 of the 20 sources** the five exports ask today, and it did not always: 15 of 19 while
+**21 of the 21 sources** the six exports ask today (the count moved when `birdseye`'s DISK
+bar asked the vendor's `Disk Activity` and the dict grew it alongside `activity`), and it did not always: 15 of 19 while
 `bars` had no drive row at all, 16 of 20 when that row arrived, and the count only closed on
 2026-11-14 when the fixture grew a `drives` section and `bars` stopped asking `Fan 3`/`Fan 4`
 names it had no way to answer.  Those two fan pairs stay in the vocabulary - four `Fan N` pairs
@@ -807,11 +826,11 @@ bars` on this bench now says `skipped: nothing` rather than naming two.  Three c
 * **every key is a key a box reports.**  The group-and-field set is checked against the
   metrics sample `sensors.py` prints at the top of its own module, so an unread key cannot sit
   in a fixture pretending to be a reading - which is precisely how this one did.
-* **coverage is what the exports need.**  The sources the five generated layouts ask, minus
+* **coverage is what the exports need.**  The sources every generated layout asks, minus
   what the fixture answers, must equal exactly the fan slots past its reported tachometers.
   A new reading in a new export has to be pinned here before the preview may be quiet about
   it.
-* **the two doors put down the same pixels.**  All five themes at that fixture, at seven ink
+* **the two doors put down the same pixels.**  Every drawn theme at that fixture, at seven ink
   choices: zero differing pixels, worst channel 0.  Measured through the pane's own door
   (`Editor.paint(*Editor.fixture(), ink=...)`), not a hand-built call - and the row counts
   with it, in `bars`: **35 of its 35 widgets** at the completed fixture today - every row
@@ -897,10 +916,10 @@ Three things follow, and all three are in the code rather than in this sentence:
   puts a string into every frame that no row will draw.
 
 And the claim the report actually needs, held as pixels: `ALoopAndAPanePaintOnePicture`
-generates each of the five layouts, **saves** it as a layout file the way the editor does,
+generates each drawn layout, **saves** it as a layout file the way the editor does,
 resolves it by name, and paints it through both doors at one body and one instant.  Zero
-differing px for all five - the three that declare rows reading those keys, and `bars` and
-`gauge` which declare no `special` row at all, because a shared door should not agree only when
+differing px for every one of them - including the two, `clock` and `dual`, that carry only
+one `special` row each, and `gauge`, which declares none at all, because a shared door should not agree only when
 the layout is interesting - the same box for every `special` row, a box for each of them, and
 ink inside every box on both frames, so neither door can pass by drawing nothing.
 
@@ -1461,7 +1480,7 @@ image and red on the next.  That one ships with a command.
   requires `edit.FIXTURE` to still hold it *and* to still equal a fresh `ast.literal_eval`
   of the literal in `edit.py`. `tests/test_export_parity.py` holds it on the shipped side:
   neither `themes.parity`, `render.draw` nor `themes.values` writes to the readings it is
-  handed, over all five themes and all five shared bodies. The cost of getting it right is
+  handed, over all six themes and all five shared bodies. The cost of getting it right is
   nothing: the deep copy measured 0.004 ms as the median of 200 on the author's bench,
   beside a layer draw measured in milliseconds, and nothing re-times that pair, so the
   figure belongs to that sitting.
@@ -1561,14 +1580,14 @@ does **not** exist in this tree:
 * a table of the vendor's defaults. Its application bundles are not in this tree, so the
   copied files are the evidence, and `--print-theme-fields` is how they are read out.
 
-What does exist, gated rather than asserted in prose: the five exports and their zero-diff
+What does exist, gated rather than asserted in prose: the six exports and their zero-diff
 parity (`tests/test_export_parity.py`); the generated `bars` file, its rows - twelve as of
 2026-11-14 - and its two memory rules (`tests/test_bars_rows.py`); the file model with its save, revert, rename and
 delete doors (`tests/test_theme_files.py`); the editor's model and the doors over it
 (`tests/test_editor.py`); pointing, dragging and the marks (`tests/test_canvas.py`,
 `tests/test_pane_chrome.py`); the row acts and the reorder census
 (`tests/test_row_acts.py`); the peek's two frames and what may differ between them
-(`tests/test_peek_readings.py`); the five `special` rows, the value table they read and the
+(`tests/test_peek_readings.py`); the `special` rows `alpha` declares, the value table they read and the
 two doors painting one saved file the same (`tests/test_specials.py`); and the library and field counts
 (`tests/test_theme_library.py`, `tests/test_field_census.py`).
 

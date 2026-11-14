@@ -2250,7 +2250,11 @@ FIXTURE = {"cpu": {"temperature": 57.0, "load": 62.0, "usage": 62.0,
            # the drive row `bars` gained on 2026-11-14: a scalar temperature beside the same
            # capacity numbers, because a preview that silences a row this box answers is the
            # half-truth this fixture was completed to stop being
-           "disk": {"temperature": 44.0, "total": 786, "used": 73},
+           # `activity` / `load` are the vendor's own disk fields, and `birdseye`'s DISK bar
+           # asks for one of them: a pinned preview body that leaves a source unanswered is a
+           # preview with a hole in it that reads as the theme's fault
+           "disk": {"temperature": 44.0, "total": 786, "used": 73, "activity": 22.0,
+                    "load": 1.4},
            # This key is not from the captured sample and is labelled as such: `drives[]` is a
            # section this program added, and the panel was asked about it and answered `200`
            # without refusing (PROTOCOL.md 8).  It belongs here because `bars` draws two of its

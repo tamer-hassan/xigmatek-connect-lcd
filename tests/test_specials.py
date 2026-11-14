@@ -482,9 +482,10 @@ class ALoopAndAPanePaintOnePicture(fixtures.FreshConfigRoot):
 
     So this class holds a **parity** claim, which is what makes it cheap enough to hold for whole
     layouts with no reference image: one file, one body, two doors, **zero differing pixels**, and
-    the same reported box for every `special` row.  It holds it for all five generated layouts,
-    saved as files - the three that declare rows reading those keys (`alpha`, `clock`, `dual`)
-    and the two that declare no `special` at all (`bars`, `gauge`), because a shared door is not
+    the same reported box for every `special` row.  It holds it for every generated layout,
+    saved as files - which today is six, and the set has moved under this sentence twice:
+    when it was written `bars` and `gauge` declared **no `special` row at all**, and they are
+    kept in the walk precisely because a shared door is not
     supposed to agree only when the layout is interesting.  A blank frame passing for a blank
     frame is excluded twice over - every reported row must carry a box, and every box must hold
     ink on both frames.
@@ -497,6 +498,9 @@ class ALoopAndAPanePaintOnePicture(fixtures.FreshConfigRoot):
     Nothing here is vendor's: the vendor's 27 layouts use no `special` row at all, which is
     exactly why a decade of pixel-for-pixel vendor comparisons never saw the asymmetry.  The
     layouts are generated, saved into a settings root this test owns, and resolved by name, so
+    (`bars` has since grown eleven of them and `birdseye` five, which is the case that made
+    the box claim bite: an unanswered row must report the **same** box in both doors, not a
+    box of its own in one and none in the other).  Today's counts print, they are not quoted
     they arrive at the loop's door the way the owner's `alpha_new` did.
     """
 

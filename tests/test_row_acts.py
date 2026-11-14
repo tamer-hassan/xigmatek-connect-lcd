@@ -81,16 +81,13 @@ class TheEnvelopeComesFromTheFiles(unittest.TestCase):
                     and field in (widget.get("property") or [{}])[0]}
 
     def test_every_row_of_every_layout_carries_the_same_five_keys(self):
-        # 185 -> 188 -> 191 -> 188 -> 199 on 2026-11-14: `bars` gained a labelled drive row, that row
-        # became two positional slots, and the block then came back down to eleven rows when
-        # the owner's `Fan GPU` row took a fan slot's place instead of adding a twelfth.  It
-        # lands on the same 188 it passed through an hour earlier, which is the point of
-        # pinning a count rather than deriving one: three widgets' worth of block was traded,
-        # not grown - and then the gutter figures added eleven rows carrying an x and a y, all
-        # of them at one x (3), which is why the snap census's shared-column count moved from
-        # 92 to 103 while its gap histogram stayed empty at 1, 6 and 7 px.  Pinned rather than
-        # derived, because this is the count that says a layout grew.
-        self.assertEqual(len(self.rows), 199, f"{len(self.rows)} rows in "
+        # 185 -> 188 -> 191 -> 188 -> 199 -> 245 on 2026-11-14: `bars` gained a labelled
+        # drive row, that row became two positional slots, the block came down to eleven
+        # rows for the owner's `Fan GPU` order, the gutter figures added a column of
+        # x/y pairs, and `birdseye` arrived as a layout of its own - 46 rows, six dials
+        # of (arc, value, name) and a usage column of (icon, label, meter, value).
+        # Pinned rather than derived, because this is the count that says a layout grew.
+        self.assertEqual(len(self.rows), 245, f"{len(self.rows)} rows in "
                                               f"{len(self.editors)} layouts")
         odd = [widget for widget in self.rows
                if frozenset(widget) != frozenset(gui_edit.WIDGET_KEYS)]

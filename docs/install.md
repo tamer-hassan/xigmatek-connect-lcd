@@ -90,5 +90,5 @@ its client.** `xigmalcd` listens on a control socket while it draws
 theme, upload a background, pause the frame loop, read the counters, all while the
 glass stays live. Nothing has to be stopped to use the window any more, and the
 display keeps drawing when the window is closed - it hides to the tray, whose menu
-has the display's status line, pause/resume and the five themes. See [Two processes,
+has the display's status line, pause/resume and the six themes. See [Two processes,
 one port](usage.md#two-processes-one-port) for what the socket accepts and what it refuses.

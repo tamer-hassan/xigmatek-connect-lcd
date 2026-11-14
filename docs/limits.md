@@ -11,7 +11,7 @@ What has been measured on glass, by whom, with how many frames - and what has no
   reason the option exists on a device that answers nothing (§11). Measured off-glass by
   `tests/test_ink.py`: painting `gauge` in red leaves its painted area at exactly 6 087
   px as with the theme's own white, moves 1 509 solid white glyph pixels to 1 830 red
-  ones with none left white, and holds for all five themes; and after the default
+  ones with none left white, and holds for all six themes; and after the default
   256-colour palette encoding (§12) the ink returns within **1/255 per channel**.
 
   And on glass, 2026-11-07 at 10:20-10:22
@@ -62,7 +62,7 @@ What has been measured on glass, by whom, with how many frames - and what has no
   keeps playing behind its gauge (`data/vendor_frames`, measured in PROTOCOL.md §9). So the
   daemon's canvas is transparent by default now; `--bg black` fills that canvas with opaque
   black, which for a layout theme means the frame covers the background layer completely -
-  and for three of our five drawn themes does not, because their own translucent fills are
+  and for four of our six drawn themes does not, because their own translucent fills are
   replaced rather than blended and keep the stored background visible (the `--bg` row in
   docs/usage.md, and `tests/test_conventions.py` derives which themes from the exports' colour keys). `--mp4 [PATH]` uploads a background the way
   ALPHA does at session start - `media/Theme_25.mp4` (215 KB, the vendor's own pairing for
@@ -245,7 +245,7 @@ What has been measured on glass, by whom, with how many frames - and what has no
   smoke test is what keeps that honest in both directions - it walks the installed tree
   and fails on any file the manifest does not name, so a `.thm` cannot sneak back into the
   .deb unnoticed. None of it is a theme this program can select: the window's theme
-  picker lists `sorted(render.THEMES)`, the five drawings this project renders, because
+  picker lists `sorted(render.THEMES)`, the drawings this project renders, because
   nothing here has ever sent a `.thm` to the panel or read one back, and the control
   socket's own `check_media_file` gate does not accept that extension. What that library
   is used for here is measured: its layouts are what the `alpha` preset was redrawn from
@@ -270,7 +270,7 @@ What has been measured on glass, by whom, with how many frames - and what has no
   `1 200`, ack-first → `1 400`, same bytes. Baud rate, DTR/RTS, chunk size, payload
   content, file-name patterns and power/theme state were each swept live and changed
   nothing.
-## What the sensors report, and what the five drawn themes show
+## What the sensors report, and what the six drawn themes show
 
 * **Which channel answers `Motherboard` is a selection rule, and it was selecting a network
    controller.** Measured on this box on 2026-11-13, before anything was changed:
@@ -403,7 +403,11 @@ What has been measured on glass, by whom, with how many frames - and what has no
    *drawn* pattern, `["Fan CPU", "CPU PUMP", "Fan GPU"]` read out of the painter with a body
    that names its fans the way this box names them, because a fan row placed by a table slice
    is a claim about arithmetic and the owner asked for a claim about the glass.
-   Figures as re-printed after the move: `bars` is **35 widgets** at **15 497 characters**,
+   Figures as re-printed after the move: `bars` is **35 widgets** at **15 497 characters**
+   *(superseded within the hour by the gutter column below: **46 widgets**, **19 890
+   characters**, parity at 74 125 / 72 814 / 16 283 / 21 558 / 11 086 — the figures kept
+   through this bullet are the ones that were true when it was written, because the
+   arithmetic in them is the arithmetic that decided the row order)*,
    parity 0 px and worst channel 0 at all five readings - **70 207 / 68 916 / 15 974 / 20 870 /
    11 086** lit px down each door - 69 131 px at the editor's pinned fixture with **35 of 35**
    widgets drawn and no missing source, 69 390 px on this machine's live readings, and 35 boxes /
@@ -782,7 +786,21 @@ What has been measured on glass, by whom, with how many frames - and what has no
   | `dual-Theme_30.mp4` | 240 | 10.00 s | 24 fps | 214 113 | 3.3 → 3.2 (0.1) | 176.7 − 38.5 = **138.2** | 17.11 / 0.45 (×37.89) |
   | `clock-Theme_07.mp4` | 240 | 10.00 s | 24 fps | 278 884 | 176.2 → 162.6 (13.6) | 241.0 − 106.4 = **134.6** | 10.63 / 1.59 (×6.69) |
   | `bars-theme_52.mp4` | 240 | 12.00 s | 20 fps | 859 706 | 11.9 → 9.5 (2.4) | 140.6 − 43.4 = **97.1** | 11.48 / 7.34 (×1.56) |
+  | `birdseye-theme_47-trimmed.mp4` | 240 | 12.00 s | 20 fps | 1 223 967 | 6.3 → *(not measured)* | *(not measured)* | *(not measured)* |
   | `alpha-Theme_25-amber.mp4` | 240 | 10.00 s | 24 fps | 927 752 | *(the ink figure: see below)* | | |
+
+  The `birdseye` row is the newest, and three of its columns are empty **on purpose**: the
+  clip's own mean luma (6.3 of 255) and everything in its first five columns come from the
+  render the tool printed (`tools/preview_gif.py --mp4 --no-gif --theme birdseye --clip
+  media/theme_47-trimmed.mp4 --series docs/videos/readings-2026-11-08.json --gif-fps 20
+  --frames 240 --out docs/videos/birdseye-theme_47-trimmed.mp4`, 1 223 967 B, 240 frames at
+  20 fps = 12.00 s, `scrim 0` - the plate rule did not engage, which is the point of pairing
+  a fourteen-reading panel with a ground measured dark rather than chosen for looks: the survey that
+  chose it measured 44 clips and put `theme_47` at 6.6 luma with motion 5.62, and the cut
+  copy reads 6.3).  What has not been measured for this file is the composited field luma,
+  the glyph-minus-halo figure and the motion split, and an estimate in those cells would be
+  worse than a gap.  The set is now **seven files, 6 342 946 B**, largest `gauge-3.mp4` at
+  1 930 104 and smallest `dual-Theme_30.mp4` at 214 113.
 
   The `bars` row is the exception in that table, and it is labelled rather than quietly
   fixed: that clip was **re-rendered on 2026-11-12**, after the theme's row geometry moved
@@ -1129,13 +1147,13 @@ those figures. A layout theme ignores `--text-color`, `--cold`/`--hot`, `--label
 `--clock-size`: its colours, sizes and geometry are inside its file - which is the same
 reason the window's picker does not list what it cannot preview. Nothing about that has
 changed on the wire. The window makes exactly one exception to it, in a preview, and says so
-under the picture: open one of the five themes this repo draws from code and `themes.with_ink`
+under the picture: open one of the six themes this repo draws from code and `themes.with_ink`
 writes the reader's text colour into a **copy** of that theme's generated layout, over the
 colours `render.SKIN` declares, so the pane's two doors agree at that ink. A vendored or
 saved layout is never touched by it - measured at 0 px - and neither is the file a save would
 write.
 
-**Why the five drawn themes are still drawn from code.**  All five also exist as
+**Why the six drawn themes are still drawn from code.**  All six also exist as
 generated layout files (`themes.export`, printed by `--export-theme NAME`), so the file
 door could draw them, and `main.paint` already prefers a file for any other name.
 Whether that is free is a measurement per option, not per theme, and `tools/knobmap.py`
@@ -1181,7 +1199,7 @@ B for `Theme_29` up to 8 115 B for `Theme_35`, one pinned fixture, one pinned in
 are offline figures from `--dry-run`, and the glass pass is stage 6 of
 [theme-editor.md](theme-editor.md).  Stage 6 also owes one phase it did not have, added on
 2026-11-12 and **still not run**: `tools/display_glass.py`'s `theme` phase applied `gauge`, one
-of the five this repo draws from code, and nothing in its table applied a **layout file** - which
+of the six this repo draws from code, and nothing in its table applied a **layout file** - which
 is the only way to see on a panel what the 2026-11-12 door fix claims, that a saved copy of
 `alpha` keeps its `temp-values` and `fan-figures` rows once the loop, rather than the editor, is
 the one drawing it.  The driver has that phase now (`APPLY a layout file`: write a copy with
@@ -1250,7 +1268,7 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   frame, and validating 27 layouts - 152 widgets, every field - per frame is a cost that has
   never been measured here, so the reader asks the one predicate the painter actually needs
   and `--check-theme` is where the detailed report is printed.
-* **The five drawn-from-code names cannot be saved as files.** A `gauge.json` would be a
+* **The six drawn-from-code names cannot be saved as files.** A `gauge.json` would be a
   second source of truth for `render.theme_gauge`, which is exactly the drift the export
   design exists to avoid; a save that tried it is refused, and `--check-theme gauge` says
   the export does not exist yet instead of failing.
@@ -1523,7 +1541,7 @@ nothing, because a committed `gauge.json` goes stale the first time anyone edits
   (PROTOCOL.md 10) - while `RAM Rate` and `Used RAM` come out of that record's `RAMRate` and
   `UsedRAM`.  Of those two aggregates the GPU one is now paired with a field and drawn as a row,
   and the CPU one is the single name in `layout.VENDOR_FORMAT` with a shape and no source, said
-  out loud in `tests/test_bars_rows.py`; and `themes.bars_recipe()` generates the 35 widgets
+  out loud in `tests/test_bars_rows.py`; and `themes.bars_recipe()` generates the 46 widgets
   out of that table and the `BARS_*`
   constants. It is pixel-identical to `render.py` at every reading
   `tests/test_bars_rows.py` and `tests/test_export_parity.py` give it, answered and

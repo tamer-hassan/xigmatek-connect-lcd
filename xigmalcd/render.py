@@ -253,7 +253,7 @@ def _text(img, xy, s, fnt, fill, anchor="mm"):
 
 
 def _fit_size(draw_or_img, s, max_w, size, bold=True):
-    """`_fit_draw` handed an image instead of an `ImageDraw` - the door the five themes
+    """`_fit_draw` handed an image instead of an `ImageDraw` - the door the drawn themes
     call.  Accepts either: a probe that walks sizes one string at a time should not have to
     allocate a canvas per call, and both doors have to walk the same loop whatever they are
     handed."""
@@ -434,6 +434,28 @@ def gb(mb) -> str:
     """
     try:
         return f"{float(mb) / 1024:.1f} GB"
+    except (TypeError, ValueError):
+        return "--"
+
+
+def deg(v) -> str:
+    """One temperature in the one spelling both doors use: `61°C`.
+
+    `layout._deg` was its own `f"{int(round(v))}°C"` while `theme_bars` wrote
+    `f"{v:.0f}°C"` inline: both half-even, so they agreed - and agreement by
+    coincidence is what the `gb` fix last week was about.  One function now, named by
+    the file door and called by the code door.
+    """
+    try:
+        return f"{int(round(float(v)))}°C"
+    except (TypeError, ValueError):
+        return "--"
+
+
+def rpm(v) -> str:
+    """A tachometer figure with no unit: `1655` (the label column says what it is)."""
+    try:
+        return f"{int(round(float(v)))}"
     except (TypeError, ValueError):
         return "--"
 
@@ -1595,8 +1617,195 @@ def gpu_fan_figure(m) -> str:
     return f"GPU FAN {pct(fan)}" if fan else "GPU FAN --"
 
 
+# ------------------------------------------------------------- birdseye --
+#: A top-down instrument panel: two rows of dials (temperatures, then cooling) above a
+#: column of usage bars with a figure beside each label.  The name is the layout's own
+#: claim - what you see is the machine from above, instruments first - and unlike the
+#: other six it is **built out of three labelled sections**, because a panel with
+#: fourteen readings on it needs the reader to know which group a dial belongs to:
+#: `Fan CPU` at 1 655 RPM and `Fan GPU` at 34 % duty sit in the same ring shape, and
+#: only the section caption says why their scales differ.
+#:
+#: The geometry is one table per section in `themes` (`BIRDSEYE_DIALS`,
+#: `BIRDSEYE_BARS`, `BIRDSEYE_SECTIONS`), read by the painter and by the generated file
+#: alike.  That is deliberate: `bars` carries two copies of its row table today - one in
+#: `themes.BARS_ROWS`, one as literals inside `theme_bars` - held equal by a test, and it
+#: took a year of parity failures to earn that test.  A new theme starts with one copy.
+BIRDSEYE_TITLE_XY, BIRDSEYE_TITLE_F = (16, 24), 18
+BIRDSEYE_CLOCK_XY, BIRDSEYE_CLOCK_F = (464, 24), 18
+BIRDSEYE_CAP_F = 11                         # section captions, and the dial names
+BIRDSEYE_DIAL_CX = (86, 240, 394)
+BIRDSEYE_DIAL_CY = (114, 246)
+BIRDSEYE_DIAL_R = 43                        # the **inner** edge, as an `arc` declares it
+BIRDSEYE_DIAL_W = 9                         # the stroke
+BIRDSEYE_DIAL_START, BIRDSEYE_DIAL_SWEEP = 140, 260
+BIRDSEYE_DIAL_VAL_F, BIRDSEYE_DIAL_NAME_F = 22, 12
+BIRDSEYE_ICON_X, BIRDSEYE_ICON_BOX = 6, (20, 20)
+BIRDSEYE_LBL_X, BIRDSEYE_VAL_X = 32, 470
+BIRDSEYE_BAR_LBL_F, BIRDSEYE_BAR_VAL_F = 13, 15
+BIRDSEYE_BAR_X, BIRDSEYE_BAR_W, BIRDSEYE_BAR_H = 118, 292, 8
+BIRDSEYE_ROW_Y0, BIRDSEYE_ROW_PITCH = 334, 30
+BIRDSEYE_RULE_X, BIRDSEYE_RULE_W, BIRDSEYE_RULE_H = 128, 340, 1
+BIRDSEYE_TRACK = (40, 46, 50, 255)          # the same track `bar` draws with
+BIRDSEYE_RULE = (70, 78, 84, 255)           # the hairline beside each section caption
+
+
+def _birdseye_tables():
+    """The section tables and the slot-name door, from the module that owns them.
+
+    `themes` imports `render`, so this is a call-time import by design: the alternative is
+    a second copy of the row tables inside the painter, which is what `bars` still carries
+    (its rows exist in `themes.BARS_ROWS` and again as literals in `theme_bars`, held
+    equal by a test only after a year of parity misses).  One table, two doors, asked at
+    draw time.
+    """
+    from . import themes as _themes
+    return (_themes.BIRDSEYE_SECTIONS, _themes.BIRDSEYE_DIALS, _themes.BIRDSEYE_BARS,
+            _themes.SLOT_NAMES)
+
+
+def _birdseye_shape(src, value):
+    """The number's spelling, asked of the same door a layout file goes through."""
+    from . import layout as _layout
+    return _layout.text_for(src, value)
+
+
+def _birdseye_css(ink):
+    """The `rgba(r, g, b, a)` spelling a layout file carries, from an ink tuple.
+
+    `themes.rgba_str` builds those strings for the generated files, and the doors that
+    read colours the vendor's way (`draw_arc`, `draw_line`) want the text form, not a
+    tuple.  Asking the same function rather than formatting one here keeps a third
+    spelling of the theme's ink out of existence - the last two times this program kept
+    its own copy of a shared spelling (the gigabytes, the degrees) the copies disagreed
+    on the glass.
+    """
+    from .themes import rgba_str
+    return rgba_str(ink)
+
+
+def _birdseye_values(m):
+    """The source -> reading table, the one `themes.values()` builds for every door."""
+    from . import themes as _themes
+    return _themes.values(m)[0]
+
+
+def theme_birdseye(m, clock=True, bg=OVERLAY, ink=None):
+    """The bird's-eye panel: six dials in two sections, five usage bars with figures.
+
+    Every reading is asked of the same source names a layout file would use, and every
+    number is spelled by the same function the file door uses (`deg`, `rpm`, `pct`), so
+    `themes.parity("birdseye", ...)` has nothing to forgive: the ring, the bar, the
+    figure and the glyph are one rule each, not two that happen to agree.
+    """
+    sections, dials, bars_rows, slot_names = _birdseye_tables()
+    vals = _birdseye_values(m)
+    img = Image.new("RGBA", (W * SS, H * SS), bg)
+    d = ImageDraw.Draw(img)
+    fg, mid, acc = _skin(ink, *SKIN["birdseye"])
+
+    # the header: what this is, and what time it is on the glass
+    d.text((BIRDSEYE_TITLE_XY[0] * SS, BIRDSEYE_TITLE_XY[1] * SS), "BIRDSEYE",
+           font=font(BIRDSEYE_TITLE_F), fill=acc, anchor="lm")
+    if clock:
+        d.text((BIRDSEYE_CLOCK_XY[0] * SS, BIRDSEYE_CLOCK_XY[1] * SS), clock_str(),
+               font=font(BIRDSEYE_CLOCK_F), fill=mid, anchor="rm")
+
+    # section captions, each with a hairline rule out to the right edge
+    for caption, cy in sections:
+        d.text((16 * SS, cy * SS), caption, font=font(BIRDSEYE_CAP_F), fill=mid,
+               anchor="lm")
+        # The rule goes through the `line` door rather than a rectangle of the painter's
+        # own.  `layout.draw_line` fixes the stroke as the half-open rect
+        # [x, x+width) x [y, y+height) - measured off the vendor's own overlay, where
+        # `height` *is* the thickness - and my second copy of that arithmetic was 4 110 px
+        # of difference (one row thicker, one column longer) at worst channel 127: the same
+        # class of mistake the `barPaint`/`arcPaint` conventions exist to prevent, arriving
+        # in a new theme within the hour.
+        from .layout import draw_line as _draw_line
+        _draw_line(d, {"x": BIRDSEYE_RULE_X, "y": cy - BIRDSEYE_RULE_H // 2,
+                       "width": BIRDSEYE_RULE_W, "height": BIRDSEYE_RULE_H,
+                       "lineColor": _birdseye_css(BIRDSEYE_RULE)})
+
+    # the two dial rows
+    for row, (cy, entries) in enumerate(zip(BIRDSEYE_DIAL_CY, dials)):
+        for col, (label, src, lo, hi, _figure) in enumerate(entries):
+            cx = BIRDSEYE_DIAL_CX[col]
+            val = vals.get(src)
+            # The same split `bars` learned the hard way: a **label belongs to the row's
+            # subject** and a **number, and the ring behind it, belong to the reading**.
+            # A machine with no second tachometer still has a second dial position - it is
+            # part of the panel's design - but it has no needle to put in it and no number
+            # to write, and drawing a track at 0 % there would read as "this fan is stopped"
+            # rather than "this box does not report one".  A slot's *name* is a reading too
+            # (`Fan N Name`), so it goes with the slot that exists, and the fallback text
+            # lives in `themes.values()` for both doors rather than in this loop.
+            if label is None:
+                name = vals.get(slot_names[src])
+            else:
+                name = label
+            if val is None:
+                # the reading is gone: the subject's name still prints, in the order the
+                # file declares it (ring, value, name) - see below
+                if name is not None:
+                    d.text((cx * SS, (cy + 26) * SS), str(name)[:10],
+                           font=font(BIRDSEYE_DIAL_NAME_F), fill=mid, anchor="mm")
+                continue
+            # The ring is drawn through the `arc` door with the same property dict the
+            # generated file carries, because a second rasterisation of one ramp is exactly
+            # how the last 156 px of disagreement showed up here: my own `gauge()` call and
+            # `layout.draw_arc` land one unit apart in blue over the sweep's early segments,
+            # which is a rounding of `heat` rather than a different drawing.  The
+            # independence is not lost, only relocated: `gauge` and `dual` still draw their
+            # rings through `render.gauge` and are matched pixel for pixel against their
+            # files (0 px at every reading), and `tests/test_conventions.py` compares the
+            # two *conventions* head to head - 164 / 3 366 / 3 889 / 6 989 differing pixels
+            # at four readings.  What this theme refuses to do is keep a second copy of the
+            # ring and argue later that the copies agree.
+            outer = BIRDSEYE_DIAL_R + BIRDSEYE_DIAL_W
+            from .layout import draw_arc as _draw_arc
+            _draw_arc(d, {"x": cx - outer, "y": cy - outer,
+                          "sizeWidth": 2 * outer, "sizeHeight": 2 * outer,
+                          "radius": BIRDSEYE_DIAL_R, "width": BIRDSEYE_DIAL_W,
+                          "angleStart": 50, "angleEnd": 310,
+                          "bgColor": _birdseye_css(BIRDSEYE_TRACK),
+                          "startColor": _birdseye_css(CYAN),
+                          "endColor": _birdseye_css(RED),
+                          "minValue": lo, "maxValue": hi, "source": src,
+                          "xigma": {"arcPaint": "render", "colourRamp": "heat"}}, val)
+            d.text((cx * SS, (cy - 7) * SS), _birdseye_shape(src, val),
+                   font=font(BIRDSEYE_DIAL_VAL_F), fill=fg, anchor="mm")
+            # drawn **last**, in the order the generated file lists the row's three parts:
+            # a name that is wider than the gap between the ring's inner edge and its own
+            # centre lands on the ring, and which of the two wins is decided by draw order.
+            # That is how this theme's parity came to differ by 156 pixels in exactly one
+            # dial - the second tachometer's name, `Fan System`, 10 characters crossing a
+            # band of cyan - while every other ring in the frame agreed to the pixel.  A
+            # z-order rule has to be written down once, not twice and hoped for.
+            if name is not None:
+                d.text((cx * SS, (cy + 26) * SS), str(name)[:10],
+                       font=font(BIRDSEYE_DIAL_NAME_F), fill=mid, anchor="mm")
+
+    # the usage column: figure, label, bar, number - one row per reading
+    for i, (label, src, lo, hi, figure) in enumerate(bars_rows):
+        y = BIRDSEYE_ROW_Y0 + i * BIRDSEYE_ROW_PITCH
+        val = vals.get(src)
+        frac = min(max((val - lo) / (hi - lo), 0.0), 1.0) if val is not None else None
+        if frac is not None:
+            draw_icon(d, figure, BIRDSEYE_ICON_X, y - BIRDSEYE_ICON_BOX[1] / 2,
+                      BIRDSEYE_ICON_BOX[0], BIRDSEYE_ICON_BOX[1], heat(frac), frac=frac)
+        d.text((BIRDSEYE_LBL_X * SS, y * SS), label,
+               font=font(BIRDSEYE_BAR_LBL_F), fill=mid, anchor="lm")
+        if frac is not None:
+            bar(img, BIRDSEYE_BAR_X, y - BIRDSEYE_BAR_H // 2, BIRDSEYE_BAR_W,
+                BIRDSEYE_BAR_H, frac, heat(frac), bg=BIRDSEYE_TRACK)
+            d.text((BIRDSEYE_VAL_X * SS, y * SS), _birdseye_shape(src, val),
+                   font=font(BIRDSEYE_BAR_VAL_F), fill=fg, anchor="rm")
+    return img.resize((W, H), Image.LANCZOS)
+
+
 THEMES = {"gauge": theme_gauge, "dual": theme_dual, "clock": theme_clock,
-          "bars": theme_bars, "alpha": theme_alpha}
+          "bars": theme_bars, "birdseye": theme_birdseye, "alpha": theme_alpha}
 
 #: The three glyph colours each drawn theme owns - primary, secondary, accent - in one
 #: place, so that **both** doors read the same declaration.  `_skin` above applies a
@@ -1615,6 +1824,9 @@ THEMES = {"gauge": theme_gauge, "dual": theme_dual, "clock": theme_clock,
 SKIN = {"gauge": (WHITE, ALPHA_LABEL, ALPHA_MINT),
         "dual": (WHITE, DIM, CYAN), "clock": (WHITE, DIM, CYAN),
         "bars": (WHITE, DIM, CYAN),
+        # the accent is the header's own word, and the mid ink carries the captions and
+        # every dial name: six rings and five bars all read their numbers in `fg`
+        "birdseye": (WHITE, DIM, CYAN),
         "alpha": (A26_WHITE, A26_WHITE, A26_WHITE)}
 
 

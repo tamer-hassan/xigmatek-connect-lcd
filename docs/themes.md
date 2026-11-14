@@ -1,6 +1,6 @@
 # The themes, and where their shapes come from
 
-The five themes this project draws, what `alpha` is a redraw *of*, and the geometry that decides how big a number can be inside a gauge ring. The vendor's own library - 27 themes, their layouts, their clips and their baked overlays - is in `themes/alpha/`, and that directory's `README.md` is the write-up of the container, the cipher and the layout schema.
+The six themes this project draws, what `alpha` is a redraw *of*, and the geometry that decides how big a number can be inside a gauge ring. The vendor's own library - 27 themes, their layouts, their clips and their baked overlays - is in `themes/alpha/`, and that directory's `README.md` is the write-up of the container, the cipher and the layout schema.
 
 ## The 27 vendor themes are not in the picker, and that is not an oversight
 
@@ -19,7 +19,7 @@ That declaration is a field, not a naming convention: `background.mediaFile`, an
 selectable layouts name 23 different clips between them - no two layouts share one.
 `themes.pair(NAME)` reads it, `--list-themes` prints it, and the window follows it:
 opening a layout puts that clip under the preview unless the reader has ticked *keep my
-background* (docs/gui.md). The five themes this repository draws from `render.py` are not
+background* (docs/gui.md). The six themes this repository draws from `render.py` are not
 vendor pages, so there is no vendor record to read for them: they pair with the backdrop
 their own published picture is composited over, kept in `themes.CODE_CLIPS` and derived
 back out of the README's `<theme>-<clip>.mp4` names by `tests/test_theme_library.py`.
@@ -229,7 +229,7 @@ process, with `/dev/xigma-no-such-port` never opened and no byte sent anywhere:
 
 So a `Theme_*` that opens, previews, edits and saves in the window and is then refused by the
 display comes down to two cases, and the display's own sentence tells them apart.  A refusal
-that lists the five drawn names and names no directory is a door from before 0.4.  A refusal
+that lists five drawn names and names no directory is a door from before 0.4.  A refusal
 that reads `no layout named 'Theme_07' under <roots>` is a display with the door, in front of
 roots that do not hold this file - because those are *its* roots, and this window resolved the
 name somewhere else.  `xigmalcd --list-themes` on the machine running the display prints what

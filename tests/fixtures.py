@@ -140,7 +140,13 @@ METRICS = {
 WHEN = time.strptime("2026-11-05 09:31:03", "%Y-%m-%d %H:%M:%S")
 WHEN_DT = datetime.datetime(*WHEN[:6])
 
-THEMES = ("gauge", "dual", "clock", "bars", "alpha")
+#: Every theme this program draws, in the order the pages have always quoted them.
+#: `tests/test_ink.py` walks this for the text-colour row and `tests/test_encoder.py`
+#: walks it for a frame of every picture, so a theme missing here is a theme whose ink
+#: and whose JPEG bytes have never been checked - which is how `birdseye` would have
+#: joined the set unnoticed.  `tests/test_fixture_shape.py` now refuses that: the tuple
+#: has to be the registry.
+THEMES = ("gauge", "dual", "clock", "bars", "birdseye", "alpha")
 
 
 def as_datetime(st: time.struct_time) -> datetime.datetime:
@@ -183,7 +189,11 @@ PARITY_CASES = ({"cpu": {"temperature": 57, "load": 62},
                  "gpu": {"temperature": 47, "load": 22, "fan": 34, "memoryUsage": 2_100_000,
                          "dedicatedTotal": 8_000_000},
                  "motherboard": {"temperature": 41},
-                 "disk": {"temperature": 41, "total": 786, "used": 73},
+                 # `activity` and `load` are the vendor's own disk fields (PROTOCOL.md §10), and
+                 # since `birdseye` draws a DISK bar one of the "complete" readings would not be
+                 # complete without them
+                 "disk": {"temperature": 41, "total": 786, "used": 73, "activity": 22.0,
+                          "load": 1.4},
                  "drives": [{"name": "nvme0", "temperature": 41, "sensors": [41, 52, 68]},
                             {"name": "nvme1", "temperature": 33, "sensors": [33]}],
                  "memory": {"used": 4_200_000, "total": 16_000_000},
@@ -198,7 +208,8 @@ PARITY_CASES = ({"cpu": {"temperature": 57, "load": 62},
                  "gpu": {"temperature": 100, "load": 0, "fan": 0, "memoryUsage": 0,
                          "dedicatedTotal": 8_000_000},
                  "motherboard": {"temperature": 0},
-                 "disk": {"temperature": 80, "total": 786, "used": 73},
+                 "disk": {"temperature": 80, "total": 786, "used": 73, "activity": 100.0,
+                          "load": 0.0},
                  # both drive slots at the opposite end of the same meter: 80 fills it, 25 is
                  # empty, and slot 1 is spelled with the boot mark while slot 2 is not - the
                  # two doors have to agree on that mark or parity moves

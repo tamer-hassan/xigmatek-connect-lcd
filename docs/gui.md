@@ -63,7 +63,7 @@ checked offline: the remote path against a real socket and no serial layer at al
 
 **Tray.** If the desktop has a tray (Qt asks: `isSystemTrayAvailable`), closing the
 window hides it instead of quitting, and the icon's menu is: the display's status
-line, pause/resume, the five themes (choosing one there sends it to the glass, not
+line, pause/resume, the six themes (choosing one there sends it to the glass, not
 just to the preview), show the window, whether to stay in the tray, and Quit - which
 does quit. `--no-tray` turns the whole thing off and closing quits as before;
 `--hidden` starts as tray only, which is what you want if the window is a control
@@ -87,10 +87,10 @@ one of them (see "How the three columns get their sizes", after the table):
 |---|---|---|---|
 | the running display | controls | what the socket says another process is drawing: one sentence, the counters (`40/41 uploads the panel confirmed, 0 refused, 1 renewal`, session age, last file and notice, `space`), **what the panel stores as its background** (`the panel stores: theme_47.mp4`, read out of the display's own event ring), and the ring itself - the last six things that display did on the port, with its verdict on each upload. It also spells out the settings that display is running with - canvas, clock size, scrim, fans, and **the text colour it holds, as the hex it will answer again** (`text #ffc400`), which is the only place in the window you can see a colour you did not pick yourself. Pause, one frame, an fps spin, `Apply these settings` (Ctrl+Return) | socket only; the port is never opened. Sent in about 1 ms: six settings on the 0.2 bench ledgers below, seven in today's tree, and `tests/test_display_remote.py` holds the whole line under 0.5 s |
 | preview | preview | the background with `render.draw`'s OSD layer composited on top - playing, via one streaming ffmpeg, or as one mid-loop frame (`playing` box, see "The preview plays" below), refreshed at `--preview-fps` (default 2). Its column is capped at 480 px plus the pane's chrome, and the picture is never drawn larger than the glass is - see "How the three columns get their sizes" below | nothing |
-| theme | controls | the five themes, clock size, **the colour of the text it draws**, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
+| theme | controls | the six themes, clock size, **the colour of the text it draws**, `clear`/`black` canvas, scrim, fan figures, and a line saying what the vendor's 27 themes in the other package are and are not | nothing until you press Apply (display running) or one of the send buttons (not running) |
 | layout editor | controls, always on | opens one of the layouts this machine can select (or one of the 5 generated ones), shows its widgets, and lays out every field that widget carries as a row of its own (8 to 18 rows by kind, from the model's list); the pane under the picture then shows *that file* rather than the live theme | nothing on `save`, and one setting on `apply to the panel`: the panel is never handed a layout file (PROTOCOL.md §11), only `("theme", <name>)`, which the display resolves to a file in the roots *it* can read. So a save alone can move the glass - a loop already naming that layout re-resolves the file every frame - and an apply alone cannot carry an unsaved edit: it changes *which* layout the panel draws. Pressing `apply` says, before it sends, how many px separate the pane from the picture that press will make (`docs/gui.md`, "Files, names and the field list a kind is offered") |
 | `reload the list`, `open a file…` | layout editor, under the menu; never fold | the two doors that decide **which file the box holds**: the first re-reads the roots the menu is built from, the second opens one layout file by path, wherever it is | nothing. Opening reads, never writes - and a layout that only a path answers is **refused** by `apply to the panel` until `save as your copy` puts it in a root the display can read |
-| clips | library | every MP4 the roots hold, listed once per **distinct file** - **40 rows out of the 46 mp4 files this repository tracks** (204 files on the author's bench, where the installed package and a mounted Windows partition add themselves; still 40 rows): 3 rows from the clips vendored here and 37 from the vendor's library on any of those boxes, the rest of the files being copies that collapse by content - 6 among the 46 tracked here (3 of them under another name), 164 on the bench, and the dated audit of all of it is written out under "Cost, measured on this box" below. This checkout's own `themes/alpha/clips` is one of the roots the list walks: 43 clip files, byte-identical to what `xigmatek-connect-lcd-themes` installs - `tools/verify_manifest.py` re-hashes every one against that package's own manifest, on this bench and on the runner - which is what lets a clone pair all 23 layouts `--list-themes` prints and why the same 40 rows turn up on a CI runner with nothing installed. `tools/preview_gif.py --clip themes/alpha/clips/Theme_30.mp4` reaches those files by path, which is how all five README previews are made. Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
+| clips | library | every MP4 the roots hold, listed once per **distinct file** - **40 rows out of the 46 mp4 files this repository tracks** *(both figures are the walk from before this repository's `media/` grew twice on 2026-11-14: `theme_47-trimmed.mp4` in this change and ten of the owner's own clips in the one after it; `xigmaui.clips.list_clips()` prints the current count)* (204 files on the author's bench, where the installed package and a mounted Windows partition add themselves; still 40 rows): 3 rows from the clips vendored here and 37 from the vendor's library on any of those boxes, the rest of the files being copies that collapse by content - 6 among the 46 tracked here (3 of them under another name), 164 on the bench, and the dated audit of all of it is written out under "Cost, measured on this box" below. This checkout's own `themes/alpha/clips` is one of the roots the list walks: 43 clip files, byte-identical to what `xigmatek-connect-lcd-themes` installs - `tools/verify_manifest.py` re-hashes every one against that package's own manifest, on this bench and on the runner - which is what lets a clone pair all 23 layouts `--list-themes` prints and why the same 40 rows turn up on a CI runner with nothing installed. `tools/preview_gif.py --clip themes/alpha/clips/Theme_30.mp4` reaches those files by path, which is how all five README previews are made. Each row gets an ffmpeg thumbnail, its measured mean luma and its measured frame size (ffprobe: 40 of the 43 clips the themes package installs are 480x480, 3 are 320x240, and a clip that is not the panel's size is labelled a guess under the list). One filter field above the list, and a row the display's own gate would refuse is greyed with its reason in the tooltip | the window's **one** upload button, `Send this background to the panel` (Ctrl+Shift+U): `STATE all 1` twice, then the whole file as one media file |
 | background state | library | one line under the list that keeps "I picked this" and "the panel stores this" apart, in three wordings: the display reported accepting this very clip, it reported accepting a different one, or this window has not seen an accept - and the matching row in the list is drawn bold. A file the socket's own `check_media_file` door refuses says so, in that door's words, before the button is pressed | nothing: it is a readout |
 | `One frame now` | library | one live frame, preview and glass showing the same render | `STATE all 1` twice, then one `.osd` upload |
 | `Send frames for 30 s` | library, advanced | the picture loop, so you can watch the real glass | `STATE all 1` twice, then 60 uploads at 2 fps |
@@ -374,7 +374,7 @@ half frame together.  That is the loop the panel plays, and it is why the README
 replay the same loops in its own videos, measured there rather than assumed: the `alpha`
 video runs the 0.958 s clip 10.4 times in its 10 s, so its restarts are the clip's own
 joins - which §9 measures at 2.50 against a 1.54 typical step at the clip's native rate,
-and docs/limits.md carries that table for all five backgrounds, including `3.mp4`, whose
+and docs/limits.md carries that table for every paired background, including `3.mp4`, whose
 loop *is* a hard cut (12.45 against 4.55).  A preview is only ever blamed for what it
 adds.  The table is a record of the runs that measured it: `ffprobe` over
 `docs/videos/*.mp4` re-reads any row of it, and nothing in `tests/` re-runs the
@@ -879,19 +879,26 @@ commonly gets wrong:
 * **The pane shows the file, at pinned readings.** `themes.draw` - one of the two doors over
   the painter the frame loop uses, the other being its `themes.paint` - with the fixture every
   documented figure in this repo was read at (CPU 57.0 °C, GPU 47.0 °C, 2026-02-17
-  09:30:12), and that fixture is shaped like a machine: it answers **15** of the **19** sources the
-  five generated layouts ask, the **4** it leaves being the `Fan 3`/`Fan 4` slots past its two
-  reported tachometers - and **20 of 20** today, since the fixture grew a `drives` section and
-  `bars` stopped asking the `Fan 3`/`Fan 4` names it had no way to answer.  Widening that census
-  to all **28** layouts the pane can open: **108** rows carry a `source` - the `data` rows and
-  the `bar` and `arc` rows that read a percentage - between them asking **22** distinct names,
-  of which that dict answers **21** and leaves **1** with no value: `Pump Speed`, on purpose,
-  because the fixture's fan rows carry no `type` saying `Pump` while nine vendored layouts ask
-  it anyway - the one hole worth leaving visible in a body everything else is measured against. The line under the picture says what it drew (`pane: pinned
+  09:30:12), and that fixture is shaped like a machine: it answers **21 of the 21** sources the six
+  generated layouts ask today.  It has not always: 15 of 19 while `bars` had no drive row at
+  all, 16 of 20 when that row arrived, 20 of 20 once the `Fan 3`/`Fan 4` names this box cannot
+  answer came out of the exports - and the twenty-first is `Disk Activity`, which `birdseye`'s
+  DISK bar asked for on 2026-11-14 and which `edit.FIXTURE` grew in the same change, because a
+  preview with a hole in it reads as the theme's fault rather than as the machine's.  Widening
+  that census to every layout the pane can open on this bench - 23 vendored pickables, one
+  saved copy of the owner's, and the six generated exports, **30 layouts** - **156** rows carry
+  a `source` (the `data` rows and the `bar` and `arc` rows that read a percentage) asking **23**
+  distinct names between them, of which that dict answers **22** and leaves **1** with no
+  value: `Pump Speed`, on purpose, because the fixture's fan rows carry no `type` saying `Pump`
+  while nine vendored layouts ask it anyway - the one hole worth leaving visible in a body
+  everything else is measured against.  Both halves print rather than being kept here:
+  `python3 -m unittest tests.test_row_notes` gives the source and name censuses over whatever
+  layouts this machine's roots hold, and `python3 -m unittest tests.test_fixture_shape` gives
+  the asked-against-answered pair. The line under the picture says what it drew (`pane: pinned
   fixture | this machine: …`) because a preview that moved with the sensors would make it
   impossible to tell an edit from a temperature. Because both doors read that one dict, a generated layout and
   the theme it was generated from put down the same picture here: zero differing pixels for
-  all five, at seven ink choices, worst channel 0, held by `tests/test_ink.py`. The text-colour
+  all six, at seven ink choices, worst channel 0, held by `tests/test_ink.py`. The text-colour
   row therefore
   reaches a generated layout - by `themes.with_ink`, into a copy, so what Save writes keeps
   the file's own colours - and does not reach anybody else's: open `Theme_28` and an ink moves
@@ -1009,7 +1016,7 @@ commonly gets wrong:
 * **A refusal is quoted, not summarised, because two displays fail this way.** A
   layout's name is resolved by the process that holds the port, not by this window, so
   the same press answers differently against two machines. A build older than this
-  window's layout door refuses with the five names it draws and names no directory at
+  window's layout door refuses with the six names it draws and names no directory at
   all; a newer build that cannot see the file refuses with the roots it did search.
   Both possibilities, and the test that tells them apart, are printed in the log after
   the refusal; why they differ, the roots in order, and what to do about either are
@@ -1130,7 +1137,7 @@ chooses another body on the knob above the picture, and the marks always belong 
 that is on screen.  `this machine's readings` makes the live frame the one a press answers at;
 `a metrics file` is a look, not an editing surface, and its doors stay shut (both in the
 bullet above).
-The theme combo lists the five names this program draws from code, because those are the
+The theme combo lists the six names this program draws from code, because those are the
 five whose options the row under it edits - a title, a label, a `cold`/`hot` band, a
 gauge source; a file layout brings its own geometry and its own colours. A layout
 reaches the glass from the editor's box instead, by `apply to the panel`, and the panel
@@ -1341,12 +1348,12 @@ Every vendor layout declares exactly one clip in its own file (`background.media
 all 23 selectable layouts name a distinct one, and `themes.pair(NAME)` is the one place
 that reads it, so `--list-themes` and the window cannot disagree with each other or with
 the file. Choosing a layout in the dropdown puts its own clip under the preview and
-marks that row in the library column - measured over all 23 vendor layouts and all five
+marks that row in the library column - measured over all 23 vendor layouts and all six
 generated exports in that dropdown, every one of them resolved to a row on this bench,
 and `tests/test_pairing.py` asserts both halves. Two cases are said out loud rather than
 left to be inferred:
 
-* **the five themes this repository draws from `render.py` pair with the backdrop their own
+* **the six themes this repository draws from `render.py` pair with the backdrop their own
   published picture sits over** - `alpha`→`Theme_25.mp4`, `gauge`→`3.mp4`,
   `dual`→`Theme_30.mp4`, `clock`→`Theme_07.mp4`, `bars`→`theme_52.mp4`, kept in
   `themes.CODE_CLIPS`. That is not a guess and not a vendor record either: the vendor
@@ -1420,7 +1427,7 @@ Five things it deliberately does not pretend to be:
   is always a copy of a row this program already draws rather than a table of defaults,
   nothing reaches the panel that this window has not saved first (`apply to the panel`
   sends a name, and the display resolves it to a file on disk), no background goes with
-  it, and the theme pane offers the five themes this repo draws, with the daemon's own
+  it, and the theme pane offers the six themes this repo draws, with the daemon's own
   options.
 * **No storage gauge.** The status pane prints `space` as a number with a note
   that it is not a size ledger: across four accepted uploads it moved a few KB
@@ -1966,7 +1973,9 @@ what it remembers (§11): the file describes the window, not the glass.
 
 Still not wired: a tray icon, and a live-to-glass toggle that keeps running after you
 let go - the frame loop only runs for the window it announced, and it always says how
-long that is. `tests/` covers the GUI offline: clip sizes and lumas, all five themes previewed,
+long that is. `tests/` covers the GUI offline: clip sizes and lumas, every drawn theme previewed - `tests/test_window.py` walks
+`render.THEMES`, and `tests/test_fixture_shape.py` refuses a theme that is in one list and
+not the other,
 the scrim rule
 tripping on the bright clip and not the dark one, a missing port reported in the
 log instead of raising, the settings round-trip plus the junk it refuses, the

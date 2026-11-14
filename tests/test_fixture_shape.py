@@ -56,7 +56,10 @@ def documented_shape() -> dict:
 
 
 def generated() -> list:
-    """The five drawn themes, opened the way the window opens them.
+    """Every drawn theme, opened the way the window opens them.
+
+    Derived from `themes.EXPORTS`, not from a list: the day a seventh theme lands, its
+    sources are covered by this file's fixture gate without anyone remembering to add it.
 
     `open_theme` is not a convenience: it is the door that records which theme a layout came from,
     and `Editor.paint(ink=...)` needs that to know whether the reader's colour can be honoured at
@@ -65,6 +68,43 @@ def generated() -> list:
     """
     return [gui_edit.Editor.open_theme(name) for name in sorted(themes.EXPORTS)]
 
+
+class TheThemeSetIsTheRegistry(unittest.TestCase):
+    """What themes the shared gates walk, and why that list cannot drift.
+
+    `fixtures.THEMES` is a tuple, not a lookup: `tests/test_ink.py` and
+    `tests/test_encoder.py` loop over it, so a theme that exists in `render.THEMES` but not
+    here is a theme whose text colour is never re-drawn and whose frame is never encoded in
+    the suite.  `birdseye` arrived on 2026-11-14 and would have slipped through exactly that
+    way - 23 new checks of its own, and neither shared gate walking it.
+
+    The set is therefore held equal in both directions, and the order is pinned too, because
+    the pages quote these names in this order and a silent reshuffle makes a table's rows
+    disagree with the sentence above it.
+    """
+
+    def test_the_walked_set_is_exactly_the_drawn_set(self):
+        self.assertEqual(sorted(fixtures.THEMES), sorted(render.THEMES),
+                         f"fixtures.THEMES {fixtures.THEMES} is not the drawn set "
+                         f"{sorted(render.THEMES)}: a theme in one and not the other is a "
+                         "theme the ink and encoder gates do not run over")
+        self.assertEqual(fixtures.THEMES, ("gauge", "dual", "clock", "bars", "birdseye",
+                                           "alpha"),
+                         "the order the pages quote changed: re-read those tables before "
+                         "accepting this")
+        print(f"  shared gates walk {len(fixtures.THEMES)} themes: "
+              + " ".join(fixtures.THEMES))
+
+    def test_every_drawn_theme_has_a_skin_and_an_export(self):
+        for name in sorted(render.THEMES):
+            self.assertIn(name, render.SKIN, f"{name} has no entry in render.SKIN")
+            self.assertIn(name, themes.EXPORTS, f"{name} is drawn but never exported")
+            self.assertIn(name, themes.CODE_CLIPS,
+                          f"{name} is drawn and published but names no backdrop")
+            self.assertIn(name, themes.GEOMETRY_ORIGIN,
+                          f"{name} says nothing about where its placement numbers came from")
+        print(f"  every drawn theme answers for skin, export, pairing and geometry origin: "
+              f"{len(render.THEMES)} of them")
 
 class TheFixtureNamesWhatARealBoxReports(unittest.TestCase):
     def setUp(self):
@@ -90,7 +130,7 @@ class TheFixtureNamesWhatARealBoxReports(unittest.TestCase):
                                 "which is how it once answered `gpu.usage` while the library asked "
                                 "for `gpu.load`")
 
-    def test_the_five_drawn_themes_ask_only_for_what_the_fixture_answers(self):
+    def test_the_drawn_themes_ask_only_for_what_the_fixture_answers(self):
         asked = {((widget.get("property") or [{}])[0])["source"]
                  for editor in generated() for widget in editor.widgets()
                  if (widget.get("property") or [{}])[0].get("source")}

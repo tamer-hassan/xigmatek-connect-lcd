@@ -161,6 +161,9 @@ VENDOR_FORMAT = {
     # the drive that owns `/`, in the same shape the other two temperatures use; ours, not
     # measured off the vendor's picture, and no shipped layout asks for it
     "Disk Temperature": _deg,
+    # the busy-percent reading `birdseye`'s DISK bar asks for, in the same percent shape
+    # every other 0..100 meter in this program prints
+    "Disk Activity": _pct,
     "Fan 1 Speed": lambda v: f"{int(round(v))}",
     "Fan 2 Speed": lambda v: f"{int(round(v))}",
     "Fan 3 Speed": lambda v: f"{int(round(v))}",
@@ -240,7 +243,7 @@ def draw_text(draw: ImageDraw.ImageDraw, prop: dict, value: str, face,
     tools/theme_check.py compares to the vendor's.
 
     Every ALPHA file anchors at the em box's top-left (`la`), and that is the default
-    here unchanged.  Two keys under `xigma` exist because the five themes this program
+    here unchanged.  Two keys under `xigma` exist because the drawn themes of this program
     wrote for itself are not drawn that way, and an export that pretended they were
     would move ink on the glass:
 
@@ -407,8 +410,13 @@ def draw_special_glyph(draw: ImageDraw.ImageDraw, prop: dict, figure: str, value
     # and no reader, the exact one-sided drift that check exists to catch
     ext = prop.get("xigma") or {}
     variant = str(ext.get("iconVariant") or "")
-    figure = (figure_for(str(prop.get("source") or ""),
-                         values.get(variant) if variant else None) or figure)
+    if variant:
+        # the declared name is the file's intent; a variant is asked for *in addition*, by
+        # naming another source, and only then may the figure change - so a theme whose
+        # source table would map the same reading to a different shape (CPU Usage is a
+        # dial in `bars` and a utilisation bar in `birdseye`) still gets what it declared
+        figure = (figure_for(str(prop.get("source") or ""), values.get(variant))
+                  or figure)
     frac = frac_of(prop, value)
     ramp, _bad = colour_ramp(prop)
     ink = (ramp or heat)(frac)
@@ -969,7 +977,7 @@ def draw_theme(obj: dict, values: dict, *, canvas: tuple | None = None,
 
     The `xigma` extension keys a text or data widget may carry - `showIf`, `anchor`,
     `autoFitMax`, `format` - are documented at `draw_text` and `text_for`, each with
-    the measured difference between our five and the vendor's files that forced it."""
+    the measured difference between our own exports and the vendor's files that forced it."""
     W, H = canvas or (obj["width"], obj["height"])
     img = Image.new("RGBA", (W * SS, H * SS), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)

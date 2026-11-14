@@ -218,18 +218,25 @@ class Control:
         return {"ok": False, "error": f"unknown cmd {cmd!r}"}
 
     def _set_theme(self, value) -> dict:
-        """Switch the picture.  Both halves of the vocabulary: the five drawn in
+        """Switch the picture.  Both halves of the vocabulary: the themes drawn in
         render.py, and ALPHA's layouts as `xigmalcd/themes.py` finds them - the same
         names `--theme` takes, because the door should not change the meaning
-        (docs/themes.md).  The window's own picker stays on the five for now: a layout
-        has no preview path there yet, and docs/theme-editor.md keeps that plan.
+        (docs/themes.md).  The window's own picker stays on the drawn set for now: a
+        layout has no preview path there yet, and docs/theme-editor.md keeps that plan.
+
+        The count in the refusal is read off `render.THEMES` instead of written into the
+        sentence.  It used to say "the five drawn here" and then print a list of six,
+        because `birdseye` joined the set on 2026-11-14 and the prose did not move with
+        the registry: a door that names its own list cannot be allowed to disagree with
+        it, and a seventh theme would have made the same sentence wrong again.
         """
         from . import render, themes
         name = str(value or "")
         if name not in render.THEMES and themes.resolve(name) is None:
             return {"ok": False,
                     "error": f"unknown theme {name!r}: {themes.why_not(name)}; "
-                             f"the five drawn here are {' '.join(sorted(render.THEMES))}"}
+                             f"the {len(render.THEMES)} drawn here are "
+                             f"{' '.join(sorted(render.THEMES))}"}
         with self.lock:
             self.args.theme = name
         return {"ok": True, "status": self.status()}

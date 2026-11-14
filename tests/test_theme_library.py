@@ -27,6 +27,7 @@ from tests import fixtures
 
 from xigmalcd import layout
 from xigmalcd import render
+from xigmalcd import main as _main
 from xigmalcd import themes
 
 #: What the 27 copied layouts divide into on this canvas.  File facts: the same 27 files are in
@@ -43,6 +44,73 @@ SOURCES_USED = {"CPU Temperature": 17, "CPU Usage": 15, "Time": 11, "Pump Speed"
                 "GPU Usage": 6, "GPU Temperature": 3, "CPU Frequency": 2}
 RULELESS_HOLES: set = set()
 NEEDS_A_PUMP_ROW, ONLY_GAP = 9, ["Pump Speed"]
+
+
+class TheDrawnSetCountsItself(unittest.TestCase):
+    """Every door that *states* how many themes this program draws states it correctly.
+
+    Adding `birdseye` on 2026-11-14 made three shipped sentences wrong at once, and none of
+    them was a comment a reader never sees: the control socket's refusal printed six names
+    under the words "the five drawn here", and `--theme`'s help listed
+    `alpha, bars, clock, dual, gauge` and called that list "the five".  A theme joins the
+    set by going into `render.THEMES` and nothing forces either sentence to move, so the fix
+    is not to re-write the numbers - it is to make the strings read the registry, and then to
+    refuse the next drift.
+
+    Nothing here hard-codes six.  The count and the names come from `render.THEMES`, and the
+    messages are asked of the shipped doors, so a seventh theme keeps this check green by
+    itself while a theme added without deriving the words goes red.
+    """
+
+    def test_the_control_sockets_refusal_names_the_registry_it_just_read(self):
+        from xigmalcd import control, main
+        args = main.build_parser().parse_args(["--once"])
+        ctl = control.Control(args, "")          # no server thread, no socket, no panel
+        refused = ctl._set_theme("definitely-not-a-theme")
+        self.assertFalse(refused["ok"])
+        said = str(refused["error"])
+        n = len(render.THEMES)
+        print(f"  refusal for an unknown name, {n} drawn themes: {said}")
+        self.assertIn(f"the {n} drawn here", said,
+                      f"the socket's refusal does not count its own registry ({n}): {said}")
+        for name in sorted(render.THEMES):
+            self.assertIn(name, said,
+                          f"`{name}` is drawn but the refusal does not name it: {said}")
+
+    def test_the_command_lines_help_counts_and_lists_the_set(self):
+        from xigmalcd import main
+        n = len(render.THEMES)
+        opts = {a.dest: a for a in main.build_parser()._actions}
+        phrases = {"theme": f"{n} this program draws",
+                   "export_theme": f"of the {n} themes this",
+                   "list_themes": f"the {n} drawn"}
+        for dest, phrase in phrases.items():
+            help_ = str(opts[dest].help or "")
+            print(f"  --{dest.replace('_', '-')}: {help_[:120]}")
+            self.assertIn(phrase, help_,
+                          f"`--{dest.replace('_', '-')}`'s help does not state {n} drawn "
+                          f"themes (looked for {phrase!r} in {help_[:160]})")
+        listed = str(opts["theme"].help)
+        for name in sorted(render.THEMES):
+            self.assertIn(name, listed,
+                          f"`--theme`'s help does not name `{name}`: {listed[:160]}")
+
+    def test_the_list_door_prints_the_header_it_draws(self):
+        """`--list-themes`'s own header line, read from the door rather than quoted."""
+        import contextlib
+        import io as _io
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = _main.main(["--list-themes"])   # returns 0 before any port is opened
+        self.assertEqual(code, 0, "the listing door did not exit cleanly")
+        text = buf.getvalue()
+        n = len(render.THEMES)
+        header = [ln for ln in text.splitlines() if "drawn here" in ln]
+        self.assertEqual(len(header), 1, text[:200])
+        names = header[0].split(":", 1)[1].split()
+        print(f"  --list-themes header names {len(names)}: {header[0]}")
+        self.assertEqual(sorted(names), sorted(render.THEMES), header[0])
+        self.assertGreaterEqual(n, 1, "no drawn themes at all?")
 
 
 class Selection(unittest.TestCase):
