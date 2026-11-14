@@ -204,6 +204,17 @@ nothing in it is written outside that directory.
   `text` with no `content`, a repeated `property` entry, and an `xigma.showIf` naming a
   source this program cannot answer - a row whose dependency can never be satisfied never
   draws at all, so a mistyped key there would look like a missing sensor.
+
+  The `fontSize` warning is a notice about vocabulary, not a fault, and the measured fact
+  belongs beside it because the page otherwise implies our own files would pass: **all six
+  generated themes trip it**. `python3 -m xigmalcd --check-theme NAME` counts them - `bars`
+  12, `birdseye` 21, `dual` 6, `alpha` 2, `gauge` 2, `clock` 2 warnings - and the sizes each
+  one declares, read out of the export: `alpha` 20 24 26 32 74, `bars` 18 20 24 28,
+  `birdseye` 11 12 13 15 18 22, `clock` 22 26 140, `dual` 15 17 24 30 52, `gauge` 14 20 22
+  52. The vendor's ten are what their layouts happen to use; a drawn theme sizes its own
+  text to its own canvas, and `birdseye` needs an 11 px caption to fit three section labels
+  above six rings in 480 px - which is a choice, stated, rather than an oversight the
+  inspector has to be told about.
 * **`--check-theme NAME` is the review door** for all of it: the file's own accounting,
   which root answered, the warnings, then what this machine's readings draw - boxes, lit
   pixels, what was skipped and why, which shapes are this repo's choice rather than
