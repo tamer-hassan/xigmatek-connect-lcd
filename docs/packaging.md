@@ -373,6 +373,13 @@ code package will differ in precisely the places above - a `WHEEL`, one `md5sums
 kilobyte of `Installed-Size`, two script bodies - while the themes package will match. The
 stamp rule is what keeps the clocks out of it; the package manager's version is what keeps
 the bytes from agreeing across machines, and that is stated here because the alternative is
-a maintainer diffing two archives hunting for a source difference that does not exist. The per-release digests - what each tag's CI build and the local rebuilds came out to -
+a maintainer diffing two archives hunting for a source difference that does not exist.
+
+  One correction, recorded where the census is rather than left silent: the 0.7 stanza's
+  lead entry first called this `the sixth tag`, and `git for-each-ref refs/tags --format=
+  '%(refname:short) %(creatordate:iso-strict)'` counts seven, created in order from v0.1 on
+  2026-11-07 to v0.7 on 2026-11-14. The stanza in this tree says `seventh`; the
+  `changelog.gz` inside the published `v0.7` archives says `sixth`, because those bytes were
+  built from the tag and the tag is not rewritten over a word. The per-release digests - what each tag's CI build and the local rebuilds came out to -
 live in that release's own notes, which is where a dated figure belongs. This page keeps the
 rule, not the table.

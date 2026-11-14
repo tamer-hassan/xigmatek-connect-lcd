@@ -1,6 +1,6 @@
 xigmatek-connect-lcd (0.7) resolute; urgency=medium
 
-  * Released as `v0.7`, the sixth tag of this tree.
+  * Released as `v0.7`, the seventh tag of this tree.
 
     This stanza is the record of the work since `v0.6`. The stamp at the
     foot of it is a packaging fact rather than a date: `dpkg-buildpackage`
