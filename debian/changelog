@@ -978,6 +978,36 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     a different row - it passes, and measures the wrong thing - which is the
     same fault shape as a count that stops matching the tree it came from.
 
+  * A tenth bench build, from the commit that puts the drive row in `bars`.
+    Same recipe (`dh_clean`, then `dpkg-buildpackage -us -uc -b`): code
+    5 489 502 B, sha256
+    3f3e092ae1337857feeaf2caa7a6b13ead6f7829bada6648f1beb88b4d6c3c89; themes
+    79 894 618 B, sha256
+    66905e1b0ba0df4bca91c5bf9b1dd589a4c8ddf28fea0e415ac636372b651547.  Read
+    back off the artefacts: the shipped Python diffed against HEAD empty for
+    both packages, one date across every archive member, and `lintian
+    --tag-display-limit 0` quiet.  Against the ninth build the two unpacked
+    trees differ in exactly eight files, and the list is the commit's shape
+    rather than a guess from the file names I edited: three shipped modules
+    (`xigmalcd/render.py`, `xigmalcd/themes.py`, `xigmaui/edit.py`),
+    `changelog.gz`, and five installed docs pages (gui, limits, theme-editor,
+    tools, usage).  Drawing `bars` through the unpacked package on this
+    machine gives 35 widgets, 29 boxes, and the drive row where it belongs -
+    the number right-aligned at x=452 with its centre at y=168 (the fourth
+    row) and its meter at y=180-186 - with the `Fan 3`/`Fan 4` slots still
+    reported as unanswered rather than drawn empty.
+
+    That build supersedes the ninth for anyone installing: the ninth predates
+    a change to three shipped files.  And a caution the docs should say out
+    loud rather than leave to be discovered: the packaged unit starts
+    `--theme alpha`, and the drive row went into `bars`.  On `alpha` the
+    install changes what goes down the wire - the blob gains a `drives`
+    section, and the pump row is named `CPU PUMP` and typed `Pump` - while
+    nothing in the `alpha` picture itself moves, because `alpha` draws no
+    board row and no drive row.  The drive row reaches the glass only under
+    `--theme bars`, set in the unit's `ExecStart` or chosen in the window's
+    layout picker.
+
   * The suite's figures, re-read rather than inherited.  This bench, one run
     of the committed tree with nothing else in flight,
     `python3 -W error::ResourceWarning -m unittest discover -s tests`:
@@ -1033,7 +1063,8 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     (#189), 351.145 with 510 (#190, one failure), 460.228 with 511 (#191, one
     error), 339.250 with 525 (#192, green and powerless), 431.661 with 526
     (#193), 460.878 with 526 (#194, one failure), 405.906 with 536 (#195, green
-    and lucky), 405.166 with 546 (#196) and 403.049 with 547 (#197).  The last
+    and lucky), 405.166 with 546 (#196), 403.049 with 547 (#197) and 410.181
+    with 549 (#200).  The last
     several skip 4 rather than 3, the extra one being the glass ledger naming
     transcripts a runner with no panel has never made, and the 9 s between #178
     and #180 is what the six new checks cost: five of them run a shipped script
@@ -1042,7 +1073,11 @@ xigmatek-connect-lcd (0.7) UNRELEASED; urgency=medium
     496 checks, the same YAML, 457.469 s / 453.508 s / 342.664 s, a 114.805 s
     spread across runs whose trees differed only in prose - and #196/#197 say
     it again: 546 checks in 405.166 s, 547 in 403.049 s, one more check 2.1 s
-    quicker.  So a pair of these numbers can bound a count and nothing else,
+    quicker.  #199 is the pair's uglier half and is not added to the series,
+    because it changed no count: a prose-only push, and it ran those same 547
+    checks in 462.593 s against #197's 403.049 s - 59.544 s apart on trees whose
+    only difference was sentences.  #200 then ran the 549 of this commit in
+    410.181 s.  So a pair of these numbers can bound a count and nothing else,
     which is why the list is kept and no check reads it.  #190 came back red
     rather than slow (510 in 351.145 s, one failure, and the failure was a new
     check reading the host it ran on); #191 was red one level down, and #192
