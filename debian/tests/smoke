@@ -205,7 +205,43 @@ case "$exec_line" in
         echo "  $unit ExecStart arms --allow-reset: FAILED"
         exit 1 ;;
 esac
-say "user unit" "$unit -> $exec_line (no --allow-reset)"
+# The other half of what may not be in the command systemd runs: a picture.  A unit that
+# names `--theme`, `--mp4` or `--fps` silently outranks the choice the window saved - the
+# precedence is flag, then file, then default - so an install that hard-codes one has put a
+# decision back where nobody can see it being made.  This unit's prose names those flags to
+# explain that it does not use them, which is why the gate reads ExecStart and not the file.
+case "$exec_line" in
+    *--theme*|*--mp4*|*--fps*)
+        echo "  $unit ExecStart names a theme, background or rate; the saved choice in"
+        echo "  \$XDG_CONFIG_HOME/xigmalcd/display.json is what decides that now: FAILED"
+        exit 1 ;;
+esac
+say "user unit" "$unit -> $exec_line (no --allow-reset, no picture named)"
+
+# And the door that answers "what would this machine boot into, and where did each part
+# come from" without opening the port it would need to change.  Checked on the installed
+# box rather than in a checkout because the question is about an install: a theme that only
+# exists in a source tree, or a background the .deb did not ship, shows up here as a
+# resolution that does not name a real file.
+choice_out=$(/usr/bin/xigmalcd --display-choice 2>&1)
+case "$choice_out" in
+    *"choice: theme "*"fps"*) : ;;
+    *) echo "  xigmalcd --display-choice said: $choice_out: FAILED"; exit 1 ;;
+esac
+# the resolved background has to be a file, wherever it came from: the roots are the
+# machine's business (`$XIGMA_MEDIA`, the .deb, the theme library), and the one claim that
+# holds everywhere is that a boot which says it will draw a clip can find that clip
+case "$choice_out" in
+    *"not a file on this machine"*)
+        echo "  the boot choice names a background that is not there:"
+        echo "  $choice_out: FAILED"; exit 1 ;;
+esac
+case "$choice_out" in
+    *"background none"*)
+        echo "  an install with no saved choice should still resolve the default clip;"
+        echo "  $choice_out: FAILED"; exit 1 ;;
+esac
+say "boot choice" "$(echo "$choice_out" | head -1)"
 
 # Where the enablement lives, reported rather than asserted.  The package enables the
 # unit through deb-systemd-helper, whose symlink lands in

@@ -17,7 +17,7 @@ import signal
 import sys
 import time
 
-from . import control, protocol, render, sensors, themes
+from . import control, display, protocol, render, sensors, themes
 from .protocol import Link, ProtocolError, find_ports
 
 
@@ -96,6 +96,112 @@ def _pinned(args) -> dict:
                                       for kk, vv in s.items()) or data}")
     PINNED, PINNED_MTIME = data, mtime
     return PINNED
+
+
+#: What a machine with no saved choice draws: the theme the vendor app currently has
+#: selected, its own paired background, and the vendor's cadence.  Named as constants because
+#: three doors now quote them - the resolution below, `--help`, and the pages - and a number
+#: written in three places is a number that will be read differently in two of them.
+DEFAULT_THEME = "alpha"
+DEFAULT_FPS = 1.0
+
+
+def apply_choice(args, notes: list | None = None) -> dict:
+    """Fill in theme, background and rate from the saved choice, flag first.
+
+    Order, and it is the whole rule of this function: **a flag on this command line beats
+    the file, and the file beats the default**.  A person typing `--theme gauge` means gauge,
+    whatever the window last did; a person who pressed `Apply these settings` in the window
+    means that until they say otherwise, and a machine where nobody has ever chosen boots
+    exactly as it always did.
+
+    Returns where each of the three came from (`flag` / `saved` / `default` / `off` /
+    `saved-missing`) so the caller can print the provenance rather than the answer alone -
+    which is the difference between a boot that can be explained and one that has to be
+    remembered.  `notes` collects the sentences for anything the file held that could not be
+    used; an unusable key costs that key, never the start.
+
+    A saved background that no root can resolve is the one case where the file wins *and*
+    still declines: the clip name is what the person chose, and a machine without the
+    partition that holds it must not quietly draw someone else's picture.  So the upload is
+    switched off for that boot and the reason is printed - the same shape as a refused
+    upload at session start, where the panel keeps what it already stores.
+    """
+    notes = notes if notes is not None else []
+    saved = display.load(notes)
+    came = {}
+
+    if args.theme is not None:
+        came["theme"] = "flag"
+    elif "theme" in saved:
+        args.theme = saved["theme"]
+        came["theme"] = "saved"
+    else:
+        args.theme = DEFAULT_THEME
+        came["theme"] = "default"
+
+    if args.fps is not None:
+        came["fps"] = "flag"
+    elif "fps" in saved:
+        args.fps = saved["fps"]
+        came["fps"] = "saved"
+    else:
+        args.fps = DEFAULT_FPS
+        came["fps"] = "default"
+
+    if args.mp4 is not None:
+        came["clip"] = "flag" if args.mp4 else "off"
+    elif "clip" in saved:
+        found = find_media(saved["clip"])
+        if os.path.isfile(found):
+            args.mp4 = found
+            came["clip"] = "saved"
+        else:
+            args.mp4 = False
+            came["clip"] = "saved-missing"
+            notes.append(f"the saved background {saved['clip']!r} resolves to {found!r}, "
+                         "which is not a file on this machine: no background will be "
+                         "uploaded this session, and the panel keeps what it already "
+                         "stores. Name one with --mp4, or let the window choose again")
+    else:
+        args.mp4 = DEFAULT_MP4
+        came["clip"] = "default"
+
+    return came
+
+
+def announce(args, came: dict, notes: list) -> None:
+    """Say, on the way to drawing, what was chosen and where it came from.
+
+    Two words carry this function.  *Provenance*: a boot that shows a picture nobody
+    remembers choosing is answered by `clip:saved-missing` or `theme:flag` instead of by
+    grepping two unit files and a drop-in.  And *stderr*: a run that only logs keeps its
+    counters, its notices and this line in one stream, which is what `tools/display_glass.py`
+    and the glass ledger read back.
+    """
+    print(choice_report(args, came), file=sys.stderr)
+    for note in notes:
+        print(f"  note: {note}", file=sys.stderr)
+
+
+def choice_report(args, came: dict) -> str:
+    """One line: what this run will draw, and where each part was decided.
+
+    The provenance is the point.  "birdseye over theme_47-trimmed.mp4 at 2 fps" answers what;
+    "background:saved, theme:flag, fps:default" answers why, which is the question a person
+    asks at 08:00 when the panel shows something they are sure they never chose - and the
+    answer today is a grep through two unit files and a drop-in.
+    """
+    # the name and the file: the same clip name can exist in three roots (the checkout, the
+    # .deb, `$XIGMA_MEDIA`), and "which one won" is the question a reader of this line has
+    clip = ("none (the panel keeps its stored background)" if args.mp4 is False
+            else (f"{os.path.basename(str(args.mp4))} ({args.mp4})"
+                  if os.path.isfile(str(args.mp4))
+                  else f"{args.mp4} - not a file on this machine"))
+    whence = ", ".join(f"{key}:{came[key]}" for key in ("theme", "clip", "fps"))
+    return (f"choice: theme {args.theme}, background {clip}, {args.fps} fps  "
+            f"({whence}; saved choice at {display.path()}"
+            f"{' exists' if display.present() else ' - none written yet'})")
 
 
 def sample(args) -> dict:
@@ -669,13 +775,15 @@ def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="xigmalcd", description=__doc__.split("\n")[0])
     ap.add_argument("-d", "--device", help="serial port (default: first ttyACM)")
     ap.add_argument("-b", "--baud", type=int, default=115200)
-    ap.add_argument("-t", "--theme", default="alpha", metavar="THEME", type=theme_name,
+    ap.add_argument("-t", "--theme", default=None, metavar="THEME", type=theme_name,
                     # the count and the names are read off the registry rather than
                     # written out here: this string listed five names and called them
                     # "the five" until `birdseye` arrived, and a reader following it
                     # would have been told a set that did not exist
                     help=f"picture to draw: one of the {len(render.THEMES)} this program "
-                         f"draws itself ({' '.join(sorted(render.THEMES))} - default "
+                         f"draws itself ({' '.join(sorted(render.THEMES))} - when the "
+                         "flag is absent, the theme saved by the window in "
+                         f"`{display.path()}`, and if that holds nothing, the default "
                          "alpha, the theme "
                          "the vendor app currently has selected, redrawn from its "
                          "stored geometry with a second temperature inside a gauge "
@@ -684,9 +792,10 @@ def build_parser() -> argparse.ArgumentParser:
                          "painted by xigmalcd/layout.py from that theme's own layout "
                          "file. --list-themes prints both sets, and why four layouts "
                          "are refused")
-    ap.add_argument("-f", "--fps", type=float, default=1.0,
-                    help="frames per second (the panel takes 3 without refusing; "
-                         "1 fps is what the vendor app does)")
+    ap.add_argument("-f", "--fps", type=float, default=None,
+                    help="frames per second (the panel takes 3 without refusing; when the "
+                         "flag is absent the rate comes from the saved choice, and with no "
+                         f"saved choice it is {DEFAULT_FPS}, what the vendor app does)")
     ap.add_argument("--duration", type=float, default=0,
                     help="stop after N seconds (0 = run forever)")
     ap.add_argument("--frames", type=int, default=0, metavar="N",
@@ -786,10 +895,12 @@ def build_parser() -> argparse.ArgumentParser:
                          "(default 26 of the panel's 480, i.e. 5.4%% of its "
                          "height: legible at arm's length, not across a room)")
     ap.add_argument("--mp4", metavar="PATH", nargs="?", const=DEFAULT_MP4,
-                    default=DEFAULT_MP4,
+                    default=None,
                     help="upload a 480x480 H.264 MP4 as the panel's background "
                          "layer at session start, as ALPHA does with its theme "
-                         "background. On by default with media/Theme_25.mp4: the "
+                         "background. With no flag, the clip named by the saved choice "
+                         f"(resolved through media_roots) or {os.path.basename(DEFAULT_MP4)}: "
+                         "the "
                          "clip ALPHA itself pairs with the theme this program "
                          "redraws (215 KB, 23 frames, a 0.96 s loop, mean luma "
                          "18.7 of 255, no black frames). Where that file is "
@@ -813,7 +924,7 @@ def build_parser() -> argparse.ArgumentParser:
                          "plate off whatever the clip, and an unmeasured clip gets "
                          "no plate unless you ask for one here")
     ap.add_argument("--no-mp4", action="store_false", dest="mp4",
-                    default=DEFAULT_MP4,
+                    default=None,
                     help="do not upload a background: keep whatever the panel "
                          "already has stored")
     ap.add_argument("--overlay", action="store_true",
@@ -879,6 +990,12 @@ def build_parser() -> argparse.ArgumentParser:
                     help="print the names a `special` widget may carry: the parts of "
                          "our own themes that stay code-drawn and take their position, "
                          "size and colour from a layout")
+    ap.add_argument("--display-choice", action="store_true",
+                    help="print the picture this machine would start with - theme, "
+                         "background, rate - naming for each one whether it came from a "
+                         "flag, from the saved choice file, or from the default, and what "
+                         "the file said that could not be used. Writes nothing, opens no "
+                         "port")
     ap.add_argument("--list-themes", action="store_true",
                     help=f"list every theme `--theme` can be given: the "
                          f"{len(render.THEMES)} drawn "
@@ -893,6 +1010,21 @@ def main(argv=None) -> int:
 
     if args.overlay:                          # kept for old command lines
         args.bg = "clear"
+
+    # Flag, then the saved choice, then the default - `apply_choice` owns that order and the
+    # tests in `tests/test_display_choice.py` hold it in both directions.  This runs before
+    # any door reads `args.theme`/`args.fps`/`args.mp4`, so every path below sees a concrete
+    # triple, and the read-only doors never mention the file at all.
+    choice_notes: list = []
+    came_from = apply_choice(args, choice_notes)
+
+    if args.display_choice:
+        # the door that answers "what would this machine start with, and why" without
+        # opening a port, writing a byte, or requiring a second unit file to read
+        print(choice_report(args, came_from))
+        for note in choice_notes:
+            print(f"  note: {note}")
+        return 0
 
     if args.print_theme_fields:
         cen = themes.field_census()
@@ -1125,6 +1257,7 @@ def main(argv=None) -> int:
         return 0
 
     if args.dry_run:
+        announce(args, came_from, choice_notes)
         os.makedirs(args.dry_run, exist_ok=True)
         deadline = time.monotonic() + args.duration if args.duration else 0
         n = 0
@@ -1212,6 +1345,10 @@ def main(argv=None) -> int:
             fans = "with" if boot.get("fans") is not None else "without"
             print("metrics: `STATE all 1` twice at session start, then left "
                   f"alone ({fans} the fans array)")
+        # announced before the upload decision rather than inside it: what the session
+        # settled on is worth knowing even when the answer is "nothing goes up, because the
+        # saved clip is not on this machine"
+        announce(args, came_from, choice_notes)
         if args.mp4:
             # ALPHA uploads its theme background first, every media session:
             # that is the layer our transparent frames sit on (§9).  Measured on

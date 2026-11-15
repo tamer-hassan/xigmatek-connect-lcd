@@ -235,8 +235,9 @@ xigmaui                                    # optional window; needs `sudo apt in
 
 That gives `/usr/bin/xigmalcd`, `/usr/bin/xigmaui` and `/usr/bin/xigmalcd-reset`, a
 udev rule that makes the port a user-owned `/dev/xigmatek-lcd` and keeps ModemManager
-off it, and a user unit whose `ExecStart` is `--theme alpha --fps 2` with no reset
-permission. Both optionality claims are deliberate: the second package is the vendor's
+off it, and a user unit whose `ExecStart` is `/usr/bin/xigmalcd` - naming **no theme,
+no background and no rate**, because what the panel shows at login is the choice made in
+the window, and `xigmalcd --display-choice` prints it - and holding no reset permission. Both optionality claims are deliberate: the second package is the vendor's
 own theme library, and the window is a client of the unit rather than part of it - stop
 `xigmaui` and the panel keeps drawing, because the frames belong to `xigmalcd`. Change
 what is drawn without the window by editing the unit's `--theme`

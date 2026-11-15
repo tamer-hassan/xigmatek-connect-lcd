@@ -33,8 +33,14 @@ set -uo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PY="${PYTHON:-$(command -v python3)}"
-THEME="${XIGMALCD_THEME:-alpha}"
-FPS="${XIGMALCD_FPS:-2}"      # 1 = the vendor's rate, 3 = the tightest clock
+# The rate and the picture a checkout's service starts with.  These used to be substituted
+# into the unit's ExecStart; they now seed the same file `xigmaui` writes when a person
+# presses `Apply these settings`, because a choice belongs to the user's config rather than
+# to a service file - and a service file that hard-codes a theme cannot be overridden by
+# the window that knows better.  Set in the environment, they write that file; unset, they
+# leave whatever is already there, and the program's defaults answer instead.
+THEME="${XIGMALCD_THEME:-}"
+FPS="${XIGMALCD_FPS:-}"      # 1 = the vendor's rate, 3 = the tightest clock
 UNIT="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/xigmalcd.service"
 RULE="$DIR/install/99-xigmatek-lcd.rules"
 DEV="${XIGMALCD_DEVICE:-/dev/ttyACM0}"
@@ -94,9 +100,39 @@ fi
 say "systemd user service"
 mkdir -p "$(dirname "$UNIT")"
 sed -e "s|@DIR@|$DIR|g" -e "s|@PYTHON@|$PY|g" \
-    -e "s|@THEME@|$THEME|g" -e "s|@FPS@|$FPS|g" \
     "$DIR/install/xigmalcd.service.in" > "$UNIT"
-echo "wrote $UNIT   (theme=$THEME, fps=$FPS)"
+echo "wrote $UNIT   (no theme or rate named: the saved choice decides)"
+
+# Seed the saved choice from the environment, through the program's own door rather than by
+# writing JSON here: `display.save` validates the same way the loop reads, so a bad
+# XIGMALCD_THEME is refused with the loop's reason instead of landing in a file that the
+# next start has to explain away.
+if [ -n "$THEME" ] || [ -n "$FPS" ]; then
+    CHOICE=$("$PY" -c '
+import sys
+sys.path.insert(0, sys.argv[1])
+from xigmalcd import display
+want, notes = {}, []
+theme, fps = sys.argv[2] or "", sys.argv[3] or ""
+if theme:
+    want["theme"] = theme
+if fps:
+    want["fps"] = float(fps)
+want["set_by"] = "install.sh"
+import time
+want["set_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+where = display.save({**display.load(), **want}, notes)
+for n in notes:
+    print("  note: " + n)
+print(display.path() if where else "FAILED")
+' "$DIR" "$THEME" "$FPS")
+    case "$CHOICE" in
+        FAILED) echo "  refused: $THEME/$FPS were not usable, so nothing was written "
+                  "(the reasons are printed above)" ;;
+        *) echo "  saved boot choice in $CHOICE (theme=${THEME:-unchanged} "
+             "fps=${FPS:-unchanged}); the window overwrites it on the next Apply" ;;
+    esac
+fi
 systemctl --user daemon-reload
 systemctl --user enable xigmalcd
 systemctl --user restart xigmalcd
@@ -140,7 +176,7 @@ cat <<EOF
 
 logs:   journalctl --user -u xigmalcd -f
 stop:   systemctl --user disable --now xigmalcd
-manual: cd $DIR && $PY -m xigmalcd --theme $THEME --fps $FPS -v
+manual: cd $DIR && $PY -m xigmalcd -v            (or --theme X --fps N to override)
 
 gui:    "Xigmatek Connect LCD" in the application menu, or
         cd $DIR && $PY -m xigmaui            (window, and tray icon if the

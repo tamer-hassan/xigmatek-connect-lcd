@@ -13,10 +13,12 @@ What has been measured on glass, by whom, with how many frames - and what has no
   `ExecMainStartTimestamp=15:02:01`, `NRestarts=0`), and its
   `/usr/lib/python3/dist-packages/xigmalcd/themes.py` and `render.py` compare **byte-identical
   to this tree** - so the picture behind the glass is the code in this repository, not a
-  checkout run and not a preview. The unit's own `ExecStart` still names `--theme alpha`: the
-  switch to `birdseye` went through the control socket, which is what the window's theme picker
-  writes, and a theme change is not a restart, which is why `NRestarts=0` says nothing about
-  it. Those counters are a snapshot of a live loop, so they move; the two commands that print
+  checkout run and not a preview. The unit's own `ExecStart` still named `--theme alpha` *as
+  of that reading* - the 0.7 unit did; the switch to `birdseye` went through the control
+  socket, which is what the window's theme picker writes, and a theme change is not a
+  restart, which is why `NRestarts=0` says nothing about it. As of the 0.8 work the unit
+  names no picture at all and the saved choice decides: see the boot-choice section in
+  docs/install.md. Those counters are a snapshot of a live loop, so they move; the two commands that print
   them are named above and in the bullet below.
 
 

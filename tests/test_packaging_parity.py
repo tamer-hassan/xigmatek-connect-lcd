@@ -53,12 +53,15 @@ class SystemdUnit(unittest.TestCase):
         self.assertEqual(self.deb["Install"]["WantedBy"], self.checkout["Install"]["WantedBy"])
 
     def arguments(self) -> dict:
-        """Two spellings of one command line.  The checkout's theme and rate come out of
-        `install.sh`'s own defaults, so a changed default cannot drift past this test."""
-        install = fixtures.read(os.path.join("install", "install.sh"))
-        defaults = dict(re.findall(r'^(\w+)="\$\{XIGMALCD_\w+:-([^"]*)\}"', install, re.M))
-        co = self.checkout["Service"]["ExecStart"].replace("@THEME@", defaults["THEME"]) \
-                                                  .replace("@FPS@", defaults["FPS"]).split()
+        """Two spellings of one command line, with nothing substituted into either.
+
+        The checkout form used to grow `--theme @THEME@ --fps @FPS@`, filled in from
+        `install.sh`'s defaults - and the packaged form carried the same two flags written
+        out.  That is the drift this test used to police by expanding both sides; it is gone
+        now on purpose, because the picture a person chose has no business being baked into a
+        service file the package manager owns.
+        """
+        co = self.checkout["Service"]["ExecStart"].split()
         self.assertEqual(co[:2], [os.path.basename(co[0]), "-m"], co[:3])
         self.assertEqual(co[2], "xigmalcd", co[:3])
         db = self.deb["Service"]["ExecStart"].split()
@@ -67,18 +70,35 @@ class SystemdUnit(unittest.TestCase):
         return {"checkout": co[3:], "installed": db[1:]}
 
     def test_both_exec_start_lines_are_one_command_and_the_real_parser_takes_both(self):
+        """One command line in two spellings, and neither of them decides a picture."""
         args = self.arguments()
         self.assertEqual(args["checkout"], args["installed"])
+        from xigmalcd import control
         from xigmalcd import main as cli
-        from xigmalcd import render
         for which, argv in args.items():
             with self.subTest(unit=which):
                 self.assertNotIn("--allow-reset", argv, argv)
                 self.assertNotIn("--no-control", argv, argv)
+                for flag in ("--theme", "--mp4", "--fps"):
+                    self.assertNotIn(flag, argv,
+                                     f"the {which} unit names {flag}: a theme, background or "
+                                     "rate belongs to the saved choice that the window "
+                                     "writes, and a flag here silently outranks it")
                 ns = cli.build_parser().parse_args(argv)
-                self.assertIn(ns.theme, render.THEMES)
-                self.assertGreaterEqual(ns.fps, 0.1)
-                self.assertLessEqual(ns.fps, 5.0)
+                # nothing named, so nothing decided yet - and the resolution the service will
+                # reach must still land inside the bounds the socket enforces
+                notes: list = []
+                came = cli.apply_choice(ns, notes)
+                self.assertEqual(notes, [], notes)
+                self.assertIn(ns.theme, cli.render.THEMES, ns.theme)
+                self.assertTrue(control.FPS_RANGE[0] <= ns.fps <= control.FPS_RANGE[1],
+                                f"the boot rate {ns.fps} is outside the socket's "
+                                f"{control.FPS_RANGE}")
+                self.assertEqual(came, {"theme": "default", "clip": "default",
+                                        "fps": "default"},
+                                 f"on a machine with no saved choice the units must agree "
+                                 f"about starting from defaults, not about a theme of "
+                                 f"their own: {came}")
 
     def test_the_two_differences_are_the_layout_and_not_the_panel(self):
         """A checkout needs a working directory because it runs `-m xigmalcd`; an installed system

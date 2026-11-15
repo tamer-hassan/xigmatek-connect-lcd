@@ -26,6 +26,7 @@ import unittest
 from tests import fixtures
 
 from xigmalcd import main as cli
+from xigmalcd import control
 from xigmalcd import render
 
 
@@ -38,19 +39,25 @@ class ServiceTemplate(unittest.TestCase):
         cls.installer = fixtures.read(os.path.join("install", "install.sh"))
 
     def test_the_only_holes_are_the_ones_the_installer_fills(self):
-        self.assertLessEqual(set(re.findall(r"@(\w+)@", self.unit)),
-                             {"DIR", "PYTHON", "THEME", "FPS"})
+        """`@THEME@` and `@FPS@` are gone, and that removal is the feature.
+
+        They used to be substituted into `ExecStart`, which is what made the picture a
+        packaging decision: to change the theme at login you edited a unit file, and the
+        window that had already chosen one knew nothing about it.  What is left to fill in is
+        where the code lives and which interpreter runs it.
+        """
+        holes = set(re.findall(r"@(\w+)@", self.unit))
+        self.assertEqual(holes, {"DIR", "PYTHON"},
+                         f"{sorted(holes - {'DIR', 'PYTHON'})} came back as a hole in the "
+                         "unit: a theme, background or rate belongs in the saved choice "
+                         "(`xigmalcd/display.py`), not in a service file")
 
     def expanded(self) -> str:
-        """Reads the defaults out of the installer's own `${XIGMALCD_*:-...}` lines, so a changed
-        default there cannot drift past a test that remembered the old one."""
-        defaults = dict(re.findall(r'^(\w+)="\$\{XIGMALCD_\w+:-([^"]*)\}"', self.installer,
-                                   re.M))
-        self.assertLessEqual({"THEME", "FPS"}, set(defaults), defaults)
+        """The unit as the installer writes it, read from the installer rather than copied."""
+        self.assertNotIn("@THEME@", self.unit)
+        self.assertNotIn("@FPS@", self.unit)
         return (self.unit.replace("@DIR@", fixtures.REPO)
-                      .replace("@PYTHON@", sys.executable)
-                      .replace("@THEME@", defaults["THEME"])
-                      .replace("@FPS@", defaults["FPS"]))
+                      .replace("@PYTHON@", sys.executable))
 
     def arguments(self) -> list:
         start = [ln for ln in self.expanded().splitlines() if ln.startswith("ExecStart=")]
@@ -59,15 +66,39 @@ class ServiceTemplate(unittest.TestCase):
         self.assertNotIn("@", " ".join(args), args)
         return args
 
-    def test_the_real_parser_takes_the_units_command_line(self):
-        """An unknown flag is a SystemExit at start.  `parse_args` on the whole argument list,
-        rather than a grep for the flags somewhere in the source."""
+    def test_the_units_own_command_line_still_parses(self):
+        """An unknown flag is a SystemExit at start, so parse the whole list, don't grep it."""
         args = self.arguments()
         ns = cli.build_parser().parse_args(args[2:])        # drop `-m xigmalcd`
-        self.assertEqual(ns.theme, args[args.index("--theme") + 1])
+        for flag in ("--theme", "--mp4", "--fps"):
+            self.assertNotIn(flag, args,
+                             f"the checkout unit grew {flag} back: the saved choice owns "
+                             "that decision now, and a unit that names it wins over the "
+                             "file with nobody able to see why")
+        self.assertIsNone(ns.theme, "the unit sets a theme after all")
+        self.assertIsNone(ns.fps)
+        self.assertIsNone(ns.mp4)
+
+    def test_what_the_unit_starts_with_is_the_same_triple_the_door_prints(self):
+        """Run the resolution the service will run, and hold it to the same bounds.
+
+        The two checks that used to assert the unit's own `--theme alpha --fps 2` were in
+        range now ask the question that matters: after `apply_choice`, on a machine with
+        nothing saved, is what starts up still a picture at all - a drawable theme, a
+        background that resolves to a real file, a rate the socket would accept?
+        """
+        notes: list = []
+        ns = cli.build_parser().parse_args(self.arguments()[2:])
+        came = cli.apply_choice(ns, notes)
+        self.assertEqual(notes, [], notes)
+        self.assertEqual(came, {"theme": "default", "clip": "default", "fps": "default"},
+                         came)
         self.assertIn(ns.theme, render.THEMES, ns.theme)
-        self.assertGreaterEqual(ns.fps, 0.1)
-        self.assertLessEqual(ns.fps, 5.0)                   # control.py's accepted range
+        lo, hi = control.FPS_RANGE
+        self.assertTrue(lo <= ns.fps <= hi, f"{ns.fps} outside {lo}-{hi}")
+        self.assertTrue(os.path.isfile(str(ns.mp4)),
+                        f"the default background does not resolve on this machine: {ns.mp4}")
+        print(f"  a unit that names nothing starts at: {cli.choice_report(ns, came)}")
 
     def test_the_unit_leaves_the_window_a_socket(self):
         """`--no-control` would take away the door the window uses to drive a running display."""

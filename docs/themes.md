@@ -23,17 +23,26 @@ background* (docs/gui.md). The six themes this repository draws from `render.py`
 vendor pages, so there is no vendor record to read for them: they pair with the backdrop
 their own published picture is composited over, kept in `themes.CODE_CLIPS` and derived
 
-  **That table is the window's, and the loop does not read it - deliberately.** A session
-  started with `--theme birdseye` draws the overlay for that theme and uploads whatever
-  `--mp4` names (the unit ships no `--mp4` at all, so an installed service keeps the panel's
-  stored background); it does not look up `CODE_CLIPS` and pick the theme's own backdrop.
-  Asked about it on 2026-11-14, the owner said the asymmetry is intentional from their side,
-  so it stays: the pairing is a *choice the reader sees and confirms* in the window, not a
-  default the loop can change underneath them. To get the pair on the service, name it -
-  `ExecStart=/usr/bin/xigmalcd --theme birdseye --fps 2 --mp4 theme_47-trimmed.mp4` - which
-  is also what the glass session in docs/limits.md actually did: `theme_47-trimmed.mp4` was
-  uploaded there four times, at 0.4-3.3 s per attempt depending on what the panel already
-  held.
+  **That table is the window's, and the loop never consults it - deliberately.** A session
+  uploads whatever `--mp4` resolves to: an explicit flag, else the clip named by the saved
+  choice, else `main.DEFAULT_MP4` (`Theme_25.mp4`, which is why the packaged service has
+  always had *a* background at session start even with no `--mp4` in its `ExecStart`).  What
+  it never does is look up `CODE_CLIPS` and pick a theme's own backdrop on its own.  Asked
+  about that on 2026-11-14, the owner said the asymmetry is intentional from their side: a
+  background change is a thing a reader should see and confirm in the window, not a default
+  a daemon can swap underneath them.
+
+  So the pair arrives by being *chosen*, not by being configured twice: press Apply with
+  "keep my background" unticked while birdseye is showing, and `theme_47-trimmed.mp4` goes
+  to the panel **and** into the saved choice, which is what the next boot reads.  Writing it
+  into a unit by hand - the advice this page gave until 2026-11-15,
+  `ExecStart=/usr/bin/xigmalcd --theme birdseye --fps 2 --mp4 theme_47-trimmed.mp4` - still
+  works (a flag beats the file, by design) but `debian/tests/smoke` now fails an install
+  whose packaged unit names a picture, and the two units in this repository no longer do.
+  `xigmalcd --display-choice` prints what a machine would actually boot into, and where each
+  part came from.  The glass session in docs/limits.md is the precedent for the upload side:
+  `theme_47-trimmed.mp4` went up four times there, at 0.4-3.3 s per attempt depending on
+  what the panel already held.
 back out of the README's `<theme>-<clip>.mp4` names by `tests/test_theme_library.py`.
 Three of the four canvas-refused files name clips as
 well, and one names a `.png` rather than a clip - one more reason the refusal is keyed on

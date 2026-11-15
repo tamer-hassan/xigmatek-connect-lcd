@@ -32,15 +32,36 @@ class RealSessionUntouched(unittest.TestCase):
         self.assertTrue(root.startswith(fixtures.ISOLATED),
                         f"the config root moved out of the temporary tree: {root}")
 
-    def test_nothing_wrote_the_settings_file_a_person_uses(self):
-        self.assertEqual(fixtures.config_fingerprint(), fixtures.BASELINE_CONFIG,
-                         "the real settings file changed under this run: "
-                         + self.who_else())
+    def test_nothing_wrote_the_files_a_person_uses(self):
+        """Both real files, not one of them.
+
+        The window's `config.json` has been guarded for a while.  The saved boot choice
+        (`~/.config/xigmalcd/display.json`, which the loop now reads at startup) is the same
+        kind of file with a worse blast radius: written by accident in a test run, it decides
+        what the panel shows the next time this user logs in.  So the check walks
+        `fixtures.WATCHED` by name, and the sentence it fails with says *which* file moved.
+        """
+        now = fixtures.fingerprints()
+        moved = [f"{label} ({where})" for label, where in fixtures.WATCHED.items()
+                 if now[where] != fixtures.BASELINES[where]]
+        self.assertEqual(moved, [],
+                         "changed under this run: " + "; ".join(moved) + " - " + self.who_else())
 
     def test_nothing_created_one_where_there_was_none(self):
-        if fixtures.BASELINE_CONFIG != "absent":
-            self.skipTest("a settings file already existed, so the previous check covers it")
-        self.assertFalse(os.path.exists(fixtures.REAL_CONFIG), self.who_else())
+        """A file that did not exist when the run started must not exist when it ends."""
+        should_be_absent = {label: where for label, where in fixtures.WATCHED.items()
+                            if fixtures.BASELINES[where] == "absent"}
+        created = [f"{label} ({where})" for label, where in should_be_absent.items()
+                   if os.path.exists(where)]
+        if not should_be_absent:
+            self.skipTest("every watched file already existed when the run started, so the "
+                          "fingerprint check above is the one with teeth here")
+        self.assertEqual(created, [],
+                         f"this run created {created}: a file that did not exist when the "
+                         "measurement began appeared during it, which is the other half of "
+                         "not touching a person's session - " + self.who_else())
+        print(f"  watched, absent at start and still absent: "
+              f"{', '.join(sorted(should_be_absent))}")
 
     @staticmethod
     def who_else() -> str:

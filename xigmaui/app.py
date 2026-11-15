@@ -88,7 +88,7 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QColorDialog, QComboBox,
                              QVBoxLayout, QWidget)
 
 from xigmalcd import control as wire                              # noqa: E402
-from xigmalcd import protocol, render, sensors, themes       # noqa: E402
+from xigmalcd import display, protocol, render, sensors, themes       # noqa: E402
 from xigmalcd.main import (BRIGHT_LUMA, CLIP_LUMA, DEFAULT_MP4,   # noqa: E402
                            SCRIM_ON_BRIGHT, read_metrics_file)
 from . import clips as clipdb
@@ -673,6 +673,7 @@ class Window(QMainWindow):
         apply_tooltip_colours()
         self.autosave = restore if save_settings is None else save_settings
         self._said_no_save = False
+        self._said_no_choice = False
         # what the file needed explaining, in its own words: an older key, or two keys that
         # answer one question.  Logged once _build() has given us somewhere to say it.
         self._cfg_notes: list[str] = []
@@ -2358,6 +2359,63 @@ class Window(QMainWindow):
                 "split": list(self.split.sizes()) if hasattr(self, "split")
                         else self.cfg["split"]}
 
+    def _save_choice(self, theme=None, fps=None, clip=None) -> str | None:
+        """Remember what this press asked the glass to show, for the loop's next start.
+
+        Three doors reach the panel deliberately - `Apply these settings`, the clips box's
+        `Send this background to the panel` (which Apply itself uses when the keep box is
+        clear), and the editor's `apply to the panel` - and each one calls this with only the
+        part it decides: a press on the clips box changes the background and must not rewrite
+        the theme, and vice versa.  The keys are therefore **merged into what is already on
+        disk**, never replaced, because writing the caller's whole state would let one button
+        undo a choice made through another.
+
+        What is stored is the *intent*, not the panel's verdict: the display cannot be asked
+        what it stores (PROTOCOL.md §11), an upload can be refused and retried, and "I want
+        this picture at login" is still true when the wire had a bad minute.  The loop reports
+        a saved clip it cannot find rather than falling back to someone else's background
+        (`main.apply_choice`, `clip:saved-missing`).
+
+        A window started with `--fresh` writes nothing, exactly as it writes no settings - one
+        flag, one answer about whether this program touches your config at all.
+        """
+        if not self.autosave:
+            if not self._said_no_choice:
+                self._said_no_choice = True
+                self._log(f"this window does not write {display.path()}: it was started "
+                          "without saving, so the loop will not inherit what you just "
+                          "showed the glass")
+            return None
+        # merge through the same door the loop reads, so a value already on disk that this
+        # build cannot use is dropped by that door once, with its reason, rather than being
+        # carried forward by every later save
+        want = dict(display.load())
+        changed = []
+        for key, val in (("theme", theme), ("fps", fps), ("clip", clip)):
+            if val is None:
+                continue
+            val = os.path.basename(str(val)) if key == "clip" else val
+            if want.get(key) != val:
+                changed.append(f"{key}={val}")
+            want[key] = val
+        if not changed:
+            return display.path()
+        want["set_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        want["set_by"] = "xigmaui"
+        refused: list = []
+        where = display.save(want, refused)
+        for note in refused:
+            # the door refused the value, not the file: say which, in its words, rather than
+            # letting a button that appears to have worked leave a boot that ignores it
+            self._log(f"the boot choice was not changed: {note}")
+        if where:
+            self.statusBar().showMessage(
+                f"boot choice saved: {', '.join(changed)} -> {where}", 3000)
+        else:
+            self._log(f"could not write {display.path()}: the display will start from its "
+                      "own defaults next time, not from what you just chose")
+        return where
+
     def _save_now(self) -> str | None:
         if not self.autosave:
             # A window that was told to ignore the session file does not write one.  Said
@@ -3986,6 +4044,9 @@ class Window(QMainWindow):
             self._refused_layout(name, rep)
             return
         shown = str((rep.get("status") or {}).get("theme") or name)
+        # the name the display answered with, not the one we typed: a loop drawing a *file*
+        # under a name of its own would otherwise record a choice this machine cannot repeat
+        self._save_choice(theme=shown)
         if rec is None:
             # one of the themes this program draws from code: the theme box names the same
             # thing, and two controls that disagree about what the panel draws are worse
@@ -4491,6 +4552,11 @@ class Window(QMainWindow):
             if kind == "upload":
                 path = kw.get("path") or self.mp4
                 self._queued_bg = os.path.basename(path)
+                # saved as soon as it is asked for, before the socket answers: the *choice*
+                # is what the next boot wants, and an action slot that is momentarily full is
+                # not a person changing their mind. The loop reports a saved name it cannot
+                # resolve instead of quietly drawing another clip.
+                self._save_choice(clip=path)
                 rep = self.daemon.upload(path)
                 if rep.get("ok"):
                     # `ok` here only means the socket let it into the loop's one
@@ -4522,6 +4588,10 @@ class Window(QMainWindow):
             self._log(why)
             self.statusBar().showMessage(why)
             return
+        if kind == "upload":
+            # the same persistence on the route where this window owns the port: two doors,
+            # one meaning, and neither of them allowed to be the only one that remembers
+            self._save_choice(clip=kw.get("path") or self.mp4)
         self.panel.queue(kind, **kw)
 
     def _do_reset(self) -> None:
@@ -4733,6 +4803,12 @@ class Window(QMainWindow):
             "fans": self.fanline.isChecked(),
             "fps": self.d_fps.value(),
         })
+        if applied:
+            # the two decisions this button makes that outlive the session: which picture to
+            # draw and how fast. The background is saved by the upload door below, because
+            # Apply sends it only when the keep box is clear, and a press that honours the
+            # box must not rewrite a stored choice.
+            self._save_choice(theme=self.theme.currentText(), fps=self.d_fps.value())
         # and what it did with the background, said out loud in every branch.  Since
         # 2026-11-14 Apply also sends the clip this window has selected - the owner asked to
         # save the second click on "Send this background to the panel" - but **only when
@@ -4836,7 +4912,13 @@ class Window(QMainWindow):
         not change rather than letting the preview imply that it did."""
         self.theme.setCurrentText(name)
         if self.daemon.present:
-            self.daemon.send("theme", value=name)
+            rep = self.daemon.send("theme", value=name)
+            if rep.get("ok"):
+                # the tray menu's label says *on the glass*, so a pick there is a boot choice
+                # as much as one made at the bigger button.  With no display running the line
+                # below says plainly that only the preview moved, and nothing is saved: a
+                # thumbnail nobody put on the panel must not decide what loads at login.
+                self._save_choice(theme=str((rep.get("status") or {}).get("theme") or name))
         else:
             self._log(f"preview set to {name}: no display is running, so the "
                       f"glass still shows what it was last given")

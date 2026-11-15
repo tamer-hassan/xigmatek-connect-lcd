@@ -41,8 +41,22 @@ Type=simple
 # not this unit, and not the control socket unless a loop was started with
 # --allow-reset - and debian/tests/smoke fails the install if this unit ever grows
 # --allow-reset.  docs/troubleshooting.md is the prose version of this.
+# What this unit deliberately does NOT name is the picture.  It used to read
+# `--theme alpha --fps 2`, which made the .deb the place where a boot's theme and cadence
+# were decided, and the only way to change either one was a systemd drop-in - a second
+# record of a decision the window had already made and knew nothing about.  The loop reads
+# a saved choice instead: `$XDG_CONFIG_HOME/xigmalcd/display.json`, written by `xigmaui`
+# when a person presses `Apply these settings`, sends a background, picks a theme from the
+# tray, or presses `apply to the panel` in the editor.  With no such file - a fresh
+# install, a purge, a machine nobody has opened the window on - the program's own defaults
+# apply: the theme ALPHA currently has selected, its paired `Theme_25.mp4`, and 1 fps, the
+# vendor app's rate (PROTOCOL.md §9 measures what the panel does faster than that).  Ask
+# what a machine would start with, without opening a port: `xigmalcd --display-choice`.
+#
+# A flag still beats the file, so a drop-in that names `--theme bars` keeps meaning bars;
+# what it no longer has to do is un-name something it never set.
 ExecStartPre=/bin/sleep 5
-ExecStart=/usr/bin/xigmalcd --theme alpha --fps 2
+ExecStart=/usr/bin/xigmalcd
 Restart=on-failure
 RestartSec=10
 # the panel is a nicety, not a service: keep it off the way of real work

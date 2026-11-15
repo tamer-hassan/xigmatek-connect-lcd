@@ -1,3 +1,127 @@
+xigmatek-connect-lcd (0.8) UNRELEASED; urgency=medium
+
+  * What the panel shows at login moves out of the unit file and into a choice.
+
+    Until this, the picture was a packaging decision:
+    `debian/xigmalcd.service` said
+    `ExecStart=/usr/bin/xigmalcd --theme alpha --fps 2`, and
+    `install/xigmalcd.service.in` filled `@THEME@` / `@FPS@` from
+    `install.sh`. To change what the panel drew after a reboot you wrote a
+    systemd drop-in - a second record of a decision the window had already
+    made and knew nothing about - and README, `docs/troubleshooting.md`,
+    `docs/packaging.md` and the release-notes template all quoted that
+    hard-coded line as though it were a fact about the device. Both units
+    now name no theme, no background and no rate, and the decision lives in
+    one validated file,
+    `${XDG_CONFIG_HOME:-~/.config}/xigmalcd/display.json`: written through
+    `xigmalcd/display.py`, read by the loop through `main.apply_choice`.
+
+    The order is the whole rule and it does not move: **a flag beats the
+    file, the file beats the default**. `--theme gauge` means gauge
+    whatever the window last saved; a drop-in that names a flag still wins,
+    and no longer has to un-name something it never set; `--no-mp4` is an
+    explicit off that no saved clip can overrule. Resolution runs before
+    any door reads `args.theme`, `args.fps` or `args.mp4`, so the loop,
+    `--dry-run`, `--check-theme` and the scrim rule that reads a clip's
+    measured luma all see one concrete triple rather than three places each
+    remembering a different default.
+
+    Four doors write it, and each saves only the part it decided, merged
+    into what is already on disk: `Apply these settings` (theme and rate,
+    plus the background when the keep box is clear), the clips box's
+    `Send this background to the panel`, the layout editor's
+    `apply to the panel`, and a theme picked from the tray menu - the last
+    saving only when a display actually took it, because a tray pick with
+    no display running moves a preview and the log already says so. A press
+    on the clips box must not rewrite a picture choice, and the reverse,
+    which is why the merge is per key rather than a rewrite of the window's
+    whole state. What is stored is the intent, not the panel's verdict: the
+    device cannot be asked what it stores (PROTOCOL.md §11), an upload can
+    be refused and retried, and "I want this at login" stays true through a
+    bad minute on the wire.
+
+    Nothing under `xigmalcd/` calls the writer, and the control socket
+    never writes the file: a scripted run against a live panel -
+    `tools/display_glass.py`, a second client - must not decide what a
+    person sees at their next login. That is a gate, not a convention: one
+    check greps every shipped module for `display.save` and requires the
+    window to be the only caller, and another runs the loop against a
+    planted file and fails if the bytes move. The end-of-run guard that has
+    long fingerprinted the real `~/.config/xigmaui/config.json` now watches
+    this second file too - and its "created where none existed" check had
+    to be rewritten, because it had started skipping on precisely the case
+    it exists for: a watched file that is absent when the run begins is the
+    one that must still be absent when it ends.
+
+    A clip is stored as a bare name, never a path, and resolved at startup
+    through `main.media_roots()` - `$XIGMA_MEDIA`, this checkout, the .deb,
+    the theme library - the order every other name in this program resolves
+    in. The window's own settings file keeps an absolute clip path and
+    drops that key when the file is not on the machine, which is the right
+    fallback for a preview and the wrong one for a device: a boot would
+    quietly draw `Theme_25.mp4` because someone's partition was not
+    mounted. A saved name that resolves to nothing uploads nothing, leaves
+    the stored layer alone, and reports `clip:saved-missing` with the name
+    and the path it tried. Unusable values cost their own key and buy a
+    printed reason: a theme this build cannot draw (asked of the same doors
+    `--theme` uses, so a saved library layout is accepted and a saved typo
+    is not), a rate outside 0.1-5.0 - now spelled once as
+    `control.FPS_RANGE`, shared by the socket's validator and this file's,
+    where the socket used to carry the pair twice - a clip with a separator
+    or a suffix the media channel refuses ( `control.UPLOAD_SUFFIXES`, read
+    from one place), a half-written file, and an array where an object was
+    expected.
+
+    A machine with no file boots as it always did, except for one number it
+    had been handed: theme `alpha`, `media/Theme_25.mp4` uploaded at
+    session start - that upload was never conditional on the unit naming
+    `--mp4`; `main.DEFAULT_MP4` did it, which corrects a sentence published
+    yesterday - and 1 fps, what `--help` has promised since 0.1 and what
+    the vendor app uses. 0.7's unit overrode the rate with `--fps 2`, and
+    by the owner's decision that override is gone: an installed service
+    starts at 1 fps until a rate is chosen once in the window. `install.sh`
+    keeps `XIGMALCD_THEME` and `XIGMALCD_FPS` but retargets them to seed
+    that file through the same validating door, so a bad value is refused
+    with the loop's reason and nothing is written.
+
+    Two doors for asking instead of remembering.
+    `xigmalcd --display-choice` prints what would start and names the
+    source of each part - `theme:saved`, `clip:default`, `fps:flag`,
+    `clip:saved-missing` - with the resolved path, because a name is not
+    enough when one clip can live in three roots; it opens no port and
+    writes nothing. `debian/tests/smoke`, which runs against a real
+    install, now fails a unit whose `ExecStart` grows a picture flag, and
+    runs the choice door to confirm the resolved background is a file on
+    that box.
+
+    Gates: `tests/test_display_choice.py`, 29 checks - the precedence in
+    both directions for all three keys, five kinds of junk refused with a
+    reason naming the key, a saved clip absent here against a name that
+    resolves in a root, the choice file never becoming a selectable layout
+    (it sits one directory above the `themes/` that `themes.scan()` globs,
+    and a check proves the two cannot meet), the loop-never-writes pair,
+    the `0o600` / `0o700` modes, four writing doors each saving only its
+    own part, a merge across two presses, a `--fresh` window that writes
+    nothing and names the path it left alone, and a tray pick that reaches
+    no glass and so saves nothing. Rewritten rather than loosened:
+    `test_launch_unit.py` asserts the template's holes are exactly `@DIR@`
+    and `@PYTHON@` and that what a no-flag unit resolves to is drawable,
+    resolvable and in range; `test_packaging_parity.py` requires neither
+    unit to name `--theme`, `--mp4` or `--fps`. Suite: 665 checks over 56
+    files, both counting doors agreeing.
+
+    One bug of my own, caught by running the installer path rather than
+    trusting it: a save whose only surviving keys were `set_by` and
+    `set_at` wrote the file anyway - provenance with no decision behind it,
+    which reads to the next start, and to anyone who cats it, as though
+    someone had chosen something. Reproduced first:
+    `XIGMALCD_THEME=theme_of_the_mountains install/install.sh` left a
+    `display.json` holding a timestamp and nothing usable. `display.save`
+    now refuses when no decision key survives cleaning, and `install.sh`
+    prints the reasons it was given.
+
+ -- Tamer Hassan <thameruddin@gmail.com>  Sun, 15 Nov 2026 14:04:35 +0200
+
 xigmatek-connect-lcd (0.7) resolute; urgency=medium
 
   * Released as `v0.7`, the seventh tag of this tree.

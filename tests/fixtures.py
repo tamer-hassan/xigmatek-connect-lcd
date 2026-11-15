@@ -51,21 +51,42 @@ ISOLATED = tempfile.mkdtemp(prefix="xigma-tests-")
 os.environ["XDG_CONFIG_HOME"] = os.path.join(ISOLATED, "config")
 os.environ["XIGMA_SOCKET"] = os.path.join(ISOLATED, "no-display.sock")
 
-#: The real settings file, as this process found it.  `test_zz_isolation.py` re-reads it at the
-#: end and fails on any difference, which is the guard the old suite closed with.
+#: The real files a person's own runs leave behind, as this process found them.  One
+#: name stopped being enough: the loop now reads a second file (`xigmalcd/display.py` -
+#: the theme, background and rate the window saved for its next start), and a suite that
+#: wrote *there* would be editing what the owner's panel draws at login, which is a worse
+#: consequence than rearranging someone's splitter widths.  Both paths are read from the
+#: real home rather than from `$XDG_CONFIG_HOME`, which is already pointed at a temporary
+#: root a few lines above - and that is exactly the difference these fingerprints prove.
 REAL_CONFIG = os.path.expanduser("~/.config/xigmaui/config.json")
+REAL_CHOICE = os.path.expanduser("~/.config/xigmalcd/display.json")
+
+#: What the end-of-run guard compares, named for the reader who has to act on the answer.
+WATCHED = {"window settings": REAL_CONFIG, "saved boot choice": REAL_CHOICE}
 
 
-def config_fingerprint() -> str:
-    """sha256 of the real settings file, or the string 'absent' when there is none."""
+def config_fingerprint(which: str = REAL_CONFIG) -> str:
+    """sha256 of one watched file, or the string 'absent' when it is not there.
+
+    The default keeps the older callers honest: this helper used to mean exactly one
+    file, and a guard that silently checks one of two watched paths is a guard that
+    passes for the wrong reason.
+    """
     try:
-        with open(REAL_CONFIG, "rb") as fh:
+        with open(which, "rb") as fh:
             return hashlib.sha256(fh.read()).hexdigest()
     except FileNotFoundError:
         return "absent"
 
 
-BASELINE_CONFIG = config_fingerprint()
+def fingerprints() -> dict:
+    """{path: digest} for everything the guard watches, in one call."""
+    return {where: config_fingerprint(where) for where in WATCHED.values()}
+
+
+BASELINE_CONFIG = config_fingerprint(REAL_CONFIG)
+BASELINE_CHOICE = config_fingerprint(REAL_CHOICE)
+BASELINES = fingerprints()
 
 #: When this process began measuring.  `test_zz_isolation.py` uses it to say whether the
 #: settings file was written **during** the run rather than before it - the difference between

@@ -27,9 +27,9 @@ reset path has seen it in ~3 s ([the GUI doc](gui.md)), and both are logged rath
 The next run re-uploads the background, since that is what `--mp4` does at session start.
 
 **Nothing in this project sends it on its own initiative.** Not a maintainer script, not
-the systemd unit - `debian/xigmalcd.service`'s `ExecStart` is `/usr/bin/xigmalcd --theme
-alpha --fps 2` and `debian/tests/smoke` fails an install whose unit ever grows
-`--allow-reset`. The control socket refuses `reset` unless the display loop was started
+the systemd unit - `debian/xigmalcd.service`'s `ExecStart` is `/usr/bin/xigmalcd`, naming
+no theme, no background and no rate, and `debian/tests/smoke` fails an install whose unit
+grows `--allow-reset` *or* starts deciding the picture again. The control socket refuses `reset` unless the display loop was started
 with `--allow-reset`, and the window quotes that refusal rather than working around it.
 And without `--yes` the command is a printout: `tests/test_packaging.py` asserts "dry run:
 nothing sent" plus the 109-byte frame length, from the entry point itself, and

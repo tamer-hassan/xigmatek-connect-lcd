@@ -50,7 +50,7 @@ clip, ten made on this bench by its owner (see
 
 ```bash
 install/install.sh                     # deps + port check + systemd user unit + menu entry
-XIGMALCD_THEME=clock XIGMALCD_FPS=1 install/install.sh
+XIGMALCD_THEME=clock XIGMALCD_FPS=1 install/install.sh   # seeds the saved choice, not the unit
 install/install.sh --udev              # also installs the udev rule (sudo)
 install/install.sh --no-desktop        # headless box: skip the window's menu entry
 ```
@@ -94,3 +94,67 @@ glass stays live. Nothing has to be stopped to use the window any more, and the
 display keeps drawing when the window is closed - it hides to the tray, whose menu
 has the display's status line, pause/resume and the six themes. See [Two processes,
 one port](usage.md#two-processes-one-port) for what the socket accepts and what it refuses.
+
+## What the panel shows at login, and where that choice lives
+
+**A file the window writes, read by the loop.** Until now the answer was a packaging
+decision: `debian/xigmalcd.service` carried
+`ExecStart=/usr/bin/xigmalcd --theme alpha --fps 2`, so what the panel drew after a reboot
+was whatever the .deb happened to ship, and changing it meant writing a systemd drop-in -
+a second record of a choice the window had already made and knew nothing about. The two
+units in this repository (the packaged one and `install/xigmalcd.service.in`) now name
+**no theme, no background and no rate**, and the decision lives in one file:
+
+    ${XDG_CONFIG_HOME:-~/.config}/xigmalcd/display.json
+
+Three keys decide a start - `theme`, `clip`, `fps` - and two more (`set_at`, `set_by`) are
+provenance for whoever cats it later. The order is the whole rule, and it does not move:
+
+    an explicit flag  >  this file  >  the program's default
+
+so `xigmalcd --theme gauge` means gauge whatever the window last saved, and a flag in a
+drop-in still wins over the file - it just no longer has to un-name something it never set.
+
+**Who writes it: the window, at the four moments a person acts on the glass.**
+`Apply these settings` (theme and rate, and the background when "keep my background" is
+unticked), the clips box's `Send this background to the panel`, the editor's
+`apply to the panel`, and a theme picked from the tray menu. Each press saves only the part
+it decided, merged into what is already on disk, so a background press never rewrites a
+picture choice and vice versa. Nothing the loop does writes it, and the control socket
+never writes it: a scripted run against a live panel (`tools/display_glass.py`, an
+experiment from another client) cannot decide what you see at your next login. That line is
+a check, not a convention - `tests/test_display_choice.py` runs the loop against a planted
+file and fails if the bytes move, and greps `xigmalcd/` for any call to the writer.
+
+**A clip is stored as a bare name**, not a path, and is resolved at startup through
+`main.media_roots()` - `$XIGMA_MEDIA`, this checkout's `media/`, `/usr/share/xigmalcd/media/`
+(the .deb), then the theme library - the same order every other name in this program
+resolves in. A saved name that no root holds is not quietly replaced: that boot uploads
+nothing, the panel keeps what it stores, and the log says `saved-missing` with the name it
+looked for and where. A preview may fall back to a default; a device should say what it did.
+
+**A machine with no file at all** boots as it always did except for one number: theme
+`alpha`, background `media/Theme_25.mp4` (ALPHA's own pairing for it, uploaded at session
+start - it always was, even when the unit named no `--mp4`), and **1 fps**, which is what
+`--help` has promised since 0.1 and what the vendor app uses. 0.7's unit overrode that with
+`--fps 2`; that override is gone, so an installed service starts at 1 fps until you choose
+a rate in the window once. `PROTOCOL.md` §9 measures what the panel does at 1, 2 and 3 fps.
+
+**Two doors to ask the question, no port needed:**
+
+```bash
+xigmalcd --display-choice          # what would start, and where each part came from
+cat ~/.config/xigmalcd/display.json
+```
+
+The first prints one line naming the triple plus the source of each part
+(`theme:saved`, `clip:default`, `fps:flag`, or `clip:saved-missing`), and every reason the
+file was refused - a theme this build cannot draw, a rate outside the 0.1-5.0 the socket
+itself accepts, a half-written JSON, a clip stored as a path. `install.sh` keeps its
+`XIGMALCD_THEME` / `XIGMALCD_FPS` knobs, but they now seed that file through the same
+validating door instead of substituting into a unit; a value that is refused is reported and
+nothing is written. `debian/tests/smoke` fails an install whose unit grows a picture flag
+again, so the arrangement cannot rot back. See [the themes page](themes.md) for
+why the loop still refuses to invent a background from a theme's own pairing - that part is
+a decision, not an omission - and `tests/test_display_choice.py` (29 checks) for the
+precedence, the validation, the file modes and the four writing doors.

@@ -145,7 +145,7 @@ class Control:
         if cmd == "theme":
             return self._set_theme(obj.get("value"))
         if cmd == "fps":
-            return self._set_number("fps", obj.get("value"), 0.1, 5.0)
+            return self._set_number("fps", obj.get("value"), *FPS_RANGE)
         if cmd == "clock_size":
             return self._set_number("clock_size", obj.get("value"), 8, 120)
         if cmd == "text_color":
@@ -346,6 +346,18 @@ class Control:
 #: must not become a route to either.
 REFUSED_SUFFIXES = (".zip", ".bin", ".img", ".tar", ".gz", ".hex", ".elf")
 
+#: The extensions the media channel will take, spelled once.  `check_media_file` below and
+#: `xigmalcd.display` (which validates a saved background name) both need it, and a second
+#: tuple kept by hand is how the two would come to disagree about what a boot may restore.
+UPLOAD_SUFFIXES = (".mp4", ".png", ".osd")
+
+#: How fast the loop may be asked to run, taken from the socket's own gate.  `--fps` on the
+#: command line is unbounded today (what rate a machine can afford is its business), but a
+#: *saved* choice and a socket write both pass through here, so one pair of numbers rules
+#: both.  The measured fact behind it is PROTOCOL.md's rate table: the panel takes 3 fps
+#: without refusing, and 5 is deliberately past anything this project has seen work.
+FPS_RANGE = (0.1, 5.0)
+
 
 def _ink_field(args) -> str | None:
     """The display's chosen text colour, as hex, for `status` and `config`.
@@ -373,7 +385,7 @@ def check_media_file(path) -> tuple[bool, str]:
                        f"file and the media channel is not the way to send one "
                        f"(the firmware path is `type: \"firmware\"`, which "
                        f"nothing in this project sends)")
-    if not low.endswith((".mp4", ".png", ".osd")):
+    if not low.endswith(UPLOAD_SUFFIXES):
         return False, f"not something the panel can store: {os.path.basename(p)}"
     size = os.path.getsize(p)
     if size == 0:

@@ -305,7 +305,10 @@ and `xigmaui --help` 1 498 B, the three clips found under `/usr/share/xigmalcd/m
 by the packaged code's own root rules at the sizes and md5s `tests/test_pinned_metrics.py`
 pins, one 480×480
 PNG from a dry run with the port never opened, the udev rule, the unit's
-`ExecStart=/usr/bin/xigmalcd --theme alpha --fps 2` with no `--allow-reset`, the menu
+`ExecStart=/usr/bin/xigmalcd` with no `--allow-reset` and no `--theme`, `--mp4` or
+`--fps` in it - the smoke test fails an install whose unit names a picture, because a flag
+there silently outranks the choice saved in `$XDG_CONFIG_HOME/xigmalcd/display.json` - and
+the door that answers what *would* start is `xigmalcd --display-choice`. The menu
 entry clean through `desktop-file-validate`, the icon 256×256 RGBA with transparent
 corners, `/usr/bin/xigmalcd-reset` printing 355 B - the 109-byte frame - and sending
 nothing, nothing from `tools/` on PATH, and 152/152 manifest entries re-hashed under the

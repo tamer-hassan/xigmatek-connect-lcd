@@ -18,7 +18,13 @@ ExecStartPre=/bin/sleep 5
 # `tools/reset_panel.py --yes` in a checkout, one module behind both
 # (xigmalcd/reset.py).  A package install has no tools/ directory, which is why
 # that command exists.
-ExecStart=@PYTHON@ -m xigmalcd --theme @THEME@ --fps @FPS@
+# Names no picture on purpose, exactly like the packaged unit (debian/xigmalcd.service):
+# the theme, the background and the rate come from the saved choice in
+# ${XDG_CONFIG_HOME:-~/.config}/xigmalcd/display.json, and with nothing saved the program's
+# own defaults - alpha, Theme_25.mp4, 1 fps.  `install.sh` seeds that file from
+# XIGMALCD_THEME / XIGMALCD_FPS when you set them, so the interface you know kept its
+# meaning and only changed destination.
+ExecStart=@PYTHON@ -m xigmalcd
 Restart=on-failure
 RestartSec=10
 # the panel is a nicety, not a service: keep it off the way of real work
