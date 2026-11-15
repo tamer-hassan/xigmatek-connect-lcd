@@ -1,4 +1,30 @@
-xigmatek-connect-lcd (0.8) UNRELEASED; urgency=medium
+xigmatek-connect-lcd (0.8) resolute; urgency=medium
+
+  * Released as `v0.8`, the eighth tag of this tree, and the first whose
+    release notes are counted out of the tree rather than typed. This
+    stanza is the record of the work since `v0.7`. The stamp at the foot of
+    it is a packaging fact rather than a date: `dpkg-buildpackage` takes
+    `SOURCE_DATE_EPOCH` from that line and `dpkg-deb` clamps every archive
+    member to it, which is why a build on a runner and a build on this
+    bench can be expected to agree on bytes - and why the code package is
+    the half that need not (measured on the 0.7 pair, in
+    `docs/packaging.md`: one generated `WHEEL` file, one `md5sums` line, 1
+    kB of `Installed-Size` and the generated maintainer scripts, all
+    traceable to debhelper 13.31 on the runner against 14.5 here; the 0.8
+    pair is re-measured below, once the tag's build has published).
+
+    Four doors on the one version, read rather than remembered:
+    `pyproject.toml` `version = "0.8"`, `xigmalcd.__version__ = "0.8"`,
+    this stanza's `(0.8) resolute`, and the annotated tag `v0.8`. What the
+    release changes for a person using it is one thing, and it is the thing
+    that was broken: what the panel shows at login - theme, background,
+    rate - comes from a file the window writes and the loop reads, not from
+    a line in a unit the package manager owns. `xigmalcd --display-choice`
+    answers what a machine would start with and where each part came from.
+    Verified at this commit: 669 checks over 56 test files by both counting
+    doors, green here (560.486 s, `skipped=3`) and on GitHub (#233 green
+    end to end including the install-and-smoke job, #234 green on the
+    changelog-only commit after it).
 
   * What the panel shows at login moves out of the unit file and into a choice.
 
@@ -210,7 +236,7 @@ xigmatek-connect-lcd (0.8) UNRELEASED; urgency=medium
     this repository does not track. The durations are recorded; no gate
     reads them.
 
- -- Tamer Hassan <thameruddin@gmail.com>  Sun, 15 Nov 2026 14:46:42 +0200
+ -- Tamer Hassan <thameruddin@gmail.com>  Sun, 15 Nov 2026 16:33:17 +0200
 
 xigmatek-connect-lcd (0.7) resolute; urgency=medium
 
