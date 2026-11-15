@@ -10,8 +10,12 @@ xigmatek-connect-lcd (0.8) resolute; urgency=medium
     the half that need not (measured on the 0.7 pair, in
     `docs/packaging.md`: one generated `WHEEL` file, one `md5sums` line, 1
     kB of `Installed-Size` and the generated maintainer scripts, all
-    traceable to debhelper 13.31 on the runner against 14.5 here; the 0.8
-    pair is re-measured below, once the tag's build has published).
+    traceable to debhelper 13.31 on the runner against 14.5 here). The 0.8
+    pair is re-measured in `docs/packaging.md`, where the rule and the 0.7
+    measurement live, not in this stanza: the line it replaced here said
+    "below", and a released stanza is not somewhere to file a measurement
+    taken after the tag was cut. The published `changelog.gz` from `v0.8`
+    still reads "below".
 
     Four doors on the one version, read rather than remembered:
     `pyproject.toml` `version = "0.8"`, `xigmalcd.__version__ = "0.8"`,

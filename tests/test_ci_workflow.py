@@ -12,8 +12,11 @@ Four facts worth holding, all of them learned from a run rather than from taste:
   job, with its `tests/` step alone at **1762 s** against the 406, 406, 412 and 415 s the same
   work took in its neighbours.  A loaded runner ran ~4.2x slow, the suite was cancelled near
   the end with one GUI check failing under the load, and the same commit re-ran green in
-  414.2 s.  So the margin was one bad machine, and the number is now 45 minutes with those
-  measurements in the comment above it.
+  414.2 s.  So the margin was one bad machine, and the number went to 45 minutes with those
+  measurements in the comment above it - and to 60 when the v0.8 tag's own checks job ran
+  **2112 s**, inside the cap at 78% of it, with `build`, `install + smoke` and `publish`
+  all waiting behind it.  A cancelled checks job on a branch costs a re-run; on a tag it
+  costs a release, and that is the difference the wider wall is paying for.
 * **The comment carries the figures.**  A budget raised without the reason next to it is a
   number someone will "tidy" back down in a month.
 * **The release body counts, it does not remember.**  Its "what this release draws" section
@@ -35,8 +38,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORKFLOW = os.path.join(ROOT, ".github", "workflows", "ci.yml")
 
 #: The checks job's budget, as the file declares it, and the figures the comment has to carry.
+#: 45 minutes held until the v0.8 tag's checks job ran 2112 s - inside the cap, at 78% of
+#: it, with the release hanging off the end of that job - and the file now carries 60 with
+#: that number next to it.  The ceiling in the check below is still 60: the point of a
+#: timeout is to make a stuck job visible, not to make a slow one comfortable.
 MIN_BUDGET = 45
-REQUIRED_FIGURES = ("1762", "414.2", "1816")
+REQUIRED_FIGURES = ("1762", "414.2", "1816", "2112")
 
 
 def jobs(text: str) -> list:
@@ -90,7 +97,9 @@ class WorkflowShape(unittest.TestCase):
                                 "being fast")
         self.assertLessEqual(declared, 60,
                              "a budget this far above the observed worst stops being a guard "
-                             "and becomes permission to hang")
+                             "and becomes permission to hang - 60 is the ceiling this project "
+                             "holds itself to, with 2112 s as the slowest checks job observed "
+                             "on one day (378 / 473 / 2112 s for the same count)")
 
     def test_the_comment_next_to_the_budget_carries_the_figures(self):
         """The number without the measurement beside it gets 'tidied' back down."""

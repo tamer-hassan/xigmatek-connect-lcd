@@ -38,17 +38,30 @@ block in a temporary `$XDG_CONFIG_HOME` rather than reading it.
 
 That checks job has a `timeout-minutes` of its own, and the number is read off GitHub's
 durations rather than chosen: it normally runs 405-465 s, so it was capped at 30 minutes -
-"four times", with 2% to spare. CI #202 showed what that margin bought. Attempt 1 ran on a
+"four times", with 2% to spare. (Today the same job ran 378 s on one runner, 473 s on
+another, 2112 s on a third - and the cap has moved to 60 minutes, with the reason below.) CI #202 showed what that margin bought. Attempt 1 ran on a
 loaded runner: the `tests/` step alone took **1762 s** against the 406, 406, 412 and 415 s of
 its four neighbours, the job reached 1816 s, and GitHub cancelled it with one GUI check red.
 Attempt 2, *the same commit*, finished green in **414.204 s**. Nothing about the geometry
-differed between the two machines, so the cap is 45 minutes now - about six times a normal
-run and comfortably above the worst attempt seen - and `tests/test_ci_workflow.py` holds the
-file to that: every job declares a timeout (without one, GitHub's default is six hours, so a
-job that cannot reach the network holds a runner for six hours before saying so), the checks
-budget covers the observed worst without becoming permission to hang, and the comment next to
-the number still carries 1762 / 1816 / 414.2, because a budget raised without its reason gets
-"tidied" back down.
+differed between the two machines, so the cap went to 45 minutes.
+
+The v0.8 tag showed what that cap costs when it is a **publication** dependency rather than a
+retry. Run #236's checks step ran **2112 s** - 35.2 minutes, inside the 45 but at 78% of it -
+and every job downstream of it (`build the .deb files`, `apt install them, then
+debian/tests/smoke`, `publish the .deb files on the tag`) waits on that one. Had the step gone
+the extra ten minutes the tag would have had no release: a green tag with nothing published,
+discovered by whoever notices the missing page. So the cap is 60 minutes now, still inside the
+`tests/test_ci_workflow.py` ceiling of 60, still about seven times today's fastest runner
+(378.430 s) and 1.7 times today's slowest (2112 s). That is not permission to hang: it is the
+observation that this repository's own spread on one day - 378 / 473 / 2112 s for the same
+669 checks - is wider than any single margin designed around the median, and that a cancelled
+checks job on a tag stops a release rather than delaying a page.
+
+The same file holds the rule to that: every job declares a timeout (without one, GitHub's
+default is six hours, so a job that cannot reach the network holds a runner for six hours
+before saying so), the checks budget covers the observed worst without becoming permission to
+hang, and the comment next to the number carries 1762 / 1816 / 414.2 / 2112, because a budget
+raised without its reason gets "tidied" back down.
 
 The check that failed under that load was itself the lesson: `tests/test_window_sizing.py`
 waited after a resize with `settle(passes)`, a fixed wall-clock pump of the Qt event loop,
@@ -365,6 +378,22 @@ at 04:12Z and this bench at 04:07Z, and that entry was stamped 04:40Z, so nothin
 Two later builds of one tree, with an epoch in the past, came out byte-identical for both
 packages, `cmp` clean. And zstd's threading is not the variable: `zstd -19 -T1` and
 `zstd -19 -T24` over one 5,652,480 B `data.tar` give the same bytes.
+
+**Re-run on the 0.8 pair, and it is the same four differences.** The tag's build (#236)
+and this bench's build of the same commit (`e28d7e1`): themes package **byte-identical** -
+79 940 716 B and sha256 `f80c564293beaaf3…` on both sides. Code package: runner 21 592 334 B
+/ `9d22431cad…`, bench 21 592 486 B / `c079a12be4…`. Unpacked: `data.tar` differs by exactly
+the one generated file again (`xigmalcd-0.8.dist-info/WHEEL` on the runner, not here) - and
+note that the runner's `data.tar.zst` is **3.2 kB smaller** than this bench's despite holding
+one file more, because a compressed member's size is not a tally of members: the delta between
+the two `.deb` files points the other way from the delta in membership, and anyone reasoning
+about "which one is bigger because it has more in it" is reasoning about the wrong quantity.
+`control.tar` differs in `Installed-Size: 22585` against `22584`, the one matching `md5sums`
+line, and `postinst`/`postrm` - debhelper 13.31ubuntu1 against 14.5ubuntu1 again.
+
+So the finding stands on two releases: the themes package reproduces across the runner and
+this desktop, the code package does not, and the reason is one toolchain version and nothing
+about the source. Two tags' worth of artefacts is enough to stop calling it a hypothesis.
 
 So the rule is a check rather than a habit: `tests/test_debian_changelog.py` fails if the top
 `debian/changelog` entry is dated in the future, and the deb job prints the stamp it built

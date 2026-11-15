@@ -77,7 +77,17 @@ jobs:
 # normal run, and comfortably above the 30-minute worst attempt observed, so a slow runner
 # costs patience rather than a red tick - while a job that cannot reach the network still
 # stops in three quarters of an hour instead of six.
-    timeout-minutes: 45
+#
+# A year-day later the same job ran 378.430 s on one runner, 473.332 s on another and
+# **2112 s** on a third - 5.6x the fastest machine, for the same 669 checks - and that last
+# one was the checks job of the **v0.8 tag**, where every downstream job (build, install +
+# smoke, publish) waits on it. It came in at 35.2 minutes against a 45-minute cap: inside
+# it, at 78% of it, and 10 minutes from a tag with no release attached to it. So the budget
+# is 60 minutes now - still the ceiling `tests/test_ci_workflow.py` allows, still ~1.7x the
+# slowest observation and ~7x the fastest, and still nowhere near GitHub's six-hour default,
+# which is what the timeout exists to avoid. A cancelled checks job on a branch costs a
+# re-run; on a tag it costs a release, and that difference is why the wall moved.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
