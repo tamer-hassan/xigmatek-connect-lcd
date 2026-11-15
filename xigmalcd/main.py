@@ -1238,7 +1238,8 @@ def main(argv=None) -> int:
             st = client.status()
         except control.ControlUnavailable as exc:
             print(f"no display answering on {client.path}: {exc}\n"
-                  f"(start one: python3 -m xigmalcd --theme alpha --fps 1)",
+                  f"(start one: python3 -m xigmalcd - and ask first what it would show: "
+                  f"`--display-choice`)",
                   file=sys.stderr)
             return 1
         print(control.describe(st))

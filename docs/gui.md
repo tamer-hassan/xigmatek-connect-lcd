@@ -1965,6 +1965,30 @@ path that is not there (the Windows partition is not always mounted) falls back 
 `--preview-fps` on the command line win over the file, and `--fresh` ignores and
 overwrites it.
 
+**A second file answers a different question.** The one above is "what should this window
+look like". `~/.config/xigmalcd/display.json`, written by `xigmaui` and read by the loop
+through `main.apply_choice`, is "what should the panel be showing when this machine starts":
+`theme`, `clip`, `fps`, plus `set_at`/`set_by` for whoever cats it later. The full rule - flag
+over file over default, the four presses that write it, the resolution order for a bare clip
+name, and what a machine with no file boots into - is in
+[the install page](install.md#what-the-panel-shows-at-login-and-where-that-choice-lives).
+
+Two clip keys with two shapes, and the difference is not tidiness. The window stores an
+absolute path and drops the key when that file is not on the machine: a preview whose layer
+is missing shows a grey thumbnail, which is an honest answer. The boot file stores a **bare
+name** and resolves it at startup through `main.media_roots()`; a name that resolves nowhere
+uploads nothing, leaves the panel's stored layer alone, and says `clip:saved-missing` with the
+path it tried - because a device quietly drawing `Theme_25.mp4` on the morning after a
+reboot is not an honest answer, it is a guess.
+
+Why the second file exists, measured on this bench rather than argued: the panel here drew
+`birdseye` over `theme_47-trimmed.mp4` from 15:02 on 2026-11-14 (4 404 of 4 413 frames
+confirmed by 15:39), and after a restart at 12:49:02 on 2026-11-15 `xigmalcd --status`
+answered `showing alpha at 2.0 fps` with `background Theme_25.mp4 accepted at session start`.
+The choice had been real, had been on the glass for a day, and had been stored nowhere the
+next start could read - only in a running process and in a unit file that named a different
+picture. That is the gap this closes.
+
 **One older key is read once.** A file written before 0.4 may hold `clip_customized`,
 which meant "a row was clicked, so no layout may walk over that clip". `_clean` maps it
 to `keep_my_clip` and leaves the behaviour alone - a box that was effectively on stays on,

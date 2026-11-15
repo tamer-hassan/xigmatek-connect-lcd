@@ -108,7 +108,10 @@ units in this repository (the packaged one and `install/xigmalcd.service.in`) no
     ${XDG_CONFIG_HOME:-~/.config}/xigmalcd/display.json
 
 Three keys decide a start - `theme`, `clip`, `fps` - and two more (`set_at`, `set_by`) are
-provenance for whoever cats it later. The order is the whole rule, and it does not move:
+provenance for whoever cats it later.  The window keeps its own clip key too, in
+`~/.config/xigmaui/config.json`, as an absolute path that is dropped when the file is not on
+the machine: right for a preview, wrong for a device, which is why the boot file stores a
+name instead and says out loud when no root holds it. The order is the whole rule, and it does not move:
 
     an explicit flag  >  this file  >  the program's default
 

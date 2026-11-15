@@ -242,6 +242,55 @@ class ASavedClipThatIsNotThere(ChoiceRoot):
         self.assertEqual(came["clip"], "saved", came)
 
 
+class WhatTheChoiceThenChanges(ChoiceRoot):
+    """A saved choice is not only an upload decision - it moves the plate rule too.
+
+    The scrim rule reads the clip's **measured** luma (`main.CLIP_LUMA`, produced by
+    `tools/clip_luma.py`), so a boot choice that names a near-white background has to be the
+    one the plate decision sees, or the picture drawn at login is judged against a clip that
+    is not the one on the glass.  Both directions are checked: the vendor's near-white
+    `theme_48.mp4` (227.3 of 255) earns the plate, and `birdseye`'s cut backdrop
+    `theme_47-trimmed.mp4` (6.5 whole-file) does not.
+    """
+
+    def saved_then_scrim(self, clip: str) -> int:
+        self.plant(clip=clip)
+        args, came, _notes = self.resolve()
+        if came["clip"] != "saved":
+            self.skipTest(f"{clip} does not resolve in this machine's roots")
+        self.assertNotEqual(args.scrim, 0)
+        return main._scrim_for(args)
+
+    def test_a_bright_saved_clip_asks_for_the_plate_without_being_told_to(self):
+        plate = self.saved_then_scrim("theme_48.mp4")
+        self.assertEqual(plate, main.SCRIM_ON_BRIGHT,
+                         f"a clip measured at {main.CLIP_LUMA['theme_48.mp4']} of 255 should "
+                         f"not draw white on white; the rule answered {plate}")
+
+    def test_a_dark_saved_clip_leaves_the_picture_as_the_vendor_draws_it(self):
+        self.assertEqual(self.saved_then_scrim("theme_47-trimmed.mp4"), 0)
+
+    def test_the_choice_door_opens_no_port_and_writes_nothing(self):
+        """`--display-choice` is a reader, on a bench where a real panel is attached.
+
+        The stub is not a quiet fake: constructing it raises, so if the door ever grows a
+        port open - a handshake, a `STATE` blob, one frame - the check fails instead of
+        politely printing a resolution next to a changed panel.
+        """
+        from unittest import mock
+
+        class NoPort:
+            def __init__(self, *a, **kw):
+                raise AssertionError("--display-choice reached for the serial port")
+
+        self.plant(theme="gauge", fps=2.0, clip="Theme_11.mp4")
+        before = self.raw()
+        with mock.patch.object(main, "Link", NoPort):
+            rc = main.main(["--display-choice"])
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.raw(), before, "the door rewrote the file it was asked to read")
+
+
 class ItIsNotALayout(ChoiceRoot):
     """One directory matters: `themes/` is globbed for layouts, its parent is not."""
 
@@ -347,10 +396,16 @@ class TheWindowDoorsWrite(remote.DisplayHarness):
             if not os.path.isfile(os.path.join(fixtures.REPO, "media", name)):
                 self.skipTest(f"no {name} in this checkout to choose")
 
-    def save_on(self) -> None:
-        """This window is allowed to remember - the default harness one is not."""
-        self.win.autosave = True
-        self.win._said_no_choice = False
+    def test_opening_the_window_saves_nothing_until_a_press(self):
+        """Construction is not a decision.
+
+        The harness builds a window, pumps the event loop, and connects it to a stub display.
+        If anything wrote the boot choice on that path, then every start of the window - or
+        every check in this file - would be rewriting what the owner's panel shows at login,
+        and the file would stop being a record of choices.
+        """
+        self.assertFalse(display.present(),
+                         f"opening the window wrote {display.path()}: {self.read()}")
 
     def read(self) -> dict:
         try:
@@ -358,6 +413,11 @@ class TheWindowDoorsWrite(remote.DisplayHarness):
                 return json.load(fh)
         except FileNotFoundError:
             return {}
+
+    def save_on(self) -> None:
+        """This window is allowed to remember - the default harness one is not."""
+        self.win.autosave = True
+        self.win._said_no_choice = False
 
     def media(self, name: str) -> str:
         return os.path.join(fixtures.REPO, "media", name)

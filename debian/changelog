@@ -10,9 +10,16 @@ xigmatek-connect-lcd (0.8) UNRELEASED; urgency=medium
     systemd drop-in - a second record of a decision the window had already
     made and knew nothing about - and README, `docs/troubleshooting.md`,
     `docs/packaging.md` and the release-notes template all quoted that
-    hard-coded line as though it were a fact about the device. Both units
-    now name no theme, no background and no rate, and the decision lives in
-    one validated file,
+    hard-coded line as though it were a fact about the device. The cost of
+    that was measured here the morning after: the panel on this bench had
+    drawn `birdseye` over `theme_47-trimmed.mp4` since 15:02 on 2026-11-14
+    (4 404 of 4 413 frames confirmed by 15:39), the service restarted at
+    12:49:02 on 2026-11-15, and `xigmalcd --status` then answered
+    `showing alpha at 2.0 fps` with
+    `background Theme_25.mp4 accepted at session start`. A choice that had
+    been on the glass for a day was stored nowhere the next start could
+    read. So both units now name no theme, no background and no rate, and
+    the decision lives in one validated file,
     `${XDG_CONFIG_HOME:-~/.config}/xigmalcd/display.json`: written through
     `xigmalcd/display.py`, read by the loop through `main.apply_choice`.
 
@@ -36,9 +43,10 @@ xigmatek-connect-lcd (0.8) UNRELEASED; urgency=medium
     on the clips box must not rewrite a picture choice, and the reverse,
     which is why the merge is per key rather than a rewrite of the window's
     whole state. What is stored is the intent, not the panel's verdict: the
-    device cannot be asked what it stores (PROTOCOL.md §11), an upload can
+    display cannot be asked what it stores (PROTOCOL.md §11), an upload can
     be refused and retried, and "I want this at login" stays true through a
-    bad minute on the wire.
+    bad minute on the wire. Building the window saves nothing either -
+    construction is not a decision, and a check says so.
 
     Nothing under `xigmalcd/` calls the writer, and the control socket
     never writes the file: a scripted run against a live panel -
@@ -51,26 +59,27 @@ xigmatek-connect-lcd (0.8) UNRELEASED; urgency=medium
     this second file too - and its "created where none existed" check had
     to be rewritten, because it had started skipping on precisely the case
     it exists for: a watched file that is absent when the run begins is the
-    one that must still be absent when it ends.
+    one that must still be absent when it ends. That is also the only
+    reason the suite's skip count moved this cycle, from four to three: a
+    guard that had stopped checking came back.
 
     A clip is stored as a bare name, never a path, and resolved at startup
     through `main.media_roots()` - `$XIGMA_MEDIA`, this checkout, the .deb,
     the theme library - the order every other name in this program resolves
     in. The window's own settings file keeps an absolute clip path and
     drops that key when the file is not on the machine, which is the right
-    fallback for a preview and the wrong one for a device: a boot would
-    quietly draw `Theme_25.mp4` because someone's partition was not
-    mounted. A saved name that resolves to nothing uploads nothing, leaves
-    the stored layer alone, and reports `clip:saved-missing` with the name
-    and the path it tried. Unusable values cost their own key and buy a
-    printed reason: a theme this build cannot draw (asked of the same doors
-    `--theme` uses, so a saved library layout is accepted and a saved typo
-    is not), a rate outside 0.1-5.0 - now spelled once as
-    `control.FPS_RANGE`, shared by the socket's validator and this file's,
-    where the socket used to carry the pair twice - a clip with a separator
-    or a suffix the media channel refuses ( `control.UPLOAD_SUFFIXES`, read
-    from one place), a half-written file, and an array where an object was
-    expected.
+    fallback for a preview - a missing layer is a grey thumbnail, an honest
+    answer - and the wrong one for a device. A saved name that resolves to
+    nothing uploads nothing, leaves the stored layer alone, and reports
+    `clip:saved-missing` with the name and the path it tried. Unusable
+    values cost their own key and buy a printed reason: a theme this build
+    cannot draw (asked of the same doors `--theme` uses, so a saved library
+    layout is accepted and a saved typo is not), a rate outside 0.1-5.0 -
+    now spelled once as `control.FPS_RANGE`, shared by the socket's
+    validator and this file's, where the socket used to carry the pair
+    twice - a clip with a separator or a suffix the media channel refuses (
+    `control.UPLOAD_SUFFIXES`, read from one place), a half-written file,
+    and an array where an object was expected.
 
     A machine with no file boots as it always did, except for one number it
     had been handed: theme `alpha`, `media/Theme_25.mp4` uploaded at
@@ -89,26 +98,30 @@ xigmatek-connect-lcd (0.8) UNRELEASED; urgency=medium
     source of each part - `theme:saved`, `clip:default`, `fps:flag`,
     `clip:saved-missing` - with the resolved path, because a name is not
     enough when one clip can live in three roots; it opens no port and
-    writes nothing. `debian/tests/smoke`, which runs against a real
-    install, now fails a unit whose `ExecStart` grows a picture flag, and
-    runs the choice door to confirm the resolved background is a file on
-    that box.
+    writes nothing, which is checked with a stub that raises on
+    construction on a bench where a real panel is attached.
+    `debian/tests/smoke`, which runs against a real install, now fails a
+    unit whose `ExecStart` grows a picture flag, and runs the choice door
+    to confirm the resolved background is a file on that box.
 
-    Gates: `tests/test_display_choice.py`, 29 checks - the precedence in
+    Gates: `tests/test_display_choice.py`, 33 checks - the precedence in
     both directions for all three keys, five kinds of junk refused with a
     reason naming the key, a saved clip absent here against a name that
-    resolves in a root, the choice file never becoming a selectable layout
-    (it sits one directory above the `themes/` that `themes.scan()` globs,
-    and a check proves the two cannot meet), the loop-never-writes pair,
-    the `0o600` / `0o700` modes, four writing doors each saving only its
-    own part, a merge across two presses, a `--fresh` window that writes
-    nothing and names the path it left alone, and a tray pick that reaches
-    no glass and so saves nothing. Rewritten rather than loosened:
-    `test_launch_unit.py` asserts the template's holes are exactly `@DIR@`
-    and `@PYTHON@` and that what a no-flag unit resolves to is drawable,
-    resolvable and in range; `test_packaging_parity.py` requires neither
-    unit to name `--theme`, `--mp4` or `--fps`. Suite: 665 checks over 56
-    files, both counting doors agreeing.
+    resolves in a root, the saved clip then driving the plate rule it is
+    drawn under ( `theme_48.mp4` at 227.3 of 255 earns `SCRIM_ON_BRIGHT`;
+    `theme_47-trimmed.mp4` at 6.5 earns none), the choice file never
+    becoming a selectable layout (it sits one directory above the `themes/`
+    that `themes.scan()` globs, and a check proves the two cannot meet),
+    the loop-never-writes pair, the `0o600` / `0o700` modes, four writing
+    doors each saving only its own part, a merge across two presses, a
+    `--fresh` window that writes nothing and names the path it left alone,
+    and a tray pick that reaches no glass and so saves nothing. Rewritten
+    rather than loosened: `test_launch_unit.py` asserts the template's
+    holes are exactly `@DIR@` and `@PYTHON@` and that what a no-flag unit
+    resolves to is drawable, resolvable and in range;
+    `test_packaging_parity.py` requires neither unit to name `--theme`,
+    `--mp4` or `--fps`. Suite: 669 checks over 56 files, both counting
+    doors agreeing.
 
     One bug of my own, caught by running the installer path rather than
     trusting it: a save whose only surviving keys were `set_by` and
@@ -118,9 +131,26 @@ xigmatek-connect-lcd (0.8) UNRELEASED; urgency=medium
     `XIGMALCD_THEME=theme_of_the_mountains install/install.sh` left a
     `display.json` holding a timestamp and nothing usable. `display.save`
     now refuses when no decision key survives cleaning, and `install.sh`
-    prints the reasons it was given.
+    prints the reasons it was given. Two counts in the pushed version of
+    this entry were wrong for the same reason numbers get wrong: it said 29
+    checks here and 665 in the suite, and both were true when written and
+    false by the time the paragraph below them landed - the four checks
+    added after it (scrim from a saved clip, the door that opens no port,
+    and no save on window construction) are why the pair is 33 and 669.
 
- -- Tamer Hassan <thameruddin@gmail.com>  Sun, 15 Nov 2026 14:04:35 +0200
+    Pages: a new section in `docs/install.md` states the whole rule and
+    names the two doors; `docs/gui.md` distinguishes the window's
+    remembered clip (a path, preview state) from the boot clip (a name,
+    resolved at start) and carries the restart measurement above;
+    `docs/themes.md` retires its own advice to write flags into a unit;
+    README, `docs/packaging.md`, `docs/troubleshooting.md`,
+    `docs/limits.md` and the release-notes template stop quoting
+    `--theme alpha --fps 2`; and `docs/usage.md` rewrote three flag rows
+    the commit that added the feature left behind, because the rows still
+    described plain defaults after the defaults had become a two-step
+    answer.
+
+ -- Tamer Hassan <thameruddin@gmail.com>  Sun, 15 Nov 2026 14:46:42 +0200
 
 xigmatek-connect-lcd (0.7) resolute; urgency=medium
 
