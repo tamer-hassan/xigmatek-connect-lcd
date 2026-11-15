@@ -138,6 +138,23 @@ xigmatek-connect-lcd (0.8) UNRELEASED; urgency=medium
     added after it (scrim from a saved clip, the door that opens no port,
     and no save on window construction) are why the pair is 33 and 669.
 
+    And the two bugs in that installer block, which the suite could not
+    have found because no check in it runs `install.sh`: first, two `echo`
+    calls written across two lines - a quoted string on the line after an
+    `echo` is not a continuation, it is a command, and CI's `shellcheck`
+    step reported SC2288 on run #231 before any human ran the branch.
+    `bash -n` passes that shape all day, which is why the lint step exists
+    and why it is not the same as a parse check. Second, once the shell
+    parsed, the refusal arm still misfired: the reasons were printed into
+    the same stream the verdict was captured from, so the variable held
+    notes followed by `FAILED`, the exact-match arm missed, and a rejected
+    choice announced itself as "saved boot choice in ... FAILED". Reasons
+    now go to stderr and only the verdict is captured, and all four paths
+    were exercised here - a valid theme+rate, a junk theme with an
+    out-of-range rate (nothing written, three reasons printed), a theme
+    alone (rate left untouched), and neither (the block not reached) - with
+    `shellcheck` clean over every tracked `.sh` locally afterwards.
+
     Pages: a new section in `docs/install.md` states the whole rule and
     names the two doors; `docs/gui.md` distinguishes the window's
     remembered clip (a path, preview state) from the boot clip (a name,

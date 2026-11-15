@@ -108,8 +108,13 @@ echo "wrote $UNIT   (no theme or rate named: the saved choice decides)"
 # XIGMALCD_THEME is refused with the loop's reason instead of landing in a file that the
 # next start has to explain away.
 if [ -n "$THEME" ] || [ -n "$FPS" ]; then
+    # Two channels, on purpose.  The reasons belong on stderr - they are for the person
+    # reading the terminal - and only the single verdict line is captured.  The first cut
+    # printed the notes into the same stream and then matched `FAILED` against the whole
+    # thing, so a refusal fell into the success arm and announced "saved boot choice in …
+    # FAILED". Caught by running the branch rather than reading it.
     CHOICE=$("$PY" -c '
-import sys
+import sys, time
 sys.path.insert(0, sys.argv[1])
 from xigmalcd import display
 want, notes = {}, []
@@ -119,18 +124,24 @@ if theme:
 if fps:
     want["fps"] = float(fps)
 want["set_by"] = "install.sh"
-import time
 want["set_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
 where = display.save({**display.load(), **want}, notes)
 for n in notes:
-    print("  note: " + n)
+    print("  note: " + n, file=sys.stderr)
 print(display.path() if where else "FAILED")
 ' "$DIR" "$THEME" "$FPS")
     case "$CHOICE" in
-        FAILED) echo "  refused: $THEME/$FPS were not usable, so nothing was written "
-                  "(the reasons are printed above)" ;;
-        *) echo "  saved boot choice in $CHOICE (theme=${THEME:-unchanged} "
-             "fps=${FPS:-unchanged}); the window overwrites it on the next Apply" ;;
+        FAILED)
+            # one argument per echo: a second quoted string on the line after an `echo` is
+            # not a continuation, it is a command - shellcheck's SC2288, and CI's lint step
+            # found this before any human ran the branch
+            echo "  refused: neither XIGMALCD_THEME nor XIGMALCD_FPS survived validation;"
+            echo "  nothing was written, and the reasons are printed above"
+            ;;
+        *)
+            echo "  saved boot choice in $CHOICE (theme=${THEME:-unchanged}, fps=${FPS:-unchanged})"
+            echo "  the window overwrites that file the next time you press Apply"
+            ;;
     esac
 fi
 systemctl --user daemon-reload

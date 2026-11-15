@@ -21,6 +21,21 @@ offline checks in `tests/`, run by the standard library, with no panel in sight 
 `.deb` job `needs` that job, so a tree that fails a check never produces a package
 (`.github/workflows/ci.yml`).
 
+The same job lints the one shell file this repository ships - `shellcheck` over
+`git ls-files '*.sh'`, currently `install/install.sh` - and that step has earned its place:
+run #231 went red on `SC2288` for a pair of `echo` arguments written across two lines, a
+shape `bash -n` accepts without complaint because it parses as a command rather than a
+continuation. The same file's runtime behaviour is not covered by the python suite at all -
+no check runs the installer - so the two commands worth knowing before a change to it is
+committed are the ones the runner will run for you:
+
+```bash
+shellcheck $(git ls-files '*.sh')          # what the CI lint step runs
+```
+
+and, for the branches of `install.sh` that only fire on someone's machine, exercising the
+block in a temporary `$XDG_CONFIG_HOME` rather than reading it.
+
 That checks job has a `timeout-minutes` of its own, and the number is read off GitHub's
 durations rather than chosen: it normally runs 405-465 s, so it was capped at 30 minutes -
 "four times", with 2% to spare. CI #202 showed what that margin bought. Attempt 1 ran on a
