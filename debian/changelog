@@ -167,6 +167,49 @@ xigmatek-connect-lcd (0.8) UNRELEASED; urgency=medium
     described plain defaults after the defaults had become a two-step
     answer.
 
+  * A 0.8 bench build, and the first artefacts anyone can try this on.
+
+    Cut from `abe2541` after `dh_clean`, the recipe the build series uses: code
+    **21
+    591 950 B**, sha256
+    `b8f6eda25bd5f2890e912975b695b7f7af1cdf5b64af12070d9db37b529074dc`;
+    themes **79 938 474 B**, sha256
+    `370f1c44960474bf0a3007bd3a37f05798e6d2f24a72c2a2b100897ce2e7b978`.
+    Read back from the unpacked archive rather than from the build log:
+    **89** members in the code package - one more than 0.7's 88, and it is
+    `xigmalcd/display.py`, the new module arriving where the loop will read
+    it - every member dated 2026-11-15 14:46, which is this stanza's own
+    trailer; `usr/share/xigmalcd/media` holding 14 files; the packaged
+    unit's `ExecStart=/usr/bin/xigmalcd` with no theme, background or rate
+    in it; all 19 shipped `.py` files byte-identical to the `HEAD` they
+    were built from; `lintian` quiet with 0 tags on both. 0.7's artefacts
+    are published from the tag; these are not, and a 0.7 install on this
+    machine still reverts to `alpha` at every restart for the reason above.
+
+    What the runner did with it: #231 and #232 failed on exactly one step
+    each, the `shellcheck` gate over the shipped shell, while their
+    `tests/` steps passed - #232 at **669 in 473.332 s**, `skipped=6` -
+    which is how a build can be red and the python side of a change still
+    be green on the same machine. #233, with the installer fixed, is green
+    end to end: checks **669 in 378.430 s**, then build, then the job that
+    installs both packages and runs `debian/tests/smoke`. On that clean box
+    the smoke test prints a `user unit` line naming
+    `/usr/lib/systemd/user/xigmalcd.service` running `/usr/bin/xigmalcd`
+    with no `--allow-reset` and no picture named, and a `boot choice` line
+    resolving to theme `alpha`, background `Theme_25.mp4` under
+    `/usr/share/xigmalcd/media/`, 1.0 fps, every one of the three marked
+    `default` - the feature answered by an installed machine rather than by
+    a checkout. The guard's own line there is worth keeping: the pair it
+    watches, `saved boot choice` and `window settings`, was absent at the
+    start of that run and absent at its end - a runner has neither file,
+    which is precisely the case the creation half of the isolation check
+    exists for, and the half that had been skipping on this bench until
+    today. Three readings of one count in one day: 378.430 s and 473.332 s
+    on two runners, 560.486 s here, where `skipped=3` against the runner's
+    6 is the difference of the checks that need the vendored library, which
+    this repository does not track. The durations are recorded; no gate
+    reads them.
+
  -- Tamer Hassan <thameruddin@gmail.com>  Sun, 15 Nov 2026 14:46:42 +0200
 
 xigmatek-connect-lcd (0.7) resolute; urgency=medium
